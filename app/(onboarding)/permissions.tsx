@@ -146,7 +146,7 @@ export default function PermissionsScreen() {
         <View style={styles.content}>
           {/* Pulsing rings + location pin */}
           <Animated.View
-            entering={FadeIn.delay(200).duration(800)}
+            entering={FadeIn.duration(300)}
             style={styles.visualContainer}
           >
             <View style={styles.ringsWrapper}>
@@ -159,7 +159,7 @@ export default function PermissionsScreen() {
 
           {/* Text */}
           <Animated.View
-            entering={FadeInUp.delay(400).duration(600).springify()}
+            entering={FadeInUp.delay(80).duration(300)}
             style={styles.textContainer}
           >
             <Text style={styles.title}>Track your journey</Text>
@@ -171,7 +171,7 @@ export default function PermissionsScreen() {
 
           {/* Feature pills */}
           <Animated.View
-            entering={FadeInDown.delay(600).duration(500)}
+            entering={FadeInDown.delay(160).duration(300)}
             style={styles.features}
           >
             {[
@@ -181,7 +181,7 @@ export default function PermissionsScreen() {
             ].map((f, i) => (
               <Animated.View
                 key={f.text}
-                entering={FadeInDown.delay(700 + i * 100).duration(400).springify()}
+                entering={FadeInDown.delay(200 + i * 60).duration(300)}
               >
                 <View style={styles.featureRow}>
                   <View style={styles.featureIcon}>
@@ -195,7 +195,7 @@ export default function PermissionsScreen() {
 
           {/* Actions */}
           <Animated.View
-            entering={FadeInDown.delay(1000).duration(500).springify()}
+            entering={FadeInDown.delay(320).duration(300)}
             style={styles.actions}
           >
             <TouchableOpacity

@@ -4,7 +4,6 @@ import { Link } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -44,72 +43,63 @@ export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
   const { signIn: googleSignIn, ready: googleReady } = useGoogleAuth();
 
   const handleSignIn = async () => {
+    setError(null);
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password.');
+      setError('Please enter your email and password.');
       return;
     }
     setLoading(true);
     try {
       await signInWithEmail(email.trim(), password);
-    } catch (error: any) {
-      Alert.alert('Sign In Failed', error.message ?? 'Something went wrong.');
+    } catch (e: any) {
+      setError(e.message ?? 'Something went wrong.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleAppleSignIn = async () => {
+    setError(null);
     setLoading(true);
     try {
       await signInWithApple();
-    } catch (error: any) {
-      if (error.code !== 'ERR_REQUEST_CANCELED') {
-        Alert.alert('Apple Sign In Failed', error.message ?? 'Something went wrong.');
-      }
+    } catch (e: any) {
+      if (e.code !== 'ERR_REQUEST_CANCELED') setError(e.message ?? 'Apple sign in failed.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
+    setError(null);
     setLoading(true);
     try {
       await googleSignIn();
-    } catch (error: any) {
-      if (!error.message?.includes('cancelled')) {
-        Alert.alert('Google Sign In Failed', error.message ?? 'Something went wrong.');
-      }
+    } catch (e: any) {
+      if (!e.message?.includes('cancelled')) setError(e.message ?? 'Google sign in failed.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleForgotPassword = () => {
+  const handleForgotPassword = async () => {
+    setError(null);
+    setResetSent(false);
     if (!email) {
-      Alert.alert('Enter Email', 'Please enter your email address first.');
+      setError('Enter your email above, then tap "Forgot password".');
       return;
     }
-    Alert.alert(
-      'Reset Password',
-      `Send a password reset email to ${email.trim()}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Send',
-          onPress: async () => {
-            try {
-              await resetPassword(email.trim());
-              Alert.alert('Email Sent', 'Check your inbox for a password reset link.');
-            } catch (error: any) {
-              Alert.alert('Error', error.message ?? 'Could not send reset email.');
-            }
-          },
-        },
-      ],
-    );
+    try {
+      await resetPassword(email.trim());
+      setResetSent(true);
+    } catch (e: any) {
+      setError(e.message ?? 'Could not send reset email.');
+    }
   };
 
   return (
@@ -174,13 +164,16 @@ export default function SignInScreen() {
                 />
               </Glass>
 
+              {error && <Text style={styles.errorText}>{error}</Text>}
+              {resetSent && <Text style={styles.successText}>Reset email sent — check your inbox.</Text>}
+
               <TouchableOpacity
                 style={[styles.continueButton, loading && styles.continueButtonDisabled]}
                 onPress={handleSignIn}
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color={Colors.text} />
+                  <ActivityIndicator color="#FFF" />
                 ) : (
                   <Text style={styles.continueButtonText}>Continue</Text>
                 )}
@@ -285,6 +278,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.text,
     fontWeight: '400',
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#E53E3E',
+    marginTop: 8,
+  },
+  successText: {
+    fontSize: 13,
+    color: '#38A169',
+    marginTop: 8,
   },
   continueButton: {
     backgroundColor: Colors.text,

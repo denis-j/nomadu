@@ -365,33 +365,34 @@ export interface Stats {
 }
 
 export async function getStats(): Promise<Stats> {
-  const database = await getDatabase();
+  // Use merged trips to avoid double-counting adjacent raw GPS entries
+  const trips = await getAllTrips();
 
-  const countriesResult = await database.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(DISTINCT country) as count FROM trips',
-  );
-  const citiesResult = await database.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(DISTINCT city || country) as count FROM trips',
-  );
-  const daysResult = await database.getFirstAsync<{ total: number | null }>(
-    'SELECT SUM(days) as total FROM trips',
-  );
-  const topCountries = await database.getAllAsync<{
-    country: string;
-    country_code: string;
-    days: number;
-  }>(
-    `SELECT country, country_code, SUM(days) as days
-     FROM trips
-     GROUP BY country, country_code
-     ORDER BY days DESC
-     LIMIT 10`,
-  );
+  const countrySet = new Set<string>();
+  const citySet = new Set<string>();
+  let totalDays = 0;
+  const countryDays: Record<string, { country: string; country_code: string; days: number }> = {};
+
+  for (const trip of trips) {
+    countrySet.add(trip.country);
+    citySet.add(`${trip.city}|${trip.country}`);
+    totalDays += trip.days;
+
+    const key = trip.country_code;
+    if (!countryDays[key]) {
+      countryDays[key] = { country: trip.country, country_code: trip.country_code, days: 0 };
+    }
+    countryDays[key].days += trip.days;
+  }
+
+  const topCountries = Object.values(countryDays)
+    .sort((a, b) => b.days - a.days)
+    .slice(0, 10);
 
   return {
-    totalCountries: countriesResult?.count ?? 0,
-    totalCities: citiesResult?.count ?? 0,
-    totalDays: daysResult?.total ?? 0,
+    totalCountries: countrySet.size,
+    totalCities: citySet.size,
+    totalDays,
     topCountries,
   };
 }

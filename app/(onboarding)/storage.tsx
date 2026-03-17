@@ -27,11 +27,11 @@ export default function StorageScreen() {
   const router = useRouter();
   const { user } = useAuth();
 
-  const handleSelect = async (choice: StorageChoice) => {
+  const handleSelect = (choice: StorageChoice) => {
     if (!choice || !user) return;
     setSelected(choice);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await setCloudSyncEnabled(user.uid, choice === 'cloud');
+    setCloudSyncEnabled(user.uid, choice === 'cloud'); // fire & forget
     router.push('/(onboarding)/paywall');
   };
 
@@ -58,7 +58,7 @@ export default function StorageScreen() {
         <View style={styles.content}>
           {/* Icon */}
           <Animated.View
-            entering={FadeIn.delay(200).duration(800)}
+            entering={FadeIn.duration(300)}
             style={styles.visualContainer}
           >
             <View style={styles.iconCircle}>
@@ -68,7 +68,7 @@ export default function StorageScreen() {
 
           {/* Text */}
           <Animated.View
-            entering={FadeInUp.delay(400).duration(600).springify()}
+            entering={FadeInUp.delay(80).duration(300)}
             style={styles.textContainer}
           >
             <Text style={styles.title}>Store your data</Text>
@@ -79,7 +79,7 @@ export default function StorageScreen() {
 
           {/* Options */}
           <Animated.View
-            entering={FadeInDown.delay(600).duration(500)}
+            entering={FadeInDown.delay(160).duration(300)}
             style={styles.options}
           >
             <TouchableOpacity

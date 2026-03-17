@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { getTripsByCity, Trip } from '../../lib/database';
 import { countryCodeToFlag } from '../../lib/geocoding';
 import { Colors } from '../../constants/colors';
+import { mapState } from '../../lib/mapState';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -29,6 +30,11 @@ export default function CityDetailScreen() {
       });
     }
   }, [city, countryCode]);
+
+  // Deselect map pin when sheet is dismissed
+  useEffect(() => {
+    return () => { mapState.deselectPin?.(); };
+  }, []);
 
   if (loading) {
     return (

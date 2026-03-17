@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import RNMapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Trip } from '../lib/database';
+import { mapState } from '../lib/mapState';
 import { Colors } from '../constants/colors';
 
 interface CityMarker {
@@ -23,6 +24,19 @@ interface MapViewProps {
 
 export function MapView({ trips }: MapViewProps) {
   const mapRef = useRef<RNMapView>(null);
+  const markerRefs = useRef<Map<string, any>>(new Map());
+  const selectedKeyRef = useRef<string | null>(null);
+
+  // Register deselect function so city screen can call it on unmount
+  useEffect(() => {
+    mapState.deselectPin = () => {
+      if (selectedKeyRef.current) {
+        markerRefs.current.get(selectedKeyRef.current)?.hideCallout();
+        selectedKeyRef.current = null;
+      }
+    };
+    return () => { mapState.deselectPin = null; };
+  }, []);
 
   const markers = useMemo<CityMarker[]>(() => {
     const map = new Map<string, CityMarker>();
@@ -48,7 +62,8 @@ export function MapView({ trips }: MapViewProps) {
     return Array.from(map.values());
   }, [trips]);
 
-  const handleCalloutPress = useCallback((marker: CityMarker) => {
+  const handleMarkerSelect = useCallback((marker: CityMarker) => {
+    selectedKeyRef.current = marker.key;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(`/city/${marker.city}::${marker.country_code}`);
   }, []);
@@ -83,12 +98,12 @@ export function MapView({ trips }: MapViewProps) {
         {markers.map((marker) => (
           <Marker
             key={marker.key}
+            ref={(r) => { if (r) markerRefs.current.set(marker.key, r); }}
             coordinate={{
               latitude: marker.latitude,
               longitude: marker.longitude,
             }}
-            onPress={() => handleCalloutPress(marker)}
-            calloutEnabled={false}
+            onSelect={() => handleMarkerSelect(marker)}
           />
         ))}
       </RNMapView>

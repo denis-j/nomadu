@@ -27,11 +27,11 @@ export default function ResidenceScreen() {
   const router = useRouter();
   const { user } = useAuth();
 
-  const handleSelect = async (choice: ResidenceChoice) => {
+  const handleSelect = (choice: ResidenceChoice) => {
     if (!choice || !user) return;
     setSelected(choice);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await setHasFixedResidence(user.uid, choice === 'yes');
+    setHasFixedResidence(user.uid, choice === 'yes'); // fire & forget
     router.push('/(onboarding)/permissions');
   };
 
@@ -58,7 +58,7 @@ export default function ResidenceScreen() {
         <View style={styles.content}>
           {/* Icon */}
           <Animated.View
-            entering={FadeIn.delay(200).duration(800)}
+            entering={FadeIn.duration(300)}
             style={styles.visualContainer}
           >
             <View style={styles.iconCircle}>
@@ -68,7 +68,7 @@ export default function ResidenceScreen() {
 
           {/* Text */}
           <Animated.View
-            entering={FadeInUp.delay(400).duration(600).springify()}
+            entering={FadeInUp.delay(80).duration(300)}
             style={styles.textContainer}
           >
             <Text style={styles.title}>Fixed residence?</Text>
@@ -79,7 +79,7 @@ export default function ResidenceScreen() {
 
           {/* Options */}
           <Animated.View
-            entering={FadeInDown.delay(600).duration(500)}
+            entering={FadeInDown.delay(160).duration(300)}
             style={styles.options}
           >
             <TouchableOpacity

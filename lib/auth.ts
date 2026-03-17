@@ -1,18 +1,21 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import {
   OAuthProvider,
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  deleteUser,
   sendPasswordResetEmail,
   signInWithCredential,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { identifyUser, logOutUser } from './revenueCat';
+import { clearAllData } from './database';
 
 async function ensureUserDocument(user: User) {
   const ref = doc(db, 'users', user.uid);
@@ -91,4 +94,30 @@ export async function resetPassword(email: string) {
 export async function signOut() {
   await firebaseSignOut(auth);
   await logOutUser();
+}
+
+export async function deleteAccount(): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('No user logged in');
+
+  const uid = user.uid;
+
+  // 1. Delete all Firestore trips
+  const tripsSnap = await getDocs(collection(db, 'users', uid, 'trips'));
+  await Promise.all(tripsSnap.docs.map((d) => deleteDoc(d.ref)));
+
+  // 2. Delete user document
+  await deleteDoc(doc(db, 'users', uid));
+
+  // 3. Clear local SQLite data
+  await clearAllData();
+
+  // 4. Clear AsyncStorage (citizenship, preferences, sync keys)
+  const keys = await AsyncStorage.getAllKeys();
+  const userKeys = keys.filter((k) => k.includes(uid) || k.startsWith('@'));
+  if (userKeys.length > 0) await AsyncStorage.multiRemove(userKeys);
+
+  // 5. Delete Firebase Auth account & sign out of RevenueCat
+  await logOutUser();
+  await deleteUser(user);
 }

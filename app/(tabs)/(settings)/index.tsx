@@ -12,7 +12,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useLocation } from '../../../hooks/useLocation';
 import { useSubscription } from '../../../hooks/useSubscription';
 import { usePassport } from '../../../hooks/usePassport';
-import { clearAllData } from '../../../lib/database';
+import { deleteAccount } from '../../../lib/auth';
 import { restorePurchases } from '../../../lib/revenueCat';
 import { useSync } from '../../../contexts/SyncContext';
 import { countryCodeToFlag } from '../../../lib/geocoding';
@@ -44,19 +44,31 @@ export default function SettingsScreen() {
   const needsAlwaysPermission = permissions.foreground && !permissions.isAlways;
   const needsAnyPermission = !permissions.foreground;
 
-  const handleClearData = () => {
+  const handleDeleteAccount = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Alert.alert(
-      'Clear All Data',
-      'This will permanently delete all your trips and visit history. This cannot be undone.',
+      'Delete Account',
+      'This will permanently delete your account, all trips, and all data — both locally and in the cloud. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete Everything',
+          text: 'Delete Account',
           style: 'destructive',
           onPress: async () => {
-            await clearAllData();
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            try {
+              await deleteAccount();
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (error: any) {
+              console.error('deleteAccount error:', error);
+              if (error?.code === 'auth/requires-recent-login') {
+                Alert.alert(
+                  'Sign in again',
+                  'For security, please sign out and sign in again before deleting your account.',
+                );
+              } else {
+                Alert.alert('Error', `Failed to delete account: ${error?.message ?? error}`);
+              }
+            }
           },
         },
       ],
@@ -328,14 +340,14 @@ export default function SettingsScreen() {
         </Pressable>
       </Glass>
 
-      {/* Data */}
+      {/* Account Deletion */}
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
-        <Text style={styles.sectionTitle}>Data</Text>
+        <Text style={styles.sectionTitle}>Danger Zone</Text>
         <Pressable
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={handleClearData}
+          onPress={handleDeleteAccount}
         >
-          <Text style={[styles.rowLabel, styles.destructive]}>Clear All Data</Text>
+          <Text style={[styles.rowLabel, styles.destructive]}>Delete Account</Text>
         </Pressable>
       </Glass>
 

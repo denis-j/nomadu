@@ -43,7 +43,8 @@ export function countDaysInRollingWindow(
   const windowStart = new Date(refDate);
   windowStart.setDate(windowStart.getDate() - (windowDays - 1));
 
-  let totalDays = 0;
+  // Use a Set to deduplicate days across overlapping/adjacent trips
+  const uniqueDays = new Set<string>();
 
   for (const trip of trips) {
     if (!codesSet.has(trip.country_code)) continue;
@@ -51,16 +52,21 @@ export function countDaysInRollingWindow(
     const tripStart = parseDate(trip.start_date);
     const tripEnd = trip.end_date ? parseDate(trip.end_date) : today();
 
-    // Check overlap with window
-    const overlapStart = tripStart > windowStart ? tripStart : windowStart;
-    const overlapEnd = tripEnd < refDate ? tripEnd : refDate;
+    const overlapStart = tripStart > windowStart ? tripStart : new Date(windowStart);
+    const overlapEnd = tripEnd < refDate ? tripEnd : new Date(refDate);
 
     if (overlapStart <= overlapEnd) {
-      totalDays += daysBetween(overlapStart, overlapEnd) + 1;
+      const cursor = new Date(overlapStart);
+      while (cursor <= overlapEnd) {
+        uniqueDays.add(
+          `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`,
+        );
+        cursor.setDate(cursor.getDate() + 1);
+      }
     }
   }
 
-  return totalDays;
+  return uniqueDays.size;
 }
 
 /**

@@ -4,7 +4,6 @@ import { Link } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -45,52 +44,52 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { signIn: googleSignIn, ready: googleReady } = useGoogleAuth();
 
   const handleSignUp = async () => {
+    setError(null);
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password.');
+      setError('Please enter your email and password.');
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match.');
+      setError('Passwords do not match.');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters.');
+      setError('Password must be at least 6 characters.');
       return;
     }
     setLoading(true);
     try {
       await signUpWithEmail(email.trim(), password);
-    } catch (error: any) {
-      Alert.alert('Sign Up Failed', error.message ?? 'Something went wrong.');
+    } catch (e: any) {
+      setError(e.message ?? 'Something went wrong.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleAppleSignIn = async () => {
+    setError(null);
     setLoading(true);
     try {
       await signInWithApple();
-    } catch (error: any) {
-      if (error.code !== 'ERR_REQUEST_CANCELED') {
-        Alert.alert('Apple Sign In Failed', error.message ?? 'Something went wrong.');
-      }
+    } catch (e: any) {
+      if (e.code !== 'ERR_REQUEST_CANCELED') setError(e.message ?? 'Apple sign in failed.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
+    setError(null);
     setLoading(true);
     try {
       await googleSignIn();
-    } catch (error: any) {
-      if (!error.message?.includes('cancelled')) {
-        Alert.alert('Google Sign In Failed', error.message ?? 'Something went wrong.');
-      }
+    } catch (e: any) {
+      if (!e.message?.includes('cancelled')) setError(e.message ?? 'Google sign in failed.');
     } finally {
       setLoading(false);
     }
@@ -171,13 +170,15 @@ export default function SignUpScreen() {
                 />
               </Glass>
 
+              {error && <Text style={styles.errorText}>{error}</Text>}
+
               <TouchableOpacity
                 style={[styles.continueButton, loading && styles.continueButtonDisabled]}
                 onPress={handleSignUp}
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color={Colors.text} />
+                  <ActivityIndicator color="#FFF" />
                 ) : (
                   <Text style={styles.continueButtonText}>Create Account</Text>
                 )}
@@ -279,6 +280,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.text,
     fontWeight: '400',
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#E53E3E',
+    marginTop: 8,
   },
   continueButton: {
     backgroundColor: Colors.text,
