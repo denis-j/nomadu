@@ -38,6 +38,21 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
       days INTEGER DEFAULT 1
     );
   `);
+
+  // Migration: add sync columns
+  const columns = await database.getAllAsync<{ name: string }>(
+    `PRAGMA table_info(trips)`,
+  );
+  const colNames = columns.map((c) => c.name);
+  if (!colNames.includes('sync_id')) {
+    await database.execAsync(`ALTER TABLE trips ADD COLUMN sync_id TEXT`);
+  }
+  if (!colNames.includes('updated_at')) {
+    await database.execAsync(`ALTER TABLE trips ADD COLUMN updated_at TEXT`);
+  }
+  if (!colNames.includes('deleted')) {
+    await database.execAsync(`ALTER TABLE trips ADD COLUMN deleted INTEGER DEFAULT 0`);
+  }
 }
 
 // ─── Visit CRUD ───
@@ -89,6 +104,9 @@ export interface Trip {
   start_date: string;
   end_date: string | null;
   days: number;
+  sync_id: string | null;
+  updated_at: string | null;
+  deleted: number;
 }
 
 export async function insertTripManual(
@@ -105,8 +123,8 @@ export async function insertTripManual(
   const end = new Date(endDate);
   const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
   const result = await database.runAsync(
-    `INSERT INTO trips (city, country, country_code, latitude, longitude, start_date, end_date, days)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO trips (city, country, country_code, latitude, longitude, start_date, end_date, days, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     [city, country, countryCode, latitude ?? null, longitude ?? null, startDate, endDate, days],
   );
   return result.lastInsertRowId;
@@ -121,8 +139,8 @@ export async function insertTrip(
 ): Promise<number> {
   const database = await getDatabase();
   const result = await database.runAsync(
-    `INSERT INTO trips (city, country, country_code, latitude, longitude, start_date, days)
-     VALUES (?, ?, ?, ?, ?, date('now'), 1)`,
+    `INSERT INTO trips (city, country, country_code, latitude, longitude, start_date, days, updated_at)
+     VALUES (?, ?, ?, ?, ?, date('now'), 1, datetime('now'))`,
     [city, country, countryCode, latitude, longitude],
   );
   return result.lastInsertRowId;
@@ -133,7 +151,8 @@ export async function updateTripEndDate(tripId: number): Promise<void> {
   await database.runAsync(
     `UPDATE trips SET
        end_date = date('now'),
-       days = MAX(1, CAST(julianday(date('now')) - julianday(start_date) AS INTEGER) + 1)
+       days = MAX(1, CAST(julianday(date('now')) - julianday(start_date) AS INTEGER) + 1),
+       updated_at = datetime('now')
      WHERE id = ?`,
     [tripId],
   );
@@ -149,7 +168,7 @@ export async function getCurrentTrip(): Promise<Trip | null> {
 export async function getAllTripsRaw(): Promise<Trip[]> {
   const database = await getDatabase();
   return database.getAllAsync<Trip>(
-    'SELECT * FROM trips ORDER BY start_date ASC, id ASC',
+    'SELECT * FROM trips WHERE deleted = 0 ORDER BY start_date ASC, id ASC',
   );
 }
 
@@ -212,6 +231,14 @@ export async function deleteTrip(id: number): Promise<void> {
   await database.runAsync('DELETE FROM trips WHERE id = ?', [id]);
 }
 
+export async function markTripDeleted(id: number): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    `UPDATE trips SET deleted = 1, updated_at = datetime('now') WHERE id = ?`,
+    [id],
+  );
+}
+
 export async function getTripById(id: number): Promise<Trip | null> {
   const database = await getDatabase();
   return database.getFirstAsync<Trip>('SELECT * FROM trips WHERE id = ?', [id]);
@@ -256,6 +283,76 @@ export async function getTripsByCity(city: string, countryCode: string): Promise
   if (latest.end_date === today) latest.end_date = null;
 
   return merged;
+}
+
+// ─── Sync Helpers ───
+
+export async function getAllTripsForSync(): Promise<Trip[]> {
+  const database = await getDatabase();
+  return database.getAllAsync<Trip>(
+    'SELECT * FROM trips ORDER BY id ASC',
+  );
+}
+
+export async function getTripsModifiedSince(timestamp: string): Promise<Trip[]> {
+  const database = await getDatabase();
+  return database.getAllAsync<Trip>(
+    'SELECT * FROM trips WHERE updated_at > ? ORDER BY id ASC',
+    [timestamp],
+  );
+}
+
+export async function upsertTripFromCloud(trip: {
+  sync_id: string;
+  city: string;
+  country: string;
+  country_code: string;
+  latitude: number | null;
+  longitude: number | null;
+  start_date: string;
+  end_date: string | null;
+  days: number;
+  updated_at: string;
+  deleted: boolean;
+  local_id?: number | null;
+}): Promise<void> {
+  const database = await getDatabase();
+
+  // Check if we already have this trip by sync_id
+  const existing = await database.getFirstAsync<Trip>(
+    'SELECT * FROM trips WHERE sync_id = ?',
+    [trip.sync_id],
+  );
+
+  if (existing) {
+    // Last-write-wins: only update if cloud is newer
+    if (existing.updated_at && existing.updated_at >= trip.updated_at) {
+      return; // local is newer or same, skip
+    }
+    if (trip.deleted) {
+      await database.runAsync('DELETE FROM trips WHERE sync_id = ?', [trip.sync_id]);
+    } else {
+      await database.runAsync(
+        `UPDATE trips SET city = ?, country = ?, country_code = ?, latitude = ?, longitude = ?,
+         start_date = ?, end_date = ?, days = ?, updated_at = ?, deleted = 0
+         WHERE sync_id = ?`,
+        [trip.city, trip.country, trip.country_code, trip.latitude, trip.longitude,
+         trip.start_date, trip.end_date, trip.days, trip.updated_at, trip.sync_id],
+      );
+    }
+  } else if (!trip.deleted) {
+    await database.runAsync(
+      `INSERT INTO trips (city, country, country_code, latitude, longitude, start_date, end_date, days, sync_id, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [trip.city, trip.country, trip.country_code, trip.latitude, trip.longitude,
+       trip.start_date, trip.end_date, trip.days, trip.sync_id, trip.updated_at],
+    );
+  }
+}
+
+export async function setSyncId(tripId: number, syncId: string): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync('UPDATE trips SET sync_id = ? WHERE id = ?', [syncId, tripId]);
 }
 
 // ─── Stats Queries ───

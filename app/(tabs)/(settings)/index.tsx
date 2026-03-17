@@ -12,6 +12,7 @@ import { useLocation } from '../../../hooks/useLocation';
 import { useSubscription } from '../../../hooks/useSubscription';
 import { clearAllData } from '../../../lib/database';
 import { restorePurchases } from '../../../lib/revenueCat';
+import { useSync } from '../../../contexts/SyncContext';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -21,6 +22,7 @@ export default function SettingsScreen() {
   const { permissions, tracking, toggleTracking } = useLocation();
   const { isPro, expirationDate, productIdentifier, loading } = useSubscription();
   const { user, signOut: handleSignOut } = useAuth();
+  const { cloudSyncEnabled, setCloudSyncEnabled, syncStatus, lastSynced, triggerSync } = useSync();
   const router = useRouter();
 
   const needsAlwaysPermission = permissions.foreground && !permissions.isAlways;
@@ -178,7 +180,7 @@ export default function SettingsScreen() {
             </Pressable>
           </>
         )}
-        {!loading && isPro && (
+        {(loading || isPro) && (
           <>
             <View style={styles.row}>
               <Text style={styles.rowLabel}>Plan</Text>
@@ -202,6 +204,56 @@ export default function SettingsScreen() {
             >
               <Text style={[styles.rowLabel, { color: Colors.primary }]}>Manage Subscription</Text>
               <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+            </Pressable>
+          </>
+        )}
+      </Glass>
+
+      {/* Cloud Sync */}
+      <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
+        <Text style={styles.sectionTitle}>Cloud Sync</Text>
+        <View style={styles.row}>
+          <View style={styles.rowContent}>
+            <Text style={styles.rowLabel}>Sync to Cloud</Text>
+            <Text style={styles.rowDescription}>
+              Back up trips and sync across devices
+            </Text>
+          </View>
+          <Switch
+            value={cloudSyncEnabled === true}
+            onValueChange={setCloudSyncEnabled}
+          />
+        </View>
+        {cloudSyncEnabled && (
+          <>
+            <View style={styles.separator} />
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>Status</Text>
+              <Text style={styles.rowValue}>
+                {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'error' ? 'Error' : 'Up to date'}
+              </Text>
+            </View>
+            {lastSynced && (
+              <>
+                <View style={styles.separator} />
+                <View style={styles.row}>
+                  <Text style={styles.rowLabel}>Last synced</Text>
+                  <Text style={styles.rowValue}>{formatDate(lastSynced)}</Text>
+                </View>
+              </>
+            )}
+            <View style={styles.separator} />
+            <Pressable
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                triggerSync();
+              }}
+              disabled={syncStatus === 'syncing'}
+            >
+              <Text style={[styles.rowLabel, { color: Colors.primary, opacity: syncStatus === 'syncing' ? 0.5 : 1 }]}>
+                Sync Now
+              </Text>
             </Pressable>
           </>
         )}
@@ -256,12 +308,14 @@ export default function SettingsScreen() {
         <View style={styles.separator} />
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Storage</Text>
-          <Text style={styles.rowValue}>Local only</Text>
+          <Text style={styles.rowValue}>{cloudSyncEnabled ? 'Local + Cloud' : 'Local only'}</Text>
         </View>
       </Glass>
 
       <Text style={styles.footer}>
-        All data is stored locally on your device.{'\n'}Nothing is uploaded to any server.
+        {cloudSyncEnabled
+          ? 'Data is stored locally and synced to the cloud.'
+          : 'All data is stored locally on your device.\nNothing is uploaded to any server.'}
       </Text>
     </ScrollView>
   );

@@ -43,6 +43,17 @@ const popularCountries = getPopularCountries();
 
 export default function TimelineScreen() {
   const { trips, loading, refresh } = useTrips();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const [result] = await Promise.all([
+      refresh(),
+      new Promise((r) => setTimeout(r, 800)),
+    ]);
+    setRefreshing(false);
+  }, [refresh]);
 
   const [step, setStep] = useState<SheetStep>('closed');
   const [closing, setClosing] = useState(false);
@@ -215,7 +226,7 @@ export default function TimelineScreen() {
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {/* One continuous line behind everything */}
         <View style={styles.timelineLine} />

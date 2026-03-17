@@ -2,6 +2,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Appearance, View } from 'react-native';
 import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
+import { SyncProvider } from '../contexts/SyncContext';
 import { useAuth } from '../hooks/useAuth';
 import { useSubscription } from '../hooks/useSubscription';
 import { configureRevenueCat, identifyUser } from '../lib/revenueCat';
@@ -97,7 +98,9 @@ export default function RootLayout() {
 
   return (
     <OnboardingProvider>
-      <RootNavigator />
+      <SyncProvider>
+        <RootNavigator />
+      </SyncProvider>
     </OnboardingProvider>
   );
 }

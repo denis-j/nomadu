@@ -114,13 +114,13 @@ export default function PermissionsScreen() {
       // User denied or error — continue anyway
     } finally {
       setLoading(false);
-      router.push('/(onboarding)/paywall');
+      router.push('/(onboarding)/storage');
     }
   };
 
   const handleSkip = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(onboarding)/paywall');
+    router.push('/(onboarding)/storage');
   };
 
   return (

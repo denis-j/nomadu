@@ -8,7 +8,6 @@ export function useTrips() {
 
   const refresh = useCallback(async () => {
     try {
-      setLoading(true);
       const data = await getAllTrips();
       setTrips(data);
     } catch (error) {
