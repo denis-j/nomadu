@@ -116,7 +116,7 @@ export default function CitizenshipScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const code = getCountryCode(countryName);
     await setCitizenship(user.uid, countryName, code);
-    router.push('/(onboarding)/permissions');
+    router.push('/(onboarding)/residence');
   }, [user, selected, router]);
 
   const handleMarkerPress = (countryName: string) => {

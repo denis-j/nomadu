@@ -227,8 +227,20 @@ export interface IslandSheetProps extends SheetLayerProps {
 }
 
 export function IslandSheet({ blurIntensity = 80, ...props }: IslandSheetProps) {
+  const [modalVisible, setModalVisible] = useState(false);
+
+  useEffect(() => {
+    if (props.visible) {
+      setModalVisible(true);
+    } else if (modalVisible) {
+      // Keep modal open while close animation plays, then hide
+      const timer = setTimeout(() => setModalVisible(false), 350);
+      return () => clearTimeout(timer);
+    }
+  }, [props.visible]);
+
   return (
-    <Modal visible={props.visible} transparent animationType="none" statusBarTranslucent onRequestClose={props.onClose}>
+    <Modal visible={modalVisible} transparent animationType="none" statusBarTranslucent onRequestClose={props.onClose}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" />
         <SheetBackdrop visible={props.visible} onPress={props.onClose} blurIntensity={blurIntensity} />
@@ -317,5 +329,6 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
+    padding: 20,
   },
 });

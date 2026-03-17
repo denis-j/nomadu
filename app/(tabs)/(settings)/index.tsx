@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Alert, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Pressable } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
@@ -10,20 +11,35 @@ import { Colors } from '../../../constants/colors';
 import { useAuth } from '../../../hooks/useAuth';
 import { useLocation } from '../../../hooks/useLocation';
 import { useSubscription } from '../../../hooks/useSubscription';
+import { usePassport } from '../../../hooks/usePassport';
 import { clearAllData } from '../../../lib/database';
 import { restorePurchases } from '../../../lib/revenueCat';
 import { useSync } from '../../../contexts/SyncContext';
+import { countryCodeToFlag } from '../../../lib/geocoding';
+import { getHasFixedResidence, setHasFixedResidence } from '../../../lib/onboarding';
+import { IslandSheet } from '../../../components/IslandSheet';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 export default function SettingsScreen() {
-  const { permissions, tracking, toggleTracking } = useLocation();
+  const { permissions } = useLocation();
+  const [trackingSheetVisible, setTrackingSheetVisible] = useState(false);
   const { isPro, expirationDate, productIdentifier, loading } = useSubscription();
   const { user, signOut: handleSignOut } = useAuth();
   const { cloudSyncEnabled, setCloudSyncEnabled, syncStatus, lastSynced, triggerSync } = useSync();
+  const { country: passportCountry, countryCode: passportCode } = usePassport();
   const router = useRouter();
+  const [fixedResidence, setFixedResidence] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      getHasFixedResidence(user.uid).then((val) => {
+        if (val !== null) setFixedResidence(val);
+      });
+    }
+  }, [user]);
 
   const needsAlwaysPermission = permissions.foreground && !permissions.isAlways;
   const needsAnyPermission = !permissions.foreground;
@@ -102,6 +118,7 @@ export default function SettingsScreen() {
   };
 
   return (
+    <>
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.content}
@@ -134,6 +151,38 @@ export default function SettingsScreen() {
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Email</Text>
           <Text style={styles.rowValue}>{user?.email ?? '—'}</Text>
+        </View>
+        <View style={styles.separator} />
+        <Pressable
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/(tabs)/(settings)/passport');
+          }}
+        >
+          <Text style={styles.rowLabel}>Passport</Text>
+          <View style={styles.passportValue}>
+            <Text style={styles.rowValue}>
+              {passportCode ? `${countryCodeToFlag(passportCode)} ${passportCountry}` : 'Not set'}
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+          </View>
+        </Pressable>
+        <View style={styles.separator} />
+        <View style={styles.row}>
+          <View style={styles.rowContent}>
+            <Text style={styles.rowLabel}>Fixed Residence</Text>
+            <Text style={styles.rowDescription}>
+              Permanent home in your country
+            </Text>
+          </View>
+          <Switch
+            value={fixedResidence}
+            onValueChange={(val) => {
+              setFixedResidence(val);
+              if (user) setHasFixedResidence(user.uid, val);
+            }}
+          />
         </View>
         <View style={styles.separator} />
         <Pressable
@@ -259,32 +308,24 @@ export default function SettingsScreen() {
         )}
       </Glass>
 
-      {/* Tracking */}
+      {/* Location Tracking */}
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
         <Text style={styles.sectionTitle}>Location Tracking</Text>
         <View style={styles.row}>
-          <View style={styles.rowContent}>
-            <Text style={styles.rowLabel}>Background Tracking</Text>
-            <Text style={styles.rowDescription}>
-              Automatically log cities as you travel
-            </Text>
-          </View>
-          <Switch value={tracking} onValueChange={toggleTracking} />
-        </View>
-      </Glass>
-
-      {/* Permissions */}
-      <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
-        <Text style={styles.sectionTitle}>Permissions</Text>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Foreground Location</Text>
-          <StatusBadge granted={permissions.foreground} />
+          <Text style={styles.rowLabel}>Status</Text>
+          <StatusBadge granted={permissions.background} label={permissions.background ? 'Active' : 'Inactive'} />
         </View>
         <View style={styles.separator} />
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Background Location</Text>
-          <StatusBadge granted={permissions.background} />
-        </View>
+        <Pressable
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setTrackingSheetVisible(true);
+          }}
+        >
+          <Text style={styles.rowLabel}>How it works</Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+        </Pressable>
       </Glass>
 
       {/* Data */}
@@ -318,14 +359,70 @@ export default function SettingsScreen() {
           : 'All data is stored locally on your device.\nNothing is uploaded to any server.'}
       </Text>
     </ScrollView>
+
+      <IslandSheet
+        visible={trackingSheetVisible}
+        onClose={() => setTrackingSheetVisible(false)}
+        title="Location Tracking"
+        snapPoint={0.55}
+      >
+        <View style={styles.sheetContent}>
+          <View style={styles.sheetItem}>
+            <Ionicons name="battery-half-outline" size={22} color={Colors.primary} />
+            <View style={styles.sheetItemText}>
+              <Text style={styles.sheetItemTitle}>Battery efficient</Text>
+              <Text style={styles.sheetItemDesc}>
+                Uses iOS Significant Location Changes — only wakes when you move to a new area.
+              </Text>
+            </View>
+          </View>
+          <View style={styles.sheetItem}>
+            <Ionicons name="time-outline" size={22} color={Colors.primary} />
+            <View style={styles.sheetItemText}>
+              <Text style={styles.sheetItemTitle}>Background checks</Text>
+              <Text style={styles.sheetItemDesc}>
+                Your location is checked roughly every 6–12 hours in the background, only when you move.
+              </Text>
+            </View>
+          </View>
+          <View style={styles.sheetItem}>
+            <Ionicons name="phone-portrait-outline" size={22} color={Colors.primary} />
+            <View style={styles.sheetItemText}>
+              <Text style={styles.sheetItemTitle}>Instant on open</Text>
+              <Text style={styles.sheetItemDesc}>
+                When you open the app, your location is checked immediately so your trips are always up to date.
+              </Text>
+            </View>
+          </View>
+          <View style={styles.sheetItem}>
+            <Ionicons name="navigate-outline" size={22} color={Colors.primary} />
+            <View style={styles.sheetItemText}>
+              <Text style={styles.sheetItemTitle}>City-level only</Text>
+              <Text style={styles.sheetItemDesc}>
+                We only need to know which city and country you're in — no precise GPS tracking.
+              </Text>
+            </View>
+          </View>
+          <View style={styles.sheetItem}>
+            <Ionicons name="lock-closed-outline" size={22} color={Colors.primary} />
+            <View style={styles.sheetItemText}>
+              <Text style={styles.sheetItemTitle}>Private by design</Text>
+              <Text style={styles.sheetItemDesc}>
+                All location data stays on your device. Nothing is sent to external servers.
+              </Text>
+            </View>
+          </View>
+        </View>
+      </IslandSheet>
+    </>
   );
 }
 
-function StatusBadge({ granted }: { granted: boolean }) {
+function StatusBadge({ granted, label }: { granted: boolean; label?: string }) {
   return (
     <View style={[styles.badge, granted ? styles.badgeGranted : styles.badgeDenied]}>
       <Text style={[styles.badgeText, granted ? styles.badgeTextGranted : styles.badgeTextDenied]}>
-        {granted ? 'Granted' : 'Not Granted'}
+        {label ?? (granted ? 'Granted' : 'Not Granted')}
       </Text>
     </View>
   );
@@ -421,6 +518,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Colors.textSecondary,
   },
+  passportValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   separator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: Colors.border,
@@ -483,5 +585,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.75)',
     marginTop: 1,
+  },
+  // ─── Sheet ───
+  sheetContent: {
+    gap: 22,
+  },
+  sheetItem: {
+    flexDirection: 'row',
+    gap: 14,
+    alignItems: 'flex-start',
+  },
+  sheetItemText: {
+    flex: 1,
+    gap: 2,
+  },
+  sheetItemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  sheetItemDesc: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    lineHeight: 20,
   },
 });

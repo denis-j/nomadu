@@ -10,6 +10,12 @@ export default function SettingsStack() {
           headerLargeTitle: true,
         }}
       />
+      <Stack.Screen
+        name="passport"
+        options={{
+          title: 'Passport',
+        }}
+      />
     </Stack>
   );
 }

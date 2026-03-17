@@ -1,6 +1,19 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { useStats } from '../../../hooks/useStats';
+import { useVisaTracker } from '../../../hooks/useVisaTracker';
+import { useTaxTracker } from '../../../hooks/useTaxTracker';
 import { Colors } from '../../../constants/colors';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { EmptyState } from '../../../components/EmptyState';
@@ -10,7 +23,23 @@ const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 export default function StatsScreen() {
-  const { stats } = useStats();
+  const { stats, refresh: refreshStats } = useStats();
+  const { visaStatuses, loading: visaLoading, refresh: refreshVisa } = useVisaTracker();
+  const { taxStatuses, loading: taxLoading, refresh: refreshTax } = useTaxTracker();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await Promise.all([
+      Promise.all([refreshStats(), refreshVisa(), refreshTax()]),
+      new Promise((r) => setTimeout(r, 800)),
+    ]);
+    setRefreshing(false);
+  }, [refreshStats, refreshVisa, refreshTax]);
+
+  const mostCritical = visaStatuses.length > 0 ? visaStatuses[0] : null;
+  const mostCriticalTax = taxStatuses.length > 0 ? taxStatuses[0] : null;
 
       if (stats.totalDays < 1) {
         return (
@@ -26,6 +55,7 @@ export default function StatsScreen() {
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
     >
       {/* Countries + Cities | Days */}
       <View style={styles.row}>
@@ -47,6 +77,64 @@ export default function StatsScreen() {
           <Text style={styles.combiLabel}>Days</Text>
         </Glass>
       </View>
+
+      {/* Visa Tracker */}
+      {!visaLoading && mostCritical && (
+        <View style={styles.countriesSection}>
+          <Text style={styles.sectionTitle}>Visa Tracker</Text>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/(tabs)/(stats)/visa');
+            }}
+            style={({ pressed }) => pressed && styles.cardPressed}
+          >
+            <Glass {...glassProps} style={[styles.visaCard, !hasGlass && styles.cardFallback]}>
+              <View style={styles.visaCardContent}>
+                <View style={styles.visaInfo}>
+                  <Text style={styles.visaFlag}>{mostCritical.flag}</Text>
+                  <View style={styles.visaText}>
+                    <Text style={styles.visaDestination}>{mostCritical.destination}</Text>
+                    <Text style={styles.visaPreview}>
+                      {mostCritical.daysRemaining}d left of {mostCritical.daysAllowed}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+              </View>
+            </Glass>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Tax Residence */}
+      {!taxLoading && mostCriticalTax && (
+        <View style={styles.countriesSection}>
+          <Text style={styles.sectionTitle}>Tax Residence</Text>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/(tabs)/(stats)/tax');
+            }}
+            style={({ pressed }) => pressed && styles.cardPressed}
+          >
+            <Glass {...glassProps} style={[styles.visaCard, !hasGlass && styles.cardFallback]}>
+              <View style={styles.visaCardContent}>
+                <View style={styles.visaInfo}>
+                  <Text style={styles.visaFlag}>{mostCriticalTax.flag}</Text>
+                  <View style={styles.visaText}>
+                    <Text style={styles.visaDestination}>{mostCriticalTax.country}</Text>
+                    <Text style={styles.visaPreview}>
+                      {mostCriticalTax.daysPresent}d of {mostCriticalTax.thresholdDays} · {mostCriticalTax.daysRemaining}d left
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+              </View>
+            </Glass>
+          </Pressable>
+        </View>
+      )}
 
       {/* Top countries */}
       {stats.topCountries.length > 0 && (
@@ -167,6 +255,44 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: Colors.primary,
+    fontVariant: ['tabular-nums'],
+  },
+  cardPressed: {
+    opacity: 0.7,
+  },
+  visaCard: {
+    borderRadius: 20,
+    padding: 18,
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+  },
+  visaCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  visaInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  visaFlag: {
+    fontSize: 28,
+  },
+  visaText: {
+    flex: 1,
+    gap: 2,
+  },
+  visaDestination: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  visaPreview: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: Colors.textSecondary,
     fontVariant: ['tabular-nums'],
   },
 });

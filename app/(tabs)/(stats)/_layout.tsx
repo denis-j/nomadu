@@ -9,6 +9,19 @@ export default function StatsStack() {
           title: 'Stats',
           headerLargeTitle: true,
         }}
+
+      />
+      <Stack.Screen
+        name="visa"
+        options={{
+          title: 'Visa Tracker',
+        }}
+      />
+      <Stack.Screen
+        name="tax"
+        options={{
+          title: 'Tax Residence',
+        }}
       />
     </Stack>
   );

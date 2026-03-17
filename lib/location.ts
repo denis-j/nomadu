@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { getCurrentTrip, insertTrip, insertVisit, updateTripEndDate } from './database';
@@ -5,7 +6,39 @@ import { reverseGeocode } from './geocoding';
 
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
 
-// Define the background task
+/**
+ * Shared logic for processing a location update (used by both background task
+ * and foreground check). Reverse-geocodes the coordinates, logs a visit, and
+ * creates / updates the current trip.
+ */
+async function processLocationUpdate(latitude: number, longitude: number): Promise<void> {
+  const geo = await reverseGeocode(latitude, longitude);
+  await insertVisit(latitude, longitude, geo.city, geo.country, geo.countryCode);
+
+  const currentTrip = await getCurrentTrip();
+
+  if (!currentTrip) {
+    // First trip ever
+    if (geo.city && geo.country && geo.countryCode) {
+      await insertTrip(geo.city, geo.country, geo.countryCode, latitude, longitude);
+    }
+  } else if (
+    geo.city &&
+    geo.country &&
+    geo.countryCode &&
+    (currentTrip.city !== geo.city || currentTrip.country !== geo.country)
+  ) {
+    // New city — close current trip and start new one
+    await updateTripEndDate(currentTrip.id);
+    await insertTrip(geo.city, geo.country, geo.countryCode, latitude, longitude);
+  } else {
+    // Same city — update end date
+    await updateTripEndDate(currentTrip.id);
+  }
+}
+
+// ─── Background task ───────────────────────────────────────────────────────────
+
 TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
   if (error) {
     console.error('Background location error:', error);
@@ -16,36 +49,14 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
   if (!locations || locations.length === 0) return;
 
   const location = locations[locations.length - 1];
-  const { latitude, longitude } = location.coords;
-
   try {
-    const geo = await reverseGeocode(latitude, longitude);
-    await insertVisit(latitude, longitude, geo.city, geo.country, geo.countryCode);
-
-    const currentTrip = await getCurrentTrip();
-
-    if (!currentTrip) {
-      // First trip ever
-      if (geo.city && geo.country && geo.countryCode) {
-        await insertTrip(geo.city, geo.country, geo.countryCode, latitude, longitude);
-      }
-    } else if (
-      geo.city &&
-      geo.country &&
-      geo.countryCode &&
-      (currentTrip.city !== geo.city || currentTrip.country !== geo.country)
-    ) {
-      // New city - close current trip and start new one
-      await updateTripEndDate(currentTrip.id);
-      await insertTrip(geo.city, geo.country, geo.countryCode, latitude, longitude);
-    } else {
-      // Same city - update end date
-      await updateTripEndDate(currentTrip.id);
-    }
+    await processLocationUpdate(location.coords.latitude, location.coords.longitude);
   } catch (err) {
     console.error('Error processing background location:', err);
   }
 });
+
+// ─── Permissions ────────────────────────────────────────────────────────────────
 
 export async function requestLocationPermissions(): Promise<boolean> {
   const { status: foreground } = await Location.requestForegroundPermissionsAsync();
@@ -69,6 +80,8 @@ export async function checkLocationPermissions(): Promise<{
   };
 }
 
+// ─── Background tracking ────────────────────────────────────────────────────────
+
 export async function startBackgroundTracking(): Promise<boolean> {
   const hasPermissions = await requestLocationPermissions();
   if (!hasPermissions) return false;
@@ -77,12 +90,22 @@ export async function startBackgroundTracking(): Promise<boolean> {
   if (isTracking) return true;
 
   await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
-    accuracy: Location.Accuracy.Balanced,
-    distanceInterval: 500, // meters
-    deferredUpdatesInterval: 5 * 60 * 1000, // 5 minutes
+    // Low accuracy is fine — we only need city-level precision in the background.
+    accuracy: Location.Accuracy.Low,
+    // Only fire when the user has moved a significant distance (~3 km).
+    distanceInterval: 3000,
+    // Batch updates: every 6 hours. On iOS this is advisory; the OS may deliver
+    // sooner when it has other location work to do.
+    deferredUpdatesInterval: 6 * 60 * 60 * 1000,
     showsBackgroundLocationIndicator: false,
+    // Let the OS pause updates when the device is stationary.
     pausesUpdatesAutomatically: true,
     activityType: Location.ActivityType.OtherNavigation,
+    // iOS only — use Significant Location Change monitoring. This is the most
+    // battery-efficient option: the system wakes the app only when the device
+    // moves to a new cell tower (~500 m – several km), which is perfect for
+    // detecting city/country changes.
+    ...(Platform.OS === 'ios' && { significantChanges: true }),
   });
 
   return true;
@@ -99,6 +122,8 @@ export async function isTrackingActive(): Promise<boolean> {
   return TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
 }
 
+// ─── Foreground location ────────────────────────────────────────────────────────
+
 export async function getCurrentLocation(): Promise<Location.LocationObject | null> {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
@@ -108,5 +133,20 @@ export async function getCurrentLocation(): Promise<Location.LocationObject | nu
     });
   } catch {
     return null;
+  }
+}
+
+/**
+ * Perform an immediate location check and update trips. Call this when the app
+ * comes to the foreground so the user always sees fresh data without waiting for
+ * the next background wake-up.
+ */
+export async function foregroundLocationCheck(): Promise<void> {
+  try {
+    const location = await getCurrentLocation();
+    if (!location) return;
+    await processLocationUpdate(location.coords.latitude, location.coords.longitude);
+  } catch (err) {
+    console.error('Foreground location check failed:', err);
   }
 }

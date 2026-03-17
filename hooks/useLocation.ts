@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import {
   checkLocationPermissions,
+  foregroundLocationCheck,
   isTrackingActive,
   startBackgroundTracking,
   stopBackgroundTracking,
@@ -10,6 +12,7 @@ export function useLocation() {
   const [permissions, setPermissions] = useState({ foreground: false, background: false, isAlways: false });
   const [tracking, setTracking] = useState(false);
   const [loading, setLoading] = useState(true);
+  const appState = useRef(AppState.currentState);
 
   const refresh = useCallback(async () => {
     try {
@@ -28,6 +31,22 @@ export function useLocation() {
     refresh();
   }, [refresh]);
 
+  // When the app comes to the foreground, do an immediate location check
+  // so trips are up-to-date without waiting for the next background wake.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextState) => {
+      if (appState.current.match(/inactive|background/) && nextState === 'active') {
+        const active = await isTrackingActive();
+        if (active) {
+          foregroundLocationCheck();
+        }
+      }
+      appState.current = nextState;
+    });
+
+    return () => subscription.remove();
+  }, []);
+
   const toggleTracking = useCallback(async () => {
     try {
       if (tracking) {
@@ -39,6 +58,8 @@ export function useLocation() {
         if (started) {
           const perms = await checkLocationPermissions();
           setPermissions(perms);
+          // Immediately check location on first enable
+          foregroundLocationCheck();
         }
       }
     } catch (error) {
