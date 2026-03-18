@@ -2,18 +2,30 @@ import { useEffect, useRef } from 'react';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { signInWithGoogleToken } from '../lib/auth';
+import * as AuthSession from 'expo-auth-session'; // Diese Zeile sicherstellen
 
 WebBrowser.maybeCompleteAuthSession();
 
-const IOS_CLIENT_ID =
-  '1044287572548-oiqqo1s9pqt6ot6vpa0bdv8gotakocrs.apps.googleusercontent.com';
+const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
 export function useGoogleAuth() {
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     iosClientId: IOS_CLIENT_ID,
     webClientId: WEB_CLIENT_ID,
+    // Explicitly set the native redirectUri if you expect it
+    redirectUri: AuthSession.makeRedirectUri({
+      native: 'com.nomady.app:/oauthredirect', 
+    }),
   });
+
+  useEffect(() => {
+    if (request?.redirectUri) {
+      console.log('Generierter Redirect URI für Google:', request.redirectUri);
+    } else {
+      console.log('Request-Objekt oder redirectUri ist noch nicht verfügbar.');
+    }
+  }, [request]);
 
   const resolveRef = useRef<((user: any) => void) | null>(null);
   const rejectRef = useRef<((err: Error) => void) | null>(null);

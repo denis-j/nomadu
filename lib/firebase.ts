@@ -3,12 +3,13 @@ import { initializeApp } from 'firebase/app';
 import { getReactNativePersistence, initializeAuth } from 'firebase/auth';
 import { initializeFirestore } from 'firebase/firestore';
 
+
 const firebaseConfig = {
-  apiKey: 'AIzaSyBtsZRmh9baTmXjsrc1HpRMRDZAzS8IpFg',
-  projectId: 'nomady-dcff6',
-  storageBucket: 'nomady-dcff6.firebasestorage.app',
-  messagingSenderId: '1044287572548',
-  appId: '1:1044287572548:ios:b7817ab3f028e3d58c0a11',
+  apiKey: process.env.EXPO_PUBLIC_GOOGLE_IOS_API_KEY,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_GOOGLE_GCM_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_GOOGLE_IOS_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);

@@ -214,12 +214,12 @@ function Slide1() {
       >
         <img
           src="/app-icon.png"
-          alt="Nomad"
+          alt="Nomady"
           style={{ width: 72, height: 72, borderRadius: 16 }}
           draggable={false}
         />
         <span style={{ fontSize: 36, fontWeight: 700, color: T.fg }}>
-          Nomad
+          Nomady
         </span>
       </div>
 
@@ -608,7 +608,7 @@ function Slide6() {
 
       <img
         src="/app-icon.png"
-        alt="Nomad"
+        alt="Nomady"
         style={{
           width: 100,
           height: 100,
@@ -621,7 +621,7 @@ function Slide6() {
       />
 
       <Caption
-        label="Nomad"
+        label="Nomady"
         headline={
           <>
             And so much
@@ -890,7 +890,7 @@ export default function ScreenshotsPage() {
     <div className="min-h-screen bg-gray-100">
       {/* Toolbar */}
       <div className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-gray-200 px-6 py-3 flex items-center gap-4">
-        <h1 className="text-lg font-bold">Nomad Screenshots</h1>
+        <h1 className="text-lg font-bold">Nomady Screenshots</h1>
 
         <div className="flex items-center gap-2 ml-auto">
           <select

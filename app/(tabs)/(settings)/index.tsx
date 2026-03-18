@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { Pressable } from 'react-native';
+import { Alert, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View , Pressable } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -151,7 +150,7 @@ export default function SettingsScreen() {
               </Text>
               <Text style={styles.warningText}>
                 {needsAnyPermission
-                  ? 'Nomad needs location access to automatically track your trips. Tap to open Settings.'
+                  ? 'Nomady needs location access to automatically track your trips. Tap to open Settings.'
                   : 'For automatic background tracking, please change location access to "Always". Tap to open Settings.'}
               </Text>
             </View>

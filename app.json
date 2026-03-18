@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "Nomad",
-    "slug": "nomad",
+    "name": "Nomady",
+    "slug": "nomady",
     "scheme": [
-      "nomad",
+      "nomady",
       "com.googleusercontent.apps.1044287572548-oiqqo1s9pqt6ot6vpa0bdv8gotakocrs"
     ],
     "version": "1.0.0",
@@ -17,7 +17,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nomad.app",
+      "bundleIdentifier": "com.nomady.app",
       "infoPlist": {
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Nomad uses your location to automatically track the cities and countries you visit.",
         "NSLocationWhenInUseUsageDescription": "Nomad uses your location to show your current city and country.",
@@ -45,7 +45,7 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
-      "package": "com.nomad.app"
+      "package": "com.nomady.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -68,7 +68,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
+          "icon": "./assets/icon.png",
           "color": "#000000",
           "sounds": []
         }

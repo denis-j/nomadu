@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>1044287572548-oiqqo1s9pqt6ot6vpa0bdv8gotakocrs.apps.googleusercontent.com</string>
+	<string>1044287572548-i6saqgh3hfc1u7k01qpsapuv9ds6u4r6.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.1044287572548-oiqqo1s9pqt6ot6vpa0bdv8gotakocrs</string>
+	<string>com.googleusercontent.apps.1044287572548-i6saqgh3hfc1u7k01qpsapuv9ds6u4r6</string>
 	<key>API_KEY</key>
 	<string>AIzaSyBtsZRmh9baTmXjsrc1HpRMRDZAzS8IpFg</string>
 	<key>GCM_SENDER_ID</key>
@@ -13,7 +13,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.nomad.app</string>
+	<string>com.nomady.app</string>
 	<key>PROJECT_ID</key>
 	<string>nomady-dcff6</string>
 	<key>STORAGE_BUCKET</key>
@@ -29,6 +29,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1044287572548:ios:b7817ab3f028e3d58c0a11</string>
+	<string>1:1044287572548:ios:8fc997c89e7a568d8c0a11</string>
 </dict>
 </plist>
