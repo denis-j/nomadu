@@ -187,20 +187,8 @@ function Slide1() {
         fontFamily: FONT,
       }}
     >
-      <WarmBlob
-        top="-10%"
-        left="-15%"
-        size="50%"
-        color={T.yellowMid}
-        opacity={0.5}
-      />
-      <WarmBlob
-        top="15%"
-        left="65%"
-        size="35%"
-        color={T.yellow}
-        opacity={0.3}
-      />
+      <WarmBlob top="-10%" left="-15%" size="50%" color={T.yellowMid} opacity={0.5} />
+      <WarmBlob top="15%" left="65%" size="35%" color={T.yellow} opacity={0.3} />
 
       {/* App icon + name */}
       <div
@@ -218,20 +206,12 @@ function Slide1() {
           style={{ width: 72, height: 72, borderRadius: 16 }}
           draggable={false}
         />
-        <span style={{ fontSize: 36, fontWeight: 700, color: T.fg }}>
-          Nomady
-        </span>
+        <span style={{ fontSize: 36, fontWeight: 700, color: T.fg }}>Nomady</span>
       </div>
 
       <Caption
-        label="Travel Tracker"
-        headline={
-          <>
-            Your journey,
-            <br />
-            mapped.
-          </>
-        }
+        label="Digital Nomad Tracker"
+        headline={<>Your journey,<br />mapped.</>}
       />
 
       <div
@@ -243,14 +223,14 @@ function Slide1() {
           width: "84%",
         }}
       >
-        <Phone src="/screenshots/map.png" alt="Map view" />
+        <Phone src="/screenshots/the%20map.png" alt="Map view" />
       </div>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Slide 2 — Auto-tracking                                            */
+/*  Slide 2 — Timeline                                                 */
 /* ------------------------------------------------------------------ */
 
 function Slide2() {
@@ -268,31 +248,13 @@ function Slide2() {
         fontFamily: FONT,
       }}
     >
-      <WarmBlob
-        top="5%"
-        left="60%"
-        size="40%"
-        color={T.yellowLight}
-        opacity={0.6}
-      />
-      <WarmBlob
-        top="50%"
-        left="-10%"
-        size="30%"
-        color={T.yellowMid}
-        opacity={0.3}
-      />
+      <WarmBlob top="5%" left="60%" size="40%" color={T.yellowLight} opacity={0.6} />
+      <WarmBlob top="50%" left="-10%" size="30%" color={T.yellowMid} opacity={0.3} />
 
       <div style={{ marginTop: IPHONE_H * 0.08 }}>
         <Caption
-          label="Automatic"
-          headline={
-            <>
-              Travels track
-              <br />
-              themselves.
-            </>
-          }
+          label="Trip Timeline"
+          headline={<>Every trip.<br />Every day.</>}
         />
       </div>
 
@@ -316,7 +278,7 @@ function Slide2() {
             opacity: 0.5,
           }}
         >
-          <Phone src="/screenshots/map.png" alt="Map view" />
+          <Phone src="/screenshots/the%20map.png" alt="Map view" />
         </div>
         <div
           style={{
@@ -326,7 +288,7 @@ function Slide2() {
             width: "82%",
           }}
         >
-          <Phone src="/screenshots/timeline.png" alt="Timeline" />
+          <Phone src="/screenshots/the%20timeline.png" alt="Timeline" />
         </div>
       </div>
     </div>
@@ -334,7 +296,7 @@ function Slide2() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Slide 3 — Stats                                                    */
+/*  Slide 3 — AI Planning                                              */
 /* ------------------------------------------------------------------ */
 
 function Slide3() {
@@ -352,31 +314,13 @@ function Slide3() {
         fontFamily: FONT,
       }}
     >
-      <WarmBlob
-        top="-5%"
-        left="50%"
-        size="45%"
-        color={T.yellow}
-        opacity={0.35}
-      />
-      <WarmBlob
-        top="60%"
-        left="-15%"
-        size="40%"
-        color={T.yellowMid}
-        opacity={0.4}
-      />
+      <WarmBlob top="-5%" left="50%" size="45%" color={T.yellow} opacity={0.35} />
+      <WarmBlob top="60%" left="-15%" size="40%" color={T.yellowMid} opacity={0.4} />
 
       <div style={{ marginTop: IPHONE_H * 0.08 }}>
         <Caption
-          label="Statistics"
-          headline={
-            <>
-              Every city.
-              <br />
-              Every country.
-            </>
-          }
+          label="AI Suggestions"
+          headline={<>Plan smarter.<br />Travel better.</>}
         />
       </div>
 
@@ -389,14 +333,14 @@ function Slide3() {
           width: "84%",
         }}
       >
-        <Phone src="/screenshots/stats.png" alt="Stats" />
+        <Phone src="/screenshots/Plan%20trips%20with%20ai.png" alt="AI trip planning" />
       </div>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Slide 4 — City Detail                                              */
+/*  Slide 4 — Visa Tracker                                             */
 /* ------------------------------------------------------------------ */
 
 function Slide4() {
@@ -414,31 +358,13 @@ function Slide4() {
         fontFamily: FONT,
       }}
     >
-      <WarmBlob
-        top="10%"
-        left="-10%"
-        size="35%"
-        color={T.yellow}
-        opacity={0.4}
-      />
-      <WarmBlob
-        top="40%"
-        left="70%"
-        size="30%"
-        color={T.accent}
-        opacity={0.15}
-      />
+      <WarmBlob top="10%" left="-10%" size="35%" color={T.yellow} opacity={0.4} />
+      <WarmBlob top="40%" left="70%" size="30%" color={T.accent} opacity={0.15} />
 
       <div style={{ marginTop: IPHONE_H * 0.08 }}>
         <Caption
-          label="Trip Details"
-          headline={
-            <>
-              Relive every
-              <br />
-              trip.
-            </>
-          }
+          label="Visa Tracker"
+          headline={<>Never<br />overstay.</>}
         />
       </div>
 
@@ -447,18 +373,18 @@ function Slide4() {
           position: "absolute",
           bottom: 0,
           left: "50%",
-          transform: "translateX(-42%) translateY(14%)",
-          width: "86%",
+          transform: "translateX(-50%) translateY(12%)",
+          width: "84%",
         }}
       >
-        <Phone src="/screenshots/details.png" alt="City detail" />
+        <Phone src="/screenshots/visa%20tracker.png" alt="Visa tracker" />
       </div>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Slide 5 — Privacy (dark contrast slide)                            */
+/*  Slide 5 — Tax Residence (dark contrast slide)                      */
 /* ------------------------------------------------------------------ */
 
 function Slide5() {
@@ -485,7 +411,7 @@ function Slide5() {
           width: "80%",
           height: "40%",
           borderRadius: "50%",
-          background: T.accent,
+          background: T.yellow,
           opacity: 0.06,
           filter: "blur(120px)",
         }}
@@ -493,14 +419,8 @@ function Slide5() {
 
       <div style={{ marginTop: IPHONE_H * 0.08 }}>
         <Caption
-          label="Your data"
-          headline={
-            <>
-              Private by
-              <br />
-              design.
-            </>
-          }
+          label="Tax Residence"
+          headline={<>Stay safe.<br />Wherever you are.</>}
           light
         />
       </div>
@@ -516,9 +436,9 @@ function Slide5() {
           fontFamily: FONT,
         }}
       >
-        All your travel data stays on your device.
+        Track days per country.
         <br />
-        No tracking. No cloud. Just yours.
+        Know your tax exposure at a glance.
       </p>
 
       <div
@@ -530,7 +450,7 @@ function Slide5() {
           width: "82%",
         }}
       >
-        <Phone src="/screenshots/timeline.png" alt="Timeline" />
+        <Phone src="/screenshots/tax%20tracker.png" alt="Tax tracker" />
       </div>
     </div>
   );
@@ -564,17 +484,14 @@ function FeaturePill({ icon, text }: { icon: string; text: string }) {
 
 function Slide6() {
   const features = [
-    { icon: "📍", text: "Auto city detection" },
     { icon: "🗺️", text: "Interactive travel map" },
+    { icon: "⏱️", text: "Trip timeline" },
+    { icon: "🤖", text: "AI trip suggestions" },
+    { icon: "🛂", text: "Visa tracker" },
+    { icon: "💼", text: "Tax residence tracker" },
+    { icon: "☁️", text: "Optional cloud sync" },
     { icon: "📊", text: "Country statistics" },
     { icon: "🏳️", text: "Flag collection" },
-    { icon: "⏱️", text: "Trip timeline" },
-    { icon: "🔒", text: "On-device storage" },
-  ];
-
-  const comingSoon = [
-    { icon: "✈️", text: "Flight tracking" },
-    { icon: "🌍", text: "Visa calculator" },
   ];
 
   return (
@@ -591,20 +508,8 @@ function Slide6() {
         fontFamily: FONT,
       }}
     >
-      <WarmBlob
-        top="20%"
-        left="-10%"
-        size="40%"
-        color={T.yellow}
-        opacity={0.35}
-      />
-      <WarmBlob
-        top="55%"
-        left="60%"
-        size="35%"
-        color={T.yellowMid}
-        opacity={0.3}
-      />
+      <WarmBlob top="20%" left="-10%" size="40%" color={T.yellow} opacity={0.35} />
+      <WarmBlob top="55%" left="60%" size="35%" color={T.yellowMid} opacity={0.3} />
 
       <img
         src="/app-icon.png"
@@ -622,13 +527,7 @@ function Slide6() {
 
       <Caption
         label="Nomady"
-        headline={
-          <>
-            And so much
-            <br />
-            more.
-          </>
-        }
+        headline={<>And so much<br />more.</>}
       />
 
       <div
@@ -645,34 +544,6 @@ function Slide6() {
           <FeaturePill key={f.text} icon={f.icon} text={f.text} />
         ))}
       </div>
-
-      <div style={{ marginTop: IPHONE_H * 0.04, textAlign: "center" }}>
-        <p
-          style={{
-            fontSize: IPHONE_W * 0.025,
-            fontWeight: 600,
-            color: T.mutedLight,
-            textTransform: "uppercase",
-            letterSpacing: IPHONE_W * 0.003,
-            marginBottom: 16,
-            fontFamily: FONT,
-          }}
-        >
-          Coming Soon
-        </p>
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            gap: 14,
-          }}
-        >
-          {comingSoon.map((f) => (
-            <FeaturePill key={f.text} icon={f.icon} text={f.text} />
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
@@ -683,10 +554,10 @@ function Slide6() {
 
 const IPHONE_SCREENSHOTS = [
   { id: "hero", label: "Hero", Component: Slide1 },
-  { id: "auto-track", label: "Auto-tracking", Component: Slide2 },
-  { id: "stats", label: "Stats", Component: Slide3 },
-  { id: "detail", label: "Trip Detail", Component: Slide4 },
-  { id: "privacy", label: "Privacy", Component: Slide5 },
+  { id: "timeline", label: "Timeline", Component: Slide2 },
+  { id: "ai-planning", label: "AI Planning", Component: Slide3 },
+  { id: "visa-tracker", label: "Visa Tracker", Component: Slide4 },
+  { id: "tax-tracker", label: "Tax Tracker", Component: Slide5 },
   { id: "more", label: "More Features", Component: Slide6 },
 ];
 
