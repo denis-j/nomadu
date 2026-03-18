@@ -15,12 +15,16 @@ export default function StatsStack() {
         name="visa"
         options={{
           title: 'Visa Tracker',
+          headerBackButtonDisplayMode: 'minimal',
+          headerTransparent: true
         }}
       />
       <Stack.Screen
         name="tax"
         options={{
           title: 'Tax Residence',
+          headerBackButtonDisplayMode: 'minimal',
+          headerTransparent: true
         }}
       />
     </Stack>

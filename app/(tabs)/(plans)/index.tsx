@@ -11,11 +11,10 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
+ Image, ImageBackground } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
-import { Image, ImageBackground } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
@@ -662,7 +661,7 @@ const styles = StyleSheet.create({
   featTagline: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.75)',
-    fontWeight: '500',
+    fontWeight: '700',
     lineHeight: 16,
   },
   featTips: {
@@ -671,7 +670,8 @@ const styles = StyleSheet.create({
   },
   featTip: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
+    color: '#fff',
+    fontWeight: '600',
     lineHeight: 17,
   },
   featAppsSection: {

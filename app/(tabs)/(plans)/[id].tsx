@@ -824,15 +824,17 @@ export default function JourneyDetailScreen() {
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   const PillShell = hasGlass ? GlassView : View;
+  const tripName = journey?.title ?? 'Trip';
 
   return (
     <>
       <Stack.Screen
         options={{
-          title: '',
+          title: tripName,
           headerTransparent: true,
           headerShadowVisible: false,
           headerTintColor: Colors.text,
+          headerBackButtonDisplayMode: 'minimal',
           headerRight,
         }}
       />

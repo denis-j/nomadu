@@ -31,16 +31,16 @@ export default function TabLayout() {
         <Trigger.Icon sf={{ default: 'clock', selected: 'clock.fill' }} />
         <Trigger.Label>Timeline</Trigger.Label>
       </Trigger>
+      <Trigger name="(plans)">
+        <Trigger.Icon sf={{ default: '1.calendar', selected: '31.calendar' }} />
+        <Trigger.Label>Plan</Trigger.Label>
+      </Trigger>
       <Trigger name="(stats)">
         <Trigger.Icon sf={{ default: 'chart.bar', selected: 'chart.bar.fill' }} />
         <Trigger.Label>Stats</Trigger.Label>
       </Trigger>
-      <Trigger name="(plans)">
-        <Trigger.Icon sf={{ default: 'calendar', selected: 'calendar.fill' }} />
-        <Trigger.Label>Plan</Trigger.Label>
-      </Trigger>
       <Trigger name="(settings)">
-        <Trigger.Icon sf="gear" />
+        <Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill'}} />
         <Trigger.Label>Settings</Trigger.Label>
       </Trigger>
     </NativeTabs>
