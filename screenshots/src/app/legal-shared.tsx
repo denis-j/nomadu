@@ -1,7 +1,7 @@
 import React from "react";
 
 export const APP_NAME = "Nomady";
-export const COMPANY = "Nomady LLC";
+export const COMPANY = "MMM 0 LLC";
 export const CONTACT_EMAIL = "legal@nomady.app";
 export const SUPPORT_EMAIL = "support@nomady.app";
 export const WEBSITE = "https://nomady.app";
