@@ -13,9 +13,14 @@ import Animated, {
 import RNMapView, { PROVIDER_DEFAULT } from 'react-native-maps';
 import { MapView } from '../../../components/MapView';
 import { useTrips } from '../../../hooks/useTrips';
+import { useVisaTracker } from '../../../hooks/useVisaTracker';
+import { useTaxTracker } from '../../../hooks/useTaxTracker';
 import { Colors } from '../../../constants/colors';
 import { countryCodeToFlag } from '../../../lib/geocoding';
-import { Trip } from '../../../lib/database';
+import { parseDate, Trip } from '../../../lib/database';
+import { VisaStatus } from '../../../lib/visaCalculations';
+import { TaxStatus } from '../../../lib/taxCalculations';
+import { SCHENGEN_COUNTRIES } from '../../../constants/visaRules';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const EXPANDED_WIDTH = SCREEN_WIDTH - 32;
@@ -34,15 +39,54 @@ function StatItem({ value, label }: { value: string; label: string }) {
   );
 }
 
-function MorphChip({ trips, currentTrip }: { trips: Trip[]; currentTrip: Trip }) {
+function visaStatusColor(status: VisaStatus['status']): string {
+  if (status === 'exceeded' || status === 'critical') return Colors.error;
+  if (status === 'warning') return Colors.warning;
+  return Colors.success;
+}
+
+function taxStatusColor(status: TaxStatus['status']): string {
+  if (status === 'resident' || status === 'warning') return Colors.error;
+  if (status === 'caution') return Colors.warning;
+  return Colors.success;
+}
+
+interface MorphChipProps {
+  trips: Trip[];
+  currentTrip: Trip;
+  visaStatuses: VisaStatus[];
+  taxStatuses: TaxStatus[];
+}
+
+function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipProps) {
   const [expanded, setExpanded] = useState(false);
   const [chipWidth, setChipWidth] = useState(0);
   const [chipRowHeight, setChipRowHeight] = useState(0);
   const progress = useSharedValue(0);
 
   const flag = countryCodeToFlag(currentTrip.country_code);
-  const uniqueCountries = new Set(trips.map((t) => t.country_code)).size;
-  const totalDays = trips.reduce((s, t) => s + t.days, 0);
+  const totalDaysInCity = trips
+    .filter((t) => t.city === currentTrip.city && t.country_code === currentTrip.country_code)
+    .reduce((s, t) => s + t.days, 0);
+
+  // Arrived date
+  const arrivedDate = parseDate(currentTrip.start_date);
+  const now = new Date();
+  const sameYear = arrivedDate.getFullYear() === now.getFullYear();
+  const arrived = arrivedDate.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(sameYear ? {} : { year: '2-digit' }),
+  });
+
+  // Find visa status for current country (handle Schengen)
+  const isSchengen = (SCHENGEN_COUNTRIES as readonly string[]).includes(currentTrip.country_code);
+  const visaStatus = visaStatuses.find((v) =>
+    isSchengen ? v.destinationCode === 'SCHENGEN' : v.destinationCode === currentTrip.country_code
+  ) ?? null;
+
+  // Find tax status for current country
+  const taxStatus = taxStatuses.find((t) => t.countryCode === currentTrip.country_code) ?? null;
 
   const handlePress = () => {
     const next = !expanded;
@@ -67,7 +111,7 @@ function MorphChip({ trips, currentTrip }: { trips: Trip[]; currentTrip: Trip })
     maxHeight: interpolate(
       progress.value,
       [0, 1],
-      [chipRowHeight > 0 ? chipRowHeight + 20 : 50, 200]
+      [chipRowHeight > 0 ? chipRowHeight + 20 : 50, 300]
     ),
   }));
 
@@ -106,13 +150,43 @@ function MorphChip({ trips, currentTrip }: { trips: Trip[]; currentTrip: Trip })
         {/* Stats – always mounted, clipped by maxHeight + faded by opacity */}
         <Animated.View style={[styles.statsSection, statsOpacity]}>
           <View style={styles.expandDivider} />
+
+          {/* Row 1: Here · Arrived · Total */}
           <View style={styles.statsRow}>
             <StatItem value={`${currentTrip.days}d`} label="Here" />
             <View style={styles.statSep} />
-            <StatItem value={String(uniqueCountries)} label="Countries" />
+            <StatItem value={arrived} label="Arrived" />
             <View style={styles.statSep} />
-            <StatItem value={`${totalDays}d`} label="Total" />
+            <StatItem value={`${totalDaysInCity}d`} label="All Stays" />
           </View>
+
+          {/* Row 2: Visa + Tax */}
+          {(visaStatus || taxStatus) && (
+            <>
+              <View style={styles.expandDivider} />
+              <View style={styles.trackingRow}>
+                {visaStatus && (
+                  <View style={styles.trackingItem}>
+                    <Text style={styles.trackingLabel}>VISA</Text>
+                    <Text style={[styles.trackingValue, { color: visaStatusColor(visaStatus.status) }]}>
+                      {visaStatus.daysRemaining}d left
+                    </Text>
+                    <Text style={styles.trackingSubLabel}>of {visaStatus.daysAllowed}d</Text>
+                  </View>
+                )}
+                {visaStatus && taxStatus && <View style={styles.statSep} />}
+                {taxStatus && (
+                  <View style={styles.trackingItem}>
+                    <Text style={styles.trackingLabel}>TAX</Text>
+                    <Text style={[styles.trackingValue, { color: taxStatusColor(taxStatus.status) }]}>
+                      {taxStatus.daysPresent}/{taxStatus.thresholdDays}d
+                    </Text>
+                    <Text style={styles.trackingSubLabel}>183d rule</Text>
+                  </View>
+                )}
+              </View>
+            </>
+          )}
         </Animated.View>
       </Animated.View>
     </Pressable>
@@ -121,6 +195,8 @@ function MorphChip({ trips, currentTrip }: { trips: Trip[]; currentTrip: Trip })
 
 export default function MapScreen() {
   const { trips, loading } = useTrips();
+  const { visaStatuses } = useVisaTracker();
+  const { taxStatuses } = useTaxTracker();
 
   const hasTrips = !loading && trips.length > 0;
   const currentTrip = hasTrips ? trips[0] : null;
@@ -147,7 +223,13 @@ export default function MapScreen() {
 
       <View style={styles.chipContainer}>
         {currentTrip ? (
-          <MorphChip key={`${currentTrip.id}-${currentTrip.city}-${currentTrip.country}`} trips={trips} currentTrip={currentTrip} />
+          <MorphChip
+            key={`${currentTrip.id}-${currentTrip.city}-${currentTrip.country}`}
+            trips={trips}
+            currentTrip={currentTrip}
+            visaStatuses={visaStatuses}
+            taxStatuses={taxStatuses}
+          />
         ) : !loading ? (
           <ChipWrapper
             {...chipGlassProps}
@@ -240,6 +322,33 @@ const styles = StyleSheet.create({
     width: StyleSheet.hairlineWidth,
     height: 36,
     backgroundColor: Colors.border,
+  },
+  // ─── Tracking row (Visa + Tax) ───
+  trackingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  trackingItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+    paddingBottom: 2,
+  },
+  trackingLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  trackingValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  trackingSubLabel: {
+    fontSize: 11,
+    color: Colors.textTertiary,
   },
   // ─── Empty state chip ───
   chip: {
