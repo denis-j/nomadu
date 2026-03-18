@@ -39,6 +39,49 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
     );
   `);
 
+  // Plans table
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS plans (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      city         TEXT NOT NULL,
+      country      TEXT NOT NULL,
+      country_code TEXT NOT NULL,
+      latitude     REAL,
+      longitude    REAL,
+      start_date   TEXT NOT NULL,
+      end_date     TEXT NOT NULL,
+      transport    TEXT NOT NULL DEFAULT 'flight',
+      notes        TEXT,
+      created_at   TEXT DEFAULT (datetime('now')),
+      updated_at   TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  // Journey tables
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS journeys (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      title      TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS journey_legs (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      journey_id   INTEGER NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+      city         TEXT NOT NULL,
+      country      TEXT NOT NULL,
+      country_code TEXT NOT NULL,
+      latitude     REAL,
+      longitude    REAL,
+      start_date   TEXT NOT NULL,
+      end_date     TEXT NOT NULL,
+      transport    TEXT NOT NULL DEFAULT 'flight',
+      notes        TEXT,
+      sort_order   INTEGER DEFAULT 0,
+      created_at   TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
   // Migration: add sync columns
   const columns = await database.getAllAsync<{ name: string }>(
     `PRAGMA table_info(trips)`,
@@ -309,6 +352,174 @@ export async function getTripsByCity(city: string, countryCode: string): Promise
   if (latest.end_date === today) latest.end_date = null;
 
   return merged;
+}
+
+// ─── Journey CRUD ───
+
+export type TransportType = 'flight' | 'train' | 'car' | 'bus' | 'ferry' | 'walk';
+
+export interface Journey {
+  id: number;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  // computed fields from getAllJourneys()
+  leg_count?: number;
+  first_start?: string | null;
+  last_end?: string | null;
+  countries?: string; // JSON array of unique country_codes
+}
+
+export interface JourneyLeg {
+  id: number;
+  journey_id: number;
+  city: string;
+  country: string;
+  country_code: string;
+  latitude: number | null;
+  longitude: number | null;
+  start_date: string;
+  end_date: string;
+  transport: TransportType;
+  notes: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface JourneyWithLegs extends Journey {
+  legs: JourneyLeg[];
+}
+
+export async function getAllJourneys(): Promise<Journey[]> {
+  const database = await getDatabase();
+  return database.getAllAsync<Journey>(`
+    SELECT
+      j.*,
+      COUNT(l.id) AS leg_count,
+      MIN(l.start_date) AS first_start,
+      MAX(l.end_date) AS last_end,
+      (
+        SELECT json_group_array(DISTINCT l2.country_code)
+        FROM journey_legs l2
+        WHERE l2.journey_id = j.id
+      ) AS countries
+    FROM journeys j
+    LEFT JOIN journey_legs l ON l.journey_id = j.id
+    GROUP BY j.id
+    ORDER BY j.created_at DESC
+  `);
+}
+
+export async function getJourneyWithLegs(id: number): Promise<JourneyWithLegs | null> {
+  const database = await getDatabase();
+  const journey = await database.getFirstAsync<Journey>(
+    'SELECT * FROM journeys WHERE id = ?',
+    [id],
+  );
+  if (!journey) return null;
+  const legs = await database.getAllAsync<JourneyLeg>(
+    'SELECT * FROM journey_legs WHERE journey_id = ? ORDER BY sort_order ASC, start_date ASC',
+    [id],
+  );
+  return { ...journey, legs };
+}
+
+export async function insertJourney(title: string): Promise<number> {
+  const database = await getDatabase();
+  const result = await database.runAsync(
+    `INSERT INTO journeys (title) VALUES (?)`,
+    [title],
+  );
+  return result.lastInsertRowId;
+}
+
+export async function updateJourneyTitle(id: number, title: string): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    `UPDATE journeys SET title = ?, updated_at = datetime('now') WHERE id = ?`,
+    [title, id],
+  );
+}
+
+export async function deleteJourney(id: number): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync('DELETE FROM journeys WHERE id = ?', [id]);
+}
+
+export async function insertJourneyLeg(
+  journeyId: number,
+  city: string,
+  country: string,
+  countryCode: string,
+  startDate: string,
+  endDate: string,
+  transport: TransportType,
+  notes: string | null,
+  sortOrder: number,
+  latitude?: number | null,
+  longitude?: number | null,
+): Promise<number> {
+  const database = await getDatabase();
+  const result = await database.runAsync(
+    `INSERT INTO journey_legs
+       (journey_id, city, country, country_code, latitude, longitude, start_date, end_date, transport, notes, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [journeyId, city, country, countryCode, latitude ?? null, longitude ?? null, startDate, endDate, transport, notes ?? null, sortOrder],
+  );
+  // Also bump parent journey updated_at
+  await database.runAsync(
+    `UPDATE journeys SET updated_at = datetime('now') WHERE id = ?`,
+    [journeyId],
+  );
+  return result.lastInsertRowId;
+}
+
+export async function updateJourneyLeg(
+  id: number,
+  city: string,
+  country: string,
+  countryCode: string,
+  startDate: string,
+  endDate: string,
+  transport: TransportType,
+  notes: string | null,
+  latitude?: number | null,
+  longitude?: number | null,
+): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    `UPDATE journey_legs
+     SET city=?, country=?, country_code=?, latitude=?, longitude=?,
+         start_date=?, end_date=?, transport=?, notes=?
+     WHERE id=?`,
+    [city, country, countryCode, latitude ?? null, longitude ?? null, startDate, endDate, transport, notes ?? null, id],
+  );
+  // Bump parent journey updated_at
+  const leg = await database.getFirstAsync<{ journey_id: number }>(
+    'SELECT journey_id FROM journey_legs WHERE id = ?',
+    [id],
+  );
+  if (leg) {
+    await database.runAsync(
+      `UPDATE journeys SET updated_at = datetime('now') WHERE id = ?`,
+      [leg.journey_id],
+    );
+  }
+}
+
+export async function deleteJourneyLeg(id: number): Promise<void> {
+  const database = await getDatabase();
+  const leg = await database.getFirstAsync<{ journey_id: number }>(
+    'SELECT journey_id FROM journey_legs WHERE id = ?',
+    [id],
+  );
+  await database.runAsync('DELETE FROM journey_legs WHERE id = ?', [id]);
+  if (leg) {
+    await database.runAsync(
+      `UPDATE journeys SET updated_at = datetime('now') WHERE id = ?`,
+      [leg.journey_id],
+    );
+  }
 }
 
 // ─── Sync Helpers ───
