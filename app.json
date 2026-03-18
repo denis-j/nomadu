@@ -2,7 +2,10 @@
   "expo": {
     "name": "Nomad",
     "slug": "nomad",
-    "scheme": ["nomad", "com.googleusercontent.apps.1044287572548-oiqqo1s9pqt6ot6vpa0bdv8gotakocrs"],
+    "scheme": [
+      "nomad",
+      "com.googleusercontent.apps.1044287572548-oiqqo1s9pqt6ot6vpa0bdv8gotakocrs"
+    ],
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -61,7 +64,15 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#000000",
+          "sounds": []
+        }
+      ]
     ]
   }
 }

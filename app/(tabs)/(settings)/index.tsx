@@ -12,6 +12,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useLocation } from '../../../hooks/useLocation';
 import { useSubscription } from '../../../hooks/useSubscription';
 import { usePassport } from '../../../hooks/usePassport';
+import { useNotificationPermission } from '../../../hooks/useNotificationPermission';
 import { deleteAccount } from '../../../lib/auth';
 import { restorePurchases } from '../../../lib/revenueCat';
 import { useSync } from '../../../contexts/SyncContext';
@@ -30,6 +31,7 @@ export default function SettingsScreen() {
   const { user, signOut: handleSignOut } = useAuth();
   const { cloudSyncEnabled, setCloudSyncEnabled, syncStatus, lastSynced, triggerSync } = useSync();
   const { country: passportCountry, countryCode: passportCode } = usePassport();
+  const { granted: notificationsGranted } = useNotificationPermission();
   const router = useRouter();
   const [fixedResidence, setFixedResidence] = useState(true);
 
@@ -111,6 +113,7 @@ export default function SettingsScreen() {
   };
 
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
+  const [versionTaps, setVersionTaps] = useState(0);
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
@@ -150,6 +153,24 @@ export default function SettingsScreen() {
                 {needsAnyPermission
                   ? 'Nomad needs location access to automatically track your trips. Tap to open Settings.'
                   : 'For automatic background tracking, please change location access to "Always". Tap to open Settings.'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+          </Glass>
+        </Pressable>
+      )}
+
+      {/* Notification Permission Warning */}
+      {!notificationsGranted && (
+        <Pressable onPress={openSettings}>
+          <Glass {...glassProps} style={[styles.warningCard, !hasGlass && styles.warningCardFallback]}>
+            <View style={styles.warningIconWrap}>
+              <Ionicons name="notifications-outline" size={24} color={Colors.warning} />
+            </View>
+            <View style={styles.warningContent}>
+              <Text style={styles.warningTitle}>Enable Notifications</Text>
+              <Text style={styles.warningText}>
+                Allow notifications to get visa warnings, tax residency alerts, and city arrival updates. Tap to open Settings.
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
@@ -354,10 +375,23 @@ export default function SettingsScreen() {
       {/* About */}
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
         <Text style={styles.sectionTitle}>About</Text>
-        <View style={styles.row}>
+        <Pressable
+          style={styles.row}
+          onPress={() => {
+            const next = versionTaps + 1;
+            setVersionTaps(next);
+            if (next >= 5) {
+              setVersionTaps(0);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              router.push('/(tabs)/(settings)/debug');
+            } else {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }
+          }}
+        >
           <Text style={styles.rowLabel}>Version</Text>
-          <Text selectable style={styles.rowValue}>{appVersion}</Text>
-        </View>
+          <Text style={styles.rowValue}>{appVersion}</Text>
+        </Pressable>
         <View style={styles.separator} />
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Storage</Text>

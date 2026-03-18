@@ -16,6 +16,12 @@ export default function SettingsStack() {
           title: 'Passport',
         }}
       />
+      <Stack.Screen
+        name="debug"
+        options={{
+          title: 'Debug',
+        }}
+      />
     </Stack>
   );
 }

@@ -3,6 +3,7 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { getCurrentTrip, insertTrip, insertVisit, updateTripEndDate } from './database';
 import { reverseGeocode } from './geocoding';
+import { sendNewCityNotification } from './notifications';
 
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
 
@@ -21,6 +22,7 @@ async function processLocationUpdate(latitude: number, longitude: number): Promi
     // First trip ever
     if (geo.city && geo.country && geo.countryCode) {
       await insertTrip(geo.city, geo.country, geo.countryCode, latitude, longitude);
+      sendNewCityNotification(geo.city, geo.country, geo.countryCode).catch(() => {});
     }
   } else if (
     geo.city &&
@@ -31,6 +33,7 @@ async function processLocationUpdate(latitude: number, longitude: number): Promi
     // New city — close current trip and start new one
     await updateTripEndDate(currentTrip.id);
     await insertTrip(geo.city, geo.country, geo.countryCode, latitude, longitude);
+    sendNewCityNotification(geo.city, geo.country, geo.countryCode).catch(() => {});
   } else {
     // Same city — update end date
     await updateTripEndDate(currentTrip.id);

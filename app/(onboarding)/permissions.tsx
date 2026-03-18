@@ -26,6 +26,7 @@ import Animated, {
 import AnimatedGradientBackground from '../../components/animated-gradient-background';
 import { Colors } from '../../constants/colors';
 import { requestLocationPermissions } from '../../lib/location';
+import { requestNotificationPermissions } from '../../lib/notifications';
 
 function PulsingRing({ delay, size }: { delay: number; size: number }) {
   const scale = useSharedValue(0.3);
@@ -110,6 +111,7 @@ export default function PermissionsScreen() {
     setLoading(true);
     try {
       await requestLocationPermissions();
+      await requestNotificationPermissions();
     } catch {
       // User denied or error — continue anyway
     } finally {
