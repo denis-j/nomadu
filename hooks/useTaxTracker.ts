@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { useAuth } from './useAuth';
 import { getCitizenship, getHasFixedResidence } from '../lib/onboarding';
 import { getAllTripsRaw } from '../lib/database';
@@ -45,9 +46,11 @@ export function useTaxTracker() {
     }
   }, [user]);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
 
   return { taxStatuses, loading, citizenshipCode, citizenshipCountry, refresh };
 }

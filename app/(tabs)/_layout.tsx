@@ -4,7 +4,7 @@ const { Trigger } = NativeTabs;
 
 export default function TabLayout() {
   return (
-    <NativeTabs minimizeBehavior="onScrollDown">
+    <NativeTabs minimizeBehavior="onScrollDown" iconColor={{ default: '#00000066', selected: '#000000' }} tintColor="#000000">
       <Trigger name="(map)">
         <Trigger.Icon sf={{ default: 'map', selected: 'map.fill' }} />
         <Trigger.Label>Map</Trigger.Label>

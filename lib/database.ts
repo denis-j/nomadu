@@ -55,6 +55,12 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
   }
 }
 
+// Parses YYYY-MM-DD as local time (not UTC) to avoid off-by-one day in timezones ahead of UTC
+export function parseDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 // ─── Visit CRUD ───
 
 export interface Visit {
@@ -114,20 +120,40 @@ export async function insertTripManual(
   country: string,
   countryCode: string,
   startDate: string,
-  endDate: string,
+  endDate: string | null,
   latitude?: number | null,
   longitude?: number | null,
 ): Promise<number> {
   const database = await getDatabase();
   const start = new Date(startDate);
-  const end = new Date(endDate);
+  const end = endDate ? new Date(endDate) : new Date();
   const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
   const result = await database.runAsync(
     `INSERT INTO trips (city, country, country_code, latitude, longitude, start_date, end_date, days, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-    [city, country, countryCode, latitude ?? null, longitude ?? null, startDate, endDate, days],
+    [city, country, countryCode, latitude ?? null, longitude ?? null, startDate, endDate ?? null, days],
   );
   return result.lastInsertRowId;
+}
+
+export async function updateTrip(
+  id: number,
+  city: string,
+  country: string,
+  countryCode: string,
+  startDate: string,
+  endDate: string | null,
+  latitude?: number | null,
+  longitude?: number | null,
+): Promise<void> {
+  const database = await getDatabase();
+  const start = parseDate(startDate);
+  const end = endDate ? parseDate(endDate) : new Date();
+  const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  await database.runAsync(
+    `UPDATE trips SET city=?, country=?, country_code=?, latitude=?, longitude=?, start_date=?, end_date=?, days=?, updated_at=datetime('now') WHERE id=?`,
+    [city, country, countryCode, latitude ?? null, longitude ?? null, startDate, endDate ?? null, days, id],
+  );
 }
 
 export async function insertTrip(
@@ -189,8 +215,8 @@ export async function getAllTrips(): Promise<Trip[]> {
 
     // Check if dates are adjacent (prev end_date + 1 day >= curr start_date)
     const adjacent = (() => {
-      const prevEnd = prev.end_date ? new Date(prev.end_date) : new Date();
-      const currStart = new Date(curr.start_date);
+      const prevEnd = prev.end_date ? parseDate(prev.end_date) : new Date();
+      const currStart = parseDate(curr.start_date);
       const diffMs = currStart.getTime() - prevEnd.getTime();
       return diffMs <= 24 * 60 * 60 * 1000; // 1 day gap tolerance
     })();
@@ -198,8 +224,8 @@ export async function getAllTrips(): Promise<Trip[]> {
     if (samePlace && adjacent) {
       // Merge: extend prev trip
       prev.end_date = curr.end_date;
-      const start = new Date(prev.start_date);
-      const end = prev.end_date ? new Date(prev.end_date) : new Date();
+      const start = parseDate(prev.start_date);
+      const end = prev.end_date ? parseDate(prev.end_date) : new Date();
       prev.days = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
       // Keep coords from whichever has them
       if (!prev.latitude && curr.latitude) {
@@ -259,14 +285,14 @@ export async function getTripsByCity(city: string, countryCode: string): Promise
   for (let i = 1; i < raw.length; i++) {
     const prev = merged[merged.length - 1];
     const curr = raw[i];
-    const prevEnd = prev.end_date ? new Date(prev.end_date) : new Date();
-    const currStart = new Date(curr.start_date);
+    const prevEnd = prev.end_date ? parseDate(prev.end_date) : new Date();
+    const currStart = parseDate(curr.start_date);
     const adjacent = currStart.getTime() - prevEnd.getTime() <= 24 * 60 * 60 * 1000;
 
     if (adjacent) {
       prev.end_date = curr.end_date;
-      const start = new Date(prev.start_date);
-      const end = prev.end_date ? new Date(prev.end_date) : new Date();
+      const start = parseDate(prev.start_date);
+      const end = prev.end_date ? parseDate(prev.end_date) : new Date();
       prev.days = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
       if (!prev.latitude && curr.latitude) {
         prev.latitude = curr.latitude;

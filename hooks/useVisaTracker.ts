@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { useAuth } from './useAuth';
 import { getCitizenship } from '../lib/onboarding';
 import { getAllTripsRaw, Trip } from '../lib/database';
@@ -40,9 +41,11 @@ export function useVisaTracker() {
     }
   }, [user]);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
 
   return { visaStatuses, loading, citizenshipCode, citizenshipCountry, refresh };
 }

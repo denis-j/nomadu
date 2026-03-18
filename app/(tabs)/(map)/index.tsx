@@ -147,7 +147,7 @@ export default function MapScreen() {
 
       <View style={styles.chipContainer}>
         {currentTrip ? (
-          <MorphChip trips={trips} currentTrip={currentTrip} />
+          <MorphChip key={`${currentTrip.id}-${currentTrip.city}-${currentTrip.country}`} trips={trips} currentTrip={currentTrip} />
         ) : !loading ? (
           <ChipWrapper
             {...chipGlassProps}

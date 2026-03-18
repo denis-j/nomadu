@@ -1,21 +1,25 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActionSheetIOS, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
-import { Trip } from '../lib/database';
+import { Trip, parseDate } from '../lib/database';
 import { countryCodeToFlag } from '../lib/geocoding';
 
 const hasGlass = isLiquidGlassAvailable();
 
 interface TripCardProps {
   trip: Trip;
+  daysOverride?: number;
+  hasOverlap?: boolean;
+  onDelete?: (id: number) => void;
+  onEdit?: (trip: Trip) => void;
 }
 
-export function TripCard({ trip }: TripCardProps) {
+export function TripCard({ trip, daysOverride, hasOverlap, onDelete, onEdit }: TripCardProps) {
   const flag = countryCodeToFlag(trip.country_code);
-  const startDate = new Date(trip.start_date);
-  const endDate = trip.end_date ? new Date(trip.end_date) : null;
+  const startDate = parseDate(trip.start_date);
+  const endDate = trip.end_date ? parseDate(trip.end_date) : null;
 
   const formatDate = (date: Date) =>
     date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -31,10 +35,31 @@ export function TripCard({ trip }: TripCardProps) {
     router.push(`/trip/${trip.id}`);
   };
 
+  const handleLongPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: `${flag} ${trip.city}`,
+        options: ['Edit', 'Open', 'Delete', 'Cancel'],
+        destructiveButtonIndex: 2,
+        cancelButtonIndex: 3,
+      },
+      (index) => {
+        if (index === 0) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onEdit?.(trip);
+        } else if (index === 1) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          router.push(`/trip/${trip.id}`);
+        } else if (index === 2) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          onDelete?.(trip.id);
+        }
+      }
+    );
+  };
+
   const CardShell = hasGlass ? GlassView : View;
-  const cardShellProps = hasGlass
-    ? { glassEffectStyle: 'regular' as const, style: styles.card }
-    : { style: [styles.card, styles.cardFallback] };
 
   return (
     <View style={styles.row}>
@@ -47,13 +72,28 @@ export function TripCard({ trip }: TripCardProps) {
       {/* Card */}
       <Pressable
         onPress={handlePress}
+        onLongPress={handleLongPress}
+        delayLongPress={350}
         style={({ pressed }) => [styles.cardPressable, pressed && styles.cardPressed]}
       >
-        <CardShell {...cardShellProps}>
+        <CardShell {...(hasGlass
+          ? { glassEffectStyle: 'regular' as const, style: styles.card }
+          : { style: [styles.card, styles.cardFallback, hasOverlap && styles.cardFallbackOverlap] }
+        )}>
+          {hasOverlap && <View style={styles.overlapTint} />}
           <View style={styles.cardTop}>
             <Text style={styles.flag}>{flag}</Text>
-            <View style={styles.daysBadge}>
-              <Text style={styles.daysText}>{trip.days}d</Text>
+            <View style={styles.cardTopRight}>
+              {hasOverlap && (
+                <View style={styles.overlapChip}>
+                  <Text style={styles.overlapChipText}>⚠ overlap</Text>
+                </View>
+              )}
+              <View style={[styles.daysBadge, hasOverlap && styles.daysBadgeOverlap]}>
+                <Text style={[styles.daysText, hasOverlap && styles.daysTextOverlap]}>
+                  {daysOverride ?? trip.days}d
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -114,6 +154,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
+  cardFallbackOverlap: {
+    borderColor: '#FF3B3035',
+    backgroundColor: '#FF3B300D',
+  },
+  overlapTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FF3B300D',
+    borderRadius: 14,
+  },
   cardPressable: {
     flex: 1,
   },
@@ -125,6 +174,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  cardTopRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   flag: {
     fontSize: 28,
@@ -154,6 +208,23 @@ const styles = StyleSheet.create({
   cardBottom: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  overlapChip: {
+    backgroundColor: '#FF3B3018',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  overlapChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FF3B30',
+  },
+  daysBadgeOverlap: {
+    backgroundColor: '#FF3B3018',
+  },
+  daysTextOverlap: {
+    color: '#FF3B30',
   },
   dates: {
     fontSize: 13,
