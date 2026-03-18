@@ -19,7 +19,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { useJourneys } from '../../../hooks/useJourneys';
-import { EmptyState } from '../../../components/EmptyState';
 import { SheetBackdrop, SheetLayer } from '../../../components/IslandSheet';
 import { Colors } from '../../../constants/colors';
 import { deleteJourney, insertJourney, insertJourneyLeg, parseDate, TransportType } from '../../../lib/database';
@@ -434,19 +433,19 @@ export default function JourneysScreen() {
     <>
       <Stack.Screen options={{ title: 'Plan Trips', headerRight }} />
 
-      {!loading && journeys.length === 0 ? (
-        <EmptyState
-          icon="🗺️"
-          title="No journeys yet"
-          subtitle="Plan your next adventure — create a journey and add destinations, dates, and how you'll travel."
-        />
-      ) : (
-        <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={styles.content}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-        >
-          {journeys.map((j) => (
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      >
+        {!loading && journeys.length === 0 ? (
+          <View style={styles.inlineEmpty}>
+            <Text style={styles.inlineEmptyIcon}>🗺️</Text>
+            <Text style={styles.inlineEmptyTitle}>No journeys yet</Text>
+            <Text style={styles.inlineEmptySub}>Plan your next adventure — tap + to create one.</Text>
+          </View>
+        ) : (
+          journeys.map((j) => (
             <JourneyCard
               key={j.id}
               journey={{
@@ -459,7 +458,9 @@ export default function JourneysScreen() {
               }}
               onDelete={handleDelete}
             />
-          ))}
+          ))
+        )}
+
 
           {/* ── Featured destinations ── */}
           <View style={styles.featSection}>
@@ -482,8 +483,7 @@ export default function JourneysScreen() {
               />
             ))}
           </ScrollView>
-        </ScrollView>
-      )}
+      </ScrollView>
 
       {/* ── New journey sheet ── */}
       {modalOpen && (
@@ -497,7 +497,6 @@ export default function JourneysScreen() {
             depth={0}
           >
             {() => (
-              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <View style={styles.newSheetContent}>
                   <TextInput
                     style={styles.titleInput}
@@ -521,7 +520,6 @@ export default function JourneysScreen() {
                     </Text>
                   </TouchableOpacity>
                 </View>
-              </KeyboardAvoidingView>
             )}
           </SheetLayer>
         </GestureHandlerRootView>
@@ -538,6 +536,35 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
     gap: 12,
   },
+  // ─── Skeleton ───
+  skeletonCard: {
+    height: 100,
+    borderRadius: 20,
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
+  // ─── Inline empty state ───
+  inlineEmpty: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 6,
+  },
+  inlineEmptyIcon: {
+    fontSize: 40,
+  },
+  inlineEmptyTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  inlineEmptySub: {
+    fontSize: 14,
+    color: Colors.textTertiary,
+    textAlign: 'center',
+  },
+
   // ─── Card ───
   cardTouchable: {
     borderRadius: 20,

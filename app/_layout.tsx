@@ -1,6 +1,7 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Appearance, View } from 'react-native';
+import { Appearance } from 'react-native';
+import SplashScreen from '../components/SplashScreen';
 import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
 import { SyncProvider } from '../contexts/SyncContext';
 import { useAuth } from '../hooks/useAuth';
@@ -82,25 +83,27 @@ function RootNavigator() {
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
   const { loading: authLoading } = useAuth();
 
   useEffect(() => {
     configureRevenueCat().then(() => setReady(true));
   }, []);
 
-  if (!ready || authLoading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator />
-      </View>
-    );
-  }
+  const appReady = ready && !authLoading;
 
   return (
-    <OnboardingProvider>
-      <SyncProvider>
-        <RootNavigator />
-      </SyncProvider>
-    </OnboardingProvider>
+    <>
+      {appReady && (
+        <OnboardingProvider>
+          <SyncProvider>
+            <RootNavigator />
+          </SyncProvider>
+        </OnboardingProvider>
+      )}
+      {showSplash && (
+        <SplashScreen ready={appReady} onDone={() => setShowSplash(false)} />
+      )}
+    </>
   );
 }

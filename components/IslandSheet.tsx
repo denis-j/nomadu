@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
+  Keyboard,
   Modal,
   ScrollView,
   StatusBar,
@@ -73,9 +74,9 @@ export function SheetLayer({
 }: SheetLayerProps) {
   const insets = useSafeAreaInsets();
   const sheetHeight = SCREEN_HEIGHT * snapPoint;
-  // Use full screen height to guarantee fully off-screen
   const hideY = SCREEN_HEIGHT;
   const [searchQuery, setSearchQuery] = useState('');
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   useEffect(() => {
     onSearchChange?.(searchQuery);
@@ -94,6 +95,16 @@ export function SheetLayer({
       setSearchQuery('');
     }
   }, [visible]);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', (e) => {
+      setKeyboardOffset(e.endCoordinates.height);
+    });
+    const hide = Keyboard.addListener('keyboardWillHide', () => {
+      setKeyboardOffset(0);
+    });
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   useEffect(() => {
     stackScale.value = withSpring(1 - depth * DEPTH_SCALE_STEP, SPRING_STACK);
@@ -134,7 +145,7 @@ export function SheetLayer({
         style={[
           styles.sheet,
           {
-            marginBottom: insets.bottom + 8,
+            marginBottom: keyboardOffset > 0 ? keyboardOffset - insets.bottom + 12 : insets.bottom + 8,
             height: sheetHeight,
             backgroundColor,
             borderRadius,

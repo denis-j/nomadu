@@ -1,20 +1,23 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { getAllJourneys, Journey } from '../lib/database';
 
 export function useJourneys() {
   const [journeys, setJourneys] = useState<Journey[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false);
+  const initialised = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
-      setLoading(true);
       const data = await getAllJourneys();
       setJourneys(data);
     } catch (error) {
       console.error('Failed to load journeys:', error);
     } finally {
-      setLoading(false);
+      if (!initialised.current) {
+        initialised.current = true;
+        setReady(true);
+      }
     }
   }, []);
 
@@ -24,5 +27,5 @@ export function useJourneys() {
     }, [refresh]),
   );
 
-  return { journeys, loading, refresh };
+  return { journeys, loading: !ready, refresh };
 }
