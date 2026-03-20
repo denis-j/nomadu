@@ -1,14 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Link } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
   Platform,
+  Pressable,
   SafeAreaView,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -40,6 +39,8 @@ const gradientColorSets = [
 ];
 
 export default function SignInScreen() {
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -112,15 +113,7 @@ export default function SignInScreen() {
       />
 
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardAvoidingView}
-        >
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
+          <View style={styles.scrollContent}>
             {/* Title */}
             <Animated.View
               entering={FadeIn.duration(400)}
@@ -138,31 +131,45 @@ export default function SignInScreen() {
               entering={FadeIn.delay(100).duration(400)}
               style={styles.formContainer}
             >
-              <Glass {...glassProps} style={[styles.inputContainer, !hasGlass && styles.inputFallback]}>
-                <TextInput
-                  style={styles.input}
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="Email"
-                  placeholderTextColor={Colors.textTertiary}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </Glass>
+              <Pressable onPress={() => emailRef.current?.focus()}>
+                <Glass {...glassProps} style={[styles.inputContainer, !hasGlass && styles.inputFallback]}>
+                  <TextInput
+                    ref={emailRef}
+                    style={styles.input}
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="Email"
+                    placeholderTextColor={Colors.textTertiary}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="email"
+                    textContentType="emailAddress"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                  />
+                </Glass>
+              </Pressable>
 
-              <Glass {...glassProps} style={[styles.inputContainer, !hasGlass && styles.inputFallback]}>
-                <TextInput
-                  style={styles.input}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="Password"
-                  placeholderTextColor={Colors.textTertiary}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </Glass>
+              <Pressable onPress={() => passwordRef.current?.focus()}>
+                <Glass {...glassProps} style={[styles.inputContainer, !hasGlass && styles.inputFallback]}>
+                  <TextInput
+                    ref={passwordRef}
+                    style={styles.input}
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Password"
+                    placeholderTextColor={Colors.textTertiary}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="password"
+                    textContentType="password"
+                    returnKeyType="done"
+                    onSubmitEditing={handleSignIn}
+                  />
+                </Glass>
+              </Pressable>
 
               {error && <Text style={styles.errorText}>{error}</Text>}
               {resetSent && <Text style={styles.successText}>Reset email sent — check your inbox.</Text>}
@@ -220,8 +227,7 @@ export default function SignInScreen() {
                 </TouchableOpacity>
               </View>
             </Animated.View>
-          </ScrollView>
-        </KeyboardAvoidingView>
+          </View>
       </SafeAreaView>
     </View>
   );
@@ -234,11 +240,8 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
   scrollContent: {
-    flexGrow: 1,
+    flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 32,
   },

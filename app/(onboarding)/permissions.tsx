@@ -276,14 +276,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 14,
     borderCurve: 'continuous',
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    backgroundColor: 'rgba(26, 26, 46, 0.08)',
+
     gap: 12,
   },
   featureIcon: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: 'rgba(26, 26, 46, 0.08)',
+    backgroundColor: 'rgba(26, 26, 46, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -317,6 +318,6 @@ const styles = StyleSheet.create({
   skipText: {
     fontSize: 15,
     fontWeight: '500',
-    color: Colors.textTertiary,
+    color: Colors.textSecondary,
   },
 });

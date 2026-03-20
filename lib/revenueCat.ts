@@ -9,6 +9,9 @@ const API_KEY = 'test_kXXfCMJCdwXmGftKoGShjPwOkJk';
 
 const ENTITLEMENT_ID = 'MMM 0 LLC Pro';
 
+// TODO: set to true once a production RevenueCat API key is configured
+const REVENUECAT_ENABLED = __DEV__;
+
 export const PRODUCT_IDS = {
   monthly: 'monthly',
   yearly: 'yearly',
@@ -18,6 +21,7 @@ export const PRODUCT_IDS = {
 let isConfigured = false;
 
 export async function configureRevenueCat(): Promise<void> {
+  if (!REVENUECAT_ENABLED) return;
   if (isConfigured) return;
 
   if (__DEV__) {
@@ -33,6 +37,9 @@ export async function checkProEntitlement(): Promise<{
   expirationDate: string | null;
   productIdentifier: string | null;
 }> {
+  if (!REVENUECAT_ENABLED) {
+    return { isActive: true, expirationDate: null, productIdentifier: null };
+  }
   try {
     const customerInfo = await Purchases.getCustomerInfo();
     const entitlement = customerInfo.entitlements.active[ENTITLEMENT_ID];
@@ -48,6 +55,7 @@ export async function checkProEntitlement(): Promise<{
 }
 
 export async function getOfferings(): Promise<PurchasesOffering | null> {
+  if (!REVENUECAT_ENABLED) return null;
   try {
     const offerings = await Purchases.getOfferings();
     return offerings.current;
@@ -57,6 +65,7 @@ export async function getOfferings(): Promise<PurchasesOffering | null> {
 }
 
 export async function getCustomerInfo(): Promise<CustomerInfo | null> {
+  if (!REVENUECAT_ENABLED) return null;
   try {
     return await Purchases.getCustomerInfo();
   } catch {
@@ -69,6 +78,7 @@ export async function restorePurchases(): Promise<CustomerInfo> {
 }
 
 export async function identifyUser(uid: string): Promise<void> {
+  if (!REVENUECAT_ENABLED) return;
   try {
     await Purchases.logIn(uid);
   } catch {
@@ -77,6 +87,7 @@ export async function identifyUser(uid: string): Promise<void> {
 }
 
 export async function logOutUser(): Promise<void> {
+  if (!REVENUECAT_ENABLED) return;
   try {
     await Purchases.logOut();
   } catch {

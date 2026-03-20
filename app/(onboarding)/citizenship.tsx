@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
   markerFlagActive: { fontSize: 24 },
   bottomCard: {
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingBottom: 0,
   },
   confirmCard: {
     flexDirection: 'row',

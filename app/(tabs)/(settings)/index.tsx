@@ -406,6 +406,7 @@ export default function SettingsScreen() {
     </ScrollView>
 
       <IslandSheet
+        inline
         visible={trackingSheetVisible}
         onClose={() => setTrackingSheetVisible(false)}
         title="Location Tracking"

@@ -235,20 +235,31 @@ export function SheetBackdrop({
 
 export interface IslandSheetProps extends SheetLayerProps {
   blurIntensity?: number;
+  /** Render inline (no Modal) so the tab bar stays visible */
+  inline?: boolean;
 }
 
-export function IslandSheet({ blurIntensity = 80, ...props }: IslandSheetProps) {
+export function IslandSheet({ blurIntensity = 80, inline = false, ...props }: IslandSheetProps) {
   const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
     if (props.visible) {
       setModalVisible(true);
     } else if (modalVisible) {
-      // Keep modal open while close animation plays, then hide
       const timer = setTimeout(() => setModalVisible(false), 350);
       return () => clearTimeout(timer);
     }
   }, [props.visible]);
+
+  if (inline) {
+    if (!modalVisible) return null;
+    return (
+      <GestureHandlerRootView style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+        <SheetBackdrop visible={props.visible} onPress={props.onClose} blurIntensity={blurIntensity} />
+        <SheetLayer {...props} />
+      </GestureHandlerRootView>
+    );
+  }
 
   return (
     <Modal visible={modalVisible} transparent animationType="none" statusBarTranslucent onRequestClose={props.onClose}>

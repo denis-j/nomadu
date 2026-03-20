@@ -185,8 +185,6 @@ const styles = StyleSheet.create({
   },
   optionCardSelected: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderWidth: 2,
-    borderColor: Colors.primary,
   },
   optionIcon: {
     width: 48,
