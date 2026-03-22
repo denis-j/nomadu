@@ -47,7 +47,7 @@ export default function CreateJourneyScreen() {
           ),
         }}
       />
-      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <TextInput
           style={styles.input}
           value={title}
@@ -64,7 +64,7 @@ export default function CreateJourneyScreen() {
             <Pressable
               key={suggestion}
               style={styles.chip}
-              onPress={() => setTitle(suggestion)}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTitle(suggestion); }}
             >
               <Text style={styles.chipText}>{suggestion}</Text>
             </Pressable>
