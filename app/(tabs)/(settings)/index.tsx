@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import RevenueCatUI from 'react-native-purchases-ui';
 import { Colors } from '../../../constants/colors';
 import { useAuth } from '../../../hooks/useAuth';
 import { useLocation } from '../../../hooks/useLocation';
@@ -84,9 +83,17 @@ export default function SettingsScreen() {
   const handleManageSubscription = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      await RevenueCatUI.presentCustomerCenter();
+      if (__DEV__) {
+        const RevenueCatUI = require('react-native-purchases-ui').default;
+        await RevenueCatUI.presentCustomerCenter();
+      } else {
+        if (Platform.OS === 'ios') {
+          Linking.openURL('https://apps.apple.com/account/subscriptions');
+        } else {
+          Linking.openURL('https://play.google.com/store/account/subscriptions');
+        }
+      }
     } catch {
-      // Fallback: open platform subscription management
       if (Platform.OS === 'ios') {
         Linking.openURL('https://apps.apple.com/account/subscriptions');
       } else {

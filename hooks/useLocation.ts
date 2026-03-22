@@ -31,21 +31,17 @@ export function useLocation() {
     refresh();
   }, [refresh]);
 
-  // When the app comes to the foreground, do an immediate location check
-  // so trips are up-to-date without waiting for the next background wake.
+  // Refresh permission/tracking status when returning to foreground
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', async (nextState) => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
       if (appState.current.match(/inactive|background/) && nextState === 'active') {
-        const active = await isTrackingActive();
-        if (active) {
-          foregroundLocationCheck();
-        }
+        refresh();
       }
       appState.current = nextState;
     });
 
     return () => subscription.remove();
-  }, []);
+  }, [refresh]);
 
   const toggleTracking = useCallback(async () => {
     try {

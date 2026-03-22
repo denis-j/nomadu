@@ -429,6 +429,8 @@ export default function JourneysScreen() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
+  if (loading) return null;
+
   return (
     <>
       <Stack.Screen options={{ title: 'Plan Trips', headerRight }} />

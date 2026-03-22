@@ -1,25 +1,27 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from './useAuth';
 import { getCitizenship } from '../lib/onboarding';
-import { getAllTripsRaw, Trip } from '../lib/database';
+import { getAllTripsRaw } from '../lib/database';
 import { calculateAllVisaStatuses, VisaStatus } from '../lib/visaCalculations';
+import { getVisaStatusesCache } from '../lib/prefetch';
 
 export function useVisaTracker() {
   const { user } = useAuth();
-  const [visaStatuses, setVisaStatuses] = useState<VisaStatus[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cached = getVisaStatusesCache();
+  const [visaStatuses, setVisaStatuses] = useState<VisaStatus[]>(cached ?? []);
+  const [ready, setReady] = useState(cached !== null);
   const [citizenshipCode, setCitizenshipCode] = useState<string | null>(null);
   const [citizenshipCountry, setCitizenshipCountry] = useState<string | null>(null);
+  const initialised = useRef(cached !== null);
 
   const refresh = useCallback(async () => {
     if (!user) {
-      setLoading(false);
+      if (!initialised.current) { initialised.current = true; setReady(true); }
       return;
     }
 
     try {
-      setLoading(true);
       const citizenship = await getCitizenship(user.uid);
       if (!citizenship) {
         setCitizenshipCode(null);
@@ -37,7 +39,7 @@ export function useVisaTracker() {
     } catch (error) {
       console.error('Failed to load visa statuses:', error);
     } finally {
-      setLoading(false);
+      if (!initialised.current) { initialised.current = true; setReady(true); }
     }
   }, [user]);
 
@@ -47,5 +49,5 @@ export function useVisaTracker() {
     }, [refresh])
   );
 
-  return { visaStatuses, loading, citizenshipCode, citizenshipCountry, refresh };
+  return { visaStatuses, loading: !ready, citizenshipCode, citizenshipCountry, refresh };
 }

@@ -1,10 +1,13 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { getAllTrips, Trip } from '../lib/database';
+import { getTripsCache } from '../lib/prefetch';
 
 export function useTrips() {
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cached = getTripsCache();
+  const [trips, setTrips] = useState<Trip[]>(cached ?? []);
+  const [ready, setReady] = useState(cached !== null);
+  const initialised = useRef(cached !== null);
 
   const refresh = useCallback(async () => {
     try {
@@ -13,7 +16,10 @@ export function useTrips() {
     } catch (error) {
       console.error('Failed to load trips:', error);
     } finally {
-      setLoading(false);
+      if (!initialised.current) {
+        initialised.current = true;
+        setReady(true);
+      }
     }
   }, []);
 
@@ -32,5 +38,5 @@ export function useTrips() {
     return acc;
   }, {});
 
-  return { trips, groupedTrips, loading, refresh };
+  return { trips, groupedTrips, loading: !ready, refresh };
 }

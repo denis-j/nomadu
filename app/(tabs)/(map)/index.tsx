@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
-import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AppState, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
@@ -21,6 +21,7 @@ import { parseDate, Trip } from '../../../lib/database';
 import { VisaStatus } from '../../../lib/visaCalculations';
 import { TaxStatus } from '../../../lib/taxCalculations';
 import { SCHENGEN_COUNTRIES } from '../../../constants/visaRules';
+import { checkLocationPermissions, foregroundLocationCheck, isTrackingActive, startBackgroundTracking } from '../../../lib/location';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const EXPANDED_WIDTH = SCREEN_WIDTH - 32;
@@ -59,10 +60,11 @@ interface MorphChipProps {
 }
 
 function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipProps) {
-  const [expanded, setExpanded] = useState(false);
   const [chipWidth, setChipWidth] = useState(0);
-  const [chipRowHeight, setChipRowHeight] = useState(0);
+  const [rowHeight, setRowHeight] = useState(0);
+  const [statsHeight, setStatsHeight] = useState(0);
   const progress = useSharedValue(0);
+  const isExpanded = useSharedValue(false);
 
   const flag = countryCodeToFlag(currentTrip.country_code);
   const totalDaysInCity = trips
@@ -89,8 +91,8 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
   const taxStatus = taxStatuses.find((t) => t.countryCode === currentTrip.country_code) ?? null;
 
   const handlePress = () => {
-    const next = !expanded;
-    setExpanded(next);
+    const next = !isExpanded.value;
+    isExpanded.value = next;
     if (next) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       progress.value = withTiming(1, OPEN_CONFIG);
@@ -100,19 +102,21 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
     }
   };
 
+  const PAD = 28; // paddingVertical 14 * 2
+  const collapsedH = rowHeight > 0 ? rowHeight + PAD : 0;
+  const expandedH = rowHeight > 0 && statsHeight > 0 ? rowHeight + statsHeight + PAD : 0;
+
   const containerStyle = useAnimatedStyle(() => ({
     width:
       chipWidth > 0
         ? interpolate(progress.value, [0, 1], [chipWidth, EXPANDED_WIDTH])
         : undefined,
     borderRadius: interpolate(progress.value, [0, 1], [100, 22]),
-    paddingVertical: interpolate(progress.value, [0, 1], [10, 14]),
-    paddingHorizontal: interpolate(progress.value, [0, 1], [16, 18]),
-    maxHeight: interpolate(
-      progress.value,
-      [0, 1],
-      [chipRowHeight > 0 ? chipRowHeight + 20 : 50, 300]
-    ),
+    height:
+      collapsedH > 0 && expandedH > 0
+        ? interpolate(progress.value, [0, 1], [collapsedH, expandedH])
+        : undefined,
+    overflow: 'hidden',
   }));
 
   const statsOpacity = useAnimatedStyle(() => ({
@@ -138,7 +142,7 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
         <View
           style={styles.chipRow}
           onLayout={(e) => {
-            if (chipRowHeight === 0) setChipRowHeight(e.nativeEvent.layout.height);
+            if (rowHeight === 0) setRowHeight(e.nativeEvent.layout.height);
           }}
         >
           <Text style={styles.chipFlag}>{flag}</Text>
@@ -147,8 +151,13 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
           <Text style={styles.chipCountry}>{currentTrip.country}</Text>
         </View>
 
-        {/* Stats – always mounted, clipped by maxHeight + faded by opacity */}
-        <Animated.View style={[styles.statsSection, statsOpacity]}>
+        {/* Stats – always mounted, clipped by height + faded by opacity */}
+        <Animated.View
+          style={[styles.statsSection, statsOpacity]}
+          onLayout={(e) => {
+            if (statsHeight === 0) setStatsHeight(e.nativeEvent.layout.height);
+          }}
+        >
           <View style={styles.expandDivider} />
 
           {/* Row 1: Here · Arrived · Total */}
@@ -194,9 +203,36 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
 }
 
 export default function MapScreen() {
-  const { trips, loading } = useTrips();
+  const { trips, loading, refresh } = useTrips();
   const { visaStatuses } = useVisaTracker();
   const { taxStatuses } = useTaxTracker();
+  const appState = useRef(AppState.currentState);
+
+  // On mount and when returning to foreground: fetch location immediately if
+  // tracking is active, then refresh trips so the chip updates without waiting
+  // for the next background wake-up.
+  useEffect(() => {
+    async function checkAndRefresh() {
+      const perms = await checkLocationPermissions();
+      if (!perms.isAlways) return;
+      // Start background tracking if not yet registered (permissions granted but task not running)
+      const active = await isTrackingActive();
+      if (!active) await startBackgroundTracking();
+      await foregroundLocationCheck();
+      refresh();
+    }
+
+    checkAndRefresh();
+
+    const sub = AppState.addEventListener('change', async (next) => {
+      if (appState.current.match(/inactive|background/) && next === 'active') {
+        checkAndRefresh();
+      }
+      appState.current = next;
+    });
+
+    return () => sub.remove();
+  }, []);
 
   const hasTrips = !loading && trips.length > 0;
   const currentTrip = hasTrips ? trips[0] : null;
@@ -258,6 +294,8 @@ const styles = StyleSheet.create({
   // ─── MorphChip ───
   morphContainer: {
     overflow: 'hidden',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
   },
   morphFallback: {
     backgroundColor: 'rgba(255,255,255,0.88)',
@@ -269,6 +307,7 @@ const styles = StyleSheet.create({
   chipRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
   },
   chipFlag: {

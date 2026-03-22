@@ -23,7 +23,7 @@ const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 export default function StatsScreen() {
-  const { stats, refresh: refreshStats } = useStats();
+  const { stats, loading, refresh: refreshStats } = useStats();
   const { visaStatuses, loading: visaLoading, refresh: refreshVisa } = useVisaTracker();
   const { taxStatuses, loading: taxLoading, refresh: refreshTax } = useTaxTracker();
   const [refreshing, setRefreshing] = useState(false);
@@ -41,6 +41,7 @@ export default function StatsScreen() {
   const mostCritical = visaStatuses.length > 0 ? visaStatuses[0] : null;
   const mostCriticalTax = taxStatuses.length > 0 ? taxStatuses[0] : null;
 
+      if (loading || visaLoading || taxLoading) return null;
       if (stats.totalDays < 1) {
         return (
           <EmptyState

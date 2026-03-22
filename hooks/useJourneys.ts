@@ -1,11 +1,13 @@
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { getAllJourneys, Journey } from '../lib/database';
+import { getJourneysCache } from '../lib/prefetch';
 
 export function useJourneys() {
-  const [journeys, setJourneys] = useState<Journey[]>([]);
-  const [ready, setReady] = useState(false);
-  const initialised = useRef(false);
+  const cached = getJourneysCache();
+  const [journeys, setJourneys] = useState<Journey[]>(cached ?? []);
+  const [ready, setReady] = useState(cached !== null);
+  const initialised = useRef(cached !== null);
 
   const refresh = useCallback(async () => {
     try {

@@ -7,6 +7,7 @@ import { SyncProvider } from '../contexts/SyncContext';
 import { useAuth } from '../hooks/useAuth';
 import { useSubscription } from '../hooks/useSubscription';
 import { configureRevenueCat, identifyUser } from '../lib/revenueCat';
+import { prefetchAll, prefetchUserData } from '../lib/prefetch';
 
 // Force light mode globally
 Appearance.setColorScheme('light');
@@ -17,7 +18,6 @@ function RootNavigator() {
   const { onboardingDone } = useOnboarding();
   const router = useRouter();
   const segments = useSegments();
-
   useEffect(() => {
     if (authLoading) return;
     if (user && onboardingDone === null) return;
@@ -83,14 +83,20 @@ function RootNavigator() {
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
+  const [userDataReady, setUserDataReady] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
-  const { loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    configureRevenueCat().then(() => setReady(true));
+    Promise.all([configureRevenueCat(), prefetchAll()]).then(() => setReady(true));
   }, []);
 
-  const appReady = ready && !authLoading;
+  useEffect(() => {
+    if (!user) return;
+    prefetchUserData(user.uid).then(() => setUserDataReady(true));
+  }, [user?.uid]);
+
+  const appReady = ready && !authLoading && (!user || userDataReady);
 
   return (
     <>

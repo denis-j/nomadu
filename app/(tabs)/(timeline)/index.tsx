@@ -460,6 +460,7 @@ export default function TimelineScreen() {
   const PillShell = hasGlass ? GlassView : View;
 
   const renderContent = () => {
+    if (loading) return null;
     if (!loading && trips.length === 0) {
       return (
         <EmptyState
