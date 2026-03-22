@@ -60,9 +60,8 @@ export default function CityDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView
-        contentContainerStyle={styles.content}
-        contentInsetAdjustmentBehavior="automatic"
+      <View
+        style={styles.content}
       >
         {/* Hero Map */}
         {coordTrip?.latitude && coordTrip?.longitude && (
@@ -162,7 +161,7 @@ export default function CityDetailScreen() {
             })}
           </View>
         </View>
-      </ScrollView>
+      </View>
     </>
   );
 }

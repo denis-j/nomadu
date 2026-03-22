@@ -11,6 +11,7 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useTrips } from '../../../hooks/useTrips';
 import { TripCard } from '../../../components/TripCard';
@@ -342,7 +343,13 @@ export default function TimelineScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {/* One continuous line behind everything */}
-        <View style={styles.timelineLine} />
+        <View style={styles.timelineLine}>
+          <LinearGradient
+            colors={['transparent', Colors.primary + '30', Colors.primary + '30', 'transparent']}
+            locations={[0, 0.02, 0.98, 1]}
+            style={{ flex: 1 }}
+          />
+        </View>
 
         {sections.map((section) => (
           <View key={section.title}>
@@ -431,7 +438,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 16 + 28 / 2 - 1, // paddingLeft + half timeline col - half line width
     width: 2,
-    backgroundColor: Colors.primary + '30',
+    overflow: 'hidden',
   },
   sectionHeader: {
     flexDirection: 'row',

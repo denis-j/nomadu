@@ -271,7 +271,7 @@ function JourneyCard({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     ActionSheetIOS.showActionSheetWithOptions(
       {
-        options: ['Delete Trip', 'Cancel'],
+        options: ['Delete trip', 'Cancel'],
         destructiveButtonIndex: 0,
         cancelButtonIndex: 1,
         title: journey.title,

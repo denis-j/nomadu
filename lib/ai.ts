@@ -46,6 +46,7 @@ export async function suggestNextStops(
   journeyTitle: string,
   legs: { city: string; country: string; startDate: string; endDate: string }[],
   visaTaxContext?: string,
+  userPreference?: string,
 ): Promise<StopSuggestion[]> {
   const itinerary = legs
     .map((l) => `• ${l.city}, ${l.country} (${l.startDate} → ${l.endDate})`)
@@ -57,13 +58,17 @@ export async function suggestNextStops(
     ? `\nTraveler visa & tax constraints — factor these into your suggestions:\n${visaTaxContext}\n`
     : '';
 
+  const preferenceBlock = userPreference?.trim()
+    ? `\nUSER PREFERENCE (high priority — shape your suggestions around this):\n"${userPreference.trim()}"\n`
+    : '';
+
   const prompt = `You are a travel planning assistant specialized in digital nomads.
 
 INPUT
 Journey title: "${journeyTitle}"
 Existing stops:
 ${itinerary}
-${contextBlock}
+${contextBlock}${preferenceBlock}
 Last stop end date: ${lastEnd}
 
 TASK
@@ -71,10 +76,13 @@ Suggest exactly 3 next destinations.
 
 CONSTRAINTS
 - The last stop defines the current country
-- Suggest the first 2 destinations in the SAME country as the last stop
+${userPreference?.trim()
+  ? `- If the user preference implies specific destinations, countries, or themes: follow those over default country rules
+- Otherwise fall back to: first 2 in same country, 3rd in a different country`
+  : `- Suggest the first 2 destinations in the SAME country as the last stop
 - These should explore new regions/cities, including islands where relevant
 - The 3rd destination MUST be in a DIFFERENT country
-- The new country must be geographically close and logically connected
+- The new country must be geographically close and logically connected`}
 - Each suggestion is an independent option, not part of a sequence
 - Prefer nearby or well-connected locations before long-haul jumps
 - Ensure variety across the 3 suggestions

@@ -54,9 +54,8 @@ export default function TripDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView
-        contentContainerStyle={styles.content}
-        contentInsetAdjustmentBehavior="automatic"
+      <View
+        style={styles.content}
       >
         {/* Hero Map */}
         {trip.latitude && trip.longitude && (
@@ -136,7 +135,7 @@ export default function TripDetailScreen() {
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={() =>
-            Alert.alert('Delete Trip', `Remove ${trip.city}, ${trip.country}?`, [
+            Alert.alert('Delete entry', `Remove ${trip.city}, ${trip.country}?`, [
               { text: 'Cancel', style: 'cancel' },
               {
                 text: 'Delete',
@@ -150,9 +149,9 @@ export default function TripDetailScreen() {
           }
           activeOpacity={0.5}
         >
-          <Text style={styles.deleteText}>Delete Trip</Text>
+          <Text style={styles.deleteText}>Delete entry</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
     </>
   );
 }

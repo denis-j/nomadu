@@ -5,9 +5,11 @@ import Animated, {
   FadeIn, FadeOut,
 } from 'react-native-reanimated';
 import {
+  PlatformColor,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -36,6 +38,7 @@ import { getCountryCode } from '../../../utils/geography';
 import { suggestNextStops, StopSuggestion } from '../../../lib/ai';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { LinearGradient } from 'expo-linear-gradient';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const hasGlass = isLiquidGlassAvailable();
@@ -446,7 +449,7 @@ function SuggestionLegCard({
             <Text style={styles.suggFlag}>{flag || '🌍'}</Text>
             <View style={styles.suggCardTopRight}>
               <View style={styles.aiBadge}>
-                <Text style={styles.aiBadgeText}>✨ AI</Text>
+                <Text style={styles.aiBadgeText}>AI</Text>
               </View>
               <View style={styles.daysBadge}>
                 <Text style={styles.daysText}>{days}d</Text>
@@ -493,6 +496,7 @@ function SuggestionLegCard({
 function AISuggestionsSection({
   suggestions, suggestionsLoading, suggestionsError,
   collapsed, onToggleCollapse, onRefresh, onAdd, hasGlass,
+  preference, onPreferenceChange, onPreferenceSubmit,
 }: {
   suggestions: StopSuggestion[];
   suggestionsLoading: boolean;
@@ -502,7 +506,11 @@ function AISuggestionsSection({
   onRefresh: () => void;
   onAdd: (s: StopSuggestion) => void;
   hasGlass: boolean;
+  preference: string;
+  onPreferenceChange: (text: string) => void;
+  onPreferenceSubmit: () => void;
 }) {
+  const [showInput, setShowInput] = useState(false);
   const PillShell = hasGlass ? GlassView : View;
 
   // Shared values
@@ -546,6 +554,7 @@ function AISuggestionsSection({
             )}
           >
             <Text style={styles.aiPillText}>✨ AI suggestions</Text>
+            <View style={styles.betaBadge}><Text style={styles.betaBadgeText}>BETA</Text></View>
             <Animated.View style={chevronStyle}>
               <Ionicons name="chevron-down" size={13} color={Colors.primary} />
             </Animated.View>
@@ -559,6 +568,20 @@ function AISuggestionsSection({
           {suggestionsError && !suggestionsLoading && (
             <Text style={[styles.aiPillStatus, { color: Colors.error }]}>Failed</Text>
           )}
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowInput((v) => !v);
+            }}
+            disabled={suggestionsLoading}
+            hitSlop={8}
+          >
+            <Ionicons
+              name="create-outline"
+              size={15}
+              color={Colors.primary}
+            />
+          </TouchableOpacity>
           <TouchableOpacity onPress={onRefresh} disabled={suggestionsLoading} hitSlop={8}>
             <Ionicons
               name="refresh"
@@ -573,12 +596,55 @@ function AISuggestionsSection({
         <View
           onLayout={(e) => {
             const h = e.nativeEvent.layout.height;
-            if (h > 0 && !measured.value) {
+            if (h > 0) {
               contentHeight.value = h;
               measured.value = true;
             }
           }}
         >
+          {showInput && (
+            <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={styles.aiInputWrap}>
+              <View style={styles.aiInputRow}>
+                <TextInput
+                  style={styles.aiInput}
+                  value={preference}
+                  onChangeText={onPreferenceChange}
+                  placeholder="Beautiful islands, cheap cities..."
+                  placeholderTextColor={PlatformColor('placeholderText')}
+                  returnKeyType="search"
+                  onSubmitEditing={onPreferenceSubmit}
+                  maxLength={120}
+                  editable={!suggestionsLoading}
+                  autoFocus
+                />
+                <TouchableOpacity
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    onPreferenceSubmit();
+                  }}
+                  disabled={suggestionsLoading || !preference.trim()}
+                  style={[styles.aiInputButton, { opacity: !preference.trim() || suggestionsLoading ? 0.3 : 1 }]}
+                  hitSlop={8}
+                >
+                  <Ionicons name="arrow-up-circle" size={28} color={Colors.primary} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.aiChipsRow}>
+                {['Beaches', 'Mountains', 'Islands', 'Cheap cities', 'Nightlife', 'Culture'].map((chip) => (
+                  <Pressable
+                    key={chip}
+                    style={styles.aiChip}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      onPreferenceChange(chip);
+                    }}
+                  >
+                    <Text style={styles.aiChipText}>{chip}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </Animated.View>
+          )}
           {suggestions.map((s, i) => (
             <SuggestionLegCard key={i} suggestion={s} onAdd={() => onAdd(s)} disabled={suggestionsLoading} />
           ))}
@@ -590,20 +656,28 @@ function AISuggestionsSection({
 
 // ─── Timeline Line (scrolls with content but stays put during drag) ──────────
 
-function TimelineLine({ scrollY, topOffset }: { scrollY: Animated.SharedValue<number>; topOffset: number }) {
+function TimelineLine({ scrollY, topOffset, lineHeight }: { scrollY: Animated.SharedValue<number>; topOffset: number; lineHeight: number }) {
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -scrollY.value }],
   }));
+
+  const lineColor = Colors.primary + '20';
 
   return (
     <Animated.View
       pointerEvents="none"
       style={[
         styles.timelineLine,
-        { top: topOffset },
+        { top: topOffset, height: lineHeight || 5000 },
         animStyle,
       ]}
-    />
+    >
+      <LinearGradient
+        colors={['transparent', lineColor, lineColor, 'transparent']}
+        locations={[0, 0.04, 0.96, 1]}
+        style={{ flex: 1 }}
+      />
+    </Animated.View>
   );
 }
 
@@ -660,6 +734,7 @@ export default function JourneyDetailScreen() {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState(false);
   const [suggestionsCollapsed, setSuggestionsCollapsed] = useState(false);
+  const [aiPreference, setAiPreference] = useState('');
 
   const cacheKey = `ai_sugg_${journeyId}`;
 
@@ -667,7 +742,7 @@ export default function JourneyDetailScreen() {
   const legFingerprint = (legs: JourneyLeg[]) =>
     legs.map((l) => l.id).sort((a, b) => a - b).join(',');
 
-  const loadSuggestions = useCallback(async (force = false) => {
+  const loadSuggestions = useCallback(async (force = false, preference?: string) => {
     if (!journey || journey.legs.length === 0) return;
     setSuggestionsLoading(true);
     setSuggestionsError(false);
@@ -675,8 +750,8 @@ export default function JourneyDetailScreen() {
       if (!force) {
         const raw = await AsyncStorage.getItem(cacheKey);
         if (raw) {
-          const { suggestions: cached, fingerprint } = JSON.parse(raw);
-          if (fingerprint === legFingerprint(journey.legs) && cached?.length > 0) {
+          const { suggestions: cached, fingerprint, pref } = JSON.parse(raw);
+          if (fingerprint === legFingerprint(journey.legs) && (pref ?? '') === (preference ?? '') && cached?.length > 0) {
             setSuggestions(cached);
             return;
           }
@@ -689,11 +764,13 @@ export default function JourneyDetailScreen() {
           startDate: l.start_date, endDate: l.end_date,
         })),
         visaTaxRef.current?.visaTaxContext,
+        preference,
       );
       setSuggestions(result);
       await AsyncStorage.setItem(cacheKey, JSON.stringify({
         suggestions: result,
         fingerprint: legFingerprint(journey.legs),
+        pref: preference ?? '',
       }));
     } catch (err) {
       console.error('[AI] suggestNextStops failed:', err);
@@ -703,10 +780,18 @@ export default function JourneyDetailScreen() {
     }
   }, [journey, cacheKey]);
 
-  // Auto-load when journey is ready (uses cache if legs unchanged)
+  // Auto-load when journey is ready — restore preference from cache
   useEffect(() => {
     if (journey && journey.legs.length > 0) {
-      loadSuggestions(false);
+      AsyncStorage.getItem(cacheKey).then((raw) => {
+        if (raw) {
+          const { pref } = JSON.parse(raw);
+          if (pref) setAiPreference(pref);
+          loadSuggestions(false, pref || undefined);
+        } else {
+          loadSuggestions(false);
+        }
+      }).catch(() => loadSuggestions(false));
     }
   }, [journey?.id, journey?.legs.length]);
 
@@ -783,6 +868,8 @@ export default function JourneyDetailScreen() {
 
   // ─── Timeline line offset ──────────────────────────────────────────────────
   const [timelineTop, setTimelineTop] = useState(0);
+  const [contentSize, setContentSize] = useState(0);
+  const [footerHeight, setFooterHeight] = useState(0);
 
   // ─── Drag & Drop reorder ─────────────────────────────────────────────────────
 
@@ -851,20 +938,26 @@ export default function JourneyDetailScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setSuggestionsCollapsed((c) => !c);
           }}
-          onRefresh={() => loadSuggestions(true)}
+          onRefresh={() => loadSuggestions(true, aiPreference || undefined)}
           onAdd={handleAddSuggestion}
           hasGlass={hasGlass}
+          preference={aiPreference}
+          onPreferenceChange={setAiPreference}
+          onPreferenceSubmit={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            loadSuggestions(true, aiPreference || undefined);
+          }}
         />
       )}
       {legs.length > 0 && (
-        <View style={styles.timelineEndCap}>
+        <View onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)} style={styles.timelineEndCap}>
           <View style={styles.endCapDot}>
             <View style={styles.endCapDotInner} />
           </View>
         </View>
       )}
     </>
-  ), [legs.length, suggestions, suggestionsLoading, suggestionsError, suggestionsCollapsed, handleAddSuggestion, loadSuggestions]);
+  ), [legs.length, suggestions, suggestionsLoading, suggestionsError, suggestionsCollapsed, aiPreference, handleAddSuggestion, loadSuggestions]);
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
@@ -893,7 +986,7 @@ export default function JourneyDetailScreen() {
         <GestureHandlerRootView style={{ flex: 1 }}>
           {/* Static timeline line — doesn't move during drag */}
           {legs.length > 0 && timelineTop > 0 && (
-            <TimelineLine scrollY={scrollY} topOffset={timelineTop} />
+            <TimelineLine scrollY={scrollY} topOffset={timelineTop} lineHeight={contentSize > timelineTop ? contentSize - timelineTop - footerHeight - 70 : 5000} />
           )}
           <DraggableFlatList
             data={legs}
@@ -906,6 +999,7 @@ export default function JourneyDetailScreen() {
             contentInsetAdjustmentBehavior="never"
             contentContainerStyle={styles.content}
             activationDistance={15}
+            onContentSizeChange={(_, h) => setContentSize(h)}
           />
         </GestureHandlerRootView>
       )}
@@ -968,9 +1062,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16 + 14 - 1, // paddingLeft + half dotCol - half lineWidth
     width: 2,
-    height: 5000, // tall enough to cover all content
-    backgroundColor: Colors.primary + '20',
     zIndex: 0,
+    overflow: 'hidden',
   },
   timelineEndCap: {
     flexDirection: 'row',
@@ -1155,15 +1248,68 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.textSecondary,
   },
+  betaBadge: {
+    backgroundColor: Colors.primary + '20',
+    borderRadius: 6,
+    borderCurve: 'continuous',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  betaBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: Colors.primary,
+    letterSpacing: 0.5,
+  },
   aiPillRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 10,
     marginLeft: 10,
   },
   aiPillStatus: {
     fontSize: 12,
     color: Colors.textTertiary,
+  },
+  aiInputWrap: {
+    marginLeft: 28,
+    marginRight: 16,
+    marginBottom: 12,
+    gap: 10,
+  },
+  aiInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aiChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  aiChip: {
+    backgroundColor: Colors.primary + '18',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  aiChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  aiInput: {
+    flex: 1,
+    backgroundColor: PlatformColor('secondarySystemGroupedBackground'),
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: PlatformColor('label'),
+  },
+  aiInputButton: {
+    padding: 2,
   },
 
   // ─── Suggestion card (mirrors TripCard) ───
