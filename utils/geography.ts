@@ -1,4 +1,4 @@
-import { countries, cities as citiesLib } from 'country-cities';
+import { Country, City, ICity } from 'country-state-city';
 
 export interface CountryInfo {
   name: string;
@@ -11,16 +11,14 @@ export interface CityInfo {
   latlong: { latitude: string; longitude: string };
 }
 
-const citiesCache = new Map<string, string[]>();
-
-// ─── Lazy-loaded country cache ───
+// ─── Lazy caches ─────────────────────────────────────────────────────────────
 
 let _allCountries: CountryInfo[] | null = null;
 let _countryNames: string[] | null = null;
 
 function ensureCountries() {
   if (!_allCountries) {
-    _allCountries = countries.all().map((c: any) => ({
+    _allCountries = Country.getAllCountries().map((c) => ({
       name: c.name,
       isoCode: c.isoCode,
       flag: c.flag,
@@ -28,6 +26,29 @@ function ensureCountries() {
     _countryNames = _allCountries.map((c) => c.name).sort();
   }
 }
+
+// Cities cache: countryIsoCode → deduplicated sorted city names
+const citiesCache = new Map<string, string[]>();
+
+function getCitiesForIso(isoCode: string): string[] {
+  if (citiesCache.has(isoCode)) return citiesCache.get(isoCode)!;
+
+  const raw = City.getCitiesOfCountry(isoCode) ?? [];
+  // Deduplicate by name (some countries have duplicate city names across states)
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const c of raw) {
+    if (!seen.has(c.name)) {
+      seen.add(c.name);
+      names.push(c.name);
+    }
+  }
+  names.sort((a, b) => a.localeCompare(b));
+  citiesCache.set(isoCode, names);
+  return names;
+}
+
+// ─── Countries ───────────────────────────────────────────────────────────────
 
 export function getAllCountries(): CountryInfo[] {
   ensureCountries();
@@ -39,7 +60,6 @@ export function getCountryNames(): string[] {
   return _countryNames!;
 }
 
-// Popular countries shown before searching
 const POPULAR_COUNTRIES = [
   'Germany', 'United States', 'United Kingdom', 'France', 'Spain',
   'Italy', 'Portugal', 'Netherlands', 'Austria', 'Switzerland',
@@ -57,59 +77,58 @@ export function searchCountries(query: string): string[] {
   return getCountryNames().filter((c) => c.toLowerCase().includes(q));
 }
 
-export async function getCitiesByCountryAsync(countryName: string): Promise<string[]> {
-  if (citiesCache.has(countryName)) {
-    return citiesCache.get(countryName)!;
-  }
-  
-  const country = countries.all().find(
-    (c: any) => c.name.toLowerCase() === countryName.toLowerCase()
+// ─── Cities ──────────────────────────────────────────────────────────────────
+
+function resolveIsoCode(countryName: string): string {
+  ensureCountries();
+  const found = _allCountries!.find(
+    (c) => c.name.toLowerCase() === countryName.toLowerCase(),
   );
-  
-  if (!country) return [];
-  
-  const countryCities = await citiesLib.getByCountry(country.isoCode) ?? [];
-  const cityNames = countryCities.map((city: any) => city.name);
-  citiesCache.set(countryName, cityNames);
-  return cityNames;
+  return found?.isoCode ?? 'XX';
+}
+
+export async function getCitiesByCountryAsync(countryName: string): Promise<string[]> {
+  return getCitiesForIso(resolveIsoCode(countryName));
 }
 
 export async function getCitiesByCountryPaginated(
   countryName: string,
   page: number = 1,
-  limit: number = 100
+  limit: number = 100,
 ): Promise<{ cities: string[]; hasMore: boolean; total: number }> {
-  const allCities = await getCitiesByCountryAsync(countryName);
-  const total = allCities.length;
+  const all = getCitiesForIso(resolveIsoCode(countryName));
   const start = (page - 1) * limit;
   const end = start + limit;
-  
-  return {
-    cities: allCities.slice(start, end),
-    hasMore: end < total,
-    total,
-  };
+  return { cities: all.slice(start, end), hasMore: end < all.length, total: all.length };
 }
 
 export async function searchCitiesByCountry(
   countryName: string,
-  query: string
+  query: string,
 ): Promise<string[]> {
-  const allCities = await getCitiesByCountryAsync(countryName);
+  const all = getCitiesForIso(resolveIsoCode(countryName));
   const q = query.toLowerCase();
-  return allCities.filter((city) => city.toLowerCase().includes(q));
+  // Prefix matches first, then includes — max 50 results
+  const prefix: string[] = [];
+  const contains: string[] = [];
+  for (const city of all) {
+    const lower = city.toLowerCase();
+    if (lower.startsWith(q)) prefix.push(city);
+    else if (lower.includes(q)) contains.push(city);
+    if (prefix.length + contains.length >= 50) break;
+  }
+  return [...prefix, ...contains];
 }
 
+// ─── Utilities ───────────────────────────────────────────────────────────────
+
 export function getCountryCode(countryName: string): string {
-  const country = countries.all().find(
-    (c: any) => c.name.toLowerCase() === countryName.toLowerCase()
-  );
-  return country?.isoCode ?? 'XX';
+  return resolveIsoCode(countryName);
 }
 
 export function getCountryFlag(countryName: string): string | undefined {
-  const country = countries.all().find(
-    (c: any) => c.name.toLowerCase() === countryName.toLowerCase()
-  );
-  return country?.flag;
+  ensureCountries();
+  return _allCountries!.find(
+    (c) => c.name.toLowerCase() === countryName.toLowerCase(),
+  )?.flag;
 }

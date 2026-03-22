@@ -13,7 +13,7 @@
     "@expo/cli": "^55.0.16",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "8.6.0",
-    "country-cities": "^1.0.8",
+    "country-state-city": "^3.2.1",
     "expo": "~55.0.6",
     "expo-apple-authentication": "^55.0.8",
     "expo-auth-session": "^55.0.8",

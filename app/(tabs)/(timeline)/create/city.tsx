@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, PlatformColor, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -25,6 +25,7 @@ export default function CreateCityScreen() {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<string[] | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!country) return;
@@ -38,12 +39,15 @@ export default function CreateCityScreen() {
   const handleSearch = useCallback(
     (text: string) => {
       setQuery(text);
-      if (!text.trim()) { setSearchResults(null); return; }
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (!text.trim()) { setSearchResults(null); setSearchLoading(false); return; }
       setSearchLoading(true);
-      searchCitiesByCountry(country, text).then((r) => {
-        setSearchResults(r);
-        setSearchLoading(false);
-      });
+      debounceRef.current = setTimeout(() => {
+        searchCitiesByCountry(country, text).then((r) => {
+          setSearchResults(r);
+          setSearchLoading(false);
+        });
+      }, 250);
     },
     [country],
   );
