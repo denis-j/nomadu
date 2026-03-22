@@ -1,25 +1,23 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActionSheetIOS,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
- Image, ImageBackground } from 'react-native';
+  Image,
+  ImageBackground,
+  Alert,
+} from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { useJourneys } from '../../../hooks/useJourneys';
-import { SheetBackdrop, SheetLayer } from '../../../components/IslandSheet';
 import { Colors } from '../../../constants/colors';
 import { deleteJourney, insertJourney, insertJourneyLeg, parseDate, TransportType } from '../../../lib/database';
 import { countryCodeToFlag } from '../../../lib/geocoding';
@@ -273,13 +271,14 @@ function JourneyCard({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     ActionSheetIOS.showActionSheetWithOptions(
       {
-        options: ['Delete Journey', 'Cancel'],
+        options: ['Delete Trip', 'Cancel'],
         destructiveButtonIndex: 0,
         cancelButtonIndex: 1,
         title: journey.title,
       },
       (i) => {
         if (i === 0) onDelete(journey.id);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       },
     );
   };
@@ -289,7 +288,10 @@ function JourneyCard({
 
   return (
     <TouchableOpacity
-      onPress={() => router.push(`/(tabs)/(plans)/${journey.id}` as any)}
+      onPress={async () => {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        router.push(`/(tabs)/(plans)/${journey.id}` as any);
+      }}
       onLongPress={handleLongPress}
       activeOpacity={0.85}
       style={styles.cardTouchable}
@@ -345,48 +347,10 @@ export default function JourneysScreen() {
     setRefreshing(false);
   }, [refresh]);
 
-  // ─── New-journey sheet ────────────────────────────────────────────────────
-
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [closing, setClosing] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout>>();
-  const [newTitle, setNewTitle] = useState('');
-  const [saving, setSaving] = useState(false);
-
   const openNewSheet = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setNewTitle('');
-    setSaving(false);
-    setSheetOpen(true);
-  }, []);
-
-  const closeSheet = useCallback(() => {
-    if (closing) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setClosing(true);
-    clearTimeout(closeTimer.current);
-    closeTimer.current = setTimeout(() => {
-      setSheetOpen(false);
-      setClosing(false);
-    }, 350);
-  }, [closing]);
-
-  const handleCreate = useCallback(async () => {
-    const title = newTitle.trim();
-    if (!title) return;
-    setSaving(true);
-    try {
-      const id = await insertJourney(title);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setSheetOpen(false);
-      setClosing(false);
-      refresh();
-      router.push(`/(tabs)/(plans)/${id}?add=1` as any);
-    } catch (err) {
-      console.error('Failed to create journey:', err);
-      setSaving(false);
-    }
-  }, [newTitle, refresh, router]);
+    router.push('/(tabs)/(plans)/create');
+  }, [router]);
 
   const handleDelete = useCallback(async (id: number) => {
     await deleteJourney(id);
@@ -395,24 +359,36 @@ export default function JourneysScreen() {
 
   const handleFeaturedPress = useCallback(async (dest: FeaturedDestination) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const today = new Date();
-    const id = await insertJourney(`${dest.flag} ${dest.country} Trip`);
-    await Promise.all(
-      dest.legs.map((leg, i) =>
-        insertJourneyLeg(
-          id,
-          leg.city, leg.country, leg.countryCode,
-          addDays(today, leg.startOffset),
-          addDays(today, leg.endOffset),
-          leg.transport, null, i,
-          leg.latitude, leg.longitude,
-        )
-      )
+    Alert.alert(
+      'Create Trip',
+      `Create a new trip to ${dest.country}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Create',
+          style: 'default',
+          onPress: async () => {
+            const today = new Date();
+            const id = await insertJourney(`${dest.flag} ${dest.country} Trip`);
+            await Promise.all(
+              dest.legs.map((leg, i) =>
+                insertJourneyLeg(
+                  id,
+                  leg.city, leg.country, leg.countryCode,
+                  addDays(today, leg.startOffset),
+                  addDays(today, leg.endOffset),
+                  leg.transport, null, i,
+                  leg.latitude, leg.longitude,
+                )
+              )
+            );
+            refresh();
+            router.push(`/(tabs)/(plans)/${id}` as any);
+          },
+        },
+      ]
     );
-    refresh();
-    router.push(`/(tabs)/(plans)/${id}` as any);
   }, [refresh, router]);
-
   // ─── Header ───────────────────────────────────────────────────────────────
 
   const headerRight = useCallback(
@@ -424,16 +400,13 @@ export default function JourneysScreen() {
     [openNewSheet],
   );
 
-  const modalOpen = sheetOpen || closing;
-  const sheetVisible = sheetOpen && !closing;
-
   // ─── Render ───────────────────────────────────────────────────────────────
 
   if (loading) return null;
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Plan Trips', headerRight }} />
+      <Stack.Screen options={{ title: 'Plan Trips', headerRight }}></Stack.Screen>
 
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
@@ -487,45 +460,6 @@ export default function JourneysScreen() {
           </ScrollView>
       </ScrollView>
 
-      {/* ── New journey sheet ── */}
-      {modalOpen && (
-        <GestureHandlerRootView style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <SheetBackdrop visible={sheetVisible} onPress={closeSheet} />
-          <SheetLayer
-            visible={sheetVisible}
-            onClose={closeSheet}
-            title="New Journey"
-            snapPoint={0.35}
-            depth={0}
-          >
-            {() => (
-                <View style={styles.newSheetContent}>
-                  <TextInput
-                    style={styles.titleInput}
-                    value={newTitle}
-                    onChangeText={setNewTitle}
-                    placeholder="Journey name…"
-                    placeholderTextColor={Colors.textTertiary}
-                    autoFocus
-                    returnKeyType="done"
-                    onSubmitEditing={handleCreate}
-                    maxLength={80}
-                  />
-                  <TouchableOpacity
-                    style={[styles.createButton, (!newTitle.trim() || saving) && styles.createButtonDisabled]}
-                    onPress={handleCreate}
-                    disabled={!newTitle.trim() || saving}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.createButtonText}>
-                      {saving ? 'Creating…' : 'Create Journey'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-            )}
-          </SheetLayer>
-        </GestureHandlerRootView>
-      )}
     </>
   );
 }
@@ -757,34 +691,4 @@ const styles = StyleSheet.create({
     color: '#000',
   },
 
-  // ─── New journey sheet ───
-  newSheetContent: {
-    padding: 20,
-    gap: 16,
-  },
-  titleInput: {
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderCurve: 'continuous',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 17,
-    color: Colors.text,
-  },
-  createButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  createButtonDisabled: {
-    opacity: 0.4,
-  },
-  createButtonText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
 });

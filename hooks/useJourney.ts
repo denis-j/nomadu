@@ -24,5 +24,5 @@ export function useJourney(id: number) {
     }, [refresh]),
   );
 
-  return { journey, loading, refresh };
+  return { journey, loading, refresh, setJourney };
 }

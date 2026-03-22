@@ -507,6 +507,28 @@ export async function updateJourneyLeg(
   }
 }
 
+export async function reorderJourneyLegs(
+  journeyId: number,
+  legIds: number[],
+  dateSlots?: { start_date: string; end_date: string }[],
+): Promise<void> {
+  const database = await getDatabase();
+  for (let i = 0; i < legIds.length; i++) {
+    if (dateSlots && dateSlots[i]) {
+      await database.runAsync(
+        'UPDATE journey_legs SET sort_order = ?, start_date = ?, end_date = ? WHERE id = ?',
+        [i, dateSlots[i].start_date, dateSlots[i].end_date, legIds[i]],
+      );
+    } else {
+      await database.runAsync('UPDATE journey_legs SET sort_order = ? WHERE id = ?', [i, legIds[i]]);
+    }
+  }
+  await database.runAsync(
+    `UPDATE journeys SET updated_at = datetime('now') WHERE id = ?`,
+    [journeyId],
+  );
+}
+
 export async function deleteJourneyLeg(id: number): Promise<void> {
   const database = await getDatabase();
   const leg = await database.getFirstAsync<{ journey_id: number }>(

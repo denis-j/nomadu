@@ -12,6 +12,7 @@ import { useSubscription } from '../../../hooks/useSubscription';
 import { usePassport } from '../../../hooks/usePassport';
 import { useNotificationPermission } from '../../../hooks/useNotificationPermission';
 import { deleteAccount } from '../../../lib/auth';
+import { clearAllData } from '../../../lib/database';
 import { restorePurchases } from '../../../lib/revenueCat';
 import { useSync } from '../../../contexts/SyncContext';
 import { countryCodeToFlag } from '../../../lib/geocoding';
@@ -367,9 +368,34 @@ export default function SettingsScreen() {
         </Pressable>
       </Glass>
 
-      {/* Account Deletion */}
+      {/* Danger Zone */}
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
         <Text style={styles.sectionTitle}>Danger Zone</Text>
+        <Pressable
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          onPress={() => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            Alert.alert(
+              'Clear Local Data',
+              'This will delete all trips and visits stored on this device. Cloud data will not be affected. This cannot be undone.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Clear Data',
+                  style: 'destructive',
+                  onPress: async () => {
+                    await clearAllData();
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    Alert.alert('Done', 'All local data has been cleared.');
+                  },
+                },
+              ],
+            );
+          }}
+        >
+          <Text style={[styles.rowLabel, styles.destructive]}>Clear Local Data</Text>
+        </Pressable>
+        <View style={styles.separator} />
         <Pressable
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           onPress={handleDeleteAccount}

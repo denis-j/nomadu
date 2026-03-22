@@ -1,51 +1,78 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withTiming, withSpring,
-  interpolate, Easing,
+  useSharedValue, useAnimatedStyle,
+  withTiming, withSpring, interpolate, Easing,
+  FadeIn, FadeOut,
 } from 'react-native-reanimated';
 import {
-  ActionSheetIOS,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import RNMapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useJourney } from '../../../hooks/useJourney';
 import { useAuth } from '../../../hooks/useAuth';
 import { EmptyState } from '../../../components/EmptyState';
-import { SheetBackdrop, SheetLayer } from '../../../components/IslandSheet';
 import { Colors } from '../../../constants/colors';
 import {
   JourneyLeg, TransportType,
-  deleteJourneyLeg, insertJourneyLeg, parseDate, updateJourneyLeg,
+  parseDate,
   getAllTripsRaw,
+  reorderJourneyLegs,
 } from '../../../lib/database';
 import { getCitizenship, getHasFixedResidence } from '../../../lib/onboarding';
 import { calculateAllVisaStatuses, VisaStatus } from '../../../lib/visaCalculations';
 import { calculateAllTaxStatuses, TaxStatus } from '../../../lib/taxCalculations';
 import { SCHENGEN_COUNTRIES, DEFAULT_VISA_RULES } from '../../../constants/visaRules';
-import { forwardGeocode, countryCodeToFlag } from '../../../lib/geocoding';
-import {
-  getPopularCountries, searchCountries, getCitiesByCountryPaginated,
-  searchCitiesByCountry, getCountryCode, getCountryFlag,
-} from '../../../utils/geography';
-import { suggestNextStops, getCityTips, StopSuggestion } from '../../../lib/ai';
+import { countryCodeToFlag } from '../../../lib/geocoding';
+import { getCountryCode } from '../../../utils/geography';
+import { suggestNextStops, StopSuggestion } from '../../../lib/ai';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const hasGlass = isLiquidGlassAvailable();
+
+// ─── Morph Text (crossfade on value change) ──────────────────────────────────
+
+function MorphText({ children, style }: { children: string; style?: any }) {
+  const opacity = useSharedValue(1);
+  const [displayed, setDisplayed] = useState(children);
+  const prevRef = useRef(children);
+
+  useEffect(() => {
+    if (children !== prevRef.current) {
+      // Fade out, swap text, fade in
+      opacity.value = withTiming(0, { duration: 150 }, (finished) => {
+        if (finished) {
+          // runOnJS doesn't work here directly, use withTiming callback
+        }
+      });
+      // Schedule text swap + fade in
+      const t = setTimeout(() => {
+        setDisplayed(children);
+        prevRef.current = children;
+        opacity.value = withTiming(1, { duration: 200 });
+      }, 150);
+      return () => clearTimeout(t);
+    }
+  }, [children]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.Text style={[style, animStyle]}>{displayed}</Animated.Text>
+  );
+}
 
 // ─── Transport config ─────────────────────────────────────────────────────────
 
@@ -64,10 +91,6 @@ function transportIcon(t: TransportType): string {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function fmt(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
 function fmtShort(dateStr: string): string {
   const d = parseDate(dateStr);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -79,9 +102,52 @@ function legDays(start: string, end: string): number {
   return Math.max(1, Math.round((e.getTime() - s.getTime()) / 86_400_000) + 1);
 }
 
+// ─── Trip Summary ────────────────────────────────────────────────────────────
+
+function TripSummary({ legs }: { legs: JourneyLeg[] }) {
+  const stats = useMemo(() => {
+    if (legs.length === 0) return null;
+    const totalDays = legs.reduce((sum, l) => sum + legDays(l.start_date, l.end_date), 0);
+    const countries = new Set(legs.map((l) => l.country)).size;
+    const cities = new Set(legs.map((l) => l.city)).size;
+    const firstDate = legs.reduce((min, l) => l.start_date < min ? l.start_date : min, legs[0].start_date);
+    const lastDate = legs.reduce((max, l) => l.end_date > max ? l.end_date : max, legs[0].end_date);
+    return { totalDays, countries, cities, firstDate, lastDate };
+  }, [legs]);
+
+  if (!stats) return null;
+
+  const CardWrap = hasGlass ? GlassView : View;
+  const cardProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
+
+  return (
+    <CardWrap {...cardProps} style={[styles.summaryBar, !hasGlass && styles.summaryBarFallback]}>
+      <View style={styles.summaryItem}>
+        <Text style={styles.summaryValue}>{stats.totalDays}</Text>
+        <Text style={styles.summaryLabel}>days</Text>
+      </View>
+      <View style={styles.summaryDivider} />
+      <View style={styles.summaryItem}>
+        <Text style={styles.summaryValue}>{stats.cities}</Text>
+        <Text style={styles.summaryLabel}>{stats.cities === 1 ? 'city' : 'cities'}</Text>
+      </View>
+      <View style={styles.summaryDivider} />
+      <View style={styles.summaryItem}>
+        <Text style={styles.summaryValue}>{stats.countries}</Text>
+        <Text style={styles.summaryLabel}>{stats.countries === 1 ? 'country' : 'countries'}</Text>
+      </View>
+      <View style={styles.summaryDivider} />
+      <View style={styles.summaryItem}>
+        <Text style={styles.summaryValue}>{fmtShort(stats.firstDate)}</Text>
+        <Text style={styles.summaryLabel}>{fmtShort(stats.lastDate)}</Text>
+      </View>
+    </CardWrap>
+  );
+}
+
 // ─── Journey Map Card ─────────────────────────────────────────────────────────
 
-function JourneyMapCard({ legs, headerHeight }: { legs: JourneyLeg[]; headerHeight: number }) {
+function JourneyMapCard({ legs, headerHeight, scrollY }: { legs: JourneyLeg[]; headerHeight: number; scrollY: Animated.SharedValue<number> }) {
   const coordLegs = useMemo(
     () => legs.filter((l) => l.latitude != null && l.longitude != null),
     [legs],
@@ -106,6 +172,21 @@ function JourneyMapCard({ legs, headerHeight }: { legs: JourneyLeg[]; headerHeig
     };
   }, [coordLegs]);
 
+  const MAP_HEIGHT = 360;
+
+  const stretchStyle = useAnimatedStyle(() => {
+    // Only stretch when actively pulling down (ignore initial small negative offsets)
+    const overscroll = Math.max(0, -scrollY.value - 110);
+    if (overscroll <= 0) return {};
+    const scale = 1 + overscroll / MAP_HEIGHT;
+    return {
+      transform: [
+        { translateY: -overscroll / 2 },
+        { scale },
+      ],
+    };
+  });
+
   if (coordLegs.length === 0 || !region) return null;
 
   const polyCoords = coordLegs.map((l) => ({
@@ -114,7 +195,7 @@ function JourneyMapCard({ legs, headerHeight }: { legs: JourneyLeg[]; headerHeig
   }));
 
   return (
-    <View style={[styles.mapCard, { marginTop: -headerHeight }]}>
+    <Animated.View style={[styles.mapCard, { marginTop: -headerHeight }, stretchStyle]}>
       <RNMapView
         style={styles.map}
         provider={PROVIDER_DEFAULT}
@@ -141,7 +222,7 @@ function JourneyMapCard({ legs, headerHeight }: { legs: JourneyLeg[]; headerHeig
           />
         ))}
       </RNMapView>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -160,23 +241,25 @@ function taxChipColor(status: TaxStatus['status']) {
   return Colors.warning; // caution
 }
 
-function LegCard({
-  leg,
-  prevCity,
-  isFirst,
-  onEdit,
-  onDelete,
-  visaStatuses,
-  taxStatuses,
-}: {
+type LegCardProps = {
   leg: JourneyLeg;
   prevCity: string | null;
   isFirst: boolean;
-  onEdit: (leg: JourneyLeg) => void;
-  onDelete: (id: number) => void;
+  onPress: (leg: JourneyLeg) => void;
+  onDrag?: () => void;
   visaStatuses: VisaStatus[];
   taxStatuses: TaxStatus[];
-}) {
+};
+
+const LegCard = React.memo(function LegCard({
+  leg,
+  prevCity,
+  isFirst,
+  onPress,
+  onDrag,
+  visaStatuses,
+  taxStatuses,
+}: LegCardProps) {
   const flag = countryCodeToFlag(leg.country_code);
   const days = legDays(leg.start_date, leg.end_date);
 
@@ -229,21 +312,6 @@ function LegCard({
     chips.push({ label: `⚠︎ ${plannedDays}d > ${TAX_THRESHOLD}d tax risk`, color: Colors.error });
   }
 
-  const handleLongPress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        options: ['Edit', 'Delete', 'Cancel'],
-        destructiveButtonIndex: 1,
-        cancelButtonIndex: 2,
-      },
-      (i) => {
-        if (i === 0) onEdit(leg);
-        if (i === 1) onDelete(leg.id);
-      },
-    );
-  };
-
   const CardWrap = hasGlass ? GlassView : View;
   const cardProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
@@ -251,7 +319,11 @@ function LegCard({
     <View style={styles.legWrapper}>
       {/* Connector between legs */}
       {!isFirst && (
-        <View style={styles.connector}>
+        <Animated.View
+          entering={FadeIn.duration(250)}
+          exiting={FadeOut.duration(150)}
+          style={styles.connector}
+        >
           <View style={styles.dotCol} />
           <View style={styles.connectorBadge}>
             <Ionicons
@@ -260,16 +332,21 @@ function LegCard({
               color={Colors.textSecondary}
             />
             {prevCity ? (
-              <Text style={styles.connectorText} numberOfLines={1}>
-                from {prevCity}
-              </Text>
+              <MorphText style={styles.connectorText}>
+                {`from ${prevCity}`}
+              </MorphText>
             ) : null}
           </View>
-        </View>
+        </Animated.View>
       )}
 
       {/* Leg row: dot col + card */}
-      <TouchableOpacity onLongPress={handleLongPress} activeOpacity={0.85}>
+      <Pressable
+        onPress={() => onPress(leg)}
+        onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onDrag?.(); }}
+        delayLongPress={200}
+        style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1 })}
+      >
         <View style={styles.legRow}>
           <View style={styles.dotCol}>
             <View style={styles.dot} />
@@ -282,9 +359,9 @@ function LegCard({
             <View style={styles.legCenter}>
               <Text style={styles.legCity}>{leg.city}</Text>
               <Text style={styles.legCountry}>{leg.country}</Text>
-              <Text style={styles.legDates}>
+              <MorphText style={styles.legDates}>
                 {fmtShort(leg.start_date)} – {fmtShort(leg.end_date)}
-              </Text>
+              </MorphText>
               {leg.notes ? (
                 <Text style={styles.legNotes} numberOfLines={2}>{leg.notes}</Text>
               ) : null}
@@ -302,7 +379,7 @@ function LegCard({
             {/* Right badges */}
             <View style={styles.legRight}>
               <View style={styles.daysBadge}>
-                <Text style={styles.daysText}>{days}d</Text>
+                <MorphText style={styles.daysText}>{days}d</MorphText>
               </View>
               <View style={styles.transportBadge}>
                 <Ionicons
@@ -314,19 +391,31 @@ function LegCard({
             </View>
           </CardWrap>
         </View>
-      </TouchableOpacity>
+      </Pressable>
     </View>
   );
-}
+}, (prev, next) =>
+  prev.leg.id === next.leg.id &&
+  prev.leg.start_date === next.leg.start_date &&
+  prev.leg.end_date === next.leg.end_date &&
+  prev.leg.transport === next.leg.transport &&
+  prev.leg.notes === next.leg.notes &&
+  prev.leg.city === next.leg.city &&
+  prev.leg.country === next.leg.country &&
+  prev.prevCity === next.prevCity &&
+  prev.isFirst === next.isFirst
+);
 
 // ─── Suggestion Leg Card ──────────────────────────────────────────────────────
 
 function SuggestionLegCard({
   suggestion,
   onAdd,
+  disabled,
 }: {
   suggestion: StopSuggestion;
   onAdd: () => void;
+  disabled?: boolean;
 }) {
   const flag = countryCodeToFlag(getCountryCode(suggestion.country));
   const days = legDays(suggestion.startDate, suggestion.endDate);
@@ -342,8 +431,9 @@ function SuggestionLegCard({
 
       {/* Card — mirrors TripCard layout exactly */}
       <Pressable
-        style={({ pressed }) => [styles.suggCardPressable, pressed && { opacity: 0.75 }]}
+        style={({ pressed }) => [styles.suggCardPressable, pressed && !disabled && { opacity: 0.75 }, disabled && { opacity: 0.5 }]}
         onPress={onAdd}
+        disabled={disabled}
       >
         <CardShell
           {...(hasGlass
@@ -383,9 +473,14 @@ function SuggestionLegCard({
           <Text style={styles.suggReason} numberOfLines={2}>{suggestion.reason}</Text>
 
           {/* Add button */}
-          <TouchableOpacity style={styles.suggAddBtn} onPress={onAdd} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={[styles.suggAddBtn, disabled && { opacity: 0.4 }]}
+            onPress={onAdd}
+            activeOpacity={0.85}
+            disabled={disabled}
+          >
             <Ionicons name="add" size={16} color="#fff" />
-            <Text style={styles.suggAddText}>Add this stop</Text>
+            <Text style={styles.suggAddText}>{disabled ? 'Loading…' : 'Add this stop'}</Text>
           </TouchableOpacity>
         </CardShell>
       </Pressable>
@@ -485,7 +580,7 @@ function AISuggestionsSection({
           }}
         >
           {suggestions.map((s, i) => (
-            <SuggestionLegCard key={i} suggestion={s} onAdd={() => onAdd(s)} />
+            <SuggestionLegCard key={i} suggestion={s} onAdd={() => onAdd(s)} disabled={suggestionsLoading} />
           ))}
         </View>
       </Animated.View>
@@ -493,38 +588,33 @@ function AISuggestionsSection({
   );
 }
 
-// ─── Sheet step type ─────────────────────────────────────────────────────────
+// ─── Timeline Line (scrolls with content but stays put during drag) ──────────
 
-type Step = 'closed' | 'country' | 'city' | 'dates' | 'details';
+function TimelineLine({ scrollY, topOffset }: { scrollY: Animated.SharedValue<number>; topOffset: number }) {
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -scrollY.value }],
+  }));
 
-const popularCountries = getPopularCountries();
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.timelineLine,
+        { top: topOffset },
+        animStyle,
+      ]}
+    />
+  );
+}
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function JourneyDetailScreen() {
   const headerHeight = useHeaderHeight();
+  const router = useRouter();
   const { id, add } = useLocalSearchParams<{ id: string; add?: string }>();
   const journeyId = Number(id);
-  const { journey, loading, refresh } = useJourney(journeyId);
-
-  // ─── Sheet state ────────────────────────────────────────────────────────────
-
-  const [step, setStep] = useState<Step>('closed');
-  const [closing, setClosing] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout>>();
-  const [editingLeg, setEditingLeg] = useState<JourneyLeg | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const [selectedCountry, setSelectedCountry] = useState('');
-  const [selectedCity, setSelectedCity] = useState('');
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 7); return d;
-  });
-  const [startPickerKey, setStartPickerKey] = useState(0);
-  const [endPickerKey, setEndPickerKey] = useState(0);
-  const [transport, setTransport] = useState<TransportType>('flight');
-  const [notes, setNotes] = useState('');
+  const { journey, loading, refresh, setJourney } = useJourney(journeyId);
 
   // ─── Visa / Tax statuses ─────────────────────────────────────────────────────
 
@@ -620,190 +710,58 @@ export default function JourneyDetailScreen() {
     }
   }, [journey?.id, journey?.legs.length]);
 
-  // City tips for the details step
-  const [cityTips, setCityTips] = useState<string | null>(null);
-  const [cityTipsLoading, setCityTipsLoading] = useState(false);
-
-  useEffect(() => {
-    if (step !== 'details' || !selectedCity || !selectedCountry) return;
-    setCityTips(null);
-    setCityTipsLoading(true);
-    getCityTips(selectedCity, selectedCountry)
-      .then(setCityTips)
-      .catch(() => setCityTips(null))
-      .finally(() => setCityTipsLoading(false));
-  }, [step, selectedCity, selectedCountry]);
-
-  // ─── City loading ────────────────────────────────────────────────────────────
-
-  const [cities, setCities] = useState<string[]>([]);
-  const [citiesLoading, setCitiesLoading] = useState(false);
-  const [citiesHasMore, setCitiesHasMore] = useState(false);
-  const [citiesPage, setCitiesPage] = useState(1);
-  const [citySearchQuery, setCitySearchQuery] = useState('');
-  const [citySearchResults, setCitySearchResults] = useState<string[] | null>(null);
-  const [citySearchLoading, setCitySearchLoading] = useState(false);
-
-  useEffect(() => {
-    if (!selectedCountry) { setCities([]); return; }
-    setCitiesPage(1);
-    setCitySearchQuery('');
-    setCitySearchResults(null);
-    setCitiesLoading(true);
-    getCitiesByCountryPaginated(selectedCountry, 1, 30).then((r) => {
-      setCities(r.cities);
-      setCitiesHasMore(r.hasMore);
-      setCitiesLoading(false);
-    });
-  }, [selectedCountry]);
-
-  const handleCitySearch = useCallback((q: string) => {
-    setCitySearchQuery(q);
-    if (!q.trim()) { setCitySearchResults(null); setCitySearchLoading(false); return; }
-    setCitySearchLoading(true);
-    searchCitiesByCountry(selectedCountry, q).then((r) => {
-      setCitySearchResults(r); setCitySearchLoading(false);
-    });
-  }, [selectedCountry]);
-
-  const loadMoreCities = useCallback(() => {
-    if (citiesLoading || !citiesHasMore) return;
-    setCitiesLoading(true);
-    const next = citiesPage + 1;
-    getCitiesByCountryPaginated(selectedCountry, next, 30).then((r) => {
-      setCities((p) => [...p, ...r.cities]);
-      setCitiesHasMore(r.hasMore);
-      setCitiesPage(next);
-      setCitiesLoading(false);
-    });
-  }, [selectedCountry, citiesPage, citiesLoading, citiesHasMore]);
-
-  // ─── Sheet helpers ────────────────────────────────────────────────────────────
-
-  const closeAll = useCallback(() => {
-    if (closing) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setClosing(true);
-    clearTimeout(closeTimer.current);
-    closeTimer.current = setTimeout(() => { setStep('closed'); setClosing(false); }, 350);
-  }, [closing]);
+  // ─── Navigation helpers ────────────────────────────────────────────────────
 
   const openAddSheet = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setEditingLeg(null);
-    setSelectedCountry('');
-    setSelectedCity('');
-    const now = new Date();
-    const week = new Date(); week.setDate(week.getDate() + 7);
-    setStartDate(now);
-    setEndDate(week);
-    setStartPickerKey(0);
-    setEndPickerKey(0);
-    setTransport('flight');
-    setNotes('');
-    setSaving(false);
-    setStep('country');
-  }, []);
+    router.push({
+      pathname: '/(tabs)/(plans)/add-stop/country',
+      params: { journeyId: String(journeyId) },
+    });
+  }, [router, journeyId]);
 
-  // Auto-open add sheet when navigated from a fresh journey creation
+  // Auto-open add sheet once when navigated from a fresh journey creation
+  const didAutoOpen = useRef(false);
   useEffect(() => {
-    if (add === '1' && !loading) {
+    if (add === '1' && !loading && !didAutoOpen.current) {
+      didAutoOpen.current = true;
       const t = setTimeout(openAddSheet, 300);
       return () => clearTimeout(t);
     }
   }, [add, loading, openAddSheet]);
 
-  const openEditSheet = useCallback((leg: JourneyLeg) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setEditingLeg(leg);
-    setSelectedCountry(leg.country);
-    setSelectedCity(leg.city);
-    setStartDate(parseDate(leg.start_date));
-    setEndDate(parseDate(leg.end_date));
-    setStartPickerKey(0);
-    setEndPickerKey(0);
-    setTransport(leg.transport);
-    setNotes(leg.notes ?? '');
-    setSaving(false);
-    setStep('country');
-  }, []);
-
-  const handleDeleteLeg = useCallback(async (legId: number) => {
-    await deleteJourneyLeg(legId);
-    refresh();
-  }, [refresh]);
-
-  const handleSave = useCallback(async () => {
-    setSaving(true);
-    try {
-      const code = getCountryCode(selectedCountry);
-      const coords = await forwardGeocode(`${selectedCity}, ${selectedCountry}`);
-      const notesVal = notes.trim() || null;
-      const sortOrder = (journey?.legs.length ?? 0);
-
-      if (editingLeg) {
-        await updateJourneyLeg(
-          editingLeg.id,
-          selectedCity, selectedCountry, code,
-          fmt(startDate), fmt(endDate),
-          transport, notesVal,
-          coords?.latitude, coords?.longitude,
-        );
-      } else {
-        await insertJourneyLeg(
-          journeyId,
-          selectedCity, selectedCountry, code,
-          fmt(startDate), fmt(endDate),
-          transport, notesVal,
-          sortOrder,
-          coords?.latitude, coords?.longitude,
-        );
-      }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setStep('closed');
-      setClosing(false);
-      refresh();
-    } catch (err) {
-      console.error('Failed to save leg:', err);
-    } finally {
-      setSaving(false);
-    }
-  }, [
-    selectedCity, selectedCountry, startDate, endDate,
-    transport, notes, editingLeg, journeyId, journey, refresh,
-  ]);
+  const openStopInfo = useCallback((leg: JourneyLeg) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({
+      pathname: '/(tabs)/(plans)/stop-info',
+      params: {
+        legId: String(leg.id),
+        journeyId: String(journeyId),
+        country: leg.country,
+        countryCode: leg.country_code,
+        city: leg.city,
+        start: leg.start_date,
+        end: leg.end_date,
+        transport: leg.transport,
+        ...(leg.notes && { notes: leg.notes }),
+      },
+    });
+  }, [router, journeyId]);
 
   const handleAddSuggestion = useCallback((s: StopSuggestion) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setEditingLeg(null);
-    setSelectedCountry(s.country);
-    setSelectedCity(s.city);
-    setStartDate(parseDate(s.startDate));
-    setEndDate(parseDate(s.endDate));
-    setStartPickerKey((k) => k + 1);
-    setEndPickerKey((k) => k + 1);
-    setTransport(s.transport);
-    setNotes('');
-    setSaving(false);
-    setStep('details');
-  }, []);
-
-  // ─── Depth mapping ────────────────────────────────────────────────────────────
-
-  const modalOpen = step !== 'closed' || closing;
-  const countryVisible = !closing && ['country', 'city', 'dates', 'details'].includes(step);
-  const cityVisible    = !closing && ['city', 'dates', 'details'].includes(step);
-  const datesVisible   = !closing && ['dates', 'details'].includes(step);
-  const detailsVisible = !closing && step === 'details';
-
-  const countryDepth = step === 'country' ? 0 : step === 'city' ? 1 : step === 'dates' ? 2 : step === 'details' ? 3 : 0;
-  const cityDepth    = step === 'city' ? 0 : step === 'dates' ? 1 : step === 'details' ? 2 : 0;
-  const datesDepth   = step === 'dates' ? 0 : step === 'details' ? 1 : 0;
-
-  const days = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1);
-
-  const fmtDateLabel = (d: Date) =>
-    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    router.push({
+      pathname: '/(tabs)/(plans)/add-stop/details',
+      params: {
+        journeyId: String(journeyId),
+        country: s.country,
+        city: s.city,
+        start: s.startDate,
+        end: s.endDate,
+        transport: s.transport,
+      },
+    });
+  }, [router, journeyId]);
 
   // ─── Header ───────────────────────────────────────────────────────────────────
 
@@ -818,12 +776,98 @@ export default function JourneyDetailScreen() {
 
   const legs = journey?.legs ?? [];
   const hasMap = legs.some((l) => l.latitude != null && l.longitude != null);
-  // Map: height 420 + marginBottom 20 - marginTop topInset = net contribution
-  const timelineLineTop = hasMap ? 360 + 20 - headerHeight : 0;
+
+  // ─── Scroll tracking for stretchy map ────────────────────────────────────────
+
+  const scrollY = useSharedValue(0);
+
+  // ─── Timeline line offset ──────────────────────────────────────────────────
+  const [timelineTop, setTimelineTop] = useState(0);
+
+  // ─── Drag & Drop reorder ─────────────────────────────────────────────────────
+
+  const handleReorder = useCallback(({ data }: { data: JourneyLeg[] }) => {
+    // Date slots stay at their positions — only the stops move
+    const originalDateSlots = legs.map((l) => ({
+      start_date: l.start_date,
+      end_date: l.end_date,
+    }));
+
+    // Assign original date slots to new positions
+    const reorderedLegs = data.map((leg, i) => ({
+      ...leg,
+      start_date: originalDateSlots[i].start_date,
+      end_date: originalDateSlots[i].end_date,
+    }));
+
+    // Optimistic update
+    setJourney((prev) => prev ? { ...prev, legs: reorderedLegs } : prev);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // Persist in background
+    const ids = reorderedLegs.map((l) => l.id);
+    reorderJourneyLegs(journeyId, ids, originalDateSlots).catch((err) =>
+      console.error('Failed to persist reorder:', err),
+    );
+  }, [journeyId, legs, setJourney]);
+
+  const renderItem = useCallback(({ item, drag, getIndex }: RenderItemParams<JourneyLeg>) => {
+    const index = getIndex() ?? 0;
+    return (
+      <ScaleDecorator>
+        <LegCard
+          leg={item}
+          prevCity={index > 0 ? legs[index - 1]?.city ?? null : null}
+          isFirst={index === 0}
+          onPress={openStopInfo}
+          onDrag={drag}
+          visaStatuses={visaStatuses}
+          taxStatuses={taxStatuses}
+        />
+      </ScaleDecorator>
+    );
+  }, [legs, openStopInfo, visaStatuses, taxStatuses]);
+
+  const onHeaderLayout = useCallback((e: any) => {
+    setTimelineTop(e.nativeEvent.layout.height);
+  }, []);
+
+  const listHeader = useMemo(() => (
+    <View onLayout={onHeaderLayout}>
+      <JourneyMapCard legs={legs} headerHeight={headerHeight} scrollY={scrollY} />
+      <TripSummary legs={legs} />
+    </View>
+  ), [legs, headerHeight, scrollY, onHeaderLayout]);
+
+  const listFooter = useMemo(() => (
+    <>
+      {legs.length > 0 && (
+        <AISuggestionsSection
+          suggestions={suggestions}
+          suggestionsLoading={suggestionsLoading}
+          suggestionsError={suggestionsError}
+          collapsed={suggestionsCollapsed}
+          onToggleCollapse={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setSuggestionsCollapsed((c) => !c);
+          }}
+          onRefresh={() => loadSuggestions(true)}
+          onAdd={handleAddSuggestion}
+          hasGlass={hasGlass}
+        />
+      )}
+      {legs.length > 0 && (
+        <View style={styles.timelineEndCap}>
+          <View style={styles.endCapDot}>
+            <View style={styles.endCapDotInner} />
+          </View>
+        </View>
+      )}
+    </>
+  ), [legs.length, suggestions, suggestionsLoading, suggestionsError, suggestionsCollapsed, handleAddSuggestion, loadSuggestions]);
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
-  const PillShell = hasGlass ? GlassView : View;
   const tripName = journey?.title ?? 'Trip';
 
   return (
@@ -846,329 +890,23 @@ export default function JourneyDetailScreen() {
           subtitle="Tap + to add your first destination — city, dates, and how you'll get there."
         />
       ) : (
-        <ScrollView
-          contentInsetAdjustmentBehavior="never"
-          contentContainerStyle={styles.content}
-        >
-          {/* Journey map */}
-          <JourneyMapCard legs={legs} headerHeight={headerHeight} />
-
-          {/* Timeline line — starts below map card if present */}
-          <View style={[styles.timelineLine, { top: timelineLineTop }]} />
-
-          {legs.map((leg, index) => (
-            <LegCard
-              key={leg.id}
-              leg={leg}
-              prevCity={index > 0 ? legs[index - 1].city : null}
-              isFirst={index === 0}
-              onEdit={openEditSheet}
-              onDelete={handleDeleteLeg}
-              visaStatuses={visaStatuses}
-              taxStatuses={taxStatuses}
-            />
-          ))}
-
-          {/* AI suggestions — inline timeline */}
-          {legs.length > 0 && (
-            <AISuggestionsSection
-              suggestions={suggestions}
-              suggestionsLoading={suggestionsLoading}
-              suggestionsError={suggestionsError}
-              collapsed={suggestionsCollapsed}
-              onToggleCollapse={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setSuggestionsCollapsed((c) => !c);
-              }}
-              onRefresh={() => loadSuggestions(true)}
-              onAdd={handleAddSuggestion}
-              hasGlass={hasGlass}
-            />
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          {/* Static timeline line — doesn't move during drag */}
+          {legs.length > 0 && timelineTop > 0 && (
+            <TimelineLine scrollY={scrollY} topOffset={timelineTop} />
           )}
-
-          {/* End cap */}
-          {legs.length > 0 && (
-            <View style={styles.timelineEndCap}>
-              <View style={styles.endCapDot}>
-                <View style={styles.endCapDotInner} />
-              </View>
-            </View>
-          )}
-        </ScrollView>
-      )}
-
-      {/* ── Sheet layers ── */}
-      {modalOpen && (
-        <GestureHandlerRootView style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <SheetBackdrop visible={modalOpen && !closing} onPress={closeAll} />
-
-          {/* Layer 1: Country */}
-          <SheetLayer
-            visible={countryVisible}
-            onClose={closeAll}
-            title={editingLeg ? 'Edit Country' : 'Choose Country'}
-            searchEnabled
-            searchPlaceholder="Search countries..."
-            snapPoint={0.5}
-            depth={countryDepth}
-          >
-            {(query: string) => {
-              const filtered = query.trim() ? searchCountries(query) : popularCountries;
-              return (
-                <View style={styles.listContainer}>
-                  {!query.trim() && <Text style={styles.listSectionLabel}>Popular</Text>}
-                  {filtered.map((name) => {
-                    const flag = getCountryFlag(name);
-                    return (
-                      <TouchableOpacity
-                        key={name}
-                        style={styles.listItem}
-                        onPress={() => {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          setSelectedCountry(name);
-                          setStep('city');
-                        }}
-                        activeOpacity={0.6}
-                      >
-                        {flag ? <Text style={styles.listItemIcon}>{flag}</Text> : null}
-                        <Text style={styles.listItemText}>{name}</Text>
-                        <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />
-                      </TouchableOpacity>
-                    );
-                  })}
-                  {filtered.length === 0 && (
-                    <Text style={styles.emptyText}>No countries found</Text>
-                  )}
-                </View>
-              );
-            }}
-          </SheetLayer>
-
-          {/* Layer 2: City */}
-          <SheetLayer
-            visible={cityVisible}
-            onClose={closeAll}
-            onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setStep('country'); }}
-            title={selectedCountry}
-            searchEnabled
-            searchPlaceholder="Search cities..."
-            onSearchChange={handleCitySearch}
-            snapPoint={0.48}
-            depth={cityDepth}
-          >
-            {() => {
-              if (citiesLoading) {
-                return (
-                  <View style={styles.listContainer}>
-                    <Text style={styles.emptyText}>Loading cities...</Text>
-                  </View>
-                );
-              }
-              const displayCities = citySearchResults ?? cities;
-              const isSearching = citySearchQuery.trim() !== '' && citySearchLoading;
-              return (
-                <View style={styles.listContainer}>
-                  {isSearching && <Text style={styles.emptyText}>Searching...</Text>}
-                  {!isSearching && displayCities.map((name: string, i: number) => (
-                    <TouchableOpacity
-                      key={`${name}-${i}`}
-                      style={styles.listItem}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setSelectedCity(name);
-                        setStep('dates');
-                      }}
-                      activeOpacity={0.6}
-                    >
-                      <Text style={styles.listItemText}>{name}</Text>
-                      <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />
-                    </TouchableOpacity>
-                  ))}
-                  {!isSearching && !citySearchQuery && citiesHasMore && (
-                    <TouchableOpacity
-                      style={styles.loadMoreButton}
-                      onPress={loadMoreCities}
-                      activeOpacity={0.6}
-                    >
-                      <Text style={styles.loadMoreText}>
-                        {citiesLoading ? 'Loading...' : 'Load more'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  {displayCities.length === 0 && !isSearching && (
-                    <Text style={styles.emptyText}>No cities found</Text>
-                  )}
-                </View>
-              );
-            }}
-          </SheetLayer>
-
-          {/* Layer 3: Dates */}
-          <SheetLayer
-            visible={datesVisible}
-            onClose={closeAll}
-            onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setStep('city'); }}
-            title="Dates"
-            snapPoint={0.48}
-            depth={datesDepth}
-          >
-            {() => (
-              <View style={styles.sheetContent}>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>{selectedCity}, {selectedCountry}</Text>
-                  <View style={styles.daysBubble}>
-                    <Text style={styles.daysBubbleText}>{days}d</Text>
-                  </View>
-                </View>
-                <View style={styles.dateRow}>
-                  <View style={styles.dateField}>
-                    <Text style={styles.fieldLabel}>From</Text>
-                    <DateTimePicker
-                      key={startPickerKey}
-                      value={startDate}
-                      mode="date"
-                      display="compact"
-                      maximumDate={endDate}
-                      onChange={(_, d) => {
-                        if (!d) return;
-                        setStartDate(d);
-                        setStartPickerKey((k) => k + 1);
-                      }}
-                    />
-                  </View>
-                  <View style={styles.dateField}>
-                    <Text style={styles.fieldLabel}>To</Text>
-                    <DateTimePicker
-                      key={endPickerKey}
-                      value={endDate}
-                      mode="date"
-                      display="compact"
-                      minimumDate={startDate}
-                      onChange={(_, d) => {
-                        if (!d) return;
-                        setEndDate(d);
-                        setEndPickerKey((k) => k + 1);
-                      }}
-                    />
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={styles.nextButton}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setStep('details');
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.nextButtonText}>Next</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </SheetLayer>
-
-          {/* Layer 4: Details (transport + notes) */}
-          <SheetLayer
-            visible={detailsVisible}
-            onClose={closeAll}
-            onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setStep('dates'); }}
-            title="Details"
-            snapPoint={0.56}
-            depth={0}
-          >
-            {() => (
-              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <View style={styles.sheetContent}>
-                  {/* Summary */}
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>{selectedCity}, {selectedCountry}</Text>
-                    <Text style={styles.summaryDates}>
-                      {fmtDateLabel(startDate)} – {fmtDateLabel(endDate)} · {days}d
-                    </Text>
-                  </View>
-
-                  {/* Transport picker */}
-                  <View>
-                    <Text style={styles.fieldLabel}>How are you getting there?</Text>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.transportScroll}
-                    >
-                      <View style={styles.transportRow}>
-                        {TRANSPORTS.map(({ type, icon, label }) => (
-                          <TouchableOpacity
-                            key={type}
-                            style={[
-                              styles.transportPill,
-                              transport === type && styles.transportPillActive,
-                            ]}
-                            onPress={() => {
-                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                              setTransport(type);
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <Ionicons
-                              name={icon as any}
-                              size={16}
-                              color={transport === type ? '#fff' : Colors.text}
-                            />
-                            <Text
-                              style={[
-                                styles.transportPillLabel,
-                                transport === type && styles.transportPillLabelActive,
-                              ]}
-                            >
-                              {label}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </ScrollView>
-                  </View>
-
-                  {/* City tips */}
-                  {(cityTipsLoading || cityTips) && (
-                    <View style={styles.tipsCard}>
-                      <Text style={styles.tipsLabel}>✨ Tips for {selectedCity}</Text>
-                      {cityTipsLoading ? (
-                        <Text style={styles.tipsText}>Loading tips…</Text>
-                      ) : (
-                        <Text style={styles.tipsText}>{cityTips}</Text>
-                      )}
-                    </View>
-                  )}
-
-                  {/* Notes */}
-                  <View>
-                    <Text style={styles.fieldLabel}>Notes</Text>
-                    <TextInput
-                      style={styles.notesInput}
-                      value={notes}
-                      onChangeText={setNotes}
-                      placeholder="Optional notes..."
-                      placeholderTextColor={Colors.textTertiary}
-                      multiline
-                      numberOfLines={3}
-                      returnKeyType="done"
-                      blurOnSubmit
-                    />
-                  </View>
-
-                  <TouchableOpacity
-                    style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-                    onPress={handleSave}
-                    activeOpacity={0.8}
-                    disabled={saving}
-                  >
-                    <Text style={styles.saveButtonText}>
-                      {saving ? 'Saving...' : editingLeg ? 'Update Stop' : 'Add Stop'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </KeyboardAvoidingView>
-            )}
-          </SheetLayer>
+          <DraggableFlatList
+            data={legs}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={renderItem}
+            onDragEnd={handleReorder}
+            onScrollOffsetChange={(offset) => { scrollY.value = offset; }}
+            ListHeaderComponent={listHeader}
+            ListFooterComponent={listFooter}
+            contentInsetAdjustmentBehavior="never"
+            contentContainerStyle={styles.content}
+            activationDistance={15}
+          />
         </GestureHandlerRootView>
       )}
     </>
@@ -1183,18 +921,56 @@ const styles = StyleSheet.create({
     paddingRight: 16,
     paddingTop: 0,
     paddingBottom: 100,
-    position: 'relative',
+  },
+
+  // ─── Summary bar ───
+  summaryBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  summaryBarFallback: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  summaryItem: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+    fontVariant: ['tabular-nums'],
+  },
+  summaryLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: Colors.border,
   },
 
   // ─── Timeline ───
   timelineLine: {
     position: 'absolute',
-    top: 0,
-    bottom: 0,
-    // paddingLeft(16) + half dotCol(14) - half lineWidth(1) = 29
-    left: 16 + 14 - 1,
+    left: 16 + 14 - 1, // paddingLeft + half dotCol - half lineWidth
     width: 2,
+    height: 5000, // tall enough to cover all content
     backgroundColor: Colors.primary + '20',
+    zIndex: 0,
   },
   timelineEndCap: {
     flexDirection: 'row',
@@ -1349,177 +1125,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // ─── Sheet / list ───
-  listContainer: {
-    paddingHorizontal: 4,
-    paddingBottom: 20,
-  },
-  listSectionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#8E8E93',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 6,
-  },
-  listItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  listItemIcon: {
-    fontSize: 22,
-    marginRight: 12,
-  },
-  listItemText: {
-    flex: 1,
-    fontSize: 16,
-    color: Colors.text,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#8E8E93',
-    fontSize: 15,
-    paddingVertical: 32,
-  },
-  loadMoreButton: {
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  loadMoreText: {
-    color: Colors.primary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-
-  // ─── Sheet content ───
-  sheetContent: {
-    padding: 20,
-    gap: 20,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  summaryLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-    flex: 1,
-  },
-  summaryDates: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontVariant: ['tabular-nums'],
-  },
-  daysBubble: {
-    backgroundColor: Colors.primary + '18',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  daysBubbleText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  dateField: {
-    flex: 1,
-    gap: 6,
-  },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-
-  // ─── Transport picker ───
-  transportScroll: {
-    marginHorizontal: -4,
-  },
-  transportRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 4,
-  },
-  transportPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  transportPillActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  transportPillLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.text,
-  },
-  transportPillLabelActive: {
-    color: '#fff',
-  },
-
-  // ─── Notes ───
-  notesInput: {
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderCurve: 'continuous',
-    padding: 12,
-    fontSize: 15,
-    color: Colors.text,
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-
-  // ─── Buttons ───
-  nextButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  nextButtonText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  saveButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
 
   // ─── AI section header (mirrors timeline month pill) ───
   aiSectionHeader: {
@@ -1693,26 +1298,4 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ─── City tips ───
-  tipsCard: {
-    backgroundColor: Colors.primary + '0C',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.primary + '22',
-    borderCurve: 'continuous',
-    padding: 14,
-    gap: 6,
-  },
-  tipsLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  tipsText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    lineHeight: 20,
-  },
 });

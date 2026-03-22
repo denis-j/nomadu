@@ -3,6 +3,7 @@ import {
   Timestamp,
   collection,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   setDoc,
@@ -51,6 +52,24 @@ export async function pushTripsToCloud(uid: string): Promise<void> {
     const syncId = trip.sync_id || `local_${trip.id}`;
     const docRef = doc(tripsCollection(uid), syncId);
 
+    const localUpdatedAt = trip.updated_at
+      ? new Date(trip.updated_at)
+      : new Date();
+
+    // Only push if local is newer than cloud
+    const cloudSnap = await getDoc(docRef);
+    if (cloudSnap.exists()) {
+      const cloudData = cloudSnap.data();
+      const cloudUpdatedAt = cloudData.updated_at instanceof Timestamp
+        ? cloudData.updated_at.toDate()
+        : new Date(0);
+      if (cloudUpdatedAt >= localUpdatedAt) {
+        // Cloud is newer or same — skip push for this trip
+        if (!trip.sync_id) await setSyncId(trip.id, syncId);
+        continue;
+      }
+    }
+
     await setDoc(docRef, {
       city: trip.city,
       country: trip.country,
@@ -61,9 +80,7 @@ export async function pushTripsToCloud(uid: string): Promise<void> {
       end_date: trip.end_date,
       days: trip.days,
       local_id: trip.id,
-      updated_at: trip.updated_at
-        ? Timestamp.fromDate(new Date(trip.updated_at))
-        : Timestamp.now(),
+      updated_at: Timestamp.fromDate(localUpdatedAt),
       deleted: trip.deleted === 1,
     }, { merge: true });
 
@@ -104,8 +121,9 @@ export async function pullTripsFromCloud(uid: string): Promise<void> {
 // ─── Bidirectional Sync ───
 
 export async function syncTrips(uid: string): Promise<void> {
-  await pushTripsToCloud(uid);
+  // Pull first so cloud data is never overwritten by an empty/stale local DB
   await pullTripsFromCloud(uid);
+  await pushTripsToCloud(uid);
   await setLastSyncTime(uid);
 }
 

@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useSubscription } from '../hooks/useSubscription';
 import { configureRevenueCat, identifyUser } from '../lib/revenueCat';
 import { prefetchAll, prefetchUserData } from '../lib/prefetch';
+import { ToastContainer } from '../components/Toast';
 
 // Force light mode globally
 Appearance.setColorScheme('light');
@@ -110,6 +111,7 @@ export default function RootLayout() {
       {showSplash && (
         <SplashScreen ready={appReady} onDone={() => setShowSplash(false)} />
       )}
+      <ToastContainer />
     </>
   );
 }

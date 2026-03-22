@@ -10,6 +10,16 @@ export default function TimelineStack() {
           headerLargeTitle: true,
         }}
       />
+      <Stack.Screen
+        name="create"
+        options={{
+          presentation: 'formSheet',
+          headerShown: false,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.75, 1.0],
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
+      />
     </Stack>
   );
 }

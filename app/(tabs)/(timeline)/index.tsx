@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,20 +8,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTrips } from '../../../hooks/useTrips';
 import { TripCard } from '../../../components/TripCard';
 import { EmptyState } from '../../../components/EmptyState';
-import { SheetLayer, SheetBackdrop } from '../../../components/IslandSheet';
 import { Colors } from '../../../constants/colors';
-import { Trip, insertTripManual, updateTrip, markTripDeleted, parseDate } from '../../../lib/database';
-import { forwardGeocode } from '../../../lib/geocoding';
-import { getPopularCountries, searchCountries, getCitiesByCountryPaginated, searchCitiesByCountry, getCountryCode, getCountryFlag } from '../../../utils/geography';
+import { Trip, markTripDeleted, parseDate } from '../../../lib/database';
 
 const hasGlass = isLiquidGlassAvailable();
 
@@ -147,15 +141,13 @@ interface Section {
   monthEnd: Date;
 }
 
-type SheetStep = 'closed' | 'country' | 'city' | 'dates';
-
-// ─── Precomputed ───
-
-const popularCountries = getPopularCountries();
+const fmt = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 // ─── Component ───
 
 export default function TimelineScreen() {
+  const router = useRouter();
   const { trips, loading, refresh } = useTrips();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -168,19 +160,6 @@ export default function TimelineScreen() {
     ]);
     setRefreshing(false);
   }, [refresh]);
-
-  const [step, setStep] = useState<SheetStep>('closed');
-  const [closing, setClosing] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout>>();
-  const [selectedCountry, setSelectedCountry] = useState('');
-  const [selectedCity, setSelectedCity] = useState('');
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
-  const [noEndDate, setNoEndDate] = useState(false);
-  const [startPickerKey, setStartPickerKey] = useState(0);
-  const [endPickerKey, setEndPickerKey] = useState(0);
-  const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
-  const [saving, setSaving] = useState(false);
 
   // ─── Overlap detection (global across all trips) ───
 
@@ -297,152 +276,38 @@ export default function TimelineScreen() {
       });
   }, [trips]);
 
-  // ─── Sheet flow ───
+  // ─── Navigation ───
 
-  const closeAll = useCallback(() => {
-    if (closing) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setClosing(true);
-    clearTimeout(closeTimer.current);
-    closeTimer.current = setTimeout(() => {
-      setStep('closed');
-      setClosing(false);
-    }, 350);
-  }, [closing]);
+  const openSheet = useCallback((prefillStart?: Date, prefillEnd?: Date) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push({
+      pathname: './create/country',
+      params: {
+        ...(prefillStart && { start: fmt(prefillStart) }),
+        ...(prefillEnd && { end: fmt(prefillEnd) }),
+      },
+    });
+  }, [router]);
+
+  const openEditSheet = useCallback((trip: Trip) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push({
+      pathname: './create/country',
+      params: {
+        id: String(trip.id),
+        country: trip.country,
+        city: trip.city,
+        start: trip.start_date,
+        ...(trip.end_date && { end: trip.end_date }),
+        noEnd: trip.end_date ? '0' : '1',
+      },
+    });
+  }, [router]);
 
   const handleDelete = useCallback(async (id: number) => {
     await markTripDeleted(id);
     refresh();
   }, [refresh]);
-
-  const openSheet = useCallback((prefillStart?: Date, prefillEnd?: Date) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setEditingTrip(null);
-    setSelectedCountry('');
-    setSelectedCity('');
-    setStartDate(prefillStart ?? new Date());
-    setEndDate(prefillEnd ?? new Date());
-    setNoEndDate(false);
-    setStartPickerKey(0);
-    setEndPickerKey(0);
-    setSaving(false);
-    setStep('country');
-  }, []);
-
-  const openEditSheet = useCallback((trip: Trip) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setEditingTrip(trip);
-    setSelectedCountry(trip.country);
-    setSelectedCity(trip.city);
-    setStartDate(parseDate(trip.start_date));
-    setEndDate(trip.end_date ? parseDate(trip.end_date) : new Date());
-    setNoEndDate(!trip.end_date);
-    setStartPickerKey(0);
-    setEndPickerKey(0);
-    setSaving(false);
-    setStep('country');
-  }, []);
-
-  const pickCountry = useCallback((name: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedCountry(name);
-    setStep('city');
-  }, []);
-
-  const pickCity = useCallback((name: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedCity(name);
-    setStep('dates');
-  }, []);
-
-  const saveWith = useCallback(async (start: Date, end: Date | null) => {
-    setSaving(true);
-    try {
-      const code = getCountryCode(selectedCountry);
-      const fmt = (d: Date) =>
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const s = fmt(start);
-      const e = end ? fmt(end) : null;
-      const coords = await forwardGeocode(`${selectedCity}, ${selectedCountry}`);
-      if (editingTrip) {
-        await updateTrip(editingTrip.id, selectedCity, selectedCountry, code, s, e, coords?.latitude, coords?.longitude);
-      } else {
-        await insertTripManual(selectedCity, selectedCountry, code, s, e, coords?.latitude, coords?.longitude);
-      }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setStep('closed');
-      refresh();
-    } catch (err) {
-      console.error('Failed to save trip:', err);
-    } finally {
-      setSaving(false);
-    }
-  }, [selectedCountry, selectedCity, editingTrip, refresh]);
-
-  const handleSave = useCallback(() => saveWith(startDate, noEndDate ? null : endDate),
-    [saveWith, startDate, endDate, noEndDate]);
-
-  // ─── Depth ───
-
-  const countryDepth = step === 'country' ? 0 : step === 'city' ? 1 : step === 'dates' ? 2 : 0;
-  const cityDepth = step === 'city' ? 0 : step === 'dates' ? 1 : 0;
-
-  const modalOpen = step !== 'closed' || closing;
-  const countryVisible = !closing && (step === 'country' || step === 'city' || step === 'dates');
-  const cityVisible = !closing && (step === 'city' || step === 'dates');
-  const datesVisible = !closing && step === 'dates';
-
-  // ─── Cities ─---
-
-  const [cities, setCities] = useState<string[]>([]);
-  const [citiesLoading, setCitiesLoading] = useState(false);
-  const [citiesHasMore, setCitiesHasMore] = useState(false);
-  const [citiesPage, setCitiesPage] = useState(1);
-  const [citySearchQuery, setCitySearchQuery] = useState('');
-  const [citySearchResults, setCitySearchResults] = useState<string[] | null>(null);
-  const [citySearchLoading, setCitySearchLoading] = useState(false);
-
-  useEffect(() => {
-    if (!selectedCountry) {
-      setCities([]);
-      return;
-    }
-    setCitiesPage(1);
-    setCitySearchQuery('');
-    setCitySearchResults(null);
-    setCitiesLoading(true);
-    getCitiesByCountryPaginated(selectedCountry, 1, 30).then((result) => {
-      setCities(result.cities);
-      setCitiesHasMore(result.hasMore);
-      setCitiesLoading(false);
-    });
-  }, [selectedCountry]);
-
-  const handleCitySearch = useCallback((query: string) => {
-    setCitySearchQuery(query);
-    if (!query.trim()) {
-      setCitySearchResults(null);
-      setCitySearchLoading(false);
-      return;
-    }
-    setCitySearchLoading(true);
-    searchCitiesByCountry(selectedCountry, query).then((results) => {
-      setCitySearchResults(results);
-      setCitySearchLoading(false);
-    });
-  }, [selectedCountry]);
-
-  const loadMoreCities = useCallback(() => {
-    if (citiesLoading || !citiesHasMore) return;
-    setCitiesLoading(true);
-    const nextPage = citiesPage + 1;
-    getCitiesByCountryPaginated(selectedCountry, nextPage, 30).then((result) => {
-      setCities((prev) => [...prev, ...result.cities]);
-      setCitiesHasMore(result.hasMore);
-      setCitiesPage(nextPage);
-      setCitiesLoading(false);
-    });
-  }, [selectedCountry, citiesPage, citiesLoading, citiesHasMore]);
 
   // ─── Header ───
 
@@ -548,211 +413,6 @@ export default function TimelineScreen() {
     <>
       <Stack.Screen options={{ headerRight }} />
       {renderContent()}
-
-      {/* ── Inline sheet layers (no Modal for instant open) ── */}
-      {modalOpen && (
-        <GestureHandlerRootView style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <SheetBackdrop visible={modalOpen && !closing} onPress={closeAll} />
-
-          {/* Layer 1: Country */}
-          <SheetLayer
-            visible={countryVisible}
-            onClose={closeAll}
-            title={editingTrip ? 'Edit Country' : 'Choose Country'}
-            searchEnabled
-            searchPlaceholder="Search countries..."
-            snapPoint={0.5}
-            depth={countryDepth}
-          >
-            {(query: string) => {
-              const filtered = query.trim()
-                ? searchCountries(query)
-                : popularCountries;
-              const showingPopular = !query.trim();
-              return (
-                <View style={styles.listContainer}>
-                  {showingPopular && (
-                    <Text style={styles.listSectionLabel}>Popular</Text>
-                  )}
-                  {filtered.map((name) => {
-                    const flag = getCountryFlag(name);
-                    return (
-                      <TouchableOpacity
-                        key={name}
-                        style={styles.listItem}
-                        onPress={() => pickCountry(name)}
-                        activeOpacity={0.6}
-                      >
-                        {flag && <Text style={styles.listItemIcon}>{flag}</Text>}
-                        <Text style={styles.listItemText}>{name}</Text>
-                        <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />
-                      </TouchableOpacity>
-                    );
-                  })}
-                  {filtered.length === 0 && (
-                    <Text style={styles.emptyText}>No countries found</Text>
-                  )}
-                </View>
-              );
-            }}
-          </SheetLayer>
-
-          {/* Layer 2: City */}
-          <SheetLayer
-            visible={cityVisible}
-            onClose={closeAll}
-            onBack={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setStep('country');
-            }}
-            title={selectedCountry}
-            searchEnabled
-            searchPlaceholder="Search cities..."
-            onSearchChange={handleCitySearch}
-            snapPoint={0.48}
-            depth={cityDepth}
-          >
-            {(query: string) => {
-              if (citiesLoading) {
-                return (
-                  <View style={styles.listContainer}>
-                    <Text style={styles.emptyText}>Loading cities...</Text>
-                  </View>
-                );
-              }
-              const displayCities = citySearchResults ?? cities;
-              const isSearching = citySearchQuery.trim() !== '' && citySearchLoading;
-
-              return (
-                <View style={styles.listContainer}>
-                  {isSearching && (
-                    <Text style={styles.emptyText}>Searching...</Text>
-                  )}
-                  {!isSearching && displayCities.map((name: string, index: number) => (
-                    <TouchableOpacity
-                      key={`${name}-${index}`}
-                      style={styles.listItem}
-                      onPress={() => pickCity(name)}
-                      activeOpacity={0.6}
-                    >
-                      <Text style={styles.listItemText}>{name}</Text>
-                      <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />
-                    </TouchableOpacity>
-                  ))}
-                  {!isSearching && !citySearchQuery && citiesHasMore && (
-                    <TouchableOpacity
-                      style={styles.loadMoreButton}
-                      onPress={loadMoreCities}
-                      activeOpacity={0.6}
-                    >
-                      <Text style={styles.loadMoreText}>
-                        {citiesLoading ? 'Loading...' : 'Load more'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  {displayCities.length === 0 && !isSearching && (
-                    <Text style={styles.emptyText}>No cities found</Text>
-                  )}
-                </View>
-              );
-            }}
-          </SheetLayer>
-
-          {/* Layer 3: Dates + Save */}
-          <SheetLayer
-            visible={datesVisible}
-            onClose={closeAll}
-            onBack={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setStep('city');
-            }}
-            title={editingTrip ? 'Edit Dates' : 'Trip Dates'}
-            snapPoint={0.52}
-            depth={0}
-          >
-            {(() => {
-              const days = noEndDate
-                ? Math.max(1, Math.round((new Date().getTime() - startDate.getTime()) / 86_400_000) + 1)
-                : Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1);
-
-              return (
-                <View style={styles.datesContainer}>
-                  {/* Location + day count */}
-                  <View style={styles.datesSummaryRow}>
-                    <Text style={styles.dateSummaryLabel}>{selectedCity}, {selectedCountry}</Text>
-                    <View style={styles.rangeDaysBubble}>
-                      <Text style={styles.rangeDaysText}>{days}d</Text>
-                    </View>
-                  </View>
-
-                  {/* FROM / TO pickers */}
-                  <View style={styles.dateRow}>
-                    <View style={styles.dateField}>
-                      <Text style={styles.dateLabel}>From</Text>
-                      <DateTimePicker
-                        key={startPickerKey}
-                        value={startDate}
-                        mode="date"
-                        display="compact"
-                        maximumDate={noEndDate ? new Date() : endDate}
-                        onChange={(_, d) => {
-                          if (!d) return;
-                          setStartDate(d);
-                          setStartPickerKey(k => k + 1);
-                        }}
-                      />
-                    </View>
-                    {!noEndDate && (
-                      <View style={styles.dateField}>
-                        <Text style={styles.dateLabel}>To</Text>
-                        <DateTimePicker
-                          key={endPickerKey}
-                          value={endDate}
-                          mode="date"
-                          display="compact"
-                          minimumDate={startDate}
-                          maximumDate={new Date()}
-                          onChange={(_, d) => {
-                            if (!d) return;
-                            setEndDate(d);
-                            setEndPickerKey(k => k + 1);
-                          }}
-                        />
-                      </View>
-                    )}
-                  </View>
-
-                  {/* Still traveling toggle */}
-                  <TouchableOpacity
-                    style={styles.toggleRow}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setNoEndDate(v => !v);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.toggle, noEndDate && styles.toggleActive]}>
-                      <View style={[styles.toggleThumb, noEndDate && styles.toggleThumbActive]} />
-                    </View>
-                    <Text style={styles.toggleLabel}>Still traveling</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-                    onPress={handleSave}
-                    activeOpacity={0.8}
-                    disabled={saving}
-                  >
-                    <Text style={styles.saveButtonText}>
-                      {saving ? 'Saving...' : editingTrip ? 'Update Trip' : 'Save Trip'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })()}
-          </SheetLayer>
-        </GestureHandlerRootView>
-      )}
     </>
   );
 }
@@ -842,203 +502,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#FF9500',
-  },
-  listContainer: {
-    paddingHorizontal: 4,
-    paddingBottom: 20,
-  },
-  listSectionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#8E8E93',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 6,
-  },
-  listItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F0F0F0',
-  },
-  listItemIcon: {
-    fontSize: 22,
-    marginRight: 12,
-  },
-  listItemText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#000',
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#8E8E93',
-    fontSize: 15,
-    paddingVertical: 32,
-  },
-  loadMoreButton: {
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  loadMoreText: {
-    color: Colors.primary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  datesContainer: {
-    padding: 20,
-    gap: 20,
-  },
-  dateSummary: {
-    backgroundColor: '#F2F2F7',
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-  },
-  dateSummaryLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-  },
-  dateRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  dateField: {
-    flex: 1,
-    gap: 6,
-  },
-  dateLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  // ─── Dates modal ───
-  datesSummaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  rangeDaysBubble: {
-    backgroundColor: Colors.primary + '18',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  rangeDaysText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  rangeStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#F2F2F7',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  rangeStripDate: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  rangeStripLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.border,
-  },
-  // ─── Start/End segment ───
-  segmentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  segmentBtn: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#F2F2F7',
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  segmentBtnActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primary + '10',
-  },
-  segmentBtnLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  segmentBtnDate: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  segmentBtnDateActive: {
-    color: Colors.primary,
-  },
-  segmentArrow: {
-    paddingHorizontal: 4,
-  },
-  // ─── Toggle ───
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  toggle: {
-    width: 44,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#E5E5EA',
-    padding: 3,
-    justifyContent: 'center',
-  },
-  toggleActive: {
-    backgroundColor: Colors.primary,
-  },
-  toggleThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  toggleThumbActive: {
-    transform: [{ translateX: 18 }],
-  },
-  toggleLabel: {
-    fontSize: 15,
-    color: Colors.text,
-  },
-  saveButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
   },
 });
