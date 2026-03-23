@@ -14,6 +14,9 @@ export default function SettingsStack() {
         name="passport"
         options={{
           title: 'Passport',
+          headerTransparent: true,
+          headerBlurEffect: 'systemMaterial',
+          headerBackButtonDisplayMode: 'minimal',
         }}
       />
       <Stack.Screen
