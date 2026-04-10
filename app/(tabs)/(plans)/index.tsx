@@ -370,18 +370,16 @@ export default function JourneysScreen() {
           onPress: async () => {
             const today = new Date();
             const id = await insertJourney(`${dest.flag} ${dest.country} Trip`);
-            await Promise.all(
-              dest.legs.map((leg, i) =>
-                insertJourneyLeg(
-                  id,
-                  leg.city, leg.country, leg.countryCode,
-                  addDays(today, leg.startOffset),
-                  addDays(today, leg.endOffset),
-                  leg.transport, null, i,
-                  leg.latitude, leg.longitude,
-                )
-              )
-            );
+            for (const leg of dest.legs) {
+              await insertJourneyLeg(
+                id,
+                leg.city, leg.country, leg.countryCode,
+                addDays(today, leg.startOffset),
+                addDays(today, leg.endOffset),
+                leg.transport, null,
+                leg.latitude, leg.longitude,
+              );
+            }
             refresh();
             router.push(`/(tabs)/(plans)/${id}` as any);
           },

@@ -16,7 +16,7 @@ import { clearAllData } from '../../../lib/database';
 import { restorePurchases } from '../../../lib/revenueCat';
 import { useSync } from '../../../contexts/SyncContext';
 import { countryCodeToFlag } from '../../../lib/geocoding';
-import { getHasFixedResidence, setHasFixedResidence } from '../../../lib/onboarding';
+import { getHasFixedResidence, setHasFixedResidence, getDetailedTracking, setDetailedTracking } from '../../../lib/onboarding';
 import { IslandSheet } from '../../../components/IslandSheet';
 
 const hasGlass = isLiquidGlassAvailable();
@@ -33,12 +33,14 @@ export default function SettingsScreen() {
   const { granted: notificationsGranted } = useNotificationPermission();
   const router = useRouter();
   const [fixedResidence, setFixedResidence] = useState(true);
+  const [detailedTracking, setDetailedTrackingState] = useState(false);
 
   useEffect(() => {
     if (user) {
       getHasFixedResidence(user.uid).then((val) => {
         if (val !== null) setFixedResidence(val);
       });
+      getDetailedTracking(user.uid).then(setDetailedTrackingState);
     }
   }, [user]);
 
@@ -354,6 +356,22 @@ export default function SettingsScreen() {
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Status</Text>
           <StatusBadge granted={permissions.background} label={permissions.background ? 'Active' : 'Inactive'} />
+        </View>
+        <View style={styles.separator} />
+        <View style={styles.row}>
+          <View style={styles.rowContent}>
+            <Text style={styles.rowLabel}>Detailed Tracking</Text>
+            <Text style={styles.rowDescription}>
+              Track districts and neighborhoods within cities. Uses more battery.
+            </Text>
+          </View>
+          <Switch
+            value={detailedTracking}
+            onValueChange={(val) => {
+              setDetailedTrackingState(val);
+              if (user) setDetailedTracking(user.uid, val);
+            }}
+          />
         </View>
         <View style={styles.separator} />
         <Pressable

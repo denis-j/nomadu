@@ -71,24 +71,68 @@ export function countDaysInRollingWindow(
 
 /**
  * For simple visa-free rules: find the most recent continuous stay
- * (unbroken) in a country and count days from entry to today/end_date.
+ * in a country and count total days. A stay is "continuous" as long as
+ * there is no gap of 1+ days outside the country between trips.
+ * This handles multiple cities within the same country correctly —
+ * the visa only resets on a border run (leaving the country for ≥1 day).
  */
 export function countCurrentStayDays(
   trips: Trip[],
   countryCode: string,
 ): number {
-  // Find the most recent trip to this country
+  // Get all trips to this country, sorted chronologically (newest first)
   const countryTrips = trips
     .filter((t) => t.country_code === countryCode)
     .sort((a, b) => b.start_date.localeCompare(a.start_date));
 
   if (countryTrips.length === 0) return 0;
 
-  const latest = countryTrips[0];
-  const tripStart = parseDate(latest.start_date);
-  const tripEnd = latest.end_date ? parseDate(latest.end_date) : today();
+  // Start from the most recent trip and walk backwards,
+  // collecting all consecutive trips with no gap > 0 days between them.
+  // Use a Set of unique days to handle overlapping trips correctly.
+  const uniqueDays = new Set<string>();
 
-  return daysBetween(tripStart, tripEnd) + 1;
+  const addTripDays = (start: Date, end: Date) => {
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      uniqueDays.add(
+        `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`,
+      );
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  };
+
+  // Add days from the most recent trip
+  let earliestDate = parseDate(countryTrips[0].start_date);
+  const latestEnd = countryTrips[0].end_date
+    ? parseDate(countryTrips[0].end_date)
+    : today();
+  addTripDays(earliestDate, latestEnd);
+
+  // Walk backwards through remaining trips — merge if no gap
+  for (let i = 1; i < countryTrips.length; i++) {
+    const tripEnd = countryTrips[i].end_date
+      ? parseDate(countryTrips[i].end_date)
+      : today();
+    const tripStart = parseDate(countryTrips[i].start_date);
+
+    // Check if this trip connects to the current continuous stay.
+    // "Connects" means the trip's end_date is at most 1 day before
+    // the earliest start we've seen (no full day gap between them).
+    const gapDays = daysBetween(tripEnd, earliestDate);
+    if (gapDays <= 1) {
+      // Connected — add these days and extend the earliest date
+      addTripDays(tripStart, tripEnd);
+      if (tripStart < earliestDate) {
+        earliestDate = tripStart;
+      }
+    } else {
+      // Gap found — border run, stop merging
+      break;
+    }
+  }
+
+  return uniqueDays.size;
 }
 
 function getStatusFromPercent(percent: number): VisaStatus['status'] {

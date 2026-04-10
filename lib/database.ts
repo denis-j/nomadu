@@ -455,16 +455,21 @@ export async function insertJourneyLeg(
   endDate: string,
   transport: TransportType,
   notes: string | null,
-  sortOrder: number,
   latitude?: number | null,
   longitude?: number | null,
 ): Promise<number> {
   const database = await getDatabase();
+  // Auto-assign sort_order to end of list
+  const row = await database.getFirstAsync<{ max_order: number | null }>(
+    'SELECT MAX(sort_order) as max_order FROM journey_legs WHERE journey_id = ?',
+    [journeyId],
+  );
+  const nextOrder = (row?.max_order ?? -1) + 1;
   const result = await database.runAsync(
     `INSERT INTO journey_legs
        (journey_id, city, country, country_code, latitude, longitude, start_date, end_date, transport, notes, sort_order)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [journeyId, city, country, countryCode, latitude ?? null, longitude ?? null, startDate, endDate, transport, notes ?? null, sortOrder],
+    [journeyId, city, country, countryCode, latitude ?? null, longitude ?? null, startDate, endDate, transport, notes ?? null, nextOrder],
   );
   // Also bump parent journey updated_at
   await database.runAsync(

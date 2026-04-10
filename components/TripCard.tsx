@@ -12,11 +12,13 @@ interface TripCardProps {
   trip: Trip;
   daysOverride?: number;
   hasOverlap?: boolean;
+  /** Compact mode: no timeline dot, no country label (used inside country groups) */
+  compact?: boolean;
   onDelete?: (id: number) => void;
   onEdit?: (trip: Trip) => void;
 }
 
-export function TripCard({ trip, daysOverride, hasOverlap, onDelete, onEdit }: TripCardProps) {
+export function TripCard({ trip, daysOverride, hasOverlap, compact, onDelete, onEdit }: TripCardProps) {
   const flag = countryCodeToFlag(trip.country_code);
   const startDate = parseDate(trip.start_date);
   const endDate = trip.end_date ? parseDate(trip.end_date) : null;
@@ -61,6 +63,48 @@ export function TripCard({ trip, daysOverride, hasOverlap, onDelete, onEdit }: T
 
   const CardShell = hasGlass ? GlassView : View;
 
+  const cardContent = (
+    <Pressable
+      onPress={handlePress}
+      onLongPress={handleLongPress}
+      delayLongPress={350}
+      style={({ pressed }) => [styles.cardPressable, pressed && styles.cardPressed]}
+    >
+      <CardShell {...(hasGlass
+        ? { glassEffectStyle: 'regular' as const, style: [styles.card, compact && styles.cardCompact] }
+        : { style: [styles.card, compact && styles.cardCompact, styles.cardFallback, hasOverlap && styles.cardFallbackOverlap] }
+      )}>
+        {hasOverlap && <View style={styles.overlapTint} />}
+        <View style={styles.cardTop}>
+          {!compact && <Text style={styles.flag}>{flag}</Text>}
+          {compact && <Text style={styles.cityInline}>{trip.city}</Text>}
+          <View style={styles.cardTopRight}>
+            {hasOverlap && (
+              <View style={styles.overlapChip}>
+                <Text style={styles.overlapChipText}>overlap</Text>
+              </View>
+            )}
+            <View style={[styles.daysBadge, hasOverlap && styles.daysBadgeOverlap]}>
+              <Text style={[styles.daysText, hasOverlap && styles.daysTextOverlap]}>
+                {daysOverride ?? trip.days}d
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {!compact && <Text style={styles.city}>{trip.city}</Text>}
+        {!compact && <Text style={styles.country}>{trip.country}</Text>}
+
+        <View style={styles.cardBottom}>
+          <Text style={styles.dates}>{dateRange}</Text>
+          {isActive && <View style={styles.activeDot} />}
+        </View>
+      </CardShell>
+    </Pressable>
+  );
+
+  if (compact) return cardContent;
+
   return (
     <View style={styles.row}>
       {/* Dot only — the line is drawn once in the parent ScrollView */}
@@ -68,44 +112,7 @@ export function TripCard({ trip, daysOverride, hasOverlap, onDelete, onEdit }: T
         <View style={styles.dotSpacer} />
         <View style={[styles.dot, isActive && styles.dotActive]} />
       </View>
-
-      {/* Card */}
-      <Pressable
-        onPress={handlePress}
-        onLongPress={handleLongPress}
-        delayLongPress={350}
-        style={({ pressed }) => [styles.cardPressable, pressed && styles.cardPressed]}
-      >
-        <CardShell {...(hasGlass
-          ? { glassEffectStyle: 'regular' as const, style: styles.card }
-          : { style: [styles.card, styles.cardFallback, hasOverlap && styles.cardFallbackOverlap] }
-        )}>
-          {hasOverlap && <View style={styles.overlapTint} />}
-          <View style={styles.cardTop}>
-            <Text style={styles.flag}>{flag}</Text>
-            <View style={styles.cardTopRight}>
-              {hasOverlap && (
-                <View style={styles.overlapChip}>
-                  <Text style={styles.overlapChipText}>⚠ overlap</Text>
-                </View>
-              )}
-              <View style={[styles.daysBadge, hasOverlap && styles.daysBadgeOverlap]}>
-                <Text style={[styles.daysText, hasOverlap && styles.daysTextOverlap]}>
-                  {daysOverride ?? trip.days}d
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <Text style={styles.city}>{trip.city}</Text>
-          <Text style={styles.country}>{trip.country}</Text>
-
-          <View style={styles.cardBottom}>
-            <Text style={styles.dates}>{dateRange}</Text>
-            {isActive && <View style={styles.activeDot} />}
-          </View>
-        </CardShell>
-      </Pressable>
+      {cardContent}
     </View>
   );
 }
@@ -148,6 +155,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 2,
     overflow: 'hidden',
+  },
+  cardCompact: {
+    padding: 10,
+    marginBottom: 4,
+    borderRadius: 10,
   },
   cardFallback: {
     backgroundColor: Colors.surface,
@@ -199,6 +211,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.text,
     marginBottom: 2,
+  },
+  cityInline: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text,
+    flex: 1,
   },
   country: {
     fontSize: 14,

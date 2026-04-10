@@ -1,11 +1,15 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
+  ActionSheetIOS,
+  LayoutAnimation,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  UIManager,
   View,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
@@ -18,6 +22,11 @@ import { TripCard } from '../../../components/TripCard';
 import { EmptyState } from '../../../components/EmptyState';
 import { Colors } from '../../../constants/colors';
 import { Trip, markTripDeleted, parseDate } from '../../../lib/database';
+import { countryCodeToFlag } from '../../../lib/geocoding';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const hasGlass = isLiquidGlassAvailable();
 
@@ -77,6 +86,294 @@ const gapStyles = StyleSheet.create({
   dates: {
     fontSize: 12,
     color: Colors.textTertiary,
+  },
+});
+
+// ─── Country group (collapsible) ───
+
+interface CountryGroupData {
+  countryCode: string;
+  country: string;
+  items: { trip: Trip; daysInMonth: number }[];
+  totalDays: number;
+}
+
+/** Groups consecutive same-country trips within a section's sorted data. */
+function groupByCountryRuns(
+  sortedData: { trip: Trip; daysInMonth: number }[],
+): (CountryGroupData | { trip: Trip; daysInMonth: number })[] {
+  const result: (CountryGroupData | { trip: Trip; daysInMonth: number })[] = [];
+  let i = 0;
+  while (i < sortedData.length) {
+    const current = sortedData[i];
+    const code = current.trip.country_code;
+    // Look ahead for consecutive trips in the same country
+    let j = i + 1;
+    while (j < sortedData.length && sortedData[j].trip.country_code === code) j++;
+    const runLength = j - i;
+    if (runLength >= 2) {
+      const items = sortedData.slice(i, j);
+      const totalDays = items.reduce((s, d) => s + d.daysInMonth, 0);
+      result.push({
+        countryCode: code,
+        country: current.trip.country,
+        items,
+        totalDays,
+      });
+    } else {
+      result.push(current);
+    }
+    i = j;
+  }
+  return result;
+}
+
+function isCountryGroup(
+  item: CountryGroupData | { trip: Trip; daysInMonth: number },
+): item is CountryGroupData {
+  return 'items' in item && 'countryCode' in item;
+}
+
+const EXPAND_CONFIG = LayoutAnimation.create(
+  250,
+  LayoutAnimation.Types.easeInEaseOut,
+  LayoutAnimation.Properties.scaleY,
+);
+
+function CountryGroupCard({
+  group,
+  overlappingTripIds,
+  onDelete,
+  onEdit,
+}: {
+  group: CountryGroupData;
+  overlappingTripIds: Set<number>;
+  onDelete: (id: number) => void;
+  onEdit: (trip: Trip) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const flag = countryCodeToFlag(group.countryCode);
+
+  const toggle = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    LayoutAnimation.configureNext(EXPAND_CONFIG);
+    setExpanded((prev) => !prev);
+  };
+
+  const handleLongPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: `${flag} ${group.country} — ${group.items.length} stops`,
+        options: ['Delete All Stops', 'Cancel'],
+        destructiveButtonIndex: 0,
+        cancelButtonIndex: 1,
+      },
+      (index) => {
+        if (index === 0) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          LayoutAnimation.configureNext(EXPAND_CONFIG);
+          for (const { trip } of group.items) {
+            onDelete(trip.id);
+          }
+        }
+      },
+    );
+  };
+
+  // Date range: earliest start → latest end across all items
+  const earliest = group.items[group.items.length - 1].trip.start_date;
+  const latestTrip = group.items[0].trip;
+  const latestEnd = latestTrip.end_date;
+  const isActive = !latestEnd;
+
+  const fmtShort = (s: string) => {
+    const d = parseDate(s);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const dateRange = latestEnd
+    ? `${fmtShort(earliest)} – ${fmtShort(latestEnd)}`
+    : `${fmtShort(earliest)} – Present`;
+
+  const GroupShell = hasGlass ? GlassView : View;
+
+  return (
+    <View style={groupStyles.wrapper}>
+      {/* Country group header */}
+      <TouchableOpacity
+        onPress={toggle}
+        onLongPress={handleLongPress}
+        delayLongPress={350}
+        activeOpacity={0.7}
+        style={groupStyles.row}
+      >
+        <View style={groupStyles.timelineCol}>
+          <View style={groupStyles.dotSpacer} />
+          <View style={[groupStyles.dot, isActive && groupStyles.dotFilled]} />
+        </View>
+        <GroupShell
+          {...(hasGlass
+            ? { glassEffectStyle: 'regular' as const, style: groupStyles.header }
+            : { style: [groupStyles.header, groupStyles.headerFallback] })}
+        >
+          <View style={groupStyles.headerTop}>
+            <Text style={groupStyles.flag}>{flag}</Text>
+            <View style={groupStyles.headerRight}>
+              <View style={groupStyles.countChip}>
+                <Text style={groupStyles.countChipText}>
+                  {group.items.length} stops
+                </Text>
+              </View>
+              <View style={groupStyles.daysBadge}>
+                <Text style={groupStyles.daysText}>{group.totalDays}d</Text>
+              </View>
+            </View>
+          </View>
+          <Text style={groupStyles.country}>{group.country}</Text>
+          <View style={groupStyles.headerBottom}>
+            <Text style={groupStyles.dates}>{dateRange}</Text>
+            {isActive && <View style={groupStyles.activeDot} />}
+            <View style={{ flex: 1 }} />
+            <Ionicons
+              name={expanded ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color={Colors.textTertiary}
+            />
+          </View>
+        </GroupShell>
+      </TouchableOpacity>
+
+      {/* Expanded children */}
+      {expanded && (
+        <View style={groupStyles.childrenWrap}>
+          {group.items.map(({ trip, daysInMonth }) => (
+            <TripCard
+              key={trip.id}
+              trip={trip}
+              daysOverride={daysInMonth}
+              hasOverlap={overlappingTripIds.has(trip.id)}
+              compact
+              onDelete={onDelete}
+              onEdit={onEdit}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const DOT_SIZE = 12;
+const DOT_ACTIVE_SIZE = 14;
+const TIMELINE_WIDTH = 28;
+
+const groupStyles = StyleSheet.create({
+  wrapper: {
+    marginBottom: 2,
+  },
+  row: {
+    flexDirection: 'row',
+    paddingRight: 16,
+  },
+  timelineCol: {
+    width: TIMELINE_WIDTH,
+    alignItems: 'center',
+  },
+  dotSpacer: {
+    height: 20,
+  },
+  dot: {
+    width: DOT_SIZE,
+    height: DOT_SIZE,
+    borderRadius: DOT_SIZE / 2,
+    borderWidth: 2.5,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.background,
+    zIndex: 1,
+  },
+  dotFilled: {
+    width: DOT_ACTIVE_SIZE,
+    height: DOT_ACTIVE_SIZE,
+    borderRadius: DOT_ACTIVE_SIZE / 2,
+    backgroundColor: Colors.primary,
+    borderWidth: 0,
+  },
+  header: {
+    flex: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 6,
+    marginTop: 2,
+    overflow: 'hidden',
+  },
+  headerFallback: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  flag: {
+    fontSize: 28,
+  },
+  countChip: {
+    backgroundColor: Colors.accent + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  countChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.accent,
+  },
+  daysBadge: {
+    backgroundColor: Colors.primary + '18',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  daysText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  country: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  headerBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  dates: {
+    fontSize: 13,
+    color: Colors.textTertiary,
+  },
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.success,
+    marginLeft: 8,
+  },
+  childrenWrap: {
+    overflow: 'hidden',
+    paddingLeft: TIMELINE_WIDTH + 10,
+    paddingRight: 16,
   },
 });
 
@@ -384,19 +681,37 @@ export default function TimelineScreen() {
               </View>
             </View>
 
-            {/* Trip cards */}
-            {[...section.data]
-              .sort((a, b) => parseDate(b.trip.start_date).getTime() - parseDate(a.trip.start_date).getTime())
-              .map(({ trip, daysInMonth }) => (
-                <TripCard
-                  key={`${trip.id}-${section.title}`}
-                  trip={trip}
-                  daysOverride={daysInMonth}
-                  hasOverlap={overlappingTripIds.has(trip.id)}
-                  onDelete={handleDelete}
-                  onEdit={openEditSheet}
-                />
-              ))}
+            {/* Trip cards — grouped by consecutive same-country runs */}
+            {(() => {
+              const sorted = [...section.data].sort(
+                (a, b) => parseDate(b.trip.start_date).getTime() - parseDate(a.trip.start_date).getTime(),
+              );
+              const grouped = groupByCountryRuns(sorted);
+              return grouped.map((item, idx) => {
+                if (isCountryGroup(item)) {
+                  return (
+                    <CountryGroupCard
+                      key={`grp-${item.countryCode}-${section.title}-${idx}`}
+                      group={item}
+                      overlappingTripIds={overlappingTripIds}
+                      onDelete={handleDelete}
+                      onEdit={openEditSheet}
+                    />
+                  );
+                }
+                const { trip, daysInMonth } = item;
+                return (
+                  <TripCard
+                    key={`${trip.id}-${section.title}`}
+                    trip={trip}
+                    daysOverride={daysInMonth}
+                    hasOverlap={overlappingTripIds.has(trip.id)}
+                    onDelete={handleDelete}
+                    onEdit={openEditSheet}
+                  />
+                );
+              });
+            })()}
 
             {/* Gap indicators — sorted newest first to match card order */}
             {[...section.gaps]

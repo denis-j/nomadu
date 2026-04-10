@@ -2,10 +2,16 @@ import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { getCurrentTrip, insertTrip, insertVisit, updateTripEndDate } from './database';
-import { reverseGeocode } from './geocoding';
+import { reverseGeocode, isSignificantMove } from './geocoding';
 import { sendNewCityNotification } from './notifications';
+import { getDetailedTracking } from './onboarding';
+import { auth } from './firebase';
 
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
+
+/** Distance threshold for city-level tracking (km). Locations within this
+ *  range of the current trip are considered the same city. */
+const CITY_RADIUS_KM = 20;
 
 /**
  * Shared logic for processing a location update (used by both background task
@@ -30,13 +36,46 @@ async function processLocationUpdate(latitude: number, longitude: number): Promi
     geo.countryCode &&
     (currentTrip.city !== geo.city || currentTrip.country !== geo.country)
   ) {
-    // New city — close current trip and start new one
-    await updateTripEndDate(currentTrip.id);
-    await insertTrip(geo.city, geo.country, geo.countryCode, latitude, longitude);
-    sendNewCityNotification(geo.city, geo.country, geo.countryCode).catch(() => {});
+    // Names differ — check if this is really a new city or just a different
+    // district within the same area.
+    const detailedTracking = await getDetailedTrackingSafe();
+
+    const nearCurrentTrip =
+      !detailedTracking &&
+      currentTrip.latitude != null &&
+      currentTrip.longitude != null &&
+      !isSignificantMove(
+        currentTrip.latitude,
+        currentTrip.longitude,
+        latitude,
+        longitude,
+        CITY_RADIUS_KM,
+      );
+
+    if (nearCurrentTrip) {
+      // Still in the same city area — just update end date
+      await updateTripEndDate(currentTrip.id);
+    } else {
+      // Genuinely new city — close current trip and start new one
+      await updateTripEndDate(currentTrip.id);
+      await insertTrip(geo.city, geo.country, geo.countryCode, latitude, longitude);
+      sendNewCityNotification(geo.city, geo.country, geo.countryCode).catch(() => {});
+    }
   } else {
     // Same city — update end date
     await updateTripEndDate(currentTrip.id);
+  }
+}
+
+/** Read the detailed-tracking preference. Returns false if the user is not
+ *  signed in or if the read fails (safe default = city-level only). */
+async function getDetailedTrackingSafe(): Promise<boolean> {
+  try {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return false;
+    return await getDetailedTracking(uid);
+  } catch {
+    return false;
   }
 }
 

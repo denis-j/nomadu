@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const ONBOARDING_COMPLETE_KEY = (uid: string) => `@onboarding_complete_${uid}`;
 const CITIZENSHIP_KEY = (uid: string) => `@citizenship_${uid}`;
 const FIXED_RESIDENCE_KEY = (uid: string) => `@fixed_residence_${uid}`;
+const DETAILED_TRACKING_KEY = (uid: string) => `@detailed_tracking_${uid}`;
 
 export async function isOnboardingComplete(uid: string): Promise<boolean> {
   const value = await AsyncStorage.getItem(ONBOARDING_COMPLETE_KEY(uid));
@@ -43,4 +44,21 @@ export async function setHasFixedResidence(
   hasFixedResidence: boolean,
 ): Promise<void> {
   await AsyncStorage.setItem(FIXED_RESIDENCE_KEY(uid), String(hasFixedResidence));
+}
+
+/**
+ * Detailed tracking: when enabled, tracks districts/neighborhoods within cities.
+ * When disabled (default), only tracks at city level — better battery life and
+ * cleaner timeline.
+ */
+export async function getDetailedTracking(uid: string): Promise<boolean> {
+  const value = await AsyncStorage.getItem(DETAILED_TRACKING_KEY(uid));
+  return value === 'true'; // default false
+}
+
+export async function setDetailedTracking(
+  uid: string,
+  enabled: boolean,
+): Promise<void> {
+  await AsyncStorage.setItem(DETAILED_TRACKING_KEY(uid), String(enabled));
 }

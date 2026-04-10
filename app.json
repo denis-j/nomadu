@@ -1,16 +1,22 @@
 {
   "expo": {
-    "name": "Nomady",
+    "name": "Nomadu",
     "slug": "nomady",
     "scheme": [
       "nomady",
       "com.googleusercontent.apps.1044287572548-oiqqo1s9pqt6ot6vpa0bdv8gotakocrs"
     ],
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/beb971a2-b15a-4048-a4a9-4f1884c338b0"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nomady.app",
@@ -19,8 +25,12 @@
         "NSLocationWhenInUseUsageDescription": "Nomad uses your location to show your current city and country.",
         "NSLocationAlwaysUsageDescription": "Nomad tracks your location in the background to log visited cities automatically.",
         "UIBackgroundModes": [
+          "location",
+          "location",
+          "location",
           "location"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       },
       "appleTeamId": "Y6KMGQ9398"
     },
@@ -69,6 +79,12 @@
           "sounds": []
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "beb971a2-b15a-4048-a4a9-4f1884c338b0"
+      }
+    }
   }
 }

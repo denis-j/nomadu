@@ -216,7 +216,6 @@ export default function AddStopDetailsScreen() {
           params.end,
           transport,
           notesVal,
-          0,
           coords?.latitude,
           coords?.longitude,
         );

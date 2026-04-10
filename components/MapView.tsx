@@ -7,6 +7,17 @@ import { Trip } from '../lib/database';
 import { mapState } from '../lib/mapState';
 import { Colors } from '../constants/colors';
 
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 interface CityMarker {
   key: string;
   city: string;
@@ -39,15 +50,24 @@ export function MapView({ trips }: MapViewProps) {
   }, []);
 
   const markers = useMemo<CityMarker[]>(() => {
-    const map = new Map<string, CityMarker>();
+    const list: CityMarker[] = [];
+
     for (const trip of trips) {
       if (!trip.latitude || !trip.longitude) continue;
-      const key = `${trip.city.toLowerCase()}-${trip.country_code}`;
-      const existing = map.get(key);
-      if (existing) {
-        existing.totalDays += trip.days;
+
+      // Find an existing marker that is nearby (same country, <20 km apart).
+      // This merges different districts / neighborhoods into one city pin.
+      const nearby = list.find(
+        (m) =>
+          m.country_code === trip.country_code &&
+          haversineKm(m.latitude, m.longitude, trip.latitude!, trip.longitude!) < 20,
+      );
+
+      if (nearby) {
+        nearby.totalDays += trip.days;
       } else {
-        map.set(key, {
+        const key = `${trip.city.toLowerCase()}-${trip.country_code}`;
+        list.push({
           key,
           city: trip.city,
           country: trip.country,
@@ -59,7 +79,8 @@ export function MapView({ trips }: MapViewProps) {
         });
       }
     }
-    return Array.from(map.values());
+
+    return list;
   }, [trips]);
 
   const handleMarkerSelect = useCallback((marker: CityMarker) => {

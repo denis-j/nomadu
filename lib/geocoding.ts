@@ -23,7 +23,7 @@ export async function reverseGeocode(
   // Try Nominatim first for English results
   try {
     const resp = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en&zoom=10`,
+      `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en&zoom=8`,
       { headers: { 'User-Agent': 'NomadApp/1.0' } },
     );
     if (resp.ok) {
