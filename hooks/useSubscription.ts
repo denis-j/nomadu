@@ -38,10 +38,8 @@ export function useSubscription(): SubscriptionState {
     }, [refresh]),
   );
 
-  // Listen for real-time changes from RevenueCat (dev only)
+  // Listen for real-time changes from RevenueCat
   useEffect(() => {
-    if (!__DEV__) return;
-
     const listener = (info: CustomerInfo) => {
       const entitlement = info.entitlements.active[ENTITLEMENT_ID];
       setIsPro(!!entitlement);

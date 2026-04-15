@@ -6,7 +6,7 @@
       "nomady",
       "com.googleusercontent.apps.1044287572548-oiqqo1s9pqt6ot6vpa0bdv8gotakocrs"
     ],
-    "version": "1.0.1",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -18,7 +18,7 @@
       "url": "https://u.expo.dev/beb971a2-b15a-4048-a4a9-4f1884c338b0"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.nomady.app",
       "infoPlist": {
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Nomad uses your location to automatically track the cities and countries you visit.",
