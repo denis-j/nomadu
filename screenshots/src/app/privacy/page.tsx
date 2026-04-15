@@ -1,8 +1,8 @@
 import { LegalLayout, Section, P, UL, CONTACT_EMAIL, EFFECTIVE_DATE, APP_NAME, COMPANY } from "../legal-shared";
 
 export const metadata = {
-  title: "Privacy Policy – Nomady",
-  description: "How Nomady collects, uses, and protects your personal data.",
+  title: "Privacy Policy – Nomadu",
+  description: "How Nomadu collects, uses, and protects your personal data.",
 };
 
 export default function PrivacyPolicy() {
@@ -15,10 +15,10 @@ export default function PrivacyPolicy() {
         <P>
           {APP_NAME} ("we", "our", or "us") is operated by {COMPANY}, a US limited liability
           company. This Privacy Policy explains what information we collect when you use the
-          Nomady app, how we use it, and the choices you have.
+          Nomadu app, how we use it, and the choices you have.
         </P>
         <P>
-          By using Nomady, you agree to the collection and use of information described in this
+          By using Nomadu, you agree to the collection and use of information described in this
           policy. If you do not agree, please stop using the app.
         </P>
       </Section>
@@ -78,7 +78,7 @@ export default function PrivacyPolicy() {
       </Section>
 
       <Section title="Third-Party Services">
-        <P>Nomady uses the following third-party services, each with its own privacy policy:</P>
+        <P>Nomadu uses the following third-party services, each with its own privacy policy:</P>
         <UL
           items={[
             <><strong>Firebase (Google)</strong> — authentication, optional cloud storage. <a href="https://firebase.google.com/support/privacy" style={{ color: "#B8860B" }}>Privacy Policy</a></>,
@@ -91,7 +91,7 @@ export default function PrivacyPolicy() {
 
       <Section title="Location Data">
         <P>
-          Location is the most sensitive data Nomady handles. Here is exactly how we use it:
+          Location is the most sensitive data Nomadu handles. Here is exactly how we use it:
         </P>
         <UL
           items={[
@@ -99,14 +99,14 @@ export default function PrivacyPolicy() {
             "Raw GPS coordinates are processed on-device to reverse-geocode a city name. The city name — not the raw coordinates — is what gets stored.",
             "If Cloud Sync is disabled, location data never leaves your device.",
             "If Cloud Sync is enabled, the resolved city/country names are stored in Firestore. Raw GPS coordinates are not stored.",
-            "You can revoke location permission at any time in iOS Settings → Nomady → Location.",
+            "You can revoke location permission at any time in iOS Settings → Nomadu → Location.",
           ]}
         />
       </Section>
 
       <Section title="Children's Privacy">
         <P>
-          Nomady is not directed to children under 13. We do not knowingly collect personal
+          Nomadu is not directed to children under 13. We do not knowingly collect personal
           information from children under 13. If you believe a child has provided us with personal
           information, contact us at {CONTACT_EMAIL} and we will delete it.
         </P>

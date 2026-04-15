@@ -1,10 +1,10 @@
 import React from "react";
 
-export const APP_NAME = "Nomady";
+export const APP_NAME = "Nomadu";
 export const COMPANY = "MMM 0 LLC";
-export const CONTACT_EMAIL = "legal@nomady.app";
-export const SUPPORT_EMAIL = "support@nomady.app";
-export const WEBSITE = "https://nomady.app";
+export const CONTACT_EMAIL = "legal@nomadu.app";
+export const SUPPORT_EMAIL = "support@nomadu.app";
+export const WEBSITE = "https://nomadu.app";
 export const EFFECTIVE_DATE = "March 18, 2025";
 
 const FONT =
@@ -44,7 +44,7 @@ export function LegalLayout({
       >
         <img
           src="/app-icon.png"
-          alt="Nomady"
+          alt="Nomadu"
           style={{ width: 36, height: 36, borderRadius: 8 }}
         />
         <span style={{ fontWeight: 700, fontSize: 18, color: "#1A1A1A" }}>

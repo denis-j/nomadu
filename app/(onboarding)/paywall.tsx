@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View } from 'react-native';
 import { useOnboarding } from '../../contexts/OnboardingContext';
 
@@ -11,17 +11,6 @@ export default function OnboardingPaywallScreen() {
     await markOnboardingComplete();
     router.replace('/(tabs)');
   };
-
-  // In production RevenueCat is disabled — skip paywall and complete onboarding immediately
-  useEffect(() => {
-    if (!__DEV__) {
-      handleCompleted();
-    }
-  }, []);
-
-  if (!__DEV__) {
-    return null;
-  }
 
   const RevenueCatUI = require('react-native-purchases-ui').default;
   return (

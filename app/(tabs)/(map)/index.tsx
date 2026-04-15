@@ -207,6 +207,7 @@ export default function MapScreen() {
   const { visaStatuses } = useVisaTracker();
   const { taxStatuses } = useTaxTracker();
   const appState = useRef(AppState.currentState);
+  const [detecting, setDetecting] = useState(false);
 
   // On mount and when returning to foreground: fetch location immediately if
   // tracking is active, then refresh trips so the chip updates without waiting
@@ -214,12 +215,19 @@ export default function MapScreen() {
   useEffect(() => {
     async function checkAndRefresh() {
       const perms = await checkLocationPermissions();
-      if (!perms.isAlways) return;
-      // Start background tracking if not yet registered (permissions granted but task not running)
-      const active = await isTrackingActive();
-      if (!active) await startBackgroundTracking();
+      if (!perms.foreground) return;
+
+      // Start background tracking if permission allows and task isn't running yet
+      if (perms.isAlways) {
+        const active = await isTrackingActive();
+        if (!active) await startBackgroundTracking();
+      }
+
+      // Always do a foreground check — only needs foreground permission
+      setDetecting(true);
       await foregroundLocationCheck();
-      refresh();
+      await refresh();
+      setDetecting(false);
     }
 
     checkAndRefresh();
@@ -271,8 +279,10 @@ export default function MapScreen() {
             {...chipGlassProps}
             style={[styles.chip, !hasGlass && styles.chipFallback]}
           >
-            <Ionicons name="navigate-outline" size={16} color={Colors.textSecondary} />
-            <Text style={styles.emptyText}>Enable location tracking to see your trips</Text>
+            <Ionicons name={detecting ? 'locate-outline' : 'navigate-outline'} size={16} color={Colors.textSecondary} />
+            <Text style={styles.emptyText}>
+              {detecting ? 'Detecting your location…' : 'Enable location tracking to see your trips'}
+            </Text>
           </ChipWrapper>
         ) : null}
       </View>

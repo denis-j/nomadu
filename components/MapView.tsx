@@ -83,10 +83,15 @@ export function MapView({ trips }: MapViewProps) {
     return list;
   }, [trips]);
 
+  const navigatingRef = useRef(false);
+
   const handleMarkerSelect = useCallback((marker: CityMarker) => {
+    if (navigatingRef.current) return;
+    navigatingRef.current = true;
     selectedKeyRef.current = marker.key;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(`/city/${marker.city}::${marker.country_code}`);
+    setTimeout(() => { navigatingRef.current = false; }, 500);
   }, []);
 
   const initialRegion =

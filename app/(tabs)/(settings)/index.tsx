@@ -160,7 +160,7 @@ export default function SettingsScreen() {
               </Text>
               <Text style={styles.warningText}>
                 {needsAnyPermission
-                  ? 'Nomady needs location access to automatically track your trips. Tap to open Settings.'
+                  ? 'Nomadu needs location access to automatically track your trips. Tap to open Settings.'
                   : 'For automatic background tracking, please change location access to "Always". Tap to open Settings.'}
               </Text>
             </View>

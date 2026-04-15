@@ -75,7 +75,7 @@ export default function SplashScreen({ ready, onDone }: Props) {
         <Image source={ICON} style={styles.icon} />
       </Animated.View>
       <Animated.View style={textStyle}>
-        <Text style={styles.appName}>Nomady</Text>
+        <Text style={styles.appName}>Nomadu</Text>
         <Text style={styles.tagline}>Your journey, tracked.</Text>
       </Animated.View>
     </Animated.View>

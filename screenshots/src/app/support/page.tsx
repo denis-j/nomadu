@@ -1,8 +1,8 @@
 import { LegalLayout, Section, P, UL, SUPPORT_EMAIL, APP_NAME } from "../legal-shared";
 
 export const metadata = {
-  title: "Support – Nomady",
-  description: "Get help with Nomady.",
+  title: "Support – Nomadu",
+  description: "Get help with Nomadu App.",
 };
 
 export default function Support() {
@@ -28,7 +28,7 @@ export default function Support() {
       <Section title="Frequently Asked Questions">
         <P><strong>How do I cancel my subscription?</strong></P>
         <P>
-          Go to iOS Settings → tap your name → Subscriptions → Nomady → Cancel Subscription.
+          Go to iOS Settings → tap your name → Subscriptions → Nomadu → Cancel Subscription.
           You'll keep Pro access until the end of the current billing period.
         </P>
 
@@ -51,7 +51,7 @@ export default function Support() {
         <P><strong>Location isn't being detected correctly.</strong></P>
         <P>
           Make sure location permission is set to "While Using" or "Always" in iOS Settings →
-          Nomady → Location. If detection is still off, try toggling the permission off and
+          Nomadu → Location. If detection is still off, try toggling the permission off and
           back on.
         </P>
 

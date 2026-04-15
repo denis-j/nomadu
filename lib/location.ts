@@ -170,6 +170,12 @@ export async function getCurrentLocation(): Promise<Location.LocationObject | nu
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return null;
+
+    // Try cached location first — instant, no GPS warm-up needed.
+    const last = await Location.getLastKnownPositionAsync();
+    if (last) return last;
+
+    // No cached location available — request a fresh GPS fix.
     return await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
     });

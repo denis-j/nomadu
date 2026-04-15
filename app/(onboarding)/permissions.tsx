@@ -166,7 +166,7 @@ export default function PermissionsScreen() {
           >
             <Text style={styles.title}>Track your journey</Text>
             <Text style={styles.description}>
-              Nomady automatically logs the cities and countries you visit.
+              Nomadu automatically logs the cities and countries you visit.
               Everything stays on your device.
             </Text>
           </Animated.View>

@@ -1,8 +1,8 @@
 import { LegalLayout, Section, P, UL, CONTACT_EMAIL, EFFECTIVE_DATE, APP_NAME, COMPANY, WEBSITE } from "../legal-shared";
 
 export const metadata = {
-  title: "Terms of Service – Nomady",
-  description: "Terms and conditions for using the Nomady app.",
+  title: "Terms of Service – Nomadu",
+  description: "Terms and conditions for using the Nomadu app.",
 };
 
 export default function TermsOfService() {

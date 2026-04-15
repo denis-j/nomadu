@@ -1,9 +1,9 @@
 import { APP_NAME, COMPANY, CONTACT_EMAIL } from "./legal-shared";
 
 export const metadata = {
-  title: "Nomady — Track your journey",
+  title: "Nomadu — Track your journey",
   description:
-    "Nomady is the travel companion for digital nomads. Track trips, stay visa-compliant, and plan smarter with AI.",
+    "Nomadu is the travel companion for digital nomads. Track trips, stay visa-compliant, and plan smarter with AI.",
 };
 
 const FONT =
@@ -68,10 +68,10 @@ export default function Home() {
       >
         <img
           src="/app-icon.png"
-          alt="Nomady"
+          alt="Nomadu"
           style={{ width: 36, height: 36, borderRadius: 8, marginRight: 10 }}
         />
-        <span style={{ fontWeight: 700, fontSize: 18 }}>Nomady</span>
+        <span style={{ fontWeight: 700, fontSize: 18 }}>Nomadu</span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 28, fontSize: 14, fontWeight: 500 }}>
           {[
             { label: "Privacy Policy", href: "/privacy" },
@@ -96,7 +96,7 @@ export default function Home() {
       >
         <img
           src="/app-icon.png"
-          alt="Nomady"
+          alt="Nomadu"
           style={{
             width: 96,
             height: 96,
@@ -133,7 +133,7 @@ export default function Home() {
           and plan smarter with AI.
         </p>
         <a
-          href="https://apps.apple.com/app/nomady/id000000000"
+          href="https://apps.apple.com/app/nomadu/id000000000"
           style={{
             display: "inline-flex",
             alignItems: "center",

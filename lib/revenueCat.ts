@@ -5,16 +5,17 @@ import Purchases, {
   PurchasesOffering,
 } from 'react-native-purchases';
 
-const API_KEY = 'test_kXXfCMJCdwXmGftKoGShjPwOkJk';
+const API_KEY = __DEV__
+  ? 'test_kXXfCMJCdwXmGftKoGShjPwOkJk'
+  : 'appl_mKLVauyQAPTHccyWZkEDCYXRgaZ';
 
 const ENTITLEMENT_ID = 'MMM 0 LLC Pro';
 
-// TODO: set to true once a production RevenueCat API key is configured
-const REVENUECAT_ENABLED = __DEV__;
+const REVENUECAT_ENABLED = true;
 
 export const PRODUCT_IDS = {
-  monthly: 'monthly',
-  yearly: 'yearly',
+  monthly: 'nomadu_monthly',
+  yearly: 'nomadu_yearly',
   lifetime: 'lifetime',
 } as const;
 

@@ -20,41 +20,58 @@ export async function reverseGeocode(
   latitude: number,
   longitude: number,
 ): Promise<GeocodedLocation> {
-  // Try Nominatim first for English results
+  // 1) Try native geocoder first (Apple/Google Maps) — best at resolving
+  //    local admin structures to recognisable city names (e.g. "Phuket"
+  //    instead of the sub-district "Ratsada").
+  try {
+    const results = await Location.reverseGeocodeAsync({ latitude, longitude });
+    if (results.length > 0) {
+      const result = results[0];
+      const city = result.city ?? result.subregion ?? result.region ?? null;
+      const code = result.isoCountryCode ?? null;
+      if (city && code) {
+        return {
+          city,
+          country: codeToEnglishCountry(code) ?? result.country ?? null,
+          countryCode: code,
+        };
+      }
+    }
+  } catch {
+    // continue to Nominatim
+  }
+
+  // 2) Nominatim fallback — English names for when native geocoder fails
   try {
     const resp = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en&zoom=8`,
+      `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en&zoom=10`,
       { headers: { 'User-Agent': 'NomadApp/1.0' } },
     );
     if (resp.ok) {
       const data = await resp.json();
       const addr = data.address;
-      if (addr) {
-        return {
-          city: addr.city ?? addr.town ?? addr.village ?? addr.municipality ?? null,
-          country: addr.country ?? null,
-          countryCode: addr.country_code?.toUpperCase() ?? null,
-        };
+      if (addr?.country_code) {
+        const city =
+          addr.city ??
+          addr.town ??
+          addr.municipality ??
+          addr.village ??
+          addr.county ??
+          addr.state ??
+          null;
+        if (city) {
+          return {
+            city,
+            country: addr.country ?? null,
+            countryCode: addr.country_code.toUpperCase(),
+          };
+        }
       }
     }
   } catch {
-    // Fallback to expo-location
+    // give up
   }
 
-  try {
-    const results = await Location.reverseGeocodeAsync({ latitude, longitude });
-    if (results.length > 0) {
-      const result = results[0];
-      const code = result.isoCountryCode ?? null;
-      return {
-        city: result.city ?? result.subregion ?? result.region ?? null,
-        country: code ? codeToEnglishCountry(code) ?? result.country : result.country ?? null,
-        countryCode: code,
-      };
-    }
-  } catch (error) {
-    console.warn('Reverse geocoding failed:', error);
-  }
   return { city: null, country: null, countryCode: null };
 }
 

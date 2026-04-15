@@ -8,7 +8,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Nomady – App Store Screenshots",
+  title: "Nomadu – App Store Screenshots",
   description: "Screenshot generator for Nomad",
 };
 
