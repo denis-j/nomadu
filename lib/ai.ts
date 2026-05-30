@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent';
 
 // ─── Core call ───────────────────────────────────────────────────────────────
 
@@ -26,6 +26,36 @@ async function callGemini(prompt: string): Promise<string> {
   const data = await res.json();
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   console.log('[AI] response:', text.slice(0, 200));
+  return text;
+}
+
+async function callGeminiVision(prompt: string, imageBase64: string, mimeType = 'image/jpeg'): Promise<string> {
+  if (!GEMINI_KEY) throw new Error('NO_KEY');
+
+  const res = await fetch(`${GEMINI_URL}?key=${GEMINI_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: mimeType, data: imageBase64 } },
+        ],
+      }],
+      generationConfig: { maxOutputTokens: 2048, temperature: 0.2 },
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error('[AI vision] HTTP error', res.status, body.slice(0, 500));
+    throw new Error(`Gemini ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  const finishReason = data?.candidates?.[0]?.finishReason;
+  console.log('[AI vision] finishReason:', finishReason, 'response:', text.slice(0, 400));
   return text;
 }
 
@@ -183,4 +213,73 @@ OUTPUT RULES
   const result = await callGemini(prompt);
   AsyncStorage.setItem(cacheKey, result).catch(() => {});
   return result;
+}
+
+// ─── Trip extraction from screenshots ────────────────────────────────────────
+
+export interface ExtractedTrip {
+  city: string;
+  country: string;
+  countryCode?: string; // ISO-2 if known
+  startDate: string;    // YYYY-MM-DD
+  endDate: string | null;
+  confidence: number;   // 0..1
+}
+
+const TRIP_EXTRACTION_PROMPT = `You are looking at a screenshot that may contain travel information.
+This could be a flight confirmation, hotel booking, itinerary, an export from another travel app,
+a timeline view, or personal notes about trips.
+
+TASK
+Extract every distinct stay (city OR country level) you can identify. A "stay" = the traveler
+being in one place for a continuous date range. Each row, card, or entry in a list of trips
+counts. Do NOT extract layovers, in-transit flights, or entries explicitly marked "Transit".
+
+OUTPUT
+Return ONLY a valid JSON array, no markdown, no commentary, no explanation:
+
+[
+  {
+    "city": "string (city name in English; if only a country is shown, use that country's capital city)",
+    "country": "string (country name in English)",
+    "countryCode": "ISO-2 country code, uppercase (or omit if unsure)",
+    "startDate": "YYYY-MM-DD",
+    "endDate": "YYYY-MM-DD or null if the entry says 'Still here', 'Present', 'ongoing', or has no end",
+    "confidence": 0.0-1.0
+  }
+]
+
+RULES
+- If you find NO trips at all, return [] (empty array)
+- If a country list shows multiple entries (e.g. "Germany 9d", "Thailand 41d"), output each as a stay using the country's capital as city, and set confidence around 0.6
+- confidence: 0.9+ when both city and dates are explicit; 0.6-0.8 when city was inferred from country; <0.6 when dates or place are unclear
+- If the year is missing from a date, infer the nearest plausible year (prefer current year or the year implied by surrounding dates)
+- "Still Here", "Present", "ongoing" → endDate: null
+- Skip duplicates within the same screenshot
+- Skip entries labelled "Transit", "Layover", "Connection"
+- Dates must be valid calendar dates
+- Do not invent dates or places that aren't on screen — lower confidence rather than guess`;
+
+export async function extractTripsFromImage(
+  imageBase64: string,
+  mimeType = 'image/jpeg',
+): Promise<ExtractedTrip[]> {
+  const raw = await callGeminiVision(TRIP_EXTRACTION_PROMPT, imageBase64, mimeType);
+  // Strip markdown code fences if present
+  const cleaned = raw.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '').trim();
+  const match = cleaned.match(/\[[\s\S]*\]/);
+  if (!match) {
+    console.warn('[AI vision] no JSON array in response. Raw:', raw.slice(0, 400));
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(match[0]) as ExtractedTrip[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (t) => t && typeof t.city === 'string' && typeof t.country === 'string' && typeof t.startDate === 'string',
+    );
+  } catch (err) {
+    console.warn('[AI vision] JSON parse failed:', err, 'Raw match:', match[0].slice(0, 400));
+    return [];
+  }
 }

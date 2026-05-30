@@ -16,7 +16,16 @@ export default function TimelineStack() {
           presentation: 'formSheet',
           headerShown: false,
           sheetGrabberVisible: true,
-          sheetAllowedDetents: [0.75, 1.0],
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
+      />
+      <Stack.Screen
+        name="import"
+        options={{
+          presentation: 'formSheet',
+          title: 'Import Trips',
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [1.0],
           contentStyle: { backgroundColor: 'transparent' },
         }}
       />

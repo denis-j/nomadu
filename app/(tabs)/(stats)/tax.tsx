@@ -6,6 +6,7 @@ import { useTaxTracker } from '../../../hooks/useTaxTracker';
 import { Colors } from '../../../constants/colors';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { EmptyState } from '../../../components/EmptyState';
+import { YearPicker } from '../../../components/YearPicker';
 import { TaxStatus } from '../../../lib/taxCalculations';
 
 const hasGlass = isLiquidGlassAvailable();
@@ -86,7 +87,9 @@ function TaxCard({ tax }: { tax: TaxStatus }) {
 }
 
 export default function TaxScreen() {
-  const { taxStatuses, loading, citizenshipCode, citizenshipCountry, refresh } = useTaxTracker();
+  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const { taxStatuses, availableYears, loading, citizenshipCode, citizenshipCountry, refresh } =
+    useTaxTracker(year);
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = useCallback(async () => {
@@ -107,19 +110,9 @@ export default function TaxScreen() {
   if (!citizenshipCode) {
     return (
       <EmptyState
-        icon="🏛️"
+        icon="🛂"
         title="No citizenship set"
         subtitle="Set your citizenship in Settings to see tax residence tracking."
-      />
-    );
-  }
-
-  if (taxStatuses.length === 0) {
-    return (
-      <EmptyState
-        icon="🌍"
-        title="No countries tracked"
-        subtitle="Visit countries to see tax residence tracking here."
       />
     );
   }
@@ -132,16 +125,30 @@ export default function TaxScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
     >
+      <YearPicker
+        years={availableYears}
+        value={year}
+        onChange={(v) => setYear(v ?? new Date().getFullYear())}
+        includeAllTime={false}
+      />
+
       <Text style={styles.subtitle}>
-        Based on {citizenshipFlag} {citizenshipCountry} citizenship
+        Based on {citizenshipFlag} {citizenshipCountry} citizenship · {year}
       </Text>
 
-      {taxStatuses.map((tax) => (
-        <TaxCard key={tax.countryCode} tax={tax} />
-      ))}
+      {taxStatuses.length === 0 ? (
+        <View style={styles.emptyForYear}>
+          <Text style={styles.emptyForYearTitle}>No tax exposure in {year}</Text>
+          <Text style={styles.emptyForYearSubtitle}>
+            You haven&apos;t spent days in any taxable country during this year.
+          </Text>
+        </View>
+      ) : (
+        taxStatuses.map((tax) => <TaxCard key={tax.countryCode} tax={tax} />)
+      )}
 
       <Text style={styles.disclaimer}>
-        This is not tax advice. Tax residency rules vary by country and individual circumstances. Consult a qualified tax professional.
+        This is not tax advice. Most countries determine residency by calendar year (183-day rule), but some use rolling 12-month or fiscal-year windows. Consult a qualified tax professional.
       </Text>
     </ScrollView>
   );
@@ -261,5 +268,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
     lineHeight: 18,
+  },
+  emptyForYear: {
+    paddingVertical: 36,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    gap: 6,
+  },
+  emptyForYearTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  emptyForYearSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 19,
   },
 });

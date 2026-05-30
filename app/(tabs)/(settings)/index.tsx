@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Alert, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View , Pressable } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View , Pressable } from 'react-native';
+import { showToast } from '../../../lib/toast';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -12,11 +13,12 @@ import { useSubscription } from '../../../hooks/useSubscription';
 import { usePassport } from '../../../hooks/usePassport';
 import { useNotificationPermission } from '../../../hooks/useNotificationPermission';
 import { deleteAccount } from '../../../lib/auth';
-import { clearAllData } from '../../../lib/database';
+import { clearAllTravelData, startRealtimeSync } from '../../../lib/sync';
 import { restorePurchases } from '../../../lib/revenueCat';
 import { useSync } from '../../../contexts/SyncContext';
 import { countryCodeToFlag } from '../../../lib/geocoding';
-import { getHasFixedResidence, setHasFixedResidence, getDetailedTracking, setDetailedTracking } from '../../../lib/onboarding';
+import { getHasFixedResidence, setHasFixedResidence, getDetailedTracking, setDetailedTracking, setExperimentalsEnabled } from '../../../lib/onboarding';
+import { useExperimentals } from '../../../hooks/useExperimentals';
 import { IslandSheet } from '../../../components/IslandSheet';
 
 const hasGlass = isLiquidGlassAvailable();
@@ -34,6 +36,8 @@ export default function SettingsScreen() {
   const router = useRouter();
   const [fixedResidence, setFixedResidence] = useState(true);
   const [detailedTracking, setDetailedTrackingState] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const experimentalsEnabled = useExperimentals();
 
   useEffect(() => {
     if (user) {
@@ -386,32 +390,67 @@ export default function SettingsScreen() {
         </Pressable>
       </Glass>
 
+      {/* Experimental */}
+      <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
+        <Text style={styles.sectionTitle}>Experimental</Text>
+        <View style={styles.row}>
+          <View style={styles.rowContent}>
+            <Text style={styles.rowLabel}>Show Plan</Text>
+            <Text style={styles.rowDescription}>
+              Enable the Plan tab to draft upcoming trips. Work in progress.
+            </Text>
+          </View>
+          <Switch
+            value={experimentalsEnabled}
+            onValueChange={(val) => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setExperimentalsEnabled(val);
+            }}
+          />
+        </View>
+      </Glass>
+
       {/* Danger Zone */}
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
         <Text style={styles.sectionTitle}>Danger Zone</Text>
         <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          disabled={isClearing}
+          style={({ pressed }) => [styles.row, pressed && !isClearing && styles.rowPressed]}
           onPress={() => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             Alert.alert(
-              'Clear Local Data',
-              'This will delete all trips and visits stored on this device. Cloud data will not be affected. This cannot be undone.',
+              'Clear Travel Data',
+              'This will delete all trips and visits — both on this device and in the cloud. Your planned trips will be preserved. This cannot be undone.',
               [
                 { text: 'Cancel', style: 'cancel' },
                 {
                   text: 'Clear Data',
                   style: 'destructive',
                   onPress: async () => {
-                    await clearAllData();
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    Alert.alert('Done', 'All local data has been cleared.');
+                    setIsClearing(true);
+                    try {
+                      await clearAllTravelData(user?.uid ?? null);
+                      if (user && cloudSyncEnabled === true) {
+                        startRealtimeSync(user.uid);
+                      }
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      showToast('Travel data cleared');
+                    } catch (error: any) {
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                      showToast(`Failed to clear: ${error?.message ?? error}`, 'error');
+                    } finally {
+                      setIsClearing(false);
+                    }
                   },
                 },
               ],
             );
           }}
         >
-          <Text style={[styles.rowLabel, styles.destructive]}>Clear Local Data</Text>
+          <Text style={[styles.rowLabel, styles.destructive, isClearing && styles.rowLabelMuted]}>
+            {isClearing ? 'Clearing…' : 'Clear Travel Data'}
+          </Text>
+          {isClearing && <ActivityIndicator size="small" color={Colors.error} />}
         </Pressable>
         <View style={styles.separator} />
         <Pressable
@@ -628,6 +667,9 @@ const styles = StyleSheet.create({
   destructive: {
     color: Colors.error,
     fontWeight: '500',
+  },
+  rowLabelMuted: {
+    opacity: 0.55,
   },
   badge: {
     paddingHorizontal: 10,

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Timestamp,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -11,11 +12,13 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import {
+  clearAllData,
   getAllTripsForSync,
   setSyncId,
   upsertTripFromCloud,
   type Trip,
 } from './database';
+import { clearBadgeProgress } from './badges';
 
 const CLOUD_SYNC_KEY = (uid: string) => `@cloud_sync_enabled_${uid}`;
 const LAST_SYNC_KEY = (uid: string) => `@last_sync_${uid}`;
@@ -169,4 +172,20 @@ export function stopRealtimeSync(): void {
     activeUnsubscribe();
     activeUnsubscribe = null;
   }
+}
+
+// ─── Wipe travel data (trips + visits), local + cloud. Plans are preserved. ───
+
+export async function clearAllTravelData(uid: string | null): Promise<void> {
+  // Stop realtime sync so cloud deletions don't race with re-inserts
+  stopRealtimeSync();
+
+  if (uid) {
+    const tripsSnap = await getDocs(tripsCollection(uid));
+    await Promise.all(tripsSnap.docs.map((d) => deleteDoc(d.ref)));
+    await AsyncStorage.removeItem(LAST_SYNC_KEY(uid));
+  }
+
+  await clearAllData();
+  await clearBadgeProgress();
 }

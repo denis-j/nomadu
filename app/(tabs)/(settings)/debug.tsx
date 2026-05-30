@@ -3,6 +3,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import { sendNewCityNotification, checkAndNotifyVisaTax, requestNotificationPermissions } from '../../../lib/notifications';
 import { Colors } from '../../../constants/colors';
 
@@ -77,6 +78,18 @@ export default function DebugScreen() {
         />
       </Glass>
 
+      {/* Experiments */}
+      <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
+        <Text style={styles.sectionTitle}>Experiments</Text>
+        <DebugButton
+          label="🏅 Achievement Badges"
+          sublabel="3D rotatable medal prototypes"
+          onPress={async () => {
+            router.push('/debug/badges');
+          }}
+        />
+      </Glass>
+
       {/* New city */}
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
         <Text style={styles.sectionTitle}>Location Notifications</Text>
@@ -132,7 +145,7 @@ export default function DebugScreen() {
           sublabel="France · 137 of 183 days"
           onPress={() => checkAndNotifyVisaTax(
             [],
-            [{ country: 'France', countryCode: 'FR_75', flag: '🇫🇷', ruleLabel: '183 days in 365-day window', thresholdDays: 183, daysPresent: 137, daysRemaining: 46, percentUsed: 75, status: 'caution' }],
+            [{ country: 'France', countryCode: 'FR_75', flag: '🇫🇷', ruleLabel: `183 days in ${new Date().getFullYear()}`, year: new Date().getFullYear(), thresholdDays: 183, daysPresent: 137, daysRemaining: 46, percentUsed: 75, status: 'caution' }],
           )}
         />
         <View style={styles.sep} />
@@ -141,7 +154,7 @@ export default function DebugScreen() {
           sublabel="France · 165 of 183 days"
           onPress={() => checkAndNotifyVisaTax(
             [],
-            [{ country: 'France', countryCode: 'FR_90', flag: '🇫🇷', ruleLabel: '183 days in 365-day window', thresholdDays: 183, daysPresent: 165, daysRemaining: 18, percentUsed: 90, status: 'warning' }],
+            [{ country: 'France', countryCode: 'FR_90', flag: '🇫🇷', ruleLabel: `183 days in ${new Date().getFullYear()}`, year: new Date().getFullYear(), thresholdDays: 183, daysPresent: 165, daysRemaining: 18, percentUsed: 90, status: 'warning' }],
           )}
         />
         <View style={styles.sep} />
@@ -150,7 +163,7 @@ export default function DebugScreen() {
           sublabel="France · 183+ days reached"
           onPress={() => checkAndNotifyVisaTax(
             [],
-            [{ country: 'France', countryCode: 'FR_100', flag: '🇫🇷', ruleLabel: '183 days in 365-day window', thresholdDays: 183, daysPresent: 185, daysRemaining: 0, percentUsed: 101, status: 'resident' }],
+            [{ country: 'France', countryCode: 'FR_100', flag: '🇫🇷', ruleLabel: `183 days in ${new Date().getFullYear()}`, year: new Date().getFullYear(), thresholdDays: 183, daysPresent: 185, daysRemaining: 0, percentUsed: 101, status: 'resident' }],
           )}
         />
       </Glass>

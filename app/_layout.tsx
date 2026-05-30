@@ -1,6 +1,26 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Appearance } from 'react-native';
+import { Appearance, LogBox } from 'react-native';
+import { useFonts, InstrumentSerif_400Regular_Italic } from '@expo-google-fonts/instrument-serif';
+
+// Suppress noisy non-fatal native warnings that pop the dev LogBox overlay
+LogBox.ignoreLogs([
+  '[RNScreens] sheetPresentationController is null',
+]);
+
+// LogBox sometimes shows native warnings via the error path with a stack trace
+// that LogBox.ignoreLogs doesn't filter. Patch console.error directly so the
+// RNScreens detents warning never reaches LogBox.
+if (__DEV__) {
+  const originalError = console.error;
+  console.error = (...args: unknown[]) => {
+    const first = args[0];
+    if (typeof first === 'string' && first.includes('sheetPresentationController is null')) {
+      return;
+    }
+    originalError(...args);
+  };
+}
 import SplashScreen from '../components/SplashScreen';
 import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
 import { SyncProvider } from '../contexts/SyncContext';
@@ -78,6 +98,28 @@ function RootNavigator() {
           sheetGrabberVisible: true,
         }}
       />
+      <Stack.Screen
+        name="debug/badges"
+        options={{
+          title: 'Badges (Debug)',
+          headerShown: true,
+        }}
+      />
+      <Stack.Screen
+        name="badge/[countryCode]"
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
+        }}
+      />
+      <Stack.Screen
+        name="library/badges"
+        options={{
+          title: 'Badge Library',
+          headerShown: true,
+        }}
+      />
     </Stack>
   );
 }
@@ -87,6 +129,7 @@ export default function RootLayout() {
   const [userDataReady, setUserDataReady] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const { user, loading: authLoading } = useAuth();
+  const [fontsLoaded] = useFonts({ InstrumentSerif_400Regular_Italic });
 
   useEffect(() => {
     Promise.all([configureRevenueCat(), prefetchAll()]).then(() => setReady(true));
@@ -97,7 +140,7 @@ export default function RootLayout() {
     prefetchUserData(user.uid).then(() => setUserDataReady(true));
   }, [user?.uid]);
 
-  const appReady = ready && !authLoading && (!user || userDataReady);
+  const appReady = ready && fontsLoaded && !authLoading && (!user || userDataReady);
 
   return (
     <>

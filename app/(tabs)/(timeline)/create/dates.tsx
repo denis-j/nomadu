@@ -8,6 +8,7 @@ import { insertTripManual, updateTrip, parseDate } from '../../../../lib/databas
 import { forwardGeocode } from '../../../../lib/geocoding';
 import { getCountryCode } from '../../../../utils/geography';
 import { showToast } from '../../../../lib/toast';
+import { hasBadge, isBadgeUnlocked, setPendingUnlock } from '../../../../lib/badges';
 
 type Params = {
   country: string;
@@ -118,6 +119,16 @@ export default function CreateDatesScreen() {
       } else {
         await insertTripManual(city, country, code, s, e, coords?.latitude, coords?.longitude);
       }
+      // If this trip's country has a badge and we haven't shown it before,
+      // queue an unlock. The timeline screen will trigger the fullscreen modal
+      // once it regains focus (can't push fullScreenModal from inside a sheet).
+      if (!isEditing && hasBadge(code)) {
+        const alreadyUnlocked = await isBadgeUnlocked(code);
+        if (!alreadyUnlocked) {
+          await setPendingUnlock(code);
+        }
+      }
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       parentNav.getParent()?.goBack();
       showToast(isEditing ? 'Trip updated' : 'Trip added');

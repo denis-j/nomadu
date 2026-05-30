@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActionSheetIOS,
+  Alert,
   LayoutAnimation,
   Platform,
   Pressable,
@@ -12,17 +13,22 @@ import {
   UIManager,
   View,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Host, Menu, Button as ExpoUIButton, Image as ExpoUIImage } from '@expo/ui/swift-ui';
 import * as Haptics from 'expo-haptics';
 import { useTrips } from '../../../hooks/useTrips';
 import { TripCard } from '../../../components/TripCard';
-import { EmptyState } from '../../../components/EmptyState';
+import { TimelineBubbles } from '../../../components/TimelineBubbles';
+import { CloudyButton } from '../../../components/CloudyButton';
+import { pickImportImages, setPendingImportImages } from '../../../lib/tripImport';
+import { takePendingUnlock } from '../../../lib/badges';
+import { BadgeUnlockOverlay } from '../../../components/BadgeUnlockOverlay';
 import { Colors } from '../../../constants/colors';
 import { Trip, markTripDeleted, parseDate } from '../../../lib/database';
 import { countryCodeToFlag } from '../../../lib/geocoding';
+import { LinearGradient } from 'react-native-svg';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -87,6 +93,109 @@ const gapStyles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textTertiary,
   },
+});
+
+// ─── Timeline empty state ───
+
+function TimelineEmpty({ onAdd, onImport }: { onAdd: () => void; onImport: () => void }) {
+  // Bump key every time the Timeline tab gains focus → bubbles remount + re-animate
+  const [focusKey, setFocusKey] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      setFocusKey((k) => k + 1);
+    }, []),
+  );
+  return (
+    <View style={emptyStyles.container}>
+      <TimelineBubbles key={focusKey} size={70} variant="burstWobble" />
+
+      <Text style={emptyStyles.title}>Start your travel timeline</Text>
+      <Text style={emptyStyles.subtitle}>
+        Trips appear here automatically as you move,{'\n'}or you can add them yourself.
+      </Text>
+
+      <CloudyButton onPress={onImport}>
+        <View style={emptyStyles.cloudyBtnContent}>
+          <Ionicons name="sparkles" size={22} color="#0B2541" />
+          <Text style={emptyStyles.cloudyTitle}>Import from screenshots</Text>
+        </View>
+      </CloudyButton>
+
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onAdd();
+        }}
+        style={({ pressed }) => [emptyStyles.secondaryBtn, pressed && emptyStyles.secondaryBtnPressed]}
+      >
+        <Ionicons name="add-circle-outline" size={20} color={Colors.text} />
+        <Text style={emptyStyles.secondaryBtnText}>Add a trip manually</Text>
+      </Pressable>
+
+      <Text style={emptyStyles.hint}>
+        Or just travel — automatic tracking will fill this in.
+      </Text>
+    </View>
+  );
+}
+
+const emptyStyles = StyleSheet.create({
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 },
+  variantLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: 4,
+    marginBottom: -8,
+  },
+  heroImage: {
+    width: 220,
+    height: 140,
+    marginBottom: -16,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: Colors.text,
+    textAlign: 'center',
+    letterSpacing: -0.4,
+    marginTop: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  cloudyBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  cloudyTitle: { color: '#0B2541', fontSize: 16, fontWeight: '700' },
+  secondaryBtn: {
+    width: '100%',
+    maxWidth: 360,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 999,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: Colors.border,
+    backgroundColor: 'transparent',
+  },
+  secondaryBtnPressed: { opacity: 0.55 },
+  secondaryBtnText: { color: Colors.text, fontSize: 15, fontWeight: '600' },
+  pressedBtn: { opacity: 0.92, transform: [{ scale: 0.99 }] },
+  hint: { fontSize: 12, color: Colors.textTertiary, textAlign: 'center', marginTop: 8 },
 });
 
 // ─── Country group (collapsible) ───
@@ -449,6 +558,25 @@ export default function TimelineScreen() {
   const { trips, loading, refresh } = useTrips();
   const [refreshing, setRefreshing] = useState(false);
 
+  // Inline unlock overlay state — avoids pushing a modal route while a form
+  // sheet is animating away (which triggers RNScreens' sheetPresentationController
+  // detents warning).
+  const [unlockCode, setUnlockCode] = useState<string | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      const t = setTimeout(async () => {
+        const code = await takePendingUnlock();
+        if (cancelled || !code) return;
+        setUnlockCode(code);
+      }, 450);
+      return () => {
+        cancelled = true;
+        clearTimeout(t);
+      };
+    }, []),
+  );
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -587,6 +715,21 @@ export default function TimelineScreen() {
     });
   }, [router]);
 
+  const openImport = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const result = await pickImportImages();
+    if (!result.ok) {
+      if (result.reason === 'no-permission') {
+        Alert.alert('Photo Access Needed', 'Please allow photo access to import screenshots.');
+      } else if (result.reason === 'empty') {
+        Alert.alert('Nothing imported', 'Could not read the selected images.');
+      }
+      return;
+    }
+    setPendingImportImages(result.images);
+    router.push('./import');
+  }, [router]);
+
   const openEditSheet = useCallback((trip: Trip) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({
@@ -610,12 +753,38 @@ export default function TimelineScreen() {
   // ─── Header ───
 
   const headerRight = useCallback(
-    () => (
-      <Pressable onPress={() => openSheet()} hitSlop={8}>
-        <Ionicons name="add" size={28} color={Colors.primary} />
-      </Pressable>
-    ),
-    [openSheet],
+    () => {
+      if (Platform.OS !== 'ios') {
+        return (
+          <Pressable onPress={() => openSheet()} hitSlop={8}>
+            <Ionicons name="add" size={28} color={Colors.primary} />
+          </Pressable>
+        );
+      }
+      return (
+        <Host matchContents>
+          <Menu label={<ExpoUIImage systemName="plus" size={18} color="#000000" />}>
+            <ExpoUIButton
+              label="Add trip manually"
+              systemImage="square.and.pencil"
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                openSheet();
+              }}
+            />
+            <ExpoUIButton
+              label="Import from screenshots"
+              systemImage="photo.on.rectangle"
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                openImport();
+              }}
+            />
+          </Menu>
+        </Host>
+      );
+    },
+    [openSheet, openImport],
   );
 
   // ─── Main content ───
@@ -625,13 +794,7 @@ export default function TimelineScreen() {
   const renderContent = () => {
     if (loading) return null;
     if (!loading && trips.length === 0) {
-      return (
-        <EmptyState
-          icon="🪰"
-          title="No trips yet"
-          subtitle="Your travels will appear here as a timeline once tracking begins."
-        />
-      );
+      return <TimelineEmpty onAdd={() => openSheet()} onImport={openImport} />;
     }
     return (
       <ScrollView
@@ -735,6 +898,12 @@ export default function TimelineScreen() {
     <>
       <Stack.Screen options={{ headerRight }} />
       {renderContent()}
+      {unlockCode && (
+        <BadgeUnlockOverlay
+          countryCode={unlockCode}
+          onClose={() => setUnlockCode(null)}
+        />
+      )}
     </>
   );
 }

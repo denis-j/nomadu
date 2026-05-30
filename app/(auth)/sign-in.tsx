@@ -17,22 +17,24 @@ import {
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import AnimatedGradientBackground from '../../components/animated-gradient-background';
+import { CloudyButton } from '../../components/CloudyButton';
 import { Colors } from '../../constants/colors';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
-import { signInWithEmail, signInWithApple, resetPassword } from '../../lib/auth';
+import { signInWithEmail, signInWithApple } from '../../lib/auth';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
+// CloudyButton palette: deep sky blue → light blue → icy → white
 const gradientColorSets = [
   {
-    colors: ['#fff4cc', '#ffe8a3', '#ffd97a'],
+    colors: ['#4DC1FF', '#8AD3FF', '#DBF0FF'],
     start: { x: 0, y: 0 },
     end: { x: 1, y: 1 },
   },
   {
-    colors: ['#fff9e6', '#fff0bf', '#ffe599'],
+    colors: ['#8AD3FF', '#DBF0FF', '#FFFFFF'],
     start: { x: 1, y: 0 },
     end: { x: 0, y: 1 },
   },
@@ -45,7 +47,6 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resetSent, setResetSent] = useState(false);
   const { signIn: googleSignIn, ready: googleReady } = useGoogleAuth();
 
   const handleSignIn = async () => {
@@ -88,21 +89,6 @@ export default function SignInScreen() {
     }
   };
 
-  const handleForgotPassword = async () => {
-    setError(null);
-    setResetSent(false);
-    if (!email) {
-      setError('Enter your email above, then tap "Forgot password".');
-      return;
-    }
-    try {
-      await resetPassword(email.trim());
-      setResetSent(true);
-    } catch (e: any) {
-      setError(e.message ?? 'Could not send reset email.');
-    }
-  };
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -120,10 +106,12 @@ export default function SignInScreen() {
               style={styles.titleContainer}
             >
               <Image
-                source={require('../../assets/app-icon-dark.png')}
+                source={require('../../assets/icons/nomadu_cloud_text.png')}
                 style={styles.appIcon}
+                resizeMode="contain"
               />
-              <Text style={styles.title}>Sign in to your account</Text>
+              <Text style={styles.title}>Welcome home</Text>
+              <Text style={styles.subtitle}>Sign in to continue your journey</Text>
             </Animated.View>
 
             {/* Form */}
@@ -131,8 +119,8 @@ export default function SignInScreen() {
               entering={FadeIn.delay(100).duration(400)}
               style={styles.formContainer}
             >
-              <Pressable onPress={() => emailRef.current?.focus()}>
-                <Glass {...glassProps} style={[styles.inputContainer, !hasGlass && styles.inputFallback]}>
+              <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
+                <Pressable onPress={() => emailRef.current?.focus()} style={styles.inputRow}>
                   <TextInput
                     ref={emailRef}
                     style={styles.input}
@@ -148,11 +136,9 @@ export default function SignInScreen() {
                     returnKeyType="next"
                     onSubmitEditing={() => passwordRef.current?.focus()}
                   />
-                </Glass>
-              </Pressable>
-
-              <Pressable onPress={() => passwordRef.current?.focus()}>
-                <Glass {...glassProps} style={[styles.inputContainer, !hasGlass && styles.inputFallback]}>
+                </Pressable>
+                <View style={styles.separator} />
+                <Pressable onPress={() => passwordRef.current?.focus()} style={styles.inputRow}>
                   <TextInput
                     ref={passwordRef}
                     style={styles.input}
@@ -168,23 +154,22 @@ export default function SignInScreen() {
                     returnKeyType="done"
                     onSubmitEditing={handleSignIn}
                   />
-                </Glass>
-              </Pressable>
+                </Pressable>
+              </Glass>
 
               {error && <Text style={styles.errorText}>{error}</Text>}
-              {resetSent && <Text style={styles.successText}>Reset email sent — check your inbox.</Text>}
 
-              <TouchableOpacity
-                style={[styles.continueButton, loading && styles.continueButtonDisabled]}
+              <CloudyButton
                 onPress={handleSignIn}
-                disabled={loading}
+                style={[styles.continueButton, loading && styles.continueButtonDisabled]}
+                innerStyle={styles.continueInner}
               >
                 {loading ? (
-                  <ActivityIndicator color="#FFF" />
+                  <ActivityIndicator color={Colors.text} />
                 ) : (
-                  <Text style={styles.continueButtonText}>Continue</Text>
+                  <Text style={styles.continueButtonText}>Login</Text>
                 )}
-              </TouchableOpacity>
+              </CloudyButton>
 
               <View style={styles.footerLinks}>
                 <Link href="/(auth)/sign-up" asChild>
@@ -192,9 +177,11 @@ export default function SignInScreen() {
                     <Text style={styles.footerLink}>Create account</Text>
                   </TouchableOpacity>
                 </Link>
-                <TouchableOpacity onPress={handleForgotPassword}>
-                  <Text style={styles.footerLink}>Forgot password</Text>
-                </TouchableOpacity>
+                <Link href="/(auth)/forgot-password" asChild>
+                  <TouchableOpacity>
+                    <Text style={styles.footerLink}>Forgot password</Text>
+                  </TouchableOpacity>
+                </Link>
               </View>
             </Animated.View>
 
@@ -211,7 +198,7 @@ export default function SignInScreen() {
 
               <View style={styles.socialButtons}>
                 {Platform.OS === 'ios' && (
-                  <TouchableOpacity onPress={handleAppleSignIn} disabled={loading}>
+                  <TouchableOpacity onPress={handleAppleSignIn} disabled={loading} activeOpacity={0.85}>
                     <Glass {...glassProps} style={[styles.socialButton, !hasGlass && styles.socialButtonFallback]}>
                       <Ionicons name="logo-apple" size={20} color={Colors.text} />
                       <Text style={styles.socialButtonText}>Continue with Apple</Text>
@@ -219,7 +206,7 @@ export default function SignInScreen() {
                   </TouchableOpacity>
                 )}
 
-                <TouchableOpacity onPress={handleGoogleSignIn} disabled={loading}>
+                <TouchableOpacity onPress={handleGoogleSignIn} disabled={loading} activeOpacity={0.85}>
                   <Glass {...glassProps} style={[styles.socialButton, !hasGlass && styles.socialButtonFallback]}>
                     <Ionicons name="logo-google" size={20} color="#EA4335" />
                     <Text style={styles.socialButtonText}>Continue with Google</Text>
@@ -247,35 +234,49 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     alignItems: 'center',
-    marginBottom: 60,
+    marginBottom: 44,
   },
   appIcon: {
-    width: 80,
-    height: 80,
-    marginBottom: 12,
-    borderRadius: 18,
-    borderCurve: 'continuous',
+    width: 150,
+    height: 32,
+    marginBottom: 30,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: 'InstrumentSerif_400Regular_Italic',
+    fontSize: 46,
     color: Colors.text,
     textAlign: 'center',
   },
-  formContainer: {
-    marginBottom: 40,
+  subtitle: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 6,
   },
-  inputContainer: {
-    borderRadius: 16,
+  formContainer: {
+    marginBottom: 48,
+  },
+  section: {
+    borderRadius: 20,
     paddingHorizontal: 20,
-    paddingVertical: 18,
-    marginBottom: 16,
+    paddingVertical: 4,
     overflow: 'hidden',
     borderCurve: 'continuous',
     backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.7)',
   },
-  inputFallback: {
+  sectionFallback: {
     backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderColor: Colors.border,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+    marginHorizontal: -20,
+  },
+  inputRow: {
+    paddingVertical: 16,
   },
   input: {
     fontSize: 16,
@@ -287,23 +288,17 @@ const styles = StyleSheet.create({
     color: '#E53E3E',
     marginTop: 8,
   },
-  successText: {
-    fontSize: 13,
-    color: '#38A169',
-    marginTop: 8,
-  },
   continueButton: {
-    backgroundColor: Colors.text,
-    borderRadius: 16,
-    paddingVertical: 18,
-    marginTop: 20,
-    borderCurve: 'continuous',
+    marginTop: 16,
+  },
+  continueInner: {
+    justifyContent: 'center',
   },
   continueButtonDisabled: {
     opacity: 0.7,
   },
   continueButtonText: {
-    color: '#FFF',
+    color: Colors.text,
     fontSize: 18,
     fontWeight: '600',
     textAlign: 'center',
@@ -315,11 +310,10 @@ const styles = StyleSheet.create({
   },
   footerLink: {
     textAlign: 'center',
-    color: Colors.text,
-    fontSize: 15,
-    fontWeight: '500',
-    marginTop: 24,
-    opacity: 0.7,
+    color: Colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '400',
+    marginTop: 20,
   },
   socialContainer: {
     alignItems: 'center',
@@ -329,7 +323,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   orLine: {
     height: 1,
@@ -349,12 +343,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    overflow: 'hidden',
+    borderRadius: 999,
     borderCurve: 'continuous',
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    overflow: 'hidden',
     backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
   },
   socialButtonFallback: {
     backgroundColor: 'rgba(255, 255, 255, 0.85)',

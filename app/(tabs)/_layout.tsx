@@ -3,6 +3,7 @@ import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNotificationCheck } from '../../hooks/useNotificationCheck';
 import { requestNotificationPermissions } from '../../lib/notifications';
+import { useExperimentals } from '../../hooks/useExperimentals';
 
 const { Trigger } = NativeTabs;
 
@@ -10,6 +11,7 @@ const NOTIF_ASKED_KEY = 'notif_permission_asked';
 
 export default function TabLayout() {
   useNotificationCheck();
+  const experimentalsEnabled = useExperimentals();
 
   useEffect(() => {
     const askOnce = async () => {
@@ -31,7 +33,7 @@ export default function TabLayout() {
         <Trigger.Icon sf={{ default: 'clock', selected: 'clock.fill' }} />
         <Trigger.Label>Timeline</Trigger.Label>
       </Trigger>
-      <Trigger name="(plans)">
+      <Trigger name="(plans)" hidden={!experimentalsEnabled}>
         <Trigger.Icon sf={{ default: '1.calendar', selected: '31.calendar' }} />
         <Trigger.Label>Plan</Trigger.Label>
       </Trigger>

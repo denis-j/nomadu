@@ -131,12 +131,12 @@ export default function PermissionsScreen() {
       <AnimatedGradientBackground
         colorSets={[
           {
-            colors: ['#fff4cc', '#ffe8a3', '#ffd97a'],
+            colors: ['#4DC1FF', '#8AD3FF', '#DBF0FF'],
             start: { x: 0, y: 0 },
             end: { x: 1, y: 1 },
           },
           {
-            colors: ['#fff9e6', '#fff0bf', '#ffe599'],
+            colors: ['#8AD3FF', '#DBF0FF', '#FFFFFF'],
             start: { x: 1, y: 0 },
             end: { x: 0, y: 1 },
           },

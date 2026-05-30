@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(npx expo install:*)",
+      "Bash(npm install:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(node -e:*)",
+      "WebFetch(domain:www.revenuecat.com)",
+      "Bash(ls:*)",
+      "Bash(python3:*)",
+      "Read(//Users/denisjurkovsek/screenshots/**)",
+      "Read(//Users/denisjurkovsek/screenshots/src/**)",
+      "WebFetch(domain:docs.expo.dev)",
+      "WebFetch(domain:expo.dev)",
+      "Bash(npm info:*)",
+      "Bash(npx expo:*)",
+      "Bash(find /Users/denisjurkovsek/Documents/workspace/privat/nomad/node_modules/expo-widgets -name autolinking.rb -o -name *.rb)",
+      "Bash(find /Users/denisjurkovsek/Documents/workspace/privat/nomad/ios/Pods -name Sealable*)",
+      "Bash(nm /Users/denisjurkovsek/Library/Developer/Xcode/DerivedData/Nomady-dvcftqisqijovmdvqnkpkoxrnhmt/Build/Products/Debug-iphonesimulator/ExpoModulesCore/libExpoModulesCore.a)",
+      "Bash(nm /Users/denisjurkovsek/Library/Developer/Xcode/DerivedData/Nomady-dvcftqisqijovmdvqnkpkoxrnhmt/Build/Products/Debug-iphonesimulator/XCFrameworkIntermediates/React-Core-prebuilt/React.framework/React)",
+      "Bash(find ~/Library/Developer/Xcode/DerivedData/Nomady-dvcftqisqijovmdvqnkpkoxrnhmt -name *.o)",
+      "Bash(xargs -I{} sh -c \"nm \"\"{}\"\" 2>/dev/null | grep \"\"SealableC2Ev\"\" | grep -v \"\" U \"\" | grep -q . && echo \"\"{}\"\"\")",
+      "Bash(find ~/Library/Developer/Xcode/DerivedData/Nomady-dvcftqisqijovmdvqnkpkoxrnhmt -name *.dylib)",
+      "Bash(find ~/Library/Developer/Xcode/DerivedData/Nomady-dvcftqisqijovmdvqnkpkoxrnhmt/Build/Products/Debug-iphonesimulator -name *.a)",
+      "Bash(pod install:*)",
+      "Bash(curl -s https://www.npmjs.com/package/country-state-city)",
+      "Bash(curl -s https://registry.npmjs.org/country-state-city/latest)",
+      "Bash(npx tsc:*)",
+      "Bash(find:*)"
+    ]
+  }
+}

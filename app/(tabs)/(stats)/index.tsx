@@ -9,21 +9,26 @@ import {
 } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useStats } from '../../../hooks/useStats';
 import { useVisaTracker } from '../../../hooks/useVisaTracker';
 import { useTaxTracker } from '../../../hooks/useTaxTracker';
 import { Colors } from '../../../constants/colors';
 import { countryCodeToFlag } from '../../../lib/geocoding';
-import { EmptyState } from '../../../components/EmptyState';
+import { StatsBars } from '../../../components/StatsBars';
+import { BADGE_LIBRARY } from '../../../lib/badges';
+import { CountryBadge3DPreview } from '../../../components/CountryBadge3D';
+import { YearPicker } from '../../../components/YearPicker';
+import type { YearFilter } from '../../../lib/yearFilter';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 export default function StatsScreen() {
-  const { stats, loading, refresh: refreshStats } = useStats();
+  const [yearFilter, setYearFilter] = useState<YearFilter>(new Date().getFullYear());
+  const { stats, loading, refresh: refreshStats } = useStats(yearFilter);
   const { visaStatuses, loading: visaLoading, refresh: refreshVisa } = useVisaTracker();
   const { taxStatuses, loading: taxLoading, refresh: refreshTax } = useTaxTracker();
   const [refreshing, setRefreshing] = useState(false);
@@ -41,16 +46,31 @@ export default function StatsScreen() {
   const mostCritical = visaStatuses.length > 0 ? visaStatuses[0] : null;
   const mostCriticalTax = taxStatuses.length > 0 ? taxStatuses[0] : null;
 
-      if (loading || visaLoading || taxLoading) return null;
-      if (stats.totalDays < 1) {
-        return (
-          <EmptyState
-            icon="🫙"
-            title="No stats yet"
-            subtitle="Your stats will appear here once you start tracking."
-          />
-        );
-      }
+  // Re-trigger bubble animations whenever the Stats tab gains focus
+  const [focusKey, setFocusKey] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      setFocusKey((k) => k + 1);
+    }, []),
+  );
+
+  if (loading || visaLoading || taxLoading) return null;
+
+  // Truly empty (no trips at all, ever) → show the placeholder.
+  // If only the current year is empty we still want to render the picker so the
+  // user can switch years.
+  const hasAnyData = stats.availableYears.length > 1 || stats.totalDays > 0;
+  if (!hasAnyData) {
+    return (
+      <View style={styles.emptyContainer}>
+        <StatsBars key={focusKey} size={80} variant="burstWobble" />
+        <Text style={styles.emptyTitle}>No stats yet</Text>
+        <Text style={styles.emptySubtitle}>
+          Once you start tracking,{'\n'}your countries, cities and days will show up here.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -58,6 +78,12 @@ export default function StatsScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
     >
+      <YearPicker
+        years={stats.availableYears}
+        value={yearFilter}
+        onChange={setYearFilter}
+      />
+
       {/* Countries + Cities | Days */}
       <View style={styles.row}>
         <Glass {...glassProps} style={[styles.card, styles.cardWide, !hasGlass && styles.cardFallback]}>
@@ -137,6 +163,9 @@ export default function StatsScreen() {
         </View>
       )}
 
+      {/* Badge Library overview — always all-time, year filter does not apply */}
+      <BadgesSection visitedCodes={new Set(stats.allTimeCountryCodes)} />
+
       {/* Top countries */}
       {stats.topCountries.length > 0 && (
         <View style={styles.countriesSection}>
@@ -163,11 +192,156 @@ export default function StatsScreen() {
   );
 }
 
+// ─── Badges section ─────────────────────────────────────────────────────────
+
+function BadgesSection({ visitedCodes }: { visitedCodes: Set<string> }) {
+  const earned = BADGE_LIBRARY.filter((b) => visitedCodes.has(b.code));
+  return (
+    <View style={badgeStyles.section}>
+      <View style={badgeStyles.sectionHeader}>
+        <Text style={badgeStyles.sectionTitle}>Badges</Text>
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/library/badges');
+          }}
+          hitSlop={8}
+          style={({ pressed }) => [badgeStyles.linkBtn, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={badgeStyles.linkBtnText}>
+            {earned.length} / {BADGE_LIBRARY.length}
+          </Text>
+          <Ionicons name="chevron-forward" size={14} color={Colors.primary} />
+        </Pressable>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={badgeStyles.row}
+      >
+        {BADGE_LIBRARY.map((b) => {
+          const isEarned = visitedCodes.has(b.code);
+          return (
+            <Pressable
+              key={b.code}
+              disabled={!isEarned}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push(`/badge/${b.code}`);
+              }}
+              style={({ pressed }) => [
+                badgeStyles.tile,
+                !isEarned && badgeStyles.tileLocked,
+                pressed && isEarned && { opacity: 0.7 },
+              ]}
+            >
+              <View style={badgeStyles.tileModel}>
+                {isEarned ? (
+                  <CountryBadge3DPreview countryCode={b.code} backgroundColor="#FFFFFF" />
+                ) : (
+                  <View style={badgeStyles.lockedPlaceholder}>
+                    <Ionicons name="medal-outline" size={36} color={Colors.textTertiary} />
+                  </View>
+                )}
+              </View>
+              <Text style={[badgeStyles.tileName, !isEarned && { color: Colors.textTertiary }]} numberOfLines={1}>
+                {b.name}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+const badgeStyles = StyleSheet.create({
+  section: { gap: 10, marginTop: 4 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+    letterSpacing: -0.3,
+  },
+  linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 4, paddingLeft: 8 },
+  linkBtnText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
+  row: { gap: 10, paddingHorizontal: 4 },
+  tile: {
+    width: 104,
+    aspectRatio: 0.85,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+    paddingTop: 6,
+    paddingBottom: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  tileLocked: {
+    backgroundColor: Colors.surfaceSecondary,
+    borderColor: 'transparent',
+  },
+  tileModel: {
+    width: '100%',
+    flex: 1,
+    overflow: 'hidden',
+    borderRadius: 10,
+    position: 'relative',
+  },
+  lockedPlaceholder: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: Colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tileName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.text,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+});
+
 const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 14,
     paddingBottom: 100,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    gap: 14,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: Colors.text,
+    textAlign: 'center',
+    letterSpacing: -0.4,
+    marginTop: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   row: {
     flexDirection: 'row',

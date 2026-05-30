@@ -24,6 +24,7 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Nomad uses your location to automatically track the cities and countries you visit.",
         "NSLocationWhenInUseUsageDescription": "Nomad uses your location to show your current city and country.",
         "NSLocationAlwaysUsageDescription": "Nomad tracks your location in the background to log visited cities automatically.",
+        "NSPhotoLibraryUsageDescription": "Nomad reads screenshots you pick to automatically extract trips into your timeline.",
         "UIBackgroundModes": [
           "location",
           "location",
@@ -78,7 +79,9 @@
           "color": "#000000",
           "sounds": []
         }
-      ]
+      ],
+      "expo-video",
+      "expo-font"
     ],
     "extra": {
       "router": {},

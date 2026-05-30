@@ -626,11 +626,22 @@ export interface Stats {
   totalCities: number;
   totalDays: number;
   topCountries: { country: string; country_code: string; days: number }[];
+  availableYears: number[];
+  /** All country codes the user has ever visited (year filter does NOT apply). */
+  allTimeCountryCodes: string[];
 }
 
-export async function getStats(): Promise<Stats> {
+/**
+ * Aggregate stats. Pass `year` to scope counts to a single calendar year;
+ * pass `null` (default) to count all-time. When filtering, a trip is included
+ * only if it actually has days within the target year, and its day count is
+ * clipped to the year boundaries.
+ */
+export async function getStats(year: number | null = null): Promise<Stats> {
   // Use merged trips to avoid double-counting adjacent raw GPS entries
   const trips = await getAllTrips();
+  // Import lazily to avoid a circular dep (yearFilter imports from database)
+  const { effectiveTripDays, availableYearsFromTrips } = await import('./yearFilter');
 
   const countrySet = new Set<string>();
   const citySet = new Set<string>();
@@ -638,26 +649,33 @@ export async function getStats(): Promise<Stats> {
   const countryDays: Record<string, { country: string; country_code: string; days: number }> = {};
 
   for (const trip of trips) {
+    const days = effectiveTripDays(trip, year);
+    if (days <= 0) continue;
+
     countrySet.add(trip.country);
     citySet.add(`${trip.city}|${trip.country}`);
-    totalDays += trip.days;
+    totalDays += days;
 
     const key = trip.country_code;
     if (!countryDays[key]) {
       countryDays[key] = { country: trip.country, country_code: trip.country_code, days: 0 };
     }
-    countryDays[key].days += trip.days;
+    countryDays[key].days += days;
   }
 
   const topCountries = Object.values(countryDays)
     .sort((a, b) => b.days - a.days)
     .slice(0, 10);
 
+  const allTimeCountryCodes = [...new Set(trips.map((t) => t.country_code.toUpperCase()))];
+
   return {
     totalCountries: countrySet.size,
     totalCities: citySet.size,
     totalDays,
     topCountries,
+    availableYears: availableYearsFromTrips(trips),
+    allTimeCountryCodes,
   };
 }
 
