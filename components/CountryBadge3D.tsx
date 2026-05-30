@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { Asset } from 'expo-asset';
 import {
   Gesture,
   GestureDetector,
@@ -15,6 +16,43 @@ import {
   useSkybox,
 } from 'react-native-filament';
 import { Colors } from '../constants/colors';
+
+/**
+ * Resolves a `require(...)`'d GLB module to a concrete local `file://` URI.
+ *
+ * In dev, react-native-filament can load the metro http URL directly, but in a
+ * production build there is no metro server — the bundled asset has to be
+ * resolved to its on-device file path. expo-asset's downloadAsync() unpacks the
+ * embedded asset and gives us `localUri`, which Filament's loader accepts via
+ * its `file://` branch.
+ */
+function useGlbUri(moduleId: number): string | null {
+  const [uri, setUri] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const asset = Asset.fromModule(moduleId);
+    asset
+      .downloadAsync()
+      .then(() => {
+        if (cancelled) return;
+        const resolved = asset.localUri ?? asset.uri;
+        // expo-asset returns a percent-encoded URI (e.g. "Application%20Support").
+        // react-native-filament's native loader does NOT percent-decode the path
+        // before NSData reads it, so "%20" is treated literally and the file is not
+        // found in release builds. Decode it back to real spaces here.
+        setUri(decodeURI(resolved));
+      })
+      .catch((e) => {
+        console.error('Failed to resolve GLB asset', e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [moduleId]);
+
+  return uri;
+}
 
 // Country-code → GLB module. Add new badges here as you create the assets.
 const COUNTRY_BADGES: Record<string, number> = {
@@ -76,6 +114,7 @@ function Scene({
   });
 
   const [viewSize, setViewSize] = useState({ w: 1, h: 1 });
+  const uri = useGlbUri(source);
 
   const pan = Gesture.Pan()
     .runOnJS(true)
@@ -103,7 +142,7 @@ function Scene({
       >
         <Camera cameraManipulator={cameraManipulator} />
         <DefaultLight />
-        <Model source={source} scale={[2.2, 2.2, 2.2]} />
+        {uri && <Model source={{ uri }} scale={[2.2, 2.2, 2.2]} />}
       </FilamentView>
     </GestureDetector>
   );
@@ -159,11 +198,13 @@ function PreviewScene({
     orbitSpeed: [0, 0],
   });
 
+  const uri = useGlbUri(source);
+
   return (
     <FilamentView style={styles.filament}>
       <Camera cameraManipulator={cameraManipulator} />
       <DefaultLight />
-      <Model source={source} scale={[scale, scale, scale]} />
+      {uri && <Model source={{ uri }} scale={[scale, scale, scale]} />}
     </FilamentView>
   );
 }

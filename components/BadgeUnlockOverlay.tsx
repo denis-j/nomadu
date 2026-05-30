@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { CountryBadge3D } from './CountryBadge3D';
 import { CloudyButton } from './CloudyButton';
 import { getBadgeInfo, markBadgeUnlocked } from '../lib/badges';
+import { playCollectSound } from '../lib/sound';
 
 const BLACK_BG = '#000000';
 
@@ -36,6 +37,11 @@ export function BadgeUnlockOverlay({ countryCode, onClose }: BadgeUnlockOverlayP
     markBadgeUnlocked(countryCode).catch(() => {});
   }, [countryCode]);
 
+  const handleCollect = () => {
+    playCollectSound();
+    onClose();
+  };
+
   if (!info) {
     onClose();
     return null;
@@ -63,7 +69,7 @@ export function BadgeUnlockOverlay({ countryCode, onClose }: BadgeUnlockOverlayP
           </View>
 
           <View pointerEvents="box-none" style={styles.bottomBlock}>
-            <CloudyButton onPress={onClose} haptic={Haptics.ImpactFeedbackStyle.Medium}>
+            <CloudyButton onPress={handleCollect} haptic={Haptics.ImpactFeedbackStyle.Medium}>
               <View style={styles.ctaContent}>
                 <Ionicons name="sparkles" size={20} color="#0B2541" />
                 <Text style={styles.ctaText}>Collect</Text>

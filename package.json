@@ -7,7 +7,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo-google-fonts/instrument-serif": "^0.4.1",
@@ -21,6 +22,7 @@
     "country-state-city": "^3.2.1",
     "expo": "~55.0.26",
     "expo-apple-authentication": "~55.0.13",
+    "expo-audio": "~55.0.14",
     "expo-auth-session": "~55.0.16",
     "expo-blur": "~55.0.14",
     "expo-constants": "~55.0.16",
@@ -65,6 +67,7 @@
     "@types/react": "~19.2.2",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~55.0.0",
+    "patch-package": "^8.0.1",
     "typescript": "~5.9.2"
   },
   "private": true

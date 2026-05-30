@@ -16,29 +16,16 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import AnimatedGradientBackground from '../../components/animated-gradient-background';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CloudyButton } from '../../components/CloudyButton';
 import { Colors } from '../../constants/colors';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { signInWithEmail, signInWithApple } from '../../lib/auth';
+import { showToast } from '../../lib/toast';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
-
-// CloudyButton palette: deep sky blue → light blue → icy → white
-const gradientColorSets = [
-  {
-    colors: ['#4DC1FF', '#8AD3FF', '#DBF0FF'],
-    start: { x: 0, y: 0 },
-    end: { x: 1, y: 1 },
-  },
-  {
-    colors: ['#8AD3FF', '#DBF0FF', '#FFFFFF'],
-    start: { x: 1, y: 0 },
-    end: { x: 0, y: 1 },
-  },
-];
 
 export default function SignInScreen() {
   const emailRef = useRef<TextInput>(null);
@@ -46,44 +33,41 @@ export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const { signIn: googleSignIn, ready: googleReady } = useGoogleAuth();
 
   const handleSignIn = async () => {
-    setError(null);
     if (!email || !password) {
-      setError('Please enter your email and password.');
+      showToast('Please enter your email and password.', 'error');
       return;
     }
     setLoading(true);
     try {
       await signInWithEmail(email.trim(), password);
     } catch (e: any) {
-      setError(e.message ?? 'Something went wrong.');
+      showToast(e.message ?? 'Something went wrong.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleAppleSignIn = async () => {
-    setError(null);
     setLoading(true);
     try {
       await signInWithApple();
     } catch (e: any) {
-      if (e.code !== 'ERR_REQUEST_CANCELED') setError(e.message ?? 'Apple sign in failed.');
+      if (e.code !== 'ERR_REQUEST_CANCELED') showToast(e.message ?? 'Apple sign in failed.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
-    setError(null);
     setLoading(true);
     try {
       await googleSignIn();
     } catch (e: any) {
-      if (!e.message?.includes('cancelled')) setError(e.message ?? 'Google sign in failed.');
+      if (!e.message?.includes('cancelled')) showToast(e.message ?? 'Google sign in failed.', 'error');
     } finally {
       setLoading(false);
     }
@@ -93,9 +77,11 @@ export default function SignInScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
-      <AnimatedGradientBackground
-        colorSets={gradientColorSets}
-        duration={4000}
+      <LinearGradient
+        colors={['#4DC1FF', '#8AD3FF', '#DBF0FF']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
       />
 
       <SafeAreaView style={styles.safeArea}>
@@ -106,7 +92,7 @@ export default function SignInScreen() {
               style={styles.titleContainer}
             >
               <Image
-                source={require('../../assets/icons/nomadu_cloud_text.png')}
+                source={require('../../assets/icons/app-icon.png')}
                 style={styles.appIcon}
                 resizeMode="contain"
               />
@@ -138,15 +124,15 @@ export default function SignInScreen() {
                   />
                 </Pressable>
                 <View style={styles.separator} />
-                <Pressable onPress={() => passwordRef.current?.focus()} style={styles.inputRow}>
+                <Pressable onPress={() => passwordRef.current?.focus()} style={[styles.inputRow, styles.inputRowIcon]}>
                   <TextInput
                     ref={passwordRef}
-                    style={styles.input}
+                    style={[styles.input, styles.inputFlex]}
                     value={password}
                     onChangeText={setPassword}
                     placeholder="Password"
                     placeholderTextColor={Colors.textTertiary}
-                    secureTextEntry
+                    secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
                     autoComplete="password"
@@ -154,10 +140,20 @@ export default function SignInScreen() {
                     returnKeyType="done"
                     onSubmitEditing={handleSignIn}
                   />
+                  <Link href="/(auth)/forgot-password" asChild>
+                    <TouchableOpacity hitSlop={8}>
+                      <Text style={styles.forgotInline}>Forgot?</Text>
+                    </TouchableOpacity>
+                  </Link>
+                  <TouchableOpacity onPress={() => setShowPassword((v) => !v)} hitSlop={10} style={styles.eyeBtn}>
+                    <Ionicons
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color={Colors.textTertiary}
+                    />
+                  </TouchableOpacity>
                 </Pressable>
               </Glass>
-
-              {error && <Text style={styles.errorText}>{error}</Text>}
 
               <CloudyButton
                 onPress={handleSignIn}
@@ -171,15 +167,11 @@ export default function SignInScreen() {
                 )}
               </CloudyButton>
 
-              <View style={styles.footerLinks}>
+              <View style={styles.signUpRow}>
+                <Text style={styles.signUpText}>Don&rsquo;t have an account? </Text>
                 <Link href="/(auth)/sign-up" asChild>
-                  <TouchableOpacity>
-                    <Text style={styles.footerLink}>Create account</Text>
-                  </TouchableOpacity>
-                </Link>
-                <Link href="/(auth)/forgot-password" asChild>
-                  <TouchableOpacity>
-                    <Text style={styles.footerLink}>Forgot password</Text>
+                  <TouchableOpacity hitSlop={6}>
+                    <Text style={styles.signUpLink}>Sign up</Text>
                   </TouchableOpacity>
                 </Link>
               </View>
@@ -237,8 +229,8 @@ const styles = StyleSheet.create({
     marginBottom: 44,
   },
   appIcon: {
-    width: 150,
-    height: 32,
+    width: 80,
+    height: 80,
     marginBottom: 30,
   },
   title: {
@@ -278,15 +270,18 @@ const styles = StyleSheet.create({
   inputRow: {
     paddingVertical: 16,
   },
+  inputRowIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  inputFlex: {
+    flex: 1,
+  },
   input: {
     fontSize: 16,
     color: Colors.text,
     fontWeight: '400',
-  },
-  errorText: {
-    fontSize: 13,
-    color: '#E53E3E',
-    marginTop: 8,
   },
   continueButton: {
     marginTop: 16,
@@ -303,17 +298,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  footerLinks: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
+  forgotInline: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '500',
   },
-  footerLink: {
-    textAlign: 'center',
+  eyeBtn: {
+    marginLeft: 2,
+  },
+  signUpRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  signUpText: {
     color: Colors.textSecondary,
     fontSize: 14,
-    fontWeight: '400',
-    marginTop: 20,
+  },
+  signUpLink: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '700',
   },
   socialContainer: {
     alignItems: 'center',

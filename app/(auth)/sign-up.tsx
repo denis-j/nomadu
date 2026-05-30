@@ -21,6 +21,7 @@ import { CloudyButton } from '../../components/CloudyButton';
 import { Colors } from '../../constants/colors';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { signUpWithEmail, signInWithApple } from '../../lib/auth';
+import { toast } from '../../lib/toast';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -48,52 +49,50 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const { signIn: googleSignIn, ready: googleReady } = useGoogleAuth();
 
   const handleSignUp = async () => {
-    setError(null);
     if (!email || !password) {
-      setError('Please enter your email and password.');
+      showToast('Please enter your email and password.', 'error');
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      showToast('Passwords do not match.', 'error');
       return;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      showToast('Password must be at least 6 characters.', 'error');
       return;
     }
     setLoading(true);
     try {
       await signUpWithEmail(email.trim(), password);
     } catch (e: any) {
-      setError(e.message ?? 'Something went wrong.');
+      showToast(e.message ?? 'Something went wrong.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleAppleSignIn = async () => {
-    setError(null);
     setLoading(true);
     try {
       await signInWithApple();
     } catch (e: any) {
-      if (e.code !== 'ERR_REQUEST_CANCELED') setError(e.message ?? 'Apple sign in failed.');
+      if (e.code !== 'ERR_REQUEST_CANCELED') showToast(e.message ?? 'Apple sign in failed.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
-    setError(null);
     setLoading(true);
     try {
       await googleSignIn();
     } catch (e: any) {
-      if (!e.message?.includes('cancelled')) setError(e.message ?? 'Google sign in failed.');
+      if (!e.message?.includes('cancelled')) showToast(e.message ?? 'Google sign in failed.', 'error');
     } finally {
       setLoading(false);
     }
@@ -148,15 +147,15 @@ export default function SignUpScreen() {
                   />
                 </Pressable>
                 <View style={styles.separator} />
-                <Pressable onPress={() => passwordRef.current?.focus()} style={styles.inputRow}>
+                <Pressable onPress={() => passwordRef.current?.focus()} style={[styles.inputRow, styles.inputRowIcon]}>
                   <TextInput
                     ref={passwordRef}
-                    style={styles.input}
+                    style={[styles.input, styles.inputFlex]}
                     value={password}
                     onChangeText={setPassword}
                     placeholder="Password"
                     placeholderTextColor={Colors.textTertiary}
-                    secureTextEntry
+                    secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
                     autoComplete="new-password"
@@ -164,17 +163,24 @@ export default function SignUpScreen() {
                     returnKeyType="next"
                     onSubmitEditing={() => confirmPasswordRef.current?.focus()}
                   />
+                  <TouchableOpacity onPress={() => setShowPassword((v) => !v)} hitSlop={10}>
+                    <Ionicons
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color={Colors.textTertiary}
+                    />
+                  </TouchableOpacity>
                 </Pressable>
                 <View style={styles.separator} />
-                <Pressable onPress={() => confirmPasswordRef.current?.focus()} style={styles.inputRow}>
+                <Pressable onPress={() => confirmPasswordRef.current?.focus()} style={[styles.inputRow, styles.inputRowIcon]}>
                   <TextInput
                     ref={confirmPasswordRef}
-                    style={styles.input}
+                    style={[styles.input, styles.inputFlex]}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                     placeholder="Confirm Password"
                     placeholderTextColor={Colors.textTertiary}
-                    secureTextEntry
+                    secureTextEntry={!showConfirm}
                     autoCapitalize="none"
                     autoCorrect={false}
                     autoComplete="new-password"
@@ -182,10 +188,15 @@ export default function SignUpScreen() {
                     returnKeyType="done"
                     onSubmitEditing={handleSignUp}
                   />
+                  <TouchableOpacity onPress={() => setShowConfirm((v) => !v)} hitSlop={10}>
+                    <Ionicons
+                      name={showConfirm ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color={Colors.textTertiary}
+                    />
+                  </TouchableOpacity>
                 </Pressable>
               </Glass>
-
-              {error && <Text style={styles.errorText}>{error}</Text>}
 
               <CloudyButton
                 onPress={handleSignUp}
@@ -199,10 +210,11 @@ export default function SignUpScreen() {
                 )}
               </CloudyButton>
 
-              <View style={styles.footerLinks}>
+              <View style={styles.signInRow}>
+                <Text style={styles.signInText}>Already have an account? </Text>
                 <Link href="/(auth)/sign-in" asChild>
-                  <TouchableOpacity>
-                    <Text style={styles.footerLink}>Already have an account? Sign in</Text>
+                  <TouchableOpacity hitSlop={6}>
+                    <Text style={styles.signInLink}>Sign in</Text>
                   </TouchableOpacity>
                 </Link>
               </View>
@@ -301,18 +313,20 @@ const styles = StyleSheet.create({
   inputRow: {
     paddingVertical: 16,
   },
+  inputRowIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputFlex: {
+    flex: 1,
+  },
   input: {
     fontSize: 16,
     color: Colors.text,
     fontWeight: '400',
   },
-  errorText: {
-    fontSize: 13,
-    color: '#E53E3E',
-    marginTop: 8,
-  },
   continueButton: {
-    marginTop: 16,
+    marginTop: 8,
   },
   continueInner: {
     justifyContent: 'center',
@@ -326,16 +340,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  footerLinks: {
+  signInRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    marginTop: 24,
   },
-  footerLink: {
-    textAlign: 'center',
+  signInText: {
     color: Colors.textSecondary,
     fontSize: 14,
-    fontWeight: '400',
-    marginTop: 20,
+  },
+  signInLink: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '700',
   },
   socialContainer: {
     alignItems: 'center',

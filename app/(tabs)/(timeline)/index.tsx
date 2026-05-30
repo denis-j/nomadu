@@ -131,10 +131,6 @@ function TimelineEmpty({ onAdd, onImport }: { onAdd: () => void; onImport: () =>
         <Ionicons name="add-circle-outline" size={20} color={Colors.text} />
         <Text style={emptyStyles.secondaryBtnText}>Add a trip manually</Text>
       </Pressable>
-
-      <Text style={emptyStyles.hint}>
-        Or just travel — automatic tracking will fill this in.
-      </Text>
     </View>
   );
 }

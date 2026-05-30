@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect } from 'react';
 import { Image, StyleSheet, Text } from 'react-native';
 import Animated, {
@@ -8,14 +9,9 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import AnimatedGradientBackground from './animated-gradient-background';
+import { Colors } from '../constants/colors';
 
-const ICON = require('../assets/app-icon-dark.png');
-
-const gradientColorSets = [
-  { colors: ['#fff4cc', '#ffe8a3', '#ffd97a'], start: { x: 0, y: 0 }, end: { x: 1, y: 1 } },
-  { colors: ['#fff9e6', '#fff0bf', '#ffe599'], start: { x: 1, y: 0 }, end: { x: 0, y: 1 } },
-];
+const ICON = require('../assets/icons/splash-icon-cloud.png');
 
 const EASE_OUT = Easing.out(Easing.cubic);
 const EASE_IN = Easing.in(Easing.cubic);
@@ -26,31 +22,27 @@ interface Props {
 }
 
 export default function SplashScreen({ ready, onDone }: Props) {
-  const iconScale = useSharedValue(0.78);
+  const iconScale = useSharedValue(0.9);
   const iconOpacity = useSharedValue(0);
-  const iconY = useSharedValue(16);
   const textOpacity = useSharedValue(0);
-  const textY = useSharedValue(10);
   const containerOpacity = useSharedValue(1);
 
-  // Smooth entry — ease-out cubic, no spring bounce
+  // Entry — opacity + gentle scale only, all on the UI thread.
+  // No translateY fly-in: it read as "laggy" while the JS thread boots.
   useEffect(() => {
-    iconOpacity.value = withTiming(1, { duration: 380, easing: EASE_OUT });
-    iconScale.value = withTiming(1, { duration: 420, easing: EASE_OUT });
-    iconY.value = withTiming(0, { duration: 420, easing: EASE_OUT });
-
-    textOpacity.value = withDelay(260, withTiming(1, { duration: 360, easing: EASE_OUT }));
-    textY.value = withDelay(260, withTiming(0, { duration: 360, easing: EASE_OUT }));
+    iconOpacity.value = withTiming(1, { duration: 400, easing: EASE_OUT });
+    iconScale.value = withTiming(1, { duration: 500, easing: EASE_OUT });
+    textOpacity.value = withDelay(240, withTiming(1, { duration: 360, easing: EASE_OUT }));
   }, []);
 
-  // Clean fade-out, no scale pulse
+  // Clean fade-out once the app is ready
   useEffect(() => {
     if (!ready) return;
     const timer = setTimeout(() => {
-      containerOpacity.value = withTiming(0, { duration: 400, easing: EASE_IN }, (done) => {
+      containerOpacity.value = withTiming(0, { duration: 420, easing: EASE_IN }, (done) => {
         if (done) runOnJS(onDone)();
       });
-    }, 800);
+    }, 600);
     return () => clearTimeout(timer);
   }, [ready]);
 
@@ -60,17 +52,22 @@ export default function SplashScreen({ ready, onDone }: Props) {
 
   const iconStyle = useAnimatedStyle(() => ({
     opacity: iconOpacity.value,
-    transform: [{ scale: iconScale.value }, { translateY: iconY.value }],
+    transform: [{ scale: iconScale.value }],
   }));
 
   const textStyle = useAnimatedStyle(() => ({
     opacity: textOpacity.value,
-    transform: [{ translateY: textY.value }],
   }));
 
   return (
     <Animated.View style={[styles.container, containerStyle]}>
-      <AnimatedGradientBackground colorSets={gradientColorSets} duration={4000} />
+      {/* Static gradient — no JS-thread animation, stays smooth during boot */}
+      <LinearGradient
+        colors={['#4DC1FF', '#8AD3FF', '#DBF0FF']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
       <Animated.View style={[styles.iconWrapper, iconStyle]}>
         <Image source={ICON} style={styles.icon} />
       </Animated.View>
@@ -84,37 +81,42 @@ export default function SplashScreen({ ready, onDone }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 9999,
     gap: 28,
   },
   iconWrapper: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
+    shadowColor: '#0A3A5C',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.22,
+    shadowRadius: 28,
     elevation: 16,
   },
   icon: {
-    width: 120,
-    height: 120,
-    borderRadius: 26,
+    width: 124,
+    height: 124,
+    borderRadius: 28,
+    borderCurve: 'continuous',
   },
   appName: {
     fontSize: 36,
     fontWeight: '800',
-    color: '#1A1200',
+    color: Colors.text,
     textAlign: 'center',
     letterSpacing: -0.5,
   },
   tagline: {
     fontSize: 15,
     fontWeight: '500',
-    color: 'rgba(26,18,0,0.55)',
+    color: Colors.textSecondary,
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: 2,
     letterSpacing: 0.1,
   },
 });

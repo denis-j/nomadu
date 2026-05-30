@@ -1,0 +1,42 @@
+diff --git a/node_modules/react-native-filament/android/libs/filament/include/math/half.h b/node_modules/react-native-filament/android/libs/filament/include/math/half.h
+index d792e1b..f8b9acd 100644
+--- a/node_modules/react-native-filament/android/libs/filament/include/math/half.h
++++ b/node_modules/react-native-filament/android/libs/filament/include/math/half.h
+@@ -171,12 +171,14 @@ template<> struct is_arithmetic<filament::math::half> : public std::true_type {}
+ 
+ namespace std {
+ 
+-template<> struct is_floating_point<filament::math::half> : public std::true_type {};
++// [patched] Specializing std::is_floating_point / std::is_arithmetic is disallowed
++// by newer libc++ (Xcode 16+) and is a hard compile error. Removed.
++// template<> struct is_floating_point<filament::math::half> : public std::true_type {};
+ 
+ // note: this shouldn't be needed (is_floating_point<> is enough) but some version of msvc need it
+ // This stopped working with MSVC 2019 16.4, so we specialize our own version of is_arithmetic in
+ // the math::filament namespace (see above).
+-template<> struct is_arithmetic<filament::math::half> : public std::true_type {};
++// template<> struct is_arithmetic<filament::math::half> : public std::true_type {};
+ 
+ template<>
+ class numeric_limits<filament::math::half> {
+diff --git a/node_modules/react-native-filament/ios/libs/filament/include/math/half.h b/node_modules/react-native-filament/ios/libs/filament/include/math/half.h
+index d792e1b..f8b9acd 100644
+--- a/node_modules/react-native-filament/ios/libs/filament/include/math/half.h
++++ b/node_modules/react-native-filament/ios/libs/filament/include/math/half.h
+@@ -171,12 +171,14 @@ template<> struct is_arithmetic<filament::math::half> : public std::true_type {}
+ 
+ namespace std {
+ 
+-template<> struct is_floating_point<filament::math::half> : public std::true_type {};
++// [patched] Specializing std::is_floating_point / std::is_arithmetic is disallowed
++// by newer libc++ (Xcode 16+) and is a hard compile error. Removed.
++// template<> struct is_floating_point<filament::math::half> : public std::true_type {};
+ 
+ // note: this shouldn't be needed (is_floating_point<> is enough) but some version of msvc need it
+ // This stopped working with MSVC 2019 16.4, so we specialize our own version of is_arithmetic in
+ // the math::filament namespace (see above).
+-template<> struct is_arithmetic<filament::math::half> : public std::true_type {};
++// template<> struct is_arithmetic<filament::math::half> : public std::true_type {};
+ 
+ template<>
+ class numeric_limits<filament::math::half> {

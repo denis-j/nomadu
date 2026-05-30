@@ -8,7 +8,7 @@
     ],
     "version": "1.0.3",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app-icons/Icon-iOS-Default-1024x1024@1x.png",
     "userInterfaceStyle": "light",
     "runtimeVersion": {
       "policy": "appVersion"
@@ -20,6 +20,11 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.nomady.app",
+      "icon": {
+        "light": "./assets/app-icons/Icon-iOS-Default-1024x1024@1x.png",
+        "dark": "./assets/app-icons/Icon-iOS-Dark-1024x1024@1x.png",
+        "tinted": "./assets/app-icons/Icon-iOS-TintedDark-1024x1024@1x.png"
+      },
       "infoPlist": {
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Nomad uses your location to automatically track the cities and countries you visit.",
         "NSLocationWhenInUseUsageDescription": "Nomad uses your location to show your current city and country.",
@@ -75,13 +80,14 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/app-icons/Icon-iOS-Default-1024x1024@1x.png",
           "color": "#000000",
           "sounds": []
         }
       ],
       "expo-video",
-      "expo-font"
+      "expo-font",
+      "expo-audio"
     ],
     "extra": {
       "router": {},

@@ -8,6 +8,7 @@ import { CountryBadge3D, hasCountryBadge } from '../../components/CountryBadge3D
 import { CloudyButton } from '../../components/CloudyButton';
 import { Colors } from '../../constants/colors';
 import { getBadgeInfo, markBadgeUnlocked } from '../../lib/badges';
+import { playCollectSound } from '../../lib/sound';
 
 const BLACK_BG = '#000000';
 const hasGlass = isLiquidGlassAvailable();
@@ -39,6 +40,11 @@ export default function BadgeFullscreenScreen() {
   const handleClose = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.back();
+  };
+
+  const handleCollect = () => {
+    playCollectSound();
+    handleClose();
   };
 
   if (!hasCountryBadge(code) || !info) {
@@ -97,7 +103,7 @@ export default function BadgeFullscreenScreen() {
           {/* Bottom CTA for unlock mode only */}
           {isUnlock && (
             <View pointerEvents="box-none" style={styles.bottomBlock}>
-              <CloudyButton onPress={handleClose} haptic={Haptics.ImpactFeedbackStyle.Medium}>
+              <CloudyButton onPress={handleCollect} haptic={Haptics.ImpactFeedbackStyle.Medium}>
                 <View style={styles.ctaContent}>
                   <Ionicons name="sparkles" size={20} color="#0B2541" />
                   <Text style={styles.ctaText}>Collect</Text>

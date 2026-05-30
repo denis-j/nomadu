@@ -142,6 +142,7 @@ const styles = StyleSheet.create({
   inner: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 24,
   },
   pressed: { opacity: 0.92, transform: [{ scale: 0.99 }] },
 });
