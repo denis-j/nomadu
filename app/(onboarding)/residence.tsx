@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -10,18 +11,45 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-} from 'react-native-reanimated';
-import AnimatedGradientBackground from '../../components/animated-gradient-background';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { useAuth } from '../../hooks/useAuth';
-import { setHasFixedResidence } from '../../lib/onboarding';
+import { LOCAL_ONBOARDING_UID, setHasFixedResidence } from '../../lib/onboarding';
+import {
+  ENTER_DURATION,
+  TITLE_DELAY,
+  OPTION_BASE_DELAY,
+  OPTION_STAGGER,
+} from '../../constants/onboardingAnimation';
+
+const hasGlass = isLiquidGlassAvailable();
+const Glass = hasGlass ? GlassView : View;
+const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 type ResidenceChoice = 'yes' | 'no' | null;
+
+interface Option {
+  choice: 'yes' | 'no';
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  description: string;
+}
+
+const OPTIONS: Option[] = [
+  {
+    choice: 'yes',
+    icon: 'home',
+    title: 'Yes, I have a home base',
+    description: "You're tax resident in your home country regardless of travel.",
+  },
+  {
+    choice: 'no',
+    icon: 'airplane',
+    title: "No, I'm fully nomadic",
+    description: 'Track your home country too. 183 days could trigger tax residency.',
+  },
+];
 
 export default function ResidenceScreen() {
   const [selected, setSelected] = useState<ResidenceChoice>(null);
@@ -29,99 +57,63 @@ export default function ResidenceScreen() {
   const { user } = useAuth();
 
   const handleSelect = (choice: ResidenceChoice) => {
-    if (!choice || !user) return;
+    if (!choice) return;
     setSelected(choice);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setHasFixedResidence(user.uid, choice === 'yes'); // fire & forget
+    const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
+    setHasFixedResidence(uid, choice === 'yes');
     router.push('/(onboarding)/permissions');
   };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <AnimatedGradientBackground
-        colorSets={[
-          {
-            colors: ['#4DC1FF', '#8AD3FF', '#DBF0FF'],
-            start: { x: 0, y: 0 },
-            end: { x: 1, y: 1 },
-          },
-          {
-            colors: ['#8AD3FF', '#DBF0FF', '#FFFFFF'],
-            start: { x: 1, y: 0 },
-            end: { x: 0, y: 1 },
-          },
-        ]}
-        duration={4000}
-      />
-
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
-          {/* Icon */}
           <Animated.View
-            entering={FadeIn.duration(300)}
-            style={styles.visualContainer}
-          >
-            <View style={styles.iconCircle}>
-              <Ionicons name="home-outline" size={48} color={Colors.primary} />
-            </View>
-          </Animated.View>
-
-          {/* Text */}
-          <Animated.View
-            entering={FadeInUp.delay(80).duration(300)}
-            style={styles.textContainer}
+            entering={FadeIn.delay(TITLE_DELAY).duration(ENTER_DURATION)}
+            style={styles.header}
           >
             <Text style={styles.title}>Fixed residence?</Text>
-            <Text style={styles.description}>
-              Do you have a permanent home address in your home country? This affects tax residence tracking.
+            <Text style={styles.subtitle}>
+              Whether you keep a permanent home shapes how we track your tax residence.
             </Text>
           </Animated.View>
 
-          {/* Options */}
-          <Animated.View
-            entering={FadeInDown.delay(160).duration(300)}
-            style={styles.options}
-          >
-            <TouchableOpacity
-              style={[
-                styles.optionCard,
-                selected === 'yes' && styles.optionCardSelected,
-              ]}
-              onPress={() => handleSelect('yes')}
-              activeOpacity={0.7}
-              disabled={selected !== null}
-            >
-              <View style={styles.optionIcon}>
-                <Ionicons name="home" size={24} color={Colors.primary} />
-              </View>
-              <View style={styles.optionTextWrap}>
-                <Text style={styles.optionTitle}>Yes, I have a home base</Text>
-                <Text style={styles.optionDescription}>
-                  You're tax resident in your home country regardless of travel.
-                </Text>
-              </View>
-            </TouchableOpacity>
+          <View style={styles.options}>
+            {OPTIONS.map((opt, i) => (
+              <Animated.View
+                key={opt.choice}
+                entering={FadeIn.delay(OPTION_BASE_DELAY + i * OPTION_STAGGER).duration(ENTER_DURATION)}
+              >
+                <TouchableOpacity
+                  onPress={() => handleSelect(opt.choice)}
+                  activeOpacity={0.85}
+                  disabled={selected !== null}
+                >
+                  <Glass
+                    {...glassProps}
+                    style={[styles.optionRow, !hasGlass && styles.optionRowFallback]}
+                  >
+                    <View style={styles.optionIcon}>
+                      <Ionicons name={opt.icon} size={24} color={Colors.cloudyButtonText} />
+                    </View>
+                    <View style={styles.optionTextWrap}>
+                      <Text style={styles.optionTitle}>{opt.title}</Text>
+                      <Text style={styles.optionDescription}>{opt.description}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+                  </Glass>
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
+          </View>
 
-            <TouchableOpacity
-              style={[
-                styles.optionCard,
-                selected === 'no' && styles.optionCardSelected,
-              ]}
-              onPress={() => handleSelect('no')}
-              activeOpacity={0.7}
-              disabled={selected !== null}
-            >
-              <View style={styles.optionIcon}>
-                <Ionicons name="airplane" size={24} color={Colors.primary} />
-              </View>
-              <View style={styles.optionTextWrap}>
-                <Text style={styles.optionTitle}>No, I'm fully nomadic</Text>
-                <Text style={styles.optionDescription}>
-                  Track your home country too — 183 days could trigger tax residency.
-                </Text>
-              </View>
-            </TouchableOpacity>
+          <Animated.View
+            entering={FadeIn.delay(OPTION_BASE_DELAY + 2 * OPTION_STAGGER + 80).duration(ENTER_DURATION)}
+            style={styles.footer}
+          >
+            <Text style={styles.footerText}>You can change this anytime in Settings.</Text>
           </Animated.View>
         </View>
       </SafeAreaView>
@@ -130,82 +122,79 @@ export default function ResidenceScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  safeArea: { flex: 1 },
   content: {
     flex: 1,
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
     justifyContent: 'center',
   },
-  visualContainer: {
+  header: {
     alignItems: 'center',
-    marginBottom: 32,
-  },
-  iconCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textContainer: {
-    alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 36,
+    paddingHorizontal: 8,
   },
   title: {
-    ...Typography.displayMedium,
-    fontSize: 32,
-    marginBottom: 12,
+    ...Typography.brandDisplay,
+    fontSize: 44,
+    marginBottom: 8,
     textAlign: 'center',
   },
-  description: {
-    ...Typography.bodyLarge,
-    fontSize: 16,
+  subtitle: {
+    ...Typography.body,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   options: {
     gap: 12,
   },
-  optionCard: {
+  optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    borderRadius: 20,
+    paddingHorizontal: 18,
     paddingVertical: 18,
-    paddingHorizontal: 16,
-    borderRadius: 16,
+    overflow: 'hidden',
     borderCurve: 'continuous',
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.7)',
     gap: 14,
   },
-  optionCardSelected: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  optionRowFallback: {
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderColor: Colors.border,
   },
   optionIcon: {
-    width: 48,
-    height: 48,
+    width: 50,
+    height: 50,
     borderRadius: 14,
-    backgroundColor: 'rgba(26, 26, 46, 0.08)',
+    backgroundColor: 'rgba(77, 193, 255, 0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  optionTextWrap: {
-    flex: 1,
-  },
+  optionTextWrap: { flex: 1 },
   optionTitle: {
-    ...Typography.bodyLarge,
+    ...Typography.titleSmall,
+    fontSize: 16,
     fontWeight: '600',
     marginBottom: 3,
   },
   optionDescription: {
     ...Typography.bodySmall,
-    fontSize: 14,
+    fontSize: 13.5,
     color: Colors.textTertiary,
-    lineHeight: 20,
+    lineHeight: 19,
+  },
+  footer: {
+    alignItems: 'center',
+    marginTop: 28,
+  },
+  footerText: {
+    ...Typography.bodySmall,
+    fontSize: 13,
+    color: Colors.textTertiary,
+    textAlign: 'center',
   },
 });

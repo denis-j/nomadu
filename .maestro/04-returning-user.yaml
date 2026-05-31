@@ -1,0 +1,21 @@
+appId: com.nomady.app
+name: Returning user signs in from welcome
+tags:
+  - reverse-funnel
+  - returning-user
+---
+- clearState
+- clearKeychain
+- launchApp
+- runFlow: 00-dismiss-system-dialogs.yaml
+
+# Welcome screen offers the escape hatch (title is 3D, not DOM text)
+- assertVisible: "Get started"
+- assertVisible: "Sign in"
+- tapOn: "Sign in"
+
+# Sign-in screen
+- extendedWaitUntil:
+    visible: "Welcome home"
+    timeout: 5000
+- assertVisible: "Login"

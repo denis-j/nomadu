@@ -3,6 +3,8 @@ import { useAuth } from '../hooks/useAuth';
 import {
   completeOnboarding as completeOnboardingStorage,
   isOnboardingComplete,
+  LOCAL_ONBOARDING_UID,
+  migrateLocalOnboardingData,
 } from '../lib/onboarding';
 
 interface OnboardingContextValue {
@@ -15,21 +17,38 @@ const OnboardingContext = createContext<OnboardingContextValue>({
   markOnboardingComplete: async () => {},
 });
 
+/**
+ * Tracks whether the onboarding setup steps have been completed.
+ *
+ * In the reverse-funnel flow there is no Firebase user until the very end, so
+ * the user-visible answers are stored under {@link LOCAL_ONBOARDING_UID}.
+ * The moment a real user materialises (sign-up succeeds), we migrate the
+ * `*_pending` keys onto the real UID before computing `onboardingDone`.
+ */
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user) {
-      setOnboardingDone(null);
-      return;
-    }
-    isOnboardingComplete(user.uid).then(setOnboardingDone);
+    let cancelled = false;
+    (async () => {
+      if (!user) {
+        const done = await isOnboardingComplete(LOCAL_ONBOARDING_UID);
+        if (!cancelled) setOnboardingDone(done);
+        return;
+      }
+      await migrateLocalOnboardingData(user.uid);
+      const done = await isOnboardingComplete(user.uid);
+      if (!cancelled) setOnboardingDone(done);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   const markOnboardingComplete = useCallback(async () => {
-    if (!user) return;
-    await completeOnboardingStorage(user.uid);
+    const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
+    await completeOnboardingStorage(uid);
     setOnboardingDone(true);
   }, [user]);
 

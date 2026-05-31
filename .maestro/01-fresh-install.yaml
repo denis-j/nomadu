@@ -1,0 +1,18 @@
+appId: com.nomady.app
+name: Fresh install lands on welcome
+tags:
+  - smoke
+  - reverse-funnel
+---
+- clearState
+- clearKeychain
+- launchApp
+- runFlow: 00-dismiss-system-dialogs.yaml
+
+# Welcome is the new entry point. No auth screen, no citizenship.
+# Only assertable DOM text: the CTA and the sign-in link.
+- assertVisible: "Get started"
+# Sign-in link sits at the very bottom of the screen. Maestro sometimes
+# can't see the prefix text on the same row due to view hierarchy quirks,
+# so just check that the link itself is tappable.
+- assertVisible: "Sign in"

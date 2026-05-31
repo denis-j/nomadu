@@ -1,0 +1,65 @@
+appId: com.nomady.app
+name: Sign-up at end of funnel reaches paywall
+tags:
+  - reverse-funnel
+  - sign-up
+env:
+  TEST_EMAIL: "maestro-${MAESTRO_RUN_ID:-local}@example.com"
+  TEST_PASSWORD: "testpw1234"
+---
+- clearState
+- clearKeychain
+- launchApp
+- runFlow: 00-dismiss-system-dialogs.yaml
+
+# Race through the funnel — the structural assertions live in 02-onboarding-funnel.
+- tapOn: "Get started"
+- extendedWaitUntil:
+    visible: "Where's home?"
+    timeout: 5000
+- tapOn: "Search countries..."
+- inputText: "Germany"
+- tapOn: "Germany"
+- extendedWaitUntil:
+    visible: "What brings you here?"
+    timeout: 5000
+- tapOn: "Avoid tax residency traps"
+- extendedWaitUntil:
+    visible: "Fixed residence?"
+    timeout: 5000
+- tapOn: "No, I'm fully nomadic"
+- extendedWaitUntil:
+    visible: "Track your journey"
+    timeout: 5000
+- tapOn: "I'll set this up later"
+
+# Wait out the loading bridge.
+- extendedWaitUntil:
+    visible: "Create account"
+    timeout: 8000
+
+# ── Sign up with a fresh email ─────────────────────────────────────
+- tapOn:
+    text: "Email"
+    index: 0
+- inputText: ${TEST_EMAIL}
+- hideKeyboard
+- tapOn:
+    text: "^Password$"
+- inputText: ${TEST_PASSWORD}
+- hideKeyboard
+- tapOn:
+    text: "Confirm Password"
+- inputText: ${TEST_PASSWORD}
+- hideKeyboard
+- tapOn:
+    text: "Create account"
+    index: 1  # 0 is the title, 1 is the submit button
+
+# ── After link: should land on the RevenueCat paywall ───────────────
+# Paywall config is in the RC dashboard, so the only text we can
+# reliably assert against is whatever the Free Trial / Continue button
+# is labelled in your offering. Fall back to absence of "Create account".
+- extendedWaitUntil:
+    notVisible: "Create account"
+    timeout: 12000

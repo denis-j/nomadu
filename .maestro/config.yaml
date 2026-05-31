@@ -1,0 +1,8 @@
+appId: com.nomady.app
+
+# Run order when invoking `maestro test .maestro`
+flows:
+  - 01-fresh-install.yaml
+  - 02-onboarding-funnel.yaml
+  - 03-sign-up.yaml
+  - 04-returning-user.yaml

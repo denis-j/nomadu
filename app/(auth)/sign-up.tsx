@@ -116,7 +116,7 @@ export default function SignUpScreen() {
               style={styles.titleContainer}
             >
               <Image
-                source={require('../../assets/icons/nomadu_cloud_text.png')}
+                source={require('../../assets/icons/app-icon.png')}
                 style={styles.appIcon}
                 resizeMode="contain"
               />
@@ -273,8 +273,8 @@ const styles = StyleSheet.create({
     marginBottom: 44,
   },
   appIcon: {
-    width: 150,
-    height: 32,
+    width: 80,
+    height: 80,
     marginBottom: 30,
   },
   title: {

@@ -1,0 +1,14 @@
+appId: com.nomady.app
+---
+# Dismiss any leftover iOS permission dialog from a previous run.
+# Accept either the English or German locale of the simulator.
+- runFlow:
+    when:
+      visible: "Don't Allow"
+    commands:
+      - tapOn: "Don't Allow"
+- runFlow:
+    when:
+      visible: "Nicht erlauben"
+    commands:
+      - tapOn: "Nicht erlauben"

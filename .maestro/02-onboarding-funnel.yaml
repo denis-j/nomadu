@@ -1,0 +1,65 @@
+appId: com.nomady.app
+name: Onboarding funnel reaches sign-up
+tags:
+  - smoke
+  - reverse-funnel
+---
+- clearState
+- clearKeychain
+- launchApp
+- runFlow: 00-dismiss-system-dialogs.yaml
+
+# ── Step 0: welcome ─────────────────────────────────────────────────
+- assertVisible: "Get started"
+- tapOn: "Get started"
+
+# ── Step 1: citizenship ─────────────────────────────────────────────
+- extendedWaitUntil:
+    visible: "Where's home?"
+    timeout: 5000
+- tapOn: "Search countries..."
+- runFlow: 00-dismiss-system-dialogs.yaml
+- inputText: "Germany"
+- runFlow: 00-dismiss-system-dialogs.yaml
+# The search results list slides in after a tiny stagger; wait for it.
+- extendedWaitUntil:
+    visible: "Germany"
+    timeout: 3000
+- tapOn: "Germany"
+- runFlow: 00-dismiss-system-dialogs.yaml
+
+# First-win celebration card holds for ~1.4s then auto-advances
+- extendedWaitUntil:
+    visible: "Added to your map"
+    timeout: 3000
+
+# ── Step 2: goal ────────────────────────────────────────────────────
+- extendedWaitUntil:
+    visible: "What brings you here?"
+    timeout: 5000
+- tapOn: "Avoid tax residency traps"
+
+# ── Step 3: residence ───────────────────────────────────────────────
+- extendedWaitUntil:
+    visible: "Fixed residence?"
+    timeout: 5000
+- tapOn:
+    text: "No, I'm fully nomadic"
+
+# ── Step 4: permissions ─────────────────────────────────────────────
+- extendedWaitUntil:
+    visible: "Track your journey"
+    timeout: 5000
+# Skip rather than enable so we don't fight the iOS system dialog
+- tapOn: "I'll set this up later"
+
+# ── Step 5: loading bridge ─────────────────────────────────────────
+- extendedWaitUntil:
+    visible: "Setting up your tracking engine"
+    timeout: 5000
+
+# ── Step 6: lands on sign-up ────────────────────────────────────────
+- extendedWaitUntil:
+    visible: "Create account"
+    timeout: 8000
+- assertVisible: "Sign up to start your journey"

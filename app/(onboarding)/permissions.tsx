@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -11,97 +11,20 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, {
-  Easing,
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
-import AnimatedGradientBackground from '../../components/animated-gradient-background';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { CloudyButton } from '../../components/CloudyButton';
+import { PlaneModel3D } from '../../components/PlaneModel3D';
+import {
+  ENTER_DURATION,
+  ICON_DELAY,
+  TITLE_DELAY,
+  OPTION_BASE_DELAY,
+} from '../../constants/onboardingAnimation';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { requestLocationPermissions } from '../../lib/location';
 import { requestNotificationPermissions } from '../../lib/notifications';
 
-function PulsingRing({ delay, size }: { delay: number; size: number }) {
-  const scale = useSharedValue(0.3);
-  const opacity = useSharedValue(0);
-
-  useEffect(() => {
-    scale.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(0.3, { duration: 0 }),
-          withTiming(1, { duration: 2500, easing: Easing.out(Easing.cubic) })
-        ),
-        -1
-      )
-    );
-    opacity.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(0.4, { duration: 0 }),
-          withTiming(0, { duration: 2500, easing: Easing.out(Easing.cubic) })
-        ),
-        -1
-      )
-    );
-  }, []);
-
-  const style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
-
-  return (
-    <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          borderWidth: 2,
-          borderColor: Colors.primary,
-        },
-        style,
-      ]}
-    />
-  );
-}
-
-function AnimatedPin() {
-  const translateY = useSharedValue(0);
-
-  useEffect(() => {
-    translateY.value = withRepeat(
-      withSequence(
-        withTiming(-8, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(8, { duration: 1500, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-  }, []);
-
-  const style = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  return (
-    <Animated.View style={style}>
-      <Ionicons name="location" size={56} color={Colors.primary} />
-    </Animated.View>
-  );
-}
 
 export default function PermissionsScreen() {
   const [loading, setLoading] = useState(false);
@@ -114,109 +37,63 @@ export default function PermissionsScreen() {
       await requestLocationPermissions();
       await requestNotificationPermissions();
     } catch {
-      // User denied or error — continue anyway
+      // User denied or error. Continue anyway.
     } finally {
       setLoading(false);
-      router.push('/(onboarding)/storage');
+      router.push('/(onboarding)/loading');
     }
   };
 
   const handleSkip = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(onboarding)/storage');
+    router.push('/(onboarding)/loading');
   };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <AnimatedGradientBackground
-        colorSets={[
-          {
-            colors: ['#4DC1FF', '#8AD3FF', '#DBF0FF'],
-            start: { x: 0, y: 0 },
-            end: { x: 1, y: 1 },
-          },
-          {
-            colors: ['#8AD3FF', '#DBF0FF', '#FFFFFF'],
-            start: { x: 1, y: 0 },
-            end: { x: 0, y: 1 },
-          },
-        ]}
-        duration={4000}
-      />
-
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
-          {/* Pulsing rings + location pin */}
+          {/* 3D plane hero */}
           <Animated.View
-            entering={FadeIn.duration(300)}
+            entering={FadeIn.delay(ICON_DELAY).duration(ENTER_DURATION)}
             style={styles.visualContainer}
           >
-            <View style={styles.ringsWrapper}>
-              <PulsingRing delay={0} size={200} />
-              <PulsingRing delay={800} size={200} />
-              <PulsingRing delay={1600} size={200} />
-              <AnimatedPin />
-            </View>
+            <PlaneModel3D />
           </Animated.View>
 
           {/* Text */}
           <Animated.View
-            entering={FadeInUp.delay(80).duration(300)}
+            entering={FadeIn.delay(TITLE_DELAY).duration(ENTER_DURATION)}
             style={styles.textContainer}
           >
             <Text style={styles.title}>Track your journey</Text>
             <Text style={styles.description}>
-              Nomadu automatically logs the cities and countries you visit.
-              Everything stays on your device.
+              Nomadu quietly logs every city and country you visit. No setup, no friction.
             </Text>
-          </Animated.View>
-
-          {/* Feature pills */}
-          <Animated.View
-            entering={FadeInDown.delay(160).duration(300)}
-            style={styles.features}
-          >
-            {[
-              { icon: 'airplane' as const, text: 'Auto-detect new cities' },
-              { icon: 'shield-checkmark' as const, text: 'Data stays on device' },
-              { icon: 'map' as const, text: 'Build your travel map' },
-            ].map((f, i) => (
-              <Animated.View
-                key={f.text}
-                entering={FadeInDown.delay(200 + i * 60).duration(300)}
-              >
-                <View style={styles.featureRow}>
-                  <View style={styles.featureIcon}>
-                    <Ionicons name={f.icon} size={18} color={Colors.primary} />
-                  </View>
-                  <Text style={styles.featureText}>{f.text}</Text>
-                </View>
-              </Animated.View>
-            ))}
           </Animated.View>
 
           {/* Actions */}
           <Animated.View
-            entering={FadeInDown.delay(320).duration(300)}
+            entering={FadeIn.delay(OPTION_BASE_DELAY + 100).duration(ENTER_DURATION)}
             style={styles.actions}
           >
-            <TouchableOpacity
-              style={[styles.enableButton, loading && styles.enableButtonDisabled]}
+            <CloudyButton
               onPress={handleEnable}
-              disabled={loading}
+              style={[styles.enableButton, loading && styles.enableButtonDisabled]}
+              innerStyle={styles.enableInner}
             >
               {loading ? (
-                <ActivityIndicator color="#FFF" />
+                <ActivityIndicator color={Colors.cloudyButtonText} />
               ) : (
-                <>
-                  <Ionicons name="location" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                <View style={styles.enableInnerRow}>
+                  <Ionicons name="location" size={20} color={Colors.cloudyButtonText} />
                   <Text style={styles.enableButtonText}>Enable Location</Text>
-                </>
+                </View>
               )}
-            </TouchableOpacity>
+            </CloudyButton>
 
-            <TouchableOpacity onPress={handleSkip} disabled={loading}>
+            <TouchableOpacity onPress={handleSkip} disabled={loading} hitSlop={8}>
               <Text style={styles.skipText}>I'll set this up later</Text>
             </TouchableOpacity>
           </Animated.View>
@@ -240,22 +117,16 @@ const styles = StyleSheet.create({
   },
   visualContainer: {
     alignItems: 'center',
-    marginBottom: 32,
-  },
-  ringsWrapper: {
-    width: 200,
-    height: 200,
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: -12,
   },
   textContainer: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 16,
   },
   title: {
-    ...Typography.displayMedium,
-    fontSize: 32,
-    marginBottom: 12,
+    ...Typography.brandDisplay,
+    fontSize: 42,
+    marginBottom: 10,
     textAlign: 'center',
   },
   description: {
@@ -265,52 +136,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-  features: {
-    gap: 10,
-    marginBottom: 36,
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    borderCurve: 'continuous',
-    backgroundColor: 'rgba(26, 26, 46, 0.08)',
-
-    gap: 12,
-  },
-  featureIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(26, 26, 46, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featureText: {
-    ...Typography.bodyMedium,
-  },
   actions: {
+    marginTop: 36,
     alignItems: 'center',
     gap: 20,
   },
   enableButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 16,
-    paddingVertical: 18,
     width: '100%',
-    borderCurve: 'continuous',
+  },
+  enableInner: {
+    justifyContent: 'center',
+  },
+  enableInnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
   },
   enableButtonDisabled: {
     opacity: 0.7,
   },
   enableButtonText: {
     ...Typography.buttonLarge,
-    color: Colors.white,
+    color: Colors.cloudyButtonText,
   },
   skipText: {
     ...Typography.bodyMedium,

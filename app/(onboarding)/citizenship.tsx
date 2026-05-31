@@ -25,7 +25,7 @@ import AnimatedGradientBackground from '../../components/animated-gradient-backg
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { useAuth } from '../../hooks/useAuth';
-import { setCitizenship } from '../../lib/onboarding';
+import { LOCAL_ONBOARDING_UID, setCitizenship } from '../../lib/onboarding';
 import {
   getCountryCode,
   getPopularCountries,
@@ -114,12 +114,27 @@ export default function CitizenshipScreen() {
   }, [query, isSearching]);
 
   const handleSelect = useCallback(async (countryName: string) => {
-    if (!user || selected) return;
+    if (selected) return;
     setSelected(countryName);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setHoveredCountry(countryName);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const code = getCountryCode(countryName);
-    await setCitizenship(user.uid, countryName, code);
-    router.push('/(onboarding)/residence');
+    const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
+    await setCitizenship(uid, countryName, code);
+
+    const coords = COUNTRY_COORDS[countryName];
+    if (coords && mapRef.current) {
+      mapRef.current.animateToRegion({
+        ...coords,
+        latitudeDelta: 18,
+        longitudeDelta: 18,
+      }, 600);
+    }
+
+    // First-Win-Moment: hold the celebration card briefly before advancing
+    setTimeout(() => {
+      router.push('/(onboarding)/goal');
+    }, 1400);
   }, [user, selected, router]);
 
   const handleMarkerPress = (countryName: string) => {
@@ -233,31 +248,38 @@ export default function CitizenshipScreen() {
           )}
         </View>
 
-        {/* Bottom card when a marker is tapped */}
-        {hoveredCountry && !isSearching && !selected && (
+        {/* Bottom card — confirm OR success (First-Win-Moment) */}
+        {(hoveredCountry || selected) && !isSearching && (
           <Animated.View
-            key={hoveredCountry}
+            key={selected ?? hoveredCountry}
             entering={FadeInDown.duration(350)}
             style={styles.bottomCard}
           >
             <TouchableOpacity
-              onPress={() => handleSelect(hoveredCountry)}
-              activeOpacity={0.8}
+              onPress={() => !selected && hoveredCountry && handleSelect(hoveredCountry)}
+              activeOpacity={selected ? 1 : 0.8}
+              disabled={!!selected}
             >
               <Glass
                 {...glassProps}
                 style={[styles.confirmCard, !hasGlass && styles.confirmCardFallback]}
               >
                 <View style={styles.confirmFlagWrap}>
-                  <Flag code={getCountryCode(hoveredCountry)} size={32} />
+                  <Flag code={getCountryCode(selected ?? hoveredCountry!)} size={32} />
                 </View>
                 <View style={styles.confirmTextWrap}>
-                  <Text style={styles.confirmName}>{hoveredCountry}</Text>
-                  <Text style={styles.confirmHint}>Tap to confirm</Text>
+                  <Text style={styles.confirmName}>{selected ?? hoveredCountry}</Text>
+                  <Text style={[styles.confirmHint, selected && styles.successHint]}>
+                    {selected ? 'Added to your map' : 'Tap to confirm'}
+                  </Text>
                 </View>
-                <View style={styles.confirmButton}>
+                <Animated.View
+                  key={selected ? 'success' : 'confirm'}
+                  entering={FadeIn.duration(220)}
+                  style={[styles.confirmButton, selected && styles.successButton]}
+                >
                   <Ionicons name="checkmark" size={22} color="#FFF" />
-                </View>
+                </Animated.View>
               </Glass>
             </TouchableOpacity>
           </Animated.View>
@@ -283,7 +305,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingTop: 12,
+    paddingTop: 24,
     paddingBottom: 12,
   },
   title: {
@@ -372,5 +394,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.text,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  successButton: {
+    backgroundColor: Colors.success,
+  },
+  successHint: {
+    color: Colors.success,
+    fontWeight: '600',
   },
 });

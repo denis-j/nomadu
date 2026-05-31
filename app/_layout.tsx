@@ -39,22 +39,35 @@ function RootNavigator() {
   const { onboardingDone } = useOnboarding();
   const router = useRouter();
   const segments = useSegments();
+
   useEffect(() => {
     if (authLoading) return;
-    if (user && onboardingDone === null) return;
+    // Wait until OnboardingContext has resolved a real boolean from storage,
+    // so we don't bounce the user to citizenship and back when they've
+    // already completed it under the LOCAL_ONBOARDING_UID placeholder.
+    if (onboardingDone === null) return;
     if (user && subLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboardingGroup = segments[0] === '(onboarding)';
 
     if (!user) {
-      if (!inAuthGroup) {
-        router.replace('/(auth)/sign-in');
+      // Reverse funnel: the user is allowed to explore onboarding without
+      // signing in. Only nudge them to /sign-up once the local onboarding
+      // is complete; otherwise drop them into citizenship.
+      if (onboardingDone) {
+        if (!inAuthGroup) {
+          router.replace('/(auth)/sign-up');
+        }
+      } else if (!inOnboardingGroup && !inAuthGroup) {
+        router.replace('/(onboarding)/welcome');
       }
     } else if (!onboardingDone) {
+      // Signed-in user whose onboarding flag isn't set for this UID
+      // (typically a brand-new account or a fresh device).
       identifyUser(user.uid);
       if (!inOnboardingGroup) {
-        router.replace('/(onboarding)/citizenship');
+        router.replace('/(onboarding)/welcome');
       }
     } else if (!isPro) {
       identifyUser(user.uid);

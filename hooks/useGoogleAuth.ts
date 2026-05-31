@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { signInWithGoogleToken } from '../lib/auth';
-import * as AuthSession from 'expo-auth-session'; // Diese Zeile sicherstellen
+import * as AuthSession from 'expo-auth-session';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -13,9 +13,8 @@ export function useGoogleAuth() {
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     iosClientId: IOS_CLIENT_ID,
     webClientId: WEB_CLIENT_ID,
-    // Explicitly set the native redirectUri if you expect it
     redirectUri: AuthSession.makeRedirectUri({
-      native: 'com.nomady.app:/oauthredirect', 
+      native: 'com.nomady.app:/oauthredirect',
     }),
   });
 
@@ -27,16 +26,14 @@ export function useGoogleAuth() {
     }
   }, [request]);
 
-  const resolveRef = useRef<((user: any) => void) | null>(null);
+  const resolveRef = useRef<((token: string) => void) | null>(null);
   const rejectRef = useRef<((err: Error) => void) | null>(null);
 
   useEffect(() => {
     if (!response) return;
 
     if (response.type === 'success' && response.params.id_token) {
-      signInWithGoogleToken(response.params.id_token)
-        .then((user) => resolveRef.current?.(user))
-        .catch((err) => rejectRef.current?.(err));
+      resolveRef.current?.(response.params.id_token);
     } else if (response.type === 'dismiss' || response.type === 'cancel') {
       rejectRef.current?.(new Error('Google Sign-In was cancelled.'));
     } else {
@@ -44,13 +41,20 @@ export function useGoogleAuth() {
     }
   }, [response]);
 
-  const signIn = () => {
-    return new Promise<any>((resolve, reject) => {
+  /** Triggers the Google OAuth flow and resolves with the raw id_token. */
+  const getIdToken = () => {
+    return new Promise<string>((resolve, reject) => {
       resolveRef.current = resolve;
       rejectRef.current = reject;
       promptAsync();
     });
   };
 
-  return { signIn, ready: !!request };
+  /** Convenience: get an id_token and immediately sign in with it. */
+  const signIn = async () => {
+    const token = await getIdToken();
+    return signInWithGoogleToken(token);
+  };
+
+  return { signIn, getIdToken, ready: !!request };
 }
