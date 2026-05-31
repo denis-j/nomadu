@@ -49,6 +49,7 @@
     "react-dom": "19.2.0",
     "react-native": "0.83.6",
     "react-native-calendars": "^1.1314.0",
+    "react-native-country-flag": "^2.0.2",
     "react-native-draggable-flatlist": "^4.0.3",
     "react-native-filament": "^1.9.0",
     "react-native-gesture-handler": "~2.30.0",

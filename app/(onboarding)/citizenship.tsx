@@ -28,10 +28,10 @@ import { useAuth } from '../../hooks/useAuth';
 import { setCitizenship } from '../../lib/onboarding';
 import {
   getCountryCode,
-  getCountryFlag,
   getPopularCountries,
   searchCountries,
 } from '../../utils/geography';
+import { Flag } from '../../components/Flag';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -79,7 +79,7 @@ const COUNTRY_COORDS: Record<string, { latitude: number; longitude: number }> = 
 function SearchRow({ name, index, onPress }: {
   name: string; index: number; onPress: () => void;
 }) {
-  const flag = getCountryFlag(name);
+  const code = getCountryCode(name);
   return (
     <Animated.View
       entering={FadeInDown.delay(index * 30).duration(300)}
@@ -87,7 +87,9 @@ function SearchRow({ name, index, onPress }: {
     >
       <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
         <Glass {...glassProps} style={[styles.searchRow, !hasGlass && styles.searchRowFallback]}>
-          <Text style={styles.searchFlag}>{flag ?? '🏳️'}</Text>
+          <View style={styles.searchFlagWrap}>
+            <Flag code={code} size={22} />
+          </View>
           <Text style={styles.searchName}>{name}</Text>
           <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
         </Glass>
@@ -159,7 +161,7 @@ export default function CitizenshipScreen() {
         {popularCountries.map((name) => {
           const coords = COUNTRY_COORDS[name];
           if (!coords) return null;
-          const flag = getCountryFlag(name);
+          const code = getCountryCode(name);
           const isHovered = hoveredCountry === name;
           return (
             <Marker
@@ -168,9 +170,7 @@ export default function CitizenshipScreen() {
               onPress={() => handleMarkerPress(name)}
             >
               <View style={[styles.markerWrap, isHovered && styles.markerWrapActive]}>
-                <Text style={[styles.markerFlag, isHovered && styles.markerFlagActive]}>
-                  {flag ?? '🏳️'}
-                </Text>
+                {code && <Flag code={code} size={isHovered ? 22 : 18} />}
               </View>
             </Marker>
           );
@@ -248,9 +248,9 @@ export default function CitizenshipScreen() {
                 {...glassProps}
                 style={[styles.confirmCard, !hasGlass && styles.confirmCardFallback]}
               >
-                <Text style={styles.confirmFlag}>
-                  {getCountryFlag(hoveredCountry) ?? '🏳️'}
-                </Text>
+                <View style={styles.confirmFlagWrap}>
+                  <Flag code={getCountryCode(hoveredCountry)} size={32} />
+                </View>
                 <View style={styles.confirmTextWrap}>
                   <Text style={styles.confirmName}>{hoveredCountry}</Text>
                   <Text style={styles.confirmHint}>Tap to confirm</Text>
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.7)',
   },
   searchRowFallback: { backgroundColor: 'rgba(255, 255, 255, 0.92)', borderColor: Colors.border },
-  searchFlag: { fontSize: 24, marginRight: 12 },
+  searchFlagWrap: { marginRight: 12 },
   searchName: { ...Typography.titleSmall, fontWeight: '500', flex: 1 },
   emptyText: { ...Typography.titleSmall, fontWeight: '400', textAlign: 'center', color: Colors.textTertiary, marginTop: 20 },
   markerWrap: {
@@ -344,8 +344,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     transform: [{ scale: 1.2 }],
   },
-  markerFlag: { fontSize: 20 },
-  markerFlagActive: { fontSize: 24 },
   bottomCard: {
     paddingHorizontal: 20,
     paddingBottom: 0,
@@ -363,7 +361,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.7)',
   },
   confirmCardFallback: { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderColor: Colors.border },
-  confirmFlag: { fontSize: 36, marginRight: 14 },
+  confirmFlagWrap: { marginRight: 14 },
   confirmTextWrap: { flex: 1 },
   confirmName: { ...Typography.titleMedium },
   confirmHint: { ...Typography.bodySmall, color: Colors.textSecondary, marginTop: 2 },

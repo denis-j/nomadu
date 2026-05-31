@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { PlatformColor, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { getPopularCountries, searchCountries, getCountryFlag } from '../../../../utils/geography';
+import { getPopularCountries, searchCountries, getCountryCode } from '../../../../utils/geography';
+import { Flag } from '../../../../components/Flag';
 
 const popularCountries = getPopularCountries();
 
@@ -54,14 +55,14 @@ export default function CreateCountryScreen() {
       >
         {!query.trim() && <Text style={styles.sectionLabel}>Popular</Text>}
         {filtered.map((name) => {
-          const flag = getCountryFlag(name);
+          const code = getCountryCode(name);
           return (
             <Pressable
               key={name}
               style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
               onPress={() => pickCountry(name)}
             >
-              {flag ? <Text style={styles.flag}>{flag}</Text> : null}
+              {code && <Flag code={code} size={20} />}
               <Text style={styles.itemText}>{name}</Text>
               <Text style={styles.chevron}>›</Text>
             </Pressable>
@@ -98,10 +99,6 @@ const styles = StyleSheet.create({
   },
   itemPressed: {
     backgroundColor: PlatformColor('systemGray5'),
-  },
-  flag: {
-    fontSize: 22,
-    width: 28,
   },
   itemText: {
     flex: 1,

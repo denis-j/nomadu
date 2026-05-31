@@ -29,7 +29,8 @@ import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { Trip, markTripDeleted, parseDate } from '../../../lib/database';
 import { countryCodeToFlag } from '../../../lib/geocoding';
-import { LinearGradient } from 'react-native-svg';
+import { Flag } from '../../../components/Flag';
+import { LinearGradient } from 'expo-linear-gradient';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -254,7 +255,8 @@ function CountryGroupCard({
   onEdit: (trip: Trip) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const flag = countryCodeToFlag(group.countryCode);
+  // ActionSheet still uses emoji — native iOS title strings handle it well.
+  const emojiFlag = countryCodeToFlag(group.countryCode);
 
   const toggle = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -266,7 +268,7 @@ function CountryGroupCard({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     ActionSheetIOS.showActionSheetWithOptions(
       {
-        title: `${flag} ${group.country} — ${group.items.length} stops`,
+        title: `${emojiFlag} ${group.country} — ${group.items.length} stops`,
         options: ['Delete All Stops', 'Cancel'],
         destructiveButtonIndex: 0,
         cancelButtonIndex: 1,
@@ -320,7 +322,7 @@ function CountryGroupCard({
             : { style: [groupStyles.header, groupStyles.headerFallback] })}
         >
           <View style={groupStyles.headerTop}>
-            <Text style={groupStyles.flag}>{flag}</Text>
+            <Flag code={group.countryCode} size={22} />
             <View style={groupStyles.headerRight}>
               <View style={groupStyles.countChip}>
                 <Text style={groupStyles.countChipText}>
@@ -424,9 +426,6 @@ const groupStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  flag: {
-    fontSize: 28,
   },
   countChip: {
     backgroundColor: Colors.accent + '20',
@@ -798,7 +797,7 @@ export default function TimelineScreen() {
         <View style={styles.timelineLine}>
           <LinearGradient
             colors={['transparent', Colors.primary + '30', Colors.primary + '30', 'transparent']}
-            locations={[0, 0.02, 0.98, 1]}
+            locations={[0, 0.1, 0.9, 1]}
             style={{ flex: 1 }}
           />
         </View>

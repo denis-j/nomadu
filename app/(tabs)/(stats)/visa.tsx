@@ -5,7 +5,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useVisaTracker } from '../../../hooks/useVisaTracker';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
-import { countryCodeToFlag } from '../../../lib/geocoding';
+import { Flag } from '../../../components/Flag';
 import { EmptyState } from '../../../components/EmptyState';
 import { VisaStatus } from '../../../lib/visaCalculations';
 
@@ -46,7 +46,7 @@ function VisaCard({ visa }: { visa: VisaStatus }) {
     <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
       <View style={styles.cardHeader}>
         <View style={styles.cardTitle}>
-          <Text style={styles.flag}>{visa.flag}</Text>
+          <Flag code={visa.destinationCode} size={24} />
           <View style={styles.titleText}>
             <Text style={styles.destination}>{visa.destination}</Text>
             <Text style={styles.ruleLabel}>{visa.ruleLabel}</Text>
@@ -124,17 +124,17 @@ export default function VisaScreen() {
     );
   }
 
-  const citizenshipFlag = citizenshipCode ? countryCodeToFlag(citizenshipCode) : '';
-
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
     >
-      <Text style={styles.subtitle}>
-        Based on {citizenshipFlag} {citizenshipCountry} passport
-      </Text>
+      <View style={styles.subtitleRow}>
+        <Text style={styles.subtitle}>Based on </Text>
+        {citizenshipCode && <Flag code={citizenshipCode} size={14} />}
+        <Text style={styles.subtitle}> {citizenshipCountry} passport</Text>
+      </View>
 
       {visaStatuses.map((visa) => (
         <VisaCard key={visa.destinationCode} visa={visa} />
@@ -189,8 +189,10 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
-  flag: {
-    fontSize: 32,
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
   },
   titleText: {
     flex: 1,

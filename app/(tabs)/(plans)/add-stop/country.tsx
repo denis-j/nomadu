@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { PlatformColor, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { PlatformColor, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { getPopularCountries, searchCountries, getCountryFlag } from '../../../../utils/geography';
+import { getPopularCountries, searchCountries, getCountryCode } from '../../../../utils/geography';
+import { Flag } from '../../../../components/Flag';
 
 const popularCountries = getPopularCountries();
 
@@ -60,14 +61,16 @@ export default function AddStopCountryScreen() {
       >
         {!query.trim() && <Text style={styles.sectionLabel}>Popular</Text>}
         {filtered.map((name) => {
-          const flag = getCountryFlag(name);
+          const code = getCountryCode(name);
           return (
             <Pressable
               key={name}
               style={styles.item}
               onPress={() => pickCountry(name)}
             >
-              {flag ? <Text style={styles.flag}>{flag}</Text> : null}
+              <View style={styles.flagWrap}>
+                <Flag code={code} size={20} />
+              </View>
               <Text style={styles.itemText}>{name}</Text>
               <Text style={styles.chevron}>›</Text>
             </Pressable>
@@ -103,8 +106,7 @@ const styles = StyleSheet.create({
     borderBottomColor: PlatformColor('separator'),
   },
 
-  flag: {
-    fontSize: 22,
+  flagWrap: {
     width: 28,
   },
   itemText: {

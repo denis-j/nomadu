@@ -11,6 +11,7 @@ const EMPTY_STATS: Stats = {
   topCountries: [],
   availableYears: [new Date().getFullYear()],
   allTimeCountryCodes: [],
+  daysByMonth: null,
 };
 
 /**

@@ -21,7 +21,7 @@ import { useJourneys } from '../../../hooks/useJourneys';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { deleteJourney, insertJourney, insertJourneyLeg, parseDate, TransportType } from '../../../lib/database';
-import { countryCodeToFlag } from '../../../lib/geocoding';
+import { Flag } from '../../../components/Flag';
 
 const hasGlass = isLiquidGlassAvailable();
 
@@ -49,7 +49,8 @@ interface TemplateLeg {
 
 interface FeaturedDestination {
   id: string;
-  flag: string;
+  flag: string; // emoji — used only in the Alert title (native iOS modals render emoji fine)
+  countryCode: string;
   country: string;
   tagline: string;
   image: string;
@@ -62,6 +63,7 @@ const FEATURED: FeaturedDestination[] = [
   {
     id: 'thailand',
     flag: '🇹🇭',
+    countryCode: 'TH',
     country: 'Thailand',
     tagline: 'Visa on arrival · Nomad-friendly · Beach + jungle',
     image: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?auto=format&fit=crop&w=800&q=80',
@@ -81,6 +83,7 @@ const FEATURED: FeaturedDestination[] = [
   {
     id: 'china',
     flag: '🇨🇳',
+    countryCode: 'CN',
     country: 'China',
     tagline: 'Install VPN before landing · WeChat everything',
     image: 'https://images.unsplash.com/photo-1547981609-4b6bfe67ca0b?auto=format&fit=crop&w=800&q=80',
@@ -100,6 +103,7 @@ const FEATURED: FeaturedDestination[] = [
   {
     id: 'japan',
     flag: '🇯🇵',
+    countryCode: 'JP',
     country: 'Japan',
     tagline: 'Bullet trains · World-class food · Ultra-fast wifi',
     image: 'https://images.unsplash.com/photo-1492571350019-22de08371fd3?auto=format&fit=crop&w=800&q=80',
@@ -119,6 +123,7 @@ const FEATURED: FeaturedDestination[] = [
   {
     id: 'portugal',
     flag: '🇵🇹',
+    countryCode: 'PT',
     country: 'Portugal',
     tagline: "Europe's nomad capital · English everywhere",
     image: 'https://images.unsplash.com/photo-1558370781-d6196949e317?auto=format&fit=crop&w=800&q=80',
@@ -165,7 +170,7 @@ function FeaturedCard({
 
         {/* Top: flag + title + tips */}
         <View style={styles.featTop}>
-          <Text style={styles.featFlag}>{item.flag}</Text>
+          <Flag code={item.countryCode} size={36} />
           <Text style={styles.featCountry} numberOfLines={1}>{item.country}</Text>
           <Text style={styles.featTagline} numberOfLines={2}>{item.tagline}</Text>
           <View style={styles.featTips}>
@@ -308,9 +313,7 @@ function JourneyCard({
         {countryCodes.length > 0 && (
           <View style={styles.flagsRow}>
             {countryCodes.slice(0, 8).map((code, i) => (
-              <Text key={`${code}-${i}`} style={styles.flagEmoji}>
-                {countryCodeToFlag(code)}
-              </Text>
+              <Flag key={`${code}-${i}`} code={code} size={20} />
             ))}
             {countryCodes.length > 8 && (
               <Text style={styles.flagMore}>+{countryCodes.length - 8}</Text>
@@ -528,9 +531,6 @@ const styles = StyleSheet.create({
     gap: 4,
     alignItems: 'center',
   },
-  flagEmoji: {
-    fontSize: 22,
-  },
   flagMore: {
     ...Typography.bodySmall,
     fontSize: 14,
@@ -611,10 +611,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 12,
     gap: 10,
-  },
-  featFlag: {
-    fontSize: 36,
-    lineHeight: 40,
   },
   featCountry: {
     ...Typography.displayMedium,

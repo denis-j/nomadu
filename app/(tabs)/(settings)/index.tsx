@@ -17,7 +17,7 @@ import { deleteAccount } from '../../../lib/auth';
 import { clearAllTravelData, startRealtimeSync } from '../../../lib/sync';
 import { restorePurchases } from '../../../lib/revenueCat';
 import { useSync } from '../../../contexts/SyncContext';
-import { countryCodeToFlag } from '../../../lib/geocoding';
+import { Flag } from '../../../components/Flag';
 import { getHasFixedResidence, setHasFixedResidence, getDetailedTracking, setDetailedTracking, setExperimentalsEnabled } from '../../../lib/onboarding';
 import { useExperimentals } from '../../../hooks/useExperimentals';
 import { IslandSheet } from '../../../components/IslandSheet';
@@ -209,9 +209,14 @@ export default function SettingsScreen() {
         >
           <Text style={styles.rowLabel}>Passport</Text>
           <View style={styles.passportValue}>
-            <Text style={styles.rowValue}>
-              {passportCode ? `${countryCodeToFlag(passportCode)} ${passportCountry}` : 'Not set'}
-            </Text>
+            {passportCode ? (
+              <>
+                <Flag code={passportCode} size={18} />
+                <Text style={styles.rowValue}>{passportCountry}</Text>
+              </>
+            ) : (
+              <Text style={styles.rowValue}>Not set</Text>
+            )}
             <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
           </View>
         </Pressable>

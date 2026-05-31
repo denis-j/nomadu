@@ -6,7 +6,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { getTripsByCity, Trip } from '../../lib/database';
-import { countryCodeToFlag } from '../../lib/geocoding';
+import { Flag } from '../../components/Flag';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { mapState } from '../../lib/mapState';
@@ -45,7 +45,6 @@ export default function CityDetailScreen() {
     );
   }
 
-  const flag = countryCodeToFlag(countryCode);
   const country = trips[0]?.country ?? '';
   const totalDays = trips.reduce((sum, t) => sum + t.days, 0);
   const totalVisits = trips.length;
@@ -92,7 +91,7 @@ export default function CityDetailScreen() {
               {...glassProps}
               style={[styles.mapOverlay, !hasGlass && styles.mapOverlayFallback]}
             >
-              <Text style={styles.heroFlag}>{flag}</Text>
+              <Flag code={countryCode} size={28} />
             </Glass>
           </View>
         )}
@@ -207,9 +206,6 @@ const styles = StyleSheet.create({
   },
   mapOverlayFallback: {
     backgroundColor: 'rgba(255,255,255,0.9)',
-  },
-  heroFlag: {
-    fontSize: 32,
   },
   // ─── Header ───
   header: {

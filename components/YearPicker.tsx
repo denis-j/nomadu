@@ -1,8 +1,11 @@
-import { ScrollView, StyleSheet, Pressable, Text } from 'react-native';
+import { ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import type { YearFilter } from '../lib/yearFilter';
+
+const hasGlass = isLiquidGlassAvailable();
 
 interface YearPickerProps {
   /** Available years to choose from (newest first). */
@@ -14,8 +17,10 @@ interface YearPickerProps {
 }
 
 /**
- * Horizontal pill row used at the top of stats-style screens to scope the
- * data to a single calendar year (or "All Time" when allowed).
+ * Horizontal pill row at the top of stats-style screens to scope data to a
+ * single calendar year (or "All Time"). On iOS 26+, renders as native Liquid
+ * Glass pills inside a GlassContainer (so adjacent pills visually merge).
+ * Falls back to flat surface pills on older devices.
  */
 export function YearPicker({ years, value, onChange, includeAllTime = true }: YearPickerProps) {
   const options: { label: string; year: YearFilter }[] = [
@@ -35,40 +40,92 @@ export function YearPicker({ years, value, onChange, includeAllTime = true }: Ye
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.row}
     >
-      {options.map((opt) => {
-        const active = opt.year === value;
-        return (
-          <Pressable
-            key={opt.label}
-            onPress={() => handlePress(opt.year)}
-            style={({ pressed }) => [
-              styles.pill,
-              active && styles.pillActive,
-              pressed && !active && styles.pillPressed,
-            ]}
-          >
-            <Text style={[styles.pillText, active && styles.pillTextActive]}>{opt.label}</Text>
-          </Pressable>
-        );
-      })}
+      {hasGlass ? (
+        <View style={styles.glassContainer}>
+          {options.map((opt) => {
+            const active = opt.year === value;
+            return (
+              <GlassView
+                key={opt.label}
+                glassEffectStyle="regular"
+                tintColor={active ? Colors.text : undefined}
+                isInteractive
+                style={styles.pillGlass}
+              >
+                <Pressable
+                  onPress={() => handlePress(opt.year)}
+                  style={styles.pillInner}
+                >
+                  <Text
+                    style={[
+                      styles.pillText,
+                      active && styles.pillTextActive,
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              </GlassView>
+            );
+          })}
+        </View>
+      ) : (
+        <View style={styles.fallbackRow}>
+          {options.map((opt) => {
+            const active = opt.year === value;
+            return (
+              <Pressable
+                key={opt.label}
+                onPress={() => handlePress(opt.year)}
+                style={({ pressed }) => [
+                  styles.pillFallback,
+                  active && styles.pillFallbackActive,
+                  pressed && !active && styles.pillPressed,
+                ]}
+              >
+                <Text style={[styles.pillText, active && styles.pillTextActive]}>{opt.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   row: {
-    gap: 8,
     paddingHorizontal: 4,
     paddingVertical: 2,
   },
-  pill: {
+  glassContainer: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  pillGlass: {
+    borderRadius: 999,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+  },
+  pillInner: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Fallback (non-Liquid-Glass devices)
+  fallbackRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  pillFallback: {
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 999,
     borderCurve: 'continuous',
     backgroundColor: Colors.surfaceSecondary,
   },
-  pillActive: {
+  pillFallbackActive: {
     backgroundColor: Colors.text,
   },
   pillPressed: {

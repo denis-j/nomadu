@@ -5,7 +5,7 @@ import RNMapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import { deleteTrip, getTripById, Trip } from '../../lib/database';
-import { countryCodeToFlag } from '../../lib/geocoding';
+import { Flag } from '../../components/Flag';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 
@@ -30,7 +30,6 @@ export default function TripDetailScreen() {
     );
   }
 
-  const flag = countryCodeToFlag(trip.country_code);
   const isActive = !trip.end_date;
 
   const formatDate = (dateStr: string) =>
@@ -88,7 +87,7 @@ export default function TripDetailScreen() {
               {...glassProps}
               style={[styles.mapOverlay, !hasGlass && styles.mapOverlayFallback]}
             >
-              <Text style={styles.heroFlag}>{flag}</Text>
+              <Flag code={trip.country_code} size={28} />
             </GlassCard>
           </View>
         )}
@@ -241,9 +240,6 @@ const styles = StyleSheet.create({
   },
   mapOverlayFallback: {
     backgroundColor: 'rgba(255,255,255,0.9)',
-  },
-  heroFlag: {
-    fontSize: 32,
   },
   // ─── Header ───
   header: {

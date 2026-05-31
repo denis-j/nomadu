@@ -13,7 +13,7 @@ import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-rout
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { deleteJourneyLeg, parseDate, type TransportType } from '../../../lib/database';
-import { countryCodeToFlag } from '../../../lib/geocoding';
+import { Flag } from '../../../components/Flag';
 import { Colors } from '../../../constants/colors';
 import { getCityTips } from '../../../lib/ai';
 import { showToast } from '../../../lib/toast';
@@ -119,7 +119,6 @@ export default function StopInfoScreen() {
   const params = useLocalSearchParams<Params>();
   const { city, country, countryCode } = params;
 
-  const flag = countryCodeToFlag(countryCode);
   const startDate = parseDate(params.start);
   const endDate = parseDate(params.end);
   const days = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1);
@@ -181,7 +180,7 @@ export default function StopInfoScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.flag}>{flag}</Text>
+          <Flag code={countryCode} size={36} />
           <View style={styles.headerInfo}>
             <Text style={styles.city}>{city}</Text>
             <Text style={styles.country}>{country}</Text>
@@ -268,9 +267,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
     paddingVertical: 4,
-  },
-  flag: {
-    fontSize: 40,
   },
   headerInfo: {
     flex: 1,

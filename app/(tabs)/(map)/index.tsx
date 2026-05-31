@@ -17,7 +17,7 @@ import { useVisaTracker } from '../../../hooks/useVisaTracker';
 import { useTaxTracker } from '../../../hooks/useTaxTracker';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
-import { countryCodeToFlag } from '../../../lib/geocoding';
+import { Flag } from '../../../components/Flag';
 import { parseDate, Trip } from '../../../lib/database';
 import { VisaStatus } from '../../../lib/visaCalculations';
 import { TaxStatus } from '../../../lib/taxCalculations';
@@ -67,7 +67,6 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
   const progress = useSharedValue(0);
   const isExpanded = useSharedValue(false);
 
-  const flag = countryCodeToFlag(currentTrip.country_code);
   const totalDaysInCity = trips
     .filter((t) => t.city === currentTrip.city && t.country_code === currentTrip.country_code)
     .reduce((s, t) => s + t.days, 0);
@@ -146,7 +145,7 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
             if (rowHeight === 0) setRowHeight(e.nativeEvent.layout.height);
           }}
         >
-          <Text style={styles.chipFlag}>{flag}</Text>
+          <Flag code={currentTrip.country_code} size={16} />
           <Text style={styles.chipCity}>{currentTrip.city}</Text>
           <View style={styles.chipDivider} />
           <Text style={styles.chipCountry}>{currentTrip.country}</Text>
@@ -320,9 +319,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-  },
-  chipFlag: {
-    fontSize: 20,
   },
   chipCity: {
     ...Typography.button,

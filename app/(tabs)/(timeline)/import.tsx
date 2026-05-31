@@ -16,7 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { FloatingBubbles } from '../../../components/FloatingBubbles';
-import { countryCodeToFlag } from '../../../lib/geocoding';
+import { Flag } from '../../../components/Flag';
 import { showToast } from '../../../lib/toast';
 import {
   commitImport,
@@ -404,7 +404,6 @@ function CandidateRow({
   onToggle: () => void;
   onRemove: () => void;
 }) {
-  const flag = countryCodeToFlag(candidate.countryCode);
   const start = new Date(candidate.startDate);
   const end = candidate.endDate ? new Date(candidate.endDate) : null;
   const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -425,7 +424,9 @@ function CandidateRow({
         pressed && rowStyles.rowPressed,
       ]}
     >
-      <Text style={[rowStyles.flag, dup && rowStyles.dimmed]}>{flag}</Text>
+      <View style={dup && rowStyles.dimmed}>
+        <Flag code={candidate.countryCode} size={18} />
+      </View>
       <View style={rowStyles.body}>
         <View style={rowStyles.titleRow}>
           <Text style={[rowStyles.city, dup && rowStyles.dimmed]} numberOfLines={1}>
@@ -540,7 +541,6 @@ const rowStyles = StyleSheet.create({
   rowSelected: { backgroundColor: Colors.primary + '0E' },
   rowDup: { opacity: 0.6 },
   dimmed: { color: Colors.textTertiary },
-  flag: { fontSize: 24 },
   body: { flex: 1, minWidth: 0, gap: 2 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   city: { ...Typography.titleSmall, flexShrink: 1 },

@@ -5,7 +5,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useTaxTracker } from '../../../hooks/useTaxTracker';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
-import { countryCodeToFlag } from '../../../lib/geocoding';
+import { Flag } from '../../../components/Flag';
 import { EmptyState } from '../../../components/EmptyState';
 import { YearPicker } from '../../../components/YearPicker';
 import { TaxStatus } from '../../../lib/taxCalculations';
@@ -48,7 +48,7 @@ function TaxCard({ tax }: { tax: TaxStatus }) {
     <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
       <View style={styles.cardHeader}>
         <View style={styles.cardTitle}>
-          <Text style={styles.flag}>{tax.flag}</Text>
+          <Flag code={tax.countryCode} size={24} />
           <View style={styles.titleText}>
             <Text style={styles.destination}>{tax.country}</Text>
             <Text style={styles.ruleLabel}>{tax.ruleLabel}</Text>
@@ -118,8 +118,6 @@ export default function TaxScreen() {
     );
   }
 
-  const citizenshipFlag = citizenshipCode ? countryCodeToFlag(citizenshipCode) : '';
-
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
@@ -133,9 +131,11 @@ export default function TaxScreen() {
         includeAllTime={false}
       />
 
-      <Text style={styles.subtitle}>
-        Based on {citizenshipFlag} {citizenshipCountry} citizenship · {year}
-      </Text>
+      <View style={styles.subtitleRow}>
+        <Text style={styles.subtitle}>Based on </Text>
+        {citizenshipCode && <Flag code={citizenshipCode} size={14} />}
+        <Text style={styles.subtitle}> {citizenshipCountry} citizenship · {year}</Text>
+      </View>
 
       {taxStatuses.length === 0 ? (
         <View style={styles.emptyForYear}>
@@ -197,8 +197,10 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
-  flag: {
-    fontSize: 32,
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
   },
   titleText: {
     flex: 1,

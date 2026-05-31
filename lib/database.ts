@@ -629,6 +629,12 @@ export interface Stats {
   availableYears: number[];
   /** All country codes the user has ever visited (year filter does NOT apply). */
   allTimeCountryCodes: string[];
+  /**
+   * Days traveled per calendar month (Jan-Dec, length 12). Only populated when
+   * `year` is set — `null` in all-time mode because per-month aggregation
+   * across years isn't meaningful.
+   */
+  daysByMonth: number[] | null;
 }
 
 /**
@@ -647,6 +653,8 @@ export async function getStats(year: number | null = null): Promise<Stats> {
   const citySet = new Set<string>();
   let totalDays = 0;
   const countryDays: Record<string, { country: string; country_code: string; days: number }> = {};
+  // Per-month bucket (Jan..Dec) for the selected year. Skipped when year=null.
+  const monthBuckets = year !== null ? new Array<number>(12).fill(0) : null;
 
   for (const trip of trips) {
     const days = effectiveTripDays(trip, year);
@@ -661,6 +669,23 @@ export async function getStats(year: number | null = null): Promise<Stats> {
       countryDays[key] = { country: trip.country, country_code: trip.country_code, days: 0 };
     }
     countryDays[key].days += days;
+
+    if (monthBuckets) {
+      // Walk each day of the trip and bucket it into its calendar month.
+      // Trips are typically days-to-weeks long, so day-level iteration is fine.
+      const start = parseDate(trip.start_date);
+      const end = trip.end_date ? parseDate(trip.end_date) : new Date();
+      const cur = new Date(start);
+      cur.setHours(0, 0, 0, 0);
+      const stop = new Date(end);
+      stop.setHours(0, 0, 0, 0);
+      while (cur <= stop) {
+        if (cur.getFullYear() === year) {
+          monthBuckets[cur.getMonth()] += 1;
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
   }
 
   const topCountries = Object.values(countryDays)
@@ -676,6 +701,7 @@ export async function getStats(year: number | null = null): Promise<Stats> {
     topCountries,
     availableYears: availableYearsFromTrips(trips),
     allTimeCountryCodes,
+    daysByMonth: monthBuckets,
   };
 }
 

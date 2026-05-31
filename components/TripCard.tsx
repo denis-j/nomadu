@@ -6,6 +6,7 @@ import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { Trip, parseDate } from '../lib/database';
 import { countryCodeToFlag } from '../lib/geocoding';
+import { Flag } from './Flag';
 
 const hasGlass = isLiquidGlassAvailable();
 
@@ -20,7 +21,8 @@ interface TripCardProps {
 }
 
 export function TripCard({ trip, daysOverride, hasOverlap, compact, onDelete, onEdit }: TripCardProps) {
-  const flag = countryCodeToFlag(trip.country_code);
+  // ActionSheet title still uses the emoji string — native iOS handles it well there.
+  const emojiFlag = countryCodeToFlag(trip.country_code);
   const startDate = parseDate(trip.start_date);
   const endDate = trip.end_date ? parseDate(trip.end_date) : null;
 
@@ -42,7 +44,7 @@ export function TripCard({ trip, daysOverride, hasOverlap, compact, onDelete, on
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     ActionSheetIOS.showActionSheetWithOptions(
       {
-        title: `${flag} ${trip.city}`,
+        title: `${emojiFlag} ${trip.city}`,
         options: ['Edit', 'Open', 'Delete', 'Cancel'],
         destructiveButtonIndex: 2,
         cancelButtonIndex: 3,
@@ -77,7 +79,7 @@ export function TripCard({ trip, daysOverride, hasOverlap, compact, onDelete, on
       )}>
         {hasOverlap && <View style={styles.overlapTint} />}
         <View style={styles.cardTop}>
-          {!compact && <Text style={styles.flag}>{flag}</Text>}
+          {!compact && <Flag code={trip.country_code} size={22} />}
           {compact && <Text style={styles.cityInline}>{trip.city}</Text>}
           <View style={styles.cardTopRight}>
             {hasOverlap && (
@@ -192,9 +194,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  flag: {
-    fontSize: 28,
   },
   daysBadge: {
     backgroundColor: Colors.primary + '18',

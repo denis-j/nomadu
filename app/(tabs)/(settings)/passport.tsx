@@ -16,8 +16,8 @@ import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { useAuth } from '../../../hooks/useAuth';
 import { getCitizenship, setCitizenship } from '../../../lib/onboarding';
-import { searchCountries, getCountryCode, getCountryFlag } from '../../../utils/geography';
-import { countryCodeToFlag } from '../../../lib/geocoding';
+import { searchCountries, getCountryCode } from '../../../utils/geography';
+import { Flag } from '../../../components/Flag';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const EXPANDED_WIDTH = SCREEN_WIDTH - 32;
@@ -107,9 +107,7 @@ export default function PassportScreen() {
         {/* Current passport */}
         {currentCountry && (
           <View style={styles.currentSection}>
-            <Text style={styles.currentFlag}>
-              {currentCode ? countryCodeToFlag(currentCode) : '🏳️'}
-            </Text>
+            {currentCode ? <Flag code={currentCode} size={32} /> : null}
             <View style={styles.currentInfo}>
               <Text style={styles.currentLabel}>Current passport</Text>
               <Text style={styles.currentCountry}>{currentCountry}</Text>
@@ -119,7 +117,7 @@ export default function PassportScreen() {
 
         {/* Country list */}
         {results.map((name, i) => {
-          const flag = getCountryFlag(name) ?? '🏳️';
+          const code = getCountryCode(name);
           const isSelected = name === currentCountry;
 
           return (
@@ -128,7 +126,7 @@ export default function PassportScreen() {
               style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
               onPress={() => handleSelect(name)}
             >
-              <Text style={styles.flag}>{flag}</Text>
+              <Flag code={code} size={22} />
               <Text style={styles.itemText}>{name}</Text>
               {isSelected && (
                 <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
@@ -219,9 +217,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: PlatformColor('separator'),
   },
-  currentFlag: {
-    fontSize: 36,
-  },
   currentInfo: {
     gap: 2,
   },
@@ -245,9 +240,6 @@ const styles = StyleSheet.create({
   },
   itemPressed: {
     backgroundColor: PlatformColor('systemGray5'),
-  },
-  flag: {
-    fontSize: 24,
   },
   itemText: {
     flex: 1,

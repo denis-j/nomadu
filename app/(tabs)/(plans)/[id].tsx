@@ -36,6 +36,7 @@ import { calculateAllTaxStatuses, TaxStatus } from '../../../lib/taxCalculations
 import { SCHENGEN_COUNTRIES, DEFAULT_VISA_RULES } from '../../../constants/visaRules';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { getCountryCode } from '../../../utils/geography';
+import { Flag } from '../../../components/Flag';
 import { suggestNextStops, StopSuggestion } from '../../../lib/ai';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
@@ -264,7 +265,7 @@ const LegCard = React.memo(function LegCard({
   visaStatuses,
   taxStatuses,
 }: LegCardProps) {
-  const flag = countryCodeToFlag(leg.country_code);
+  const emojiFlag = countryCodeToFlag(leg.country_code); // used in chip labels
   const days = legDays(leg.start_date, leg.end_date);
 
   const isSchengen = !!leg.country_code && (SCHENGEN_COUNTRIES as readonly string[]).includes(leg.country_code);
@@ -298,13 +299,13 @@ const LegCard = React.memo(function LegCard({
     const color = visaChipColor(trackedVisa.status);
     const label = isSchengen
       ? `🇪🇺 ${trackedVisa.daysRemaining}d Schengen left`
-      : `${flag} ${trackedVisa.daysRemaining}d visa left`;
+      : `${emojiFlag} ${trackedVisa.daysRemaining}d visa left`;
     chips.push({ label, color });
   } else if (plannedVisaExceeds) {
     // No tracked data but this leg alone exceeds the limit
     const label = isSchengen
       ? `🇪🇺 ${plannedDays}d > ${visaLimit}d Schengen`
-      : `${flag} ${plannedDays}d > ${visaLimit}d visa`;
+      : `${emojiFlag} ${plannedDays}d > ${visaLimit}d visa`;
     chips.push({ label, color: Colors.error });
   }
 
@@ -357,7 +358,7 @@ const LegCard = React.memo(function LegCard({
           </View>
           <CardWrap {...cardProps} style={[styles.legCard, !hasGlass && styles.legCardFallback]}>
             {/* Flag */}
-            <Text style={styles.legFlag}>{flag}</Text>
+            <Flag code={leg.country_code ?? ''} size={28} style={styles.legFlagWrap} />
 
             {/* Center info */}
             <View style={styles.legCenter}>
@@ -421,7 +422,7 @@ function SuggestionLegCard({
   onAdd: () => void;
   disabled?: boolean;
 }) {
-  const flag = countryCodeToFlag(getCountryCode(suggestion.country));
+  const countryCode = getCountryCode(suggestion.country);
   const days = legDays(suggestion.startDate, suggestion.endDate);
   const CardShell = hasGlass ? GlassView : View;
 
@@ -447,7 +448,7 @@ function SuggestionLegCard({
         >
           {/* Top row: flag + badges */}
           <View style={styles.suggCardTop}>
-            <Text style={styles.suggFlag}>{flag || '🌍'}</Text>
+            <Flag code={countryCode} size={24} />
             <View style={styles.suggCardTopRight}>
               <View style={styles.aiBadge}>
                 <Text style={styles.aiBadgeText}>AI</Text>
@@ -1146,9 +1147,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  legFlag: {
-    fontSize: 32,
-    lineHeight: 38,
+  legFlagWrap: {
+    marginTop: 2,
   },
   legCenter: {
     flex: 1,
@@ -1354,9 +1354,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  suggFlag: {
-    fontSize: 28,
   },
   aiBadge: {
     backgroundColor: Colors.primary + '18',
