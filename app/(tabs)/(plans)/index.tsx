@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useJourneys } from '../../../hooks/useJourneys';
 import { Colors } from '../../../constants/colors';
+import { Typography } from '../../../constants/typography';
 import { deleteJourney, insertJourney, insertJourneyLeg, parseDate, TransportType } from '../../../lib/database';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 
@@ -489,11 +490,11 @@ const styles = StyleSheet.create({
     fontSize: 40,
   },
   inlineEmptyTitle: {
-    fontSize: 17,
+    ...Typography.bodyLarge,
     fontWeight: '600',
-    color: Colors.text,
   },
   inlineEmptySub: {
+    ...Typography.bodySmall,
     fontSize: 14,
     color: Colors.textTertiary,
     textAlign: 'center',
@@ -517,9 +518,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   cardTitle: {
+    ...Typography.titleLarge,
     fontSize: 20,
-    fontWeight: '700',
-    color: Colors.text,
     letterSpacing: -0.3,
   },
   flagsRow: {
@@ -532,9 +532,10 @@ const styles = StyleSheet.create({
     fontSize: 22,
   },
   flagMore: {
+    ...Typography.bodySmall,
     fontSize: 14,
-    color: Colors.textTertiary,
     fontWeight: '600',
+    color: Colors.textTertiary,
   },
   cardBottom: {
     flexDirection: 'row',
@@ -549,15 +550,18 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   cardDateRange: {
+    ...Typography.bodySmall,
     fontSize: 14,
     color: Colors.textSecondary,
     fontVariant: ['tabular-nums'],
   },
   cardMetaDot: {
+    ...Typography.bodySmall,
     fontSize: 14,
     color: Colors.textTertiary,
   },
   cardMetaText: {
+    ...Typography.bodySmall,
     fontSize: 14,
     color: Colors.textTertiary,
   },
@@ -567,13 +571,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   featSectionTitle: {
+    ...Typography.titleLarge,
     fontSize: 20,
-    fontWeight: '700',
-    color: Colors.text,
     letterSpacing: -0.3,
   },
   featSectionSub: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     color: Colors.textTertiary,
     marginTop: 2,
   },
@@ -614,14 +617,14 @@ const styles = StyleSheet.create({
     lineHeight: 40,
   },
   featCountry: {
+    ...Typography.displayMedium,
     fontSize: 26,
-    fontWeight: '800',
-    color: '#fff',
+    color: Colors.white,
     letterSpacing: -0.5,
   },
   featTagline: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.75)',
+    ...Typography.caption,
+    color: Colors.whiteAlpha75,
     fontWeight: '700',
     lineHeight: 16,
   },
@@ -630,8 +633,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   featTip: {
-    fontSize: 12,
-    color: '#fff',
+    ...Typography.caption,
+    color: Colors.white,
     fontWeight: '600',
     lineHeight: 17,
   },
@@ -657,7 +660,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.white,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
@@ -678,15 +681,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.white,
     borderRadius: 14,
     paddingVertical: 13,
     marginTop: 2,
   },
   featCtaText: {
-    fontSize: 15,
+    ...Typography.button,
     fontWeight: '700',
-    color: '#000',
   },
 
 });

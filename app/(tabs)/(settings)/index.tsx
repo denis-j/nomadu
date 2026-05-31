@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../../constants/colors';
+import { Typography } from '../../../constants/typography';
 import { useAuth } from '../../../hooks/useAuth';
 import { useLocation } from '../../../hooks/useLocation';
 import { useSubscription } from '../../../hooks/useSubscription';
@@ -259,7 +260,7 @@ export default function SettingsScreen() {
               onPress={handleUpgrade}
             >
               <View style={styles.upgradeContent}>
-                <Ionicons name="star" size={20} color="#FFF" />
+                <Ionicons name="star" size={20} color={Colors.white} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.upgradeTitle}>Upgrade to Pro</Text>
                   <Text style={styles.upgradeSubtitle}>Unlock all features</Text>
@@ -599,12 +600,10 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   warningTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
+    ...Typography.button,
   },
   warningText: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
     lineHeight: 18,
   },
@@ -621,11 +620,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   sectionTitle: {
+    ...Typography.eyebrow,
     fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
     marginBottom: 12,
   },
   row: {
@@ -642,16 +638,16 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   rowLabel: {
-    fontSize: 16,
-    color: Colors.text,
+    ...Typography.titleSmall,
+    fontWeight: '400',
   },
   rowDescription: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     color: Colors.textTertiary,
     marginTop: 2,
   },
   rowValue: {
-    fontSize: 15,
+    ...Typography.body,
     color: Colors.textSecondary,
   },
   passportValue: {
@@ -683,7 +679,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.warning + '18',
   },
   badgeText: {
-    fontSize: 12,
+    ...Typography.caption,
     fontWeight: '600',
   },
   badgeTextGranted: {
@@ -693,7 +689,7 @@ const styles = StyleSheet.create({
     color: Colors.warning,
   },
   footer: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     color: Colors.textTertiary,
     textAlign: 'center',
     lineHeight: 20,
@@ -716,13 +712,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   upgradeTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFF',
+    ...Typography.titleSmall,
+    color: Colors.white,
   },
   upgradeSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.75)',
+    ...Typography.bodySmall,
+    color: Colors.whiteAlpha75,
     marginTop: 1,
   },
   // ─── Sheet ───
@@ -739,11 +734,10 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   sheetItemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
+    ...Typography.titleSmall,
   },
   sheetItemDesc: {
+    ...Typography.bodySmall,
     fontSize: 14,
     color: Colors.textSecondary,
     lineHeight: 20,

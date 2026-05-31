@@ -25,6 +25,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import AnimatedGradientBackground from '../../components/animated-gradient-background';
 import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
 import { requestLocationPermissions } from '../../lib/location';
 import { requestNotificationPermissions } from '../../lib/notifications';
 
@@ -252,16 +253,15 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   title: {
+    ...Typography.displayMedium,
     fontSize: 32,
-    fontWeight: '800',
-    color: Colors.text,
     marginBottom: 12,
     textAlign: 'center',
   },
   description: {
+    ...Typography.bodyLarge,
     fontSize: 16,
-    color: Colors.text,
-    opacity: 0.6,
+    color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -289,9 +289,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   featureText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: Colors.text,
+    ...Typography.bodyMedium,
   },
   actions: {
     alignItems: 'center',
@@ -311,13 +309,11 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   enableButtonText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '600',
+    ...Typography.buttonLarge,
+    color: Colors.white,
   },
   skipText: {
-    fontSize: 15,
-    fontWeight: '500',
+    ...Typography.bodyMedium,
     color: Colors.textSecondary,
   },
 });

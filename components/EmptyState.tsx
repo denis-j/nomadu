@@ -1,5 +1,6 @@
 import { Button, StyleSheet, Text, View } from 'react-native';
 import { Colors } from '../constants/colors';
+import { Typography } from '../constants/typography';
 
 interface EmptyStateProps {
   icon: string;
@@ -29,14 +30,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: Colors.text,
+    ...Typography.titleLarge,
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 15,
+    ...Typography.body,
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,

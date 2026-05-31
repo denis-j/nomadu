@@ -18,6 +18,7 @@ import { forwardGeocode } from '../../../../lib/geocoding';
 import { getCountryCode } from '../../../../utils/geography';
 import { getCityTips } from '../../../../lib/ai';
 import { showToast } from '../../../../lib/toast';
+import { Colors } from '../../../../constants/colors';
 
 type Params = {
   journeyId: string;
@@ -422,7 +423,7 @@ const styles = StyleSheet.create({
     color: PlatformColor('label'),
   },
   transportLabelActive: {
-    color: '#fff',
+    color: Colors.white,
   },
   notesInput: {
     padding: 16,

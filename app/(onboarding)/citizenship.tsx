@@ -23,6 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import AnimatedGradientBackground from '../../components/animated-gradient-background';
 import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
 import { useAuth } from '../../hooks/useAuth';
 import { setCitizenship } from '../../lib/onboarding';
 import {
@@ -286,13 +287,12 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   title: {
-    fontFamily: 'InstrumentSerif_400Regular_Italic',
+    ...Typography.brandDisplay,
     fontSize: 40,
-    color: Colors.text,
     marginBottom: 2,
   },
   subtitle: {
-    fontSize: 15,
+    ...Typography.body,
     color: Colors.textSecondary,
   },
   searchWrap: { paddingHorizontal: 20, marginBottom: 4 },
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   searchBarFallback: { backgroundColor: 'rgba(255, 255, 255, 0.9)', borderColor: Colors.border },
-  searchInput: { flex: 1, fontSize: 16, color: Colors.text },
+  searchInput: { ...Typography.titleSmall, fontWeight: '400', flex: 1 },
   searchList: { paddingHorizontal: 20, paddingBottom: 12, gap: 6 },
   searchRow: {
     flexDirection: 'row',
@@ -326,8 +326,8 @@ const styles = StyleSheet.create({
   },
   searchRowFallback: { backgroundColor: 'rgba(255, 255, 255, 0.92)', borderColor: Colors.border },
   searchFlag: { fontSize: 24, marginRight: 12 },
-  searchName: { flex: 1, fontSize: 16, fontWeight: '500', color: Colors.text },
-  emptyText: { textAlign: 'center', color: Colors.textTertiary, fontSize: 16, marginTop: 20 },
+  searchName: { ...Typography.titleSmall, fontWeight: '500', flex: 1 },
+  emptyText: { ...Typography.titleSmall, fontWeight: '400', textAlign: 'center', color: Colors.textTertiary, marginTop: 20 },
   markerWrap: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 100,
@@ -365,8 +365,8 @@ const styles = StyleSheet.create({
   confirmCardFallback: { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderColor: Colors.border },
   confirmFlag: { fontSize: 36, marginRight: 14 },
   confirmTextWrap: { flex: 1 },
-  confirmName: { fontSize: 18, fontWeight: '700', color: Colors.text },
-  confirmHint: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  confirmName: { ...Typography.titleMedium },
+  confirmHint: { ...Typography.bodySmall, color: Colors.textSecondary, marginTop: 2 },
   confirmButton: {
     width: 44,
     height: 44,

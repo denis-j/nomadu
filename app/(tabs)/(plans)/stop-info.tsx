@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { deleteJourneyLeg, parseDate, type TransportType } from '../../../lib/database';
 import { countryCodeToFlag } from '../../../lib/geocoding';
+import { Colors } from '../../../constants/colors';
 import { getCityTips } from '../../../lib/ai';
 import { showToast } from '../../../lib/toast';
 
@@ -247,7 +248,7 @@ export default function StopInfoScreen() {
             <Text style={styles.editButtonText}>Edit Stop</Text>
           </Pressable>
           <Pressable style={styles.deleteButton} onPress={handleDelete}>
-            <Ionicons name="trash-outline" size={16} color="#EF5350" />
+            <Ionicons name="trash-outline" size={16} color={Colors.error} />
             <Text style={styles.deleteButtonText}>Delete</Text>
           </Pressable>
         </View>
@@ -390,6 +391,6 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#EF5350',
+    color: Colors.error,
   },
 });

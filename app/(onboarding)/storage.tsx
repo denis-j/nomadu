@@ -17,6 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import AnimatedGradientBackground from '../../components/animated-gradient-background';
 import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
 import { useAuth } from '../../hooks/useAuth';
 import { setCloudSyncEnabled } from '../../lib/sync';
 
@@ -157,16 +158,15 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   title: {
+    ...Typography.displayMedium,
     fontSize: 32,
-    fontWeight: '800',
-    color: Colors.text,
     marginBottom: 12,
     textAlign: 'center',
   },
   description: {
+    ...Typography.bodyLarge,
     fontSize: 16,
-    color: Colors.text,
-    opacity: 0.6,
+    color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -198,15 +198,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   optionTitle: {
-    fontSize: 17,
+    ...Typography.bodyLarge,
     fontWeight: '600',
-    color: Colors.text,
     marginBottom: 3,
   },
   optionDescription: {
+    ...Typography.bodySmall,
     fontSize: 14,
-    color: Colors.text,
-    opacity: 0.5,
+    color: Colors.textTertiary,
     lineHeight: 20,
   },
 });

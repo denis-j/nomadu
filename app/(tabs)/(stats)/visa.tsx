@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useVisaTracker } from '../../../hooks/useVisaTracker';
 import { Colors } from '../../../constants/colors';
+import { Typography } from '../../../constants/typography';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { EmptyState } from '../../../components/EmptyState';
 import { VisaStatus } from '../../../lib/visaCalculations';
@@ -158,6 +159,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   subtitle: {
+    ...Typography.bodySmall,
     fontSize: 14,
     fontWeight: '500',
     color: Colors.textSecondary,
@@ -195,14 +197,11 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   destination: {
-    fontSize: 17,
+    ...Typography.bodyLarge,
     fontWeight: '700',
-    color: Colors.text,
   },
   ruleLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: Colors.textSecondary,
+    ...Typography.label,
   },
   statusBadge: {
     paddingHorizontal: 10,
@@ -211,7 +210,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
   },
   statusText: {
-    fontSize: 12,
+    ...Typography.caption,
     fontWeight: '700',
   },
   progressContainer: {
@@ -233,6 +232,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   daysText: {
+    ...Typography.bodySmall,
     fontSize: 14,
     fontVariant: ['tabular-nums'],
   },
@@ -249,13 +249,12 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   daysRemaining: {
-    fontSize: 15,
+    ...Typography.button,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
   disclaimer: {
-    fontSize: 12,
-    color: Colors.textTertiary,
+    ...Typography.caption,
     textAlign: 'center',
     paddingHorizontal: 20,
     paddingTop: 8,

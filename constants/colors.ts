@@ -14,6 +14,17 @@ export const Colors = {
   surfaceSecondary: '#F0F2F5',
   border: '#E5E7EB',
 
+  // Whites — for overlays/text on dark or vivid backgrounds
+  white: '#FFFFFF',
+  whiteAlpha90: 'rgba(255, 255, 255, 0.9)',
+  whiteAlpha75: 'rgba(255, 255, 255, 0.75)',
+  whiteAlpha55: 'rgba(255, 255, 255, 0.55)',
+  whiteAlpha35: 'rgba(255, 255, 255, 0.35)',
+
+  // Brand — Cloudy
+  cloudyBlue: '#4DC1FF',
+  cloudyButtonText: '#0B2541', // dark navy for legible CTAs on the cloudy gradient
+
   // Text
   text: '#000000',
   textSecondary: '#6B7280',
@@ -22,7 +33,7 @@ export const Colors = {
   // Semantic
   success: '#4CAF50',
   warning: '#FF9800',
-  error: '#EF5350',
+  error: '#FF3B30', // iOS system red — matches what we already use in most places
 
   // Map
   markerDefault: '#4A90A4',

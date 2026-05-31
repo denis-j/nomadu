@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
+import { Typography } from '../constants/typography';
 
 const hasGlass = isLiquidGlassAvailable();
 const CardShell = hasGlass ? GlassView : View;
@@ -70,17 +71,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   value: {
-    fontSize: 34,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
+    ...Typography.numericLarge,
   },
   valueLarge: {
     fontSize: 52,
   },
   label: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontWeight: '500',
+    ...Typography.label,
   },
   labelLarge: {
     fontSize: 15,

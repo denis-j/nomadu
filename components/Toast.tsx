@@ -3,6 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, FadeOut, SlideInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { registerToast, ToastData } from '../lib/toast';
+import { Colors } from '../constants/colors';
+import { Typography } from '../constants/typography';
 
 export function ToastContainer() {
   const [toast, setToast] = useState<ToastData | null>(null);
@@ -50,23 +52,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#000',
+    backgroundColor: Colors.text,
     borderRadius: 100,
     paddingHorizontal: 18,
     paddingVertical: 12,
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
   },
   pillError: {
-    backgroundColor: '#EF5350',
+    backgroundColor: Colors.error,
   },
   icon: {
-    fontSize: 14,
+    ...Typography.bodySmall,
     fontWeight: '700',
-    color: '#fff',
+    color: Colors.white,
   },
   text: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fff',
+    ...Typography.button,
+    color: Colors.white,
   },
 });

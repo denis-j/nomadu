@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../../../constants/colors';
+import { Typography } from '../../../constants/typography';
 import { useAuth } from '../../../hooks/useAuth';
 import { getCitizenship, setCitizenship } from '../../../lib/onboarding';
 import { searchCountries, getCountryCode, getCountryFlag } from '../../../utils/geography';
@@ -286,9 +287,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chipText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
+    ...Typography.button,
   },
   inputSection: {},
   expandDivider: {
@@ -303,9 +302,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   searchInput: {
+    ...Typography.titleSmall,
+    fontWeight: '400',
     flex: 1,
-    fontSize: 16,
-    color: Colors.text,
     padding: 0,
   },
 });

@@ -19,6 +19,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CloudyButton } from '../../components/CloudyButton';
 import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { signInWithEmail, signInWithApple } from '../../lib/auth';
 import { showToast } from '../../lib/toast';
@@ -234,13 +235,12 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   title: {
-    fontFamily: 'InstrumentSerif_400Regular_Italic',
+    ...Typography.brandDisplay,
     fontSize: 46,
-    color: Colors.text,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 15,
+    ...Typography.body,
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 6,
@@ -279,8 +279,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   input: {
-    fontSize: 16,
-    color: Colors.text,
+    ...Typography.titleSmall,
     fontWeight: '400',
   },
   continueButton: {
@@ -293,15 +292,11 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   continueButtonText: {
-    color: Colors.text,
-    fontSize: 18,
-    fontWeight: '600',
+    ...Typography.buttonLarge,
     textAlign: 'center',
   },
   forgotInline: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '500',
+    ...Typography.label,
   },
   eyeBtn: {
     marginLeft: 2,
@@ -313,12 +308,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   signUpText: {
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
-    fontSize: 14,
   },
   signUpLink: {
-    color: Colors.text,
-    fontSize: 14,
+    ...Typography.bodySmall,
     fontWeight: '700',
   },
   socialContainer: {
@@ -337,8 +331,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(26, 26, 46, 0.2)',
   },
   orText: {
-    color: Colors.text,
-    fontSize: 14,
+    ...Typography.bodySmall,
     opacity: 0.5,
   },
   socialButtons: {
@@ -362,9 +355,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.85)',
   },
   socialButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
+    ...Typography.titleSmall,
     marginLeft: 12,
   },
 });

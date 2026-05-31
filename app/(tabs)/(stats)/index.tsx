@@ -15,6 +15,7 @@ import { useStats } from '../../../hooks/useStats';
 import { useVisaTracker } from '../../../hooks/useVisaTracker';
 import { useTaxTracker } from '../../../hooks/useTaxTracker';
 import { Colors } from '../../../constants/colors';
+import { Typography } from '../../../constants/typography';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { StatsBars } from '../../../components/StatsBars';
 import { BADGE_LIBRARY } from '../../../lib/badges';
@@ -265,13 +266,11 @@ const badgeStyles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text,
+    ...Typography.titleMedium,
     letterSpacing: -0.3,
   },
   linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 4, paddingLeft: 8 },
-  linkBtnText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
+  linkBtnText: { ...Typography.bodySmall, fontWeight: '600', color: Colors.primary },
   row: { gap: 10, paddingHorizontal: 4 },
   tile: {
     width: 104,
@@ -308,7 +307,7 @@ const badgeStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   tileName: {
-    fontSize: 12,
+    ...Typography.caption,
     fontWeight: '600',
     color: Colors.text,
     textAlign: 'center',
@@ -330,14 +329,13 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   emptyTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.text,
+    ...Typography.titleLarge,
     textAlign: 'center',
     letterSpacing: -0.4,
     marginTop: 8,
   },
   emptySubtitle: {
+    ...Typography.bodySmall,
     fontSize: 14,
     color: Colors.textSecondary,
     textAlign: 'center',
@@ -376,25 +374,17 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
   },
   combiValue: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: Colors.text,
-    fontVariant: ['tabular-nums'],
+    ...Typography.numericLarge,
   },
   combiLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: Colors.textSecondary,
+    ...Typography.label,
   },
   countriesSection: {
     gap: 10,
   },
   sectionTitle: {
+    ...Typography.eyebrow,
     fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
     paddingLeft: 4,
   },
   countriesGrid: {
@@ -411,7 +401,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
   },
   countryRank: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     fontWeight: '700',
     color: Colors.textTertiary,
     width: 22,
@@ -421,13 +411,11 @@ const styles = StyleSheet.create({
     fontSize: 26,
   },
   countryName: {
+    ...Typography.titleSmall,
     flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
   },
   countryDays: {
-    fontSize: 15,
+    ...Typography.button,
     fontWeight: '700',
     color: Colors.primary,
     fontVariant: ['tabular-nums'],
@@ -460,14 +448,11 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   visaDestination: {
-    fontSize: 16,
+    ...Typography.titleSmall,
     fontWeight: '700',
-    color: Colors.text,
   },
   visaPreview: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: Colors.textSecondary,
+    ...Typography.label,
     fontVariant: ['tabular-nums'],
   },
 });

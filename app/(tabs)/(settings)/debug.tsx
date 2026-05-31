@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { sendNewCityNotification, checkAndNotifyVisaTax, requestNotificationPermissions } from '../../../lib/notifications';
 import { Colors } from '../../../constants/colors';
+import { Typography } from '../../../constants/typography';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -193,7 +194,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   warning: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     color: Colors.textTertiary,
     textAlign: 'center',
     paddingVertical: 4,
@@ -211,11 +212,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   sectionTitle: {
+    ...Typography.eyebrow,
     fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
     marginBottom: 12,
   },
   sep: {
@@ -238,15 +236,14 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   buttonLabel: {
-    fontSize: 16,
-    color: Colors.primary,
+    ...Typography.titleSmall,
     fontWeight: '500',
+    color: Colors.primary,
   },
   buttonLabelDestructive: {
     color: Colors.error,
   },
   buttonSublabel: {
-    fontSize: 12,
-    color: Colors.textTertiary,
+    ...Typography.caption,
   },
 });

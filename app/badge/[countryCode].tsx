@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { CountryBadge3D, hasCountryBadge } from '../../components/CountryBadge3D';
 import { CloudyButton } from '../../components/CloudyButton';
 import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
 import { getBadgeInfo, markBadgeUnlocked } from '../../lib/badges';
 import { playCollectSound } from '../../lib/sound';
 
@@ -77,7 +78,7 @@ export default function BadgeFullscreenScreen() {
                   hitSlop={12}
                   style={({ pressed }) => [styles.closeInner, pressed && { opacity: 0.6 }]}
                 >
-                  <Ionicons name="close" size={20} color="#FFFFFF" />
+                  <Ionicons name="close" size={20} color={Colors.white} />
                 </Pressable>
               </GlassView>
             ) : (
@@ -86,7 +87,7 @@ export default function BadgeFullscreenScreen() {
                 hitSlop={12}
                 style={({ pressed }) => [styles.closeBtnFallback, pressed && { opacity: 0.6 }]}
               >
-                <Ionicons name="close" size={20} color="#FFFFFF" />
+                <Ionicons name="close" size={20} color={Colors.white} />
               </Pressable>
             )}
           </View>
@@ -105,7 +106,7 @@ export default function BadgeFullscreenScreen() {
             <View pointerEvents="box-none" style={styles.bottomBlock}>
               <CloudyButton onPress={handleCollect} haptic={Haptics.ImpactFeedbackStyle.Medium}>
                 <View style={styles.ctaContent}>
-                  <Ionicons name="sparkles" size={20} color="#0B2541" />
+                  <Ionicons name="sparkles" size={20} color={Colors.cloudyButtonText} />
                   <Text style={styles.ctaText}>Collect</Text>
                 </View>
               </CloudyButton>
@@ -155,16 +156,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   eyebrow: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.55)',
+    ...Typography.eyebrow,
+    color: Colors.whiteAlpha55,
     letterSpacing: 3.2,
-    textTransform: 'uppercase',
   },
   title: {
+    ...Typography.displayLarge,
     fontSize: 44,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    color: Colors.white,
     letterSpacing: -1.2,
     textAlign: 'center',
     marginTop: 2,
@@ -178,7 +177,7 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: 10,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.55)',
+    color: Colors.whiteAlpha55,
     letterSpacing: 1.6,
   },
   bottomBlock: {
@@ -197,9 +196,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   ctaText: {
-    color: '#0B2541',
+    ...Typography.titleSmall,
     fontWeight: '700',
-    fontSize: 16,
+    color: Colors.cloudyButtonText,
     letterSpacing: 0.3,
   },
   errorContainer: {
@@ -210,8 +209,9 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   errorText: {
-    color: 'rgba(255,255,255,0.7)',
+    ...Typography.bodySmall,
     fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
   },
   errorClose: {
     paddingHorizontal: 24,
@@ -220,8 +220,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
   errorCloseText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
+    ...Typography.bodySmall,
     fontSize: 14,
+    fontWeight: '600',
+    color: Colors.white,
   },
 });

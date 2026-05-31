@@ -14,6 +14,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../../../constants/colors';
+import { Typography } from '../../../constants/typography';
 import { FloatingBubbles } from '../../../components/FloatingBubbles';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { showToast } from '../../../lib/toast';
@@ -206,7 +207,7 @@ export default function ImportScreen() {
             ]}
           >
             <Text style={styles.confirmBtnText}>Add to Timeline</Text>
-            <Ionicons name="arrow-forward" size={18} color="#FFF" />
+            <Ionicons name="arrow-forward" size={18} color={Colors.white} />
           </Pressable>
         </Glass>
       )}
@@ -255,9 +256,7 @@ const parsingStyles = StyleSheet.create({
     gap: 14,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.text,
+    ...Typography.titleLarge,
     textAlign: 'center',
     letterSpacing: -0.4,
   },
@@ -266,7 +265,7 @@ const parsingStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  subtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
+  subtitle: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
 });
 
 // ─── Step 2: Review ───────────────────────────────────────────────────────────
@@ -466,14 +465,12 @@ const reviewStyles = StyleSheet.create({
     marginBottom: 18,
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.text,
+    ...Typography.titleLarge,
     letterSpacing: -0.4,
   },
-  headerSub: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  headerSub: { ...Typography.bodySmall, color: Colors.textSecondary, marginTop: 2 },
   toggleAllBtn: { paddingVertical: 6, paddingHorizontal: 10 },
-  toggleAllText: { fontSize: 14, fontWeight: '600', color: Colors.primary },
+  toggleAllText: { ...Typography.bodySmall, fontSize: 14, fontWeight: '600', color: Colors.primary },
   warnBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -483,7 +480,7 @@ const reviewStyles = StyleSheet.create({
     padding: 10,
     marginBottom: 14,
   },
-  warnText: { fontSize: 13, color: Colors.warning, flex: 1 },
+  warnText: { ...Typography.bodySmall, color: Colors.warning, flex: 1 },
   section: { marginBottom: 8 },
   sectionHeader: {
     flexDirection: 'row',
@@ -493,13 +490,11 @@ const reviewStyles = StyleSheet.create({
     paddingBottom: 8,
   },
   sectionTitle: {
+    ...Typography.eyebrow,
     fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
-  sectionCount: { fontSize: 13, color: Colors.textTertiary },
+  sectionCount: { ...Typography.bodySmall, color: Colors.textTertiary },
   sectionList: {
     backgroundColor: Colors.surface,
     borderRadius: 14,
@@ -514,8 +509,7 @@ const reviewStyles = StyleSheet.create({
     marginLeft: 50,
   },
   footHint: {
-    fontSize: 12,
-    color: Colors.textTertiary,
+    ...Typography.caption,
     textAlign: 'center',
     marginTop: 20,
     paddingHorizontal: 20,
@@ -530,8 +524,8 @@ const reviewStyles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
-  emptyTitle: { fontSize: 18, fontWeight: '600', color: Colors.text },
-  emptyText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 21 },
+  emptyTitle: { ...Typography.titleMedium, fontWeight: '600' },
+  emptyText: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 21 },
 });
 
 const rowStyles = StyleSheet.create({
@@ -549,8 +543,8 @@ const rowStyles = StyleSheet.create({
   flag: { fontSize: 24 },
   body: { flex: 1, minWidth: 0, gap: 2 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  city: { fontSize: 16, fontWeight: '600', color: Colors.text, flexShrink: 1 },
-  meta: { fontSize: 13, color: Colors.textSecondary },
+  city: { ...Typography.titleSmall, flexShrink: 1 },
+  meta: { ...Typography.bodySmall, color: Colors.textSecondary },
   nowPill: {
     backgroundColor: Colors.success + '22',
     paddingHorizontal: 7,
@@ -566,7 +560,7 @@ const rowStyles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   daysValue: { fontSize: 19, fontWeight: '700', color: Colors.text, fontVariant: ['tabular-nums'] },
-  daysUnit: { fontSize: 12, fontWeight: '600', color: Colors.textTertiary },
+  daysUnit: { ...Typography.caption, fontWeight: '600' },
   removeBtn: { padding: 4, marginLeft: 2 },
 });
 
@@ -583,9 +577,9 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   headerBtn: { padding: 4 },
-  headerTitle: { fontSize: 17, fontWeight: '600', color: Colors.text },
+  headerTitle: { ...Typography.buttonLarge },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
-  committingText: { fontSize: 14, color: Colors.textSecondary },
+  committingText: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary },
   bottomBar: {
     position: 'absolute',
     bottom: 24,
@@ -605,8 +599,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   bottomInfo: { paddingLeft: 6, flexDirection: 'row', alignItems: 'baseline', gap: 5 },
-  bottomCount: { fontSize: 20, fontWeight: '700', color: Colors.text },
-  bottomLabel: { fontSize: 13, color: Colors.textSecondary },
+  bottomCount: { ...Typography.titleLarge, fontSize: 20 },
+  bottomLabel: { ...Typography.bodySmall, color: Colors.textSecondary },
   confirmBtn: {
     marginLeft: 'auto',
     flexDirection: 'row',
@@ -620,5 +614,5 @@ const styles = StyleSheet.create({
   },
   confirmBtnDisabled: { opacity: 0.4 },
   confirmBtnPressed: { opacity: 0.85 },
-  confirmBtnText: { color: '#FFF', fontWeight: '600', fontSize: 15 },
+  confirmBtnText: { ...Typography.button, color: Colors.white },
 });

@@ -17,6 +17,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import AnimatedGradientBackground from '../../components/animated-gradient-background';
 import { CloudyButton } from '../../components/CloudyButton';
 import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
 import { resetPassword } from '../../lib/auth';
 
 const hasGlass = isLiquidGlassAvailable();
@@ -207,13 +208,12 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   title: {
-    fontFamily: 'InstrumentSerif_400Regular_Italic',
+    ...Typography.brandDisplay,
     fontSize: 46,
-    color: Colors.text,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 15,
+    ...Typography.body,
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 6,
@@ -239,18 +239,17 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   input: {
-    fontSize: 16,
-    color: Colors.text,
+    ...Typography.titleSmall,
     fontWeight: '400',
   },
   errorText: {
-    fontSize: 13,
-    color: '#E53E3E',
+    ...Typography.bodySmall,
+    color: Colors.error,
     marginTop: 8,
   },
   successText: {
-    fontSize: 13,
-    color: '#38A169',
+    ...Typography.bodySmall,
+    color: Colors.success,
     marginTop: 8,
   },
   continueButton: {
@@ -263,9 +262,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   continueButtonText: {
-    color: Colors.text,
-    fontSize: 18,
-    fontWeight: '600',
+    ...Typography.buttonLarge,
     textAlign: 'center',
   },
 });

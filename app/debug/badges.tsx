@@ -16,6 +16,7 @@ import {
   useSkybox,
 } from 'react-native-filament';
 import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
 
 const THAILAND_GLB = require('../../assets/glb/thailand.glb');
 const VIETNAM_GLB = require('../../assets/glb/vietnam.glb');
@@ -101,10 +102,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   label: {
+    ...Typography.eyebrow,
     fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
     letterSpacing: 0.6,
     marginTop: 8,
     marginBottom: 4,

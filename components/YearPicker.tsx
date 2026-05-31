@@ -1,6 +1,7 @@
 import { ScrollView, StyleSheet, Pressable, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
+import { Typography } from '../constants/typography';
 import type { YearFilter } from '../lib/yearFilter';
 
 interface YearPickerProps {
@@ -74,12 +75,11 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   pillText: {
-    fontSize: 13,
+    ...Typography.label,
     fontWeight: '600',
-    color: Colors.textSecondary,
     fontVariant: ['tabular-nums'],
   },
   pillTextActive: {
-    color: '#FFFFFF',
+    color: Colors.white,
   },
 });

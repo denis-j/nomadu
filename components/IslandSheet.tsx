@@ -26,6 +26,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Colors } from '../constants/colors';
+import { Typography } from '../constants/typography';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -311,9 +313,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E5EA',
   },
   title: {
-    fontSize: 18,
+    ...Typography.titleMedium,
     fontWeight: '600',
-    color: '#000000',
     flex: 1,
   },
   backButton: {
@@ -344,9 +345,9 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   searchInput: {
+    ...Typography.titleSmall,
+    fontWeight: '400',
     flex: 1,
-    fontSize: 16,
-    color: '#000000',
     padding: 0,
   },
   body: {

@@ -15,6 +15,7 @@ import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
 import { updateJourneyLeg, parseDate, type TransportType } from '../../../lib/database';
 import { forwardGeocode } from '../../../lib/geocoding';
+import { Colors } from '../../../constants/colors';
 import { getCountryCode } from '../../../utils/geography';
 import { showToast } from '../../../lib/toast';
 
@@ -295,7 +296,7 @@ const styles = StyleSheet.create({
     color: PlatformColor('label'),
   },
   transportLabelActive: {
-    color: '#fff',
+    color: Colors.white,
   },
   inputCard: {
     backgroundColor: PlatformColor('secondarySystemGroupedBackground'),

@@ -23,6 +23,7 @@ import { useJourney } from '../../../hooks/useJourney';
 import { useAuth } from '../../../hooks/useAuth';
 import { EmptyState } from '../../../components/EmptyState';
 import { Colors } from '../../../constants/colors';
+import { Typography } from '../../../constants/typography';
 import {
   JourneyLeg, TransportType,
   parseDate,
@@ -482,7 +483,7 @@ function SuggestionLegCard({
             activeOpacity={0.85}
             disabled={disabled}
           >
-            <Ionicons name="add" size={16} color="#fff" />
+            <Ionicons name="add" size={16} color={Colors.white} />
             <Text style={styles.suggAddText}>{disabled ? 'Loading…' : 'Add this stop'}</Text>
           </TouchableOpacity>
         </CardShell>
@@ -1039,16 +1040,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   summaryValue: {
-    fontSize: 16,
+    ...Typography.titleSmall,
     fontWeight: '700',
-    color: Colors.text,
     fontVariant: ['tabular-nums'],
   },
   summaryLabel: {
-    fontSize: 11,
+    ...Typography.eyebrow,
     fontWeight: '500',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   summaryDivider: {
@@ -1106,7 +1104,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   connectorText: {
-    fontSize: 12,
+    ...Typography.caption,
     color: Colors.textSecondary,
     fontWeight: '500',
     maxWidth: 180,
@@ -1129,7 +1127,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: Colors.primary,
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: Colors.white,
   },
 
   // ─── Leg card ───
@@ -1157,23 +1155,22 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   legCity: {
-    fontSize: 17,
+    ...Typography.bodyLarge,
     fontWeight: '700',
-    color: Colors.text,
     letterSpacing: -0.2,
   },
   legCountry: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
   },
   legDates: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
     fontVariant: ['tabular-nums'],
     marginTop: 2,
   },
   legNotes: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     color: Colors.textTertiary,
     lineHeight: 18,
     marginTop: 4,
@@ -1190,7 +1187,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   statusChipText: {
-    fontSize: 12,
+    ...Typography.caption,
     fontWeight: '600',
   },
   legRight: {
@@ -1204,7 +1201,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   daysText: {
-    fontSize: 12,
+    ...Typography.caption,
     fontWeight: '700',
     color: Colors.primary,
     fontVariant: ['tabular-nums'],
@@ -1244,7 +1241,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   aiPillText: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     fontWeight: '600',
     color: Colors.textSecondary,
   },
@@ -1268,8 +1265,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   aiPillStatus: {
-    fontSize: 12,
-    color: Colors.textTertiary,
+    ...Typography.caption,
   },
   aiInputWrap: {
     marginLeft: 28,
@@ -1294,7 +1290,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   aiChipText: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     fontWeight: '700',
     color: Colors.primary,
   },
@@ -1374,12 +1370,12 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   suggCity: {
-    fontSize: 17,
+    ...Typography.bodyLarge,
     fontWeight: '600',
-    color: Colors.text,
     marginBottom: 2,
   },
   suggCountry: {
+    ...Typography.bodySmall,
     fontSize: 14,
     color: Colors.textSecondary,
     marginBottom: 8,
@@ -1390,7 +1386,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   suggDates: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     color: Colors.textTertiary,
   },
   suggTransportChip: {
@@ -1409,7 +1405,7 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   suggReason: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     color: Colors.textTertiary,
     lineHeight: 18,
     marginTop: 6,
@@ -1425,9 +1421,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   suggAddText: {
+    ...Typography.bodySmall,
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: Colors.white,
   },
 
   // ─── Journey map ───

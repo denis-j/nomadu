@@ -10,6 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Colors } from '../constants/colors';
+import { Typography } from '../constants/typography';
 
 const ICON = require('../assets/icons/splash-icon-cloud.png');
 
@@ -105,15 +106,11 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
   },
   appName: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: Colors.text,
+    ...Typography.displayLarge,
     textAlign: 'center',
-    letterSpacing: -0.5,
   },
   tagline: {
-    fontSize: 15,
-    fontWeight: '500',
+    ...Typography.bodyMedium,
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 2,

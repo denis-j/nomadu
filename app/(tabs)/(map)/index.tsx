@@ -16,6 +16,7 @@ import { useTrips } from '../../../hooks/useTrips';
 import { useVisaTracker } from '../../../hooks/useVisaTracker';
 import { useTaxTracker } from '../../../hooks/useTaxTracker';
 import { Colors } from '../../../constants/colors';
+import { Typography } from '../../../constants/typography';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { parseDate, Trip } from '../../../lib/database';
 import { VisaStatus } from '../../../lib/visaCalculations';
@@ -324,9 +325,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   chipCity: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
+    ...Typography.button,
   },
   chipDivider: {
     width: 1,
@@ -334,6 +333,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
   },
   chipCountry: {
+    ...Typography.bodySmall,
     fontSize: 14,
     color: Colors.textSecondary,
   },
@@ -355,16 +355,11 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
   },
   statValue: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.text,
-    fontVariant: ['tabular-nums'],
+    ...Typography.numericMedium,
   },
   statLabel: {
-    fontSize: 11,
+    ...Typography.eyebrow,
     fontWeight: '500',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   statSep: {
@@ -384,15 +379,12 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
   },
   trackingLabel: {
+    ...Typography.eyebrow,
     fontSize: 10,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
   trackingValue: {
-    fontSize: 18,
-    fontWeight: '700',
+    ...Typography.titleMedium,
     fontVariant: ['tabular-nums'],
   },
   trackingSubLabel: {
@@ -418,6 +410,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   emptyText: {
+    ...Typography.bodySmall,
     fontSize: 14,
     color: Colors.textSecondary,
   },

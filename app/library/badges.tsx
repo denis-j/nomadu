@@ -4,6 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
 import { BADGE_LIBRARY, type BadgeInfo } from '../../lib/badges';
 import { getAllTripsRaw } from '../../lib/database';
 import { CountryBadge3DPreview } from '../../components/CountryBadge3D';
@@ -62,7 +63,7 @@ export default function BadgeLibraryScreen() {
               >
                 <View style={styles.tileTop}>
                   {isEarned ? (
-                    <CountryBadge3DPreview countryCode={b.code} backgroundColor="#FFFFFF" />
+                    <CountryBadge3DPreview countryCode={b.code} backgroundColor={Colors.white} />
                   ) : (
                     <View style={styles.lockedPlaceholder}>
                       <Ionicons name="medal-outline" size={40} color={Colors.textTertiary} />
@@ -93,18 +94,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   heading: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.text,
+    ...Typography.titleLarge,
     letterSpacing: -0.4,
   },
   heading2: {
+    ...Typography.bodySmall,
     fontSize: 14,
     color: Colors.textSecondary,
     fontVariant: ['tabular-nums'],
   },
   intro: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
     lineHeight: 19,
     marginBottom: 6,
@@ -147,9 +147,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tileName: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     fontWeight: '600',
-    color: Colors.text,
     textAlign: 'center',
     marginTop: 6,
   },

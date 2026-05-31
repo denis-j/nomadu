@@ -26,6 +26,7 @@ import { pickImportImages, setPendingImportImages } from '../../../lib/tripImpor
 import { takePendingUnlock } from '../../../lib/badges';
 import { BadgeUnlockOverlay } from '../../../components/BadgeUnlockOverlay';
 import { Colors } from '../../../constants/colors';
+import { Typography } from '../../../constants/typography';
 import { Trip, markTripDeleted, parseDate } from '../../../lib/database';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { LinearGradient } from 'react-native-svg';
@@ -85,13 +86,12 @@ const gapStyles = StyleSheet.create({
     gap: 2,
   },
   days: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     fontWeight: '600',
     color: Colors.primary + 'AA',
   },
   dates: {
-    fontSize: 12,
-    color: Colors.textTertiary,
+    ...Typography.caption,
   },
 });
 
@@ -116,7 +116,7 @@ function TimelineEmpty({ onAdd, onImport }: { onAdd: () => void; onImport: () =>
 
       <CloudyButton onPress={onImport}>
         <View style={emptyStyles.cloudyBtnContent}>
-          <Ionicons name="sparkles" size={22} color="#0B2541" />
+          <Ionicons name="sparkles" size={22} color={Colors.cloudyButtonText} />
           <Text style={emptyStyles.cloudyTitle}>Import from screenshots</Text>
         </View>
       </CloudyButton>
@@ -138,10 +138,8 @@ function TimelineEmpty({ onAdd, onImport }: { onAdd: () => void; onImport: () =>
 const emptyStyles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 },
   variantLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    ...Typography.eyebrow,
     color: Colors.textTertiary,
-    textTransform: 'uppercase',
     letterSpacing: 0.6,
     marginTop: 4,
     marginBottom: -8,
@@ -152,14 +150,13 @@ const emptyStyles = StyleSheet.create({
     marginBottom: -16,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.text,
+    ...Typography.titleLarge,
     textAlign: 'center',
     letterSpacing: -0.4,
     marginTop: 8,
   },
   subtitle: {
+    ...Typography.bodySmall,
     fontSize: 14,
     color: Colors.textSecondary,
     textAlign: 'center',
@@ -173,7 +170,7 @@ const emptyStyles = StyleSheet.create({
     gap: 10,
     flex: 1,
   },
-  cloudyTitle: { color: '#0B2541', fontSize: 16, fontWeight: '700' },
+  cloudyTitle: { ...Typography.titleSmall, fontWeight: '700', color: Colors.cloudyButtonText },
   secondaryBtn: {
     width: '100%',
     maxWidth: 360,
@@ -189,9 +186,9 @@ const emptyStyles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   secondaryBtnPressed: { opacity: 0.55 },
-  secondaryBtnText: { color: Colors.text, fontSize: 15, fontWeight: '600' },
+  secondaryBtnText: { ...Typography.button },
   pressedBtn: { opacity: 0.92, transform: [{ scale: 0.99 }] },
-  hint: { fontSize: 12, color: Colors.textTertiary, textAlign: 'center', marginTop: 8 },
+  hint: { ...Typography.caption, textAlign: 'center', marginTop: 8 },
 });
 
 // ─── Country group (collapsible) ───
@@ -438,7 +435,7 @@ const groupStyles = StyleSheet.create({
     borderRadius: 8,
   },
   countChipText: {
-    fontSize: 12,
+    ...Typography.caption,
     fontWeight: '600',
     color: Colors.accent,
   },
@@ -449,14 +446,13 @@ const groupStyles = StyleSheet.create({
     borderRadius: 10,
   },
   daysText: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     fontWeight: '700',
     color: Colors.primary,
   },
   country: {
-    fontSize: 17,
+    ...Typography.bodyLarge,
     fontWeight: '600',
-    color: Colors.text,
     marginBottom: 2,
   },
   headerBottom: {
@@ -465,7 +461,7 @@ const groupStyles = StyleSheet.create({
     marginTop: 6,
   },
   dates: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     color: Colors.textTertiary,
   },
   activeDot: {
@@ -941,7 +937,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   sectionTitle: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     fontWeight: '600',
     color: Colors.textSecondary,
   },
@@ -952,17 +948,16 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   sectionStatValue: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     fontWeight: '600',
     color: Colors.textTertiary,
   },
   sectionStatLabel: {
-    fontSize: 12,
-    color: Colors.textTertiary,
+    ...Typography.caption,
     opacity: 0.7,
   },
   sectionStatSep: {
-    fontSize: 12,
+    ...Typography.caption,
     color: Colors.border,
     marginHorizontal: 1,
   },
@@ -976,7 +971,7 @@ const styles = StyleSheet.create({
   warningBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#FF3B30',
+    color: Colors.error,
   },
   gapBadge: {
     backgroundColor: '#FF950015',

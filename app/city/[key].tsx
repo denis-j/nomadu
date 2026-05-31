@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { getTripsByCity, Trip } from '../../lib/database';
 import { countryCodeToFlag } from '../../lib/geocoding';
 import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
 import { mapState } from '../../lib/mapState';
 
 const hasGlass = isLiquidGlassAvailable();
@@ -176,8 +177,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingText: {
+    ...Typography.titleSmall,
+    fontWeight: '400',
     color: Colors.textSecondary,
-    fontSize: 16,
   },
   content: {
     paddingBottom: 60,
@@ -217,12 +219,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   city: {
+    ...Typography.displayMedium,
     fontSize: 26,
     fontWeight: '700',
-    color: Colors.text,
   },
   country: {
-    fontSize: 16,
+    ...Typography.titleSmall,
+    fontWeight: '400',
     color: Colors.textSecondary,
     marginTop: 2,
   },
@@ -251,9 +254,7 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
   },
   statValue: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: Colors.text,
+    ...Typography.displayMedium,
     fontVariant: ['tabular-nums'],
   },
   // ─── Timeline ───
@@ -262,9 +263,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   timelineTitle: {
-    fontSize: 15,
+    ...Typography.button,
     fontWeight: '700',
-    color: Colors.text,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 16,
@@ -323,9 +323,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   visitNumber: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
+    ...Typography.button,
   },
   daysBadge: {
     backgroundColor: Colors.primary + '18',
@@ -334,12 +332,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   daysText: {
-    fontSize: 12,
+    ...Typography.caption,
     fontWeight: '700',
     color: Colors.primary,
   },
   dateRange: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     color: Colors.textSecondary,
   },
   activeBadge: {
@@ -355,7 +353,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.success,
   },
   activeText: {
-    fontSize: 12,
+    ...Typography.caption,
     fontWeight: '600',
     color: Colors.success,
   },

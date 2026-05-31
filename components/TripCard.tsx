@@ -3,6 +3,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
+import { Typography } from '../constants/typography';
 import { Trip, parseDate } from '../lib/database';
 import { countryCodeToFlag } from '../lib/geocoding';
 
@@ -202,23 +203,21 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   daysText: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     fontWeight: '700',
     color: Colors.primary,
   },
   city: {
-    fontSize: 17,
+    ...Typography.bodyLarge,
     fontWeight: '600',
-    color: Colors.text,
     marginBottom: 2,
   },
   cityInline: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
+    ...Typography.button,
     flex: 1,
   },
   country: {
+    ...Typography.bodySmall,
     fontSize: 14,
     color: Colors.textSecondary,
     marginBottom: 8,
@@ -234,18 +233,18 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   overlapChipText: {
-    fontSize: 12,
+    ...Typography.caption,
     fontWeight: '600',
-    color: '#FF3B30',
+    color: Colors.error,
   },
   daysBadgeOverlap: {
     backgroundColor: '#FF3B3018',
   },
   daysTextOverlap: {
-    color: '#FF3B30',
+    color: Colors.error,
   },
   dates: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     color: Colors.textTertiary,
   },
   activeDot: {

@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { insertJourney } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
 import { Colors } from '../../../constants/colors';
+import { Typography } from '../../../constants/typography';
 
 export default function CreateJourneyScreen() {
   const router = useRouter();
@@ -102,7 +103,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   chipText: {
-    fontSize: 13,
+    ...Typography.bodySmall,
     fontWeight: '700',
     color: Colors.primary,
   },
