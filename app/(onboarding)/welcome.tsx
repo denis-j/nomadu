@@ -16,6 +16,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import { BackgroundClouds } from '../../components/BackgroundClouds';
@@ -23,18 +24,21 @@ import { CloudyButton } from '../../components/CloudyButton';
 import { PlaneModel3D } from '../../components/PlaneModel3D';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
+import { playCollectSound } from '../../lib/sound';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const PLANE_WIDTH = 240;
-const FLIGHT_BUFFER = 0;
 const FLIGHT_DURATION_MS = 11000;
+
+// Transition timing. Total visible white-flash window is FLASH_IN + FLASH_OUT.
+// Navigation happens at the peak (FLASH_IN end) so the next screen mounts
+// hidden under the flash and is revealed as it fades.
+const FLASH_IN_MS = 320;
+const FLASH_OUT_MS = 420;
 
 export default function WelcomeScreen() {
   const router = useRouter();
 
-  // Plane loops right → left, exits the screen, re-enters from the right.
-  // Linear timing + non-reversing repeat = the plane disappears off the left
-  // and reappears from off-right without visibly snapping back.
   const flight = useSharedValue(0);
   useEffect(() => {
     flight.value = withRepeat(
@@ -45,16 +49,39 @@ export default function WelcomeScreen() {
   }, [flight]);
 
   const flightStyle = useAnimatedStyle(() => {
-    const startX = SCREEN_WIDTH + FLIGHT_BUFFER;
-    const endX = -PLANE_WIDTH - FLIGHT_BUFFER;
+    const startX = SCREEN_WIDTH;
+    const endX = -PLANE_WIDTH;
     const x = startX + flight.value * (endX - startX);
     const y = Math.sin(flight.value * Math.PI * 4) * 4;
     return { transform: [{ translateX: x }, { translateY: y }] };
   });
 
+  // Transition shared values
+  const flash = useSharedValue(0);
+  const contentFade = useSharedValue(1);
+
+  const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }));
+  const contentStyle = useAnimatedStyle(() => ({
+    opacity: contentFade.value,
+    transform: [{ translateY: (1 - contentFade.value) * -30 }],
+  }));
+
   const handleStart = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/(onboarding)/citizenship');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    playCollectSound();
+
+    contentFade.value = withTiming(0, {
+      duration: FLASH_IN_MS,
+      easing: Easing.in(Easing.cubic),
+    });
+    flash.value = withSequence(
+      withTiming(0.95, { duration: FLASH_IN_MS, easing: Easing.in(Easing.cubic) }),
+      withTiming(0, { duration: FLASH_OUT_MS, easing: Easing.out(Easing.cubic) }),
+    );
+
+    setTimeout(() => {
+      router.push('/(onboarding)/citizenship');
+    }, FLASH_IN_MS);
   };
 
   return (
@@ -70,7 +97,7 @@ export default function WelcomeScreen() {
       </Animated.View>
 
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.content}>
+        <Animated.View style={[styles.content, contentStyle]}>
           <Animated.View
             entering={FadeIn.delay(200).duration(600)}
             style={styles.header}
@@ -102,14 +129,19 @@ export default function WelcomeScreen() {
               </Link>
             </View>
           </Animated.View>
-        </View>
+        </Animated.View>
       </SafeAreaView>
+
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.flash, flashStyle]}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, overflow: 'hidden' },
   safeArea: { flex: 1 },
   content: {
     flex: 1,
@@ -122,6 +154,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 70,
     left: 0,
+  },
+  flash: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#FFFFFF',
   },
   header: {
     alignItems: 'center',

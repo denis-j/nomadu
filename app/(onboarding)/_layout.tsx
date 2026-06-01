@@ -53,6 +53,7 @@ export default function OnboardingLayout() {
         <Stack.Screen name="permissions" />
         <Stack.Screen name="loading" />
         <Stack.Screen name="paywall" />
+        <Stack.Screen name="celebrate" />
       </Stack>
 
       {step !== null && <OnboardingProgress step={step} total={TOTAL_STEPS} />}

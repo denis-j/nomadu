@@ -16,7 +16,7 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
+import AnimatedGradientBackground from '../../components/animated-gradient-background';
 import { CloudyButton } from '../../components/CloudyButton';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
@@ -27,6 +27,20 @@ import { showToast } from '../../lib/toast';
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
+
+// Same animated palette used on sign-up so both auth screens share the look.
+const gradientColorSets = [
+  {
+    colors: ['#4DC1FF', '#8AD3FF', '#DBF0FF'],
+    start: { x: 0, y: 0 },
+    end: { x: 1, y: 1 },
+  },
+  {
+    colors: ['#8AD3FF', '#DBF0FF', '#FFFFFF'],
+    start: { x: 1, y: 0 },
+    end: { x: 0, y: 1 },
+  },
+];
 
 export default function SignInScreen() {
   const emailRef = useRef<TextInput>(null);
@@ -78,11 +92,9 @@ export default function SignInScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
-      <LinearGradient
-        colors={['#4DC1FF', '#8AD3FF', '#DBF0FF']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
+      <AnimatedGradientBackground
+        colorSets={gradientColorSets}
+        duration={4000}
       />
 
       <SafeAreaView style={styles.safeArea}>

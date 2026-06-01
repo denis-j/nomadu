@@ -16,6 +16,7 @@ import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { useAuth } from '../../hooks/useAuth';
 import { LOCAL_ONBOARDING_UID, OnboardingGoal, setOnboardingGoal } from '../../lib/onboarding';
+import { playCardTapSound } from '../../lib/sound';
 import {
   ENTER_DURATION,
   TITLE_DELAY,
@@ -64,6 +65,7 @@ export default function GoalScreen() {
     if (selected) return;
     setSelected(goal);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    playCardTapSound();
     const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
     setOnboardingGoal(uid, goal);
     router.push('/(onboarding)/residence');

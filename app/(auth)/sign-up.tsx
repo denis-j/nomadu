@@ -22,13 +22,13 @@ import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { signUpWithEmail, signInWithApple } from '../../lib/auth';
-import { toast } from '../../lib/toast';
+import { showToast } from '../../lib/toast';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
-// CloudyButton palette: deep sky blue → light blue → icy → white
+// Same animated palette used on sign-in so both auth screens share the look.
 const gradientColorSets = [
   {
     colors: ['#4DC1FF', '#8AD3FF', '#DBF0FF'],
@@ -42,25 +42,19 @@ const gradientColorSets = [
   },
 ];
 
+
 export default function SignUpScreen() {
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
-  const confirmPasswordRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const { signIn: googleSignIn, ready: googleReady } = useGoogleAuth();
 
   const handleSignUp = async () => {
     if (!email || !password) {
       showToast('Please enter your email and password.', 'error');
-      return;
-    }
-    if (password !== confirmPassword) {
-      showToast('Passwords do not match.', 'error');
       return;
     }
     if (password.length < 6) {
@@ -161,37 +155,12 @@ export default function SignUpScreen() {
                     autoCorrect={false}
                     autoComplete="new-password"
                     textContentType="newPassword"
-                    returnKeyType="next"
-                    onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+                    returnKeyType="done"
+                    onSubmitEditing={handleSignUp}
                   />
                   <TouchableOpacity onPress={() => setShowPassword((v) => !v)} hitSlop={10}>
                     <Ionicons
                       name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                      size={20}
-                      color={Colors.textTertiary}
-                    />
-                  </TouchableOpacity>
-                </Pressable>
-                <View style={styles.separator} />
-                <Pressable onPress={() => confirmPasswordRef.current?.focus()} style={[styles.inputRow, styles.inputRowIcon]}>
-                  <TextInput
-                    ref={confirmPasswordRef}
-                    style={[styles.input, styles.inputFlex]}
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    placeholder="Confirm Password"
-                    placeholderTextColor={Colors.textTertiary}
-                    secureTextEntry={!showConfirm}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="new-password"
-                    textContentType="newPassword"
-                    returnKeyType="done"
-                    onSubmitEditing={handleSignUp}
-                  />
-                  <TouchableOpacity onPress={() => setShowConfirm((v) => !v)} hitSlop={10}>
-                    <Ionicons
-                      name={showConfirm ? 'eye-off-outline' : 'eye-outline'}
                       size={20}
                       color={Colors.textTertiary}
                     />
@@ -325,7 +294,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   continueButton: {
-    marginTop: 8,
+    marginTop: 16,
   },
   continueInner: {
     justifyContent: 'center',

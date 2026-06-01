@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View , Pressable } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View , Pressable } from 'react-native';
 import { showToast } from '../../../lib/toast';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
@@ -177,14 +177,16 @@ export default function SettingsScreen() {
       {/* Notification Permission Warning */}
       {!notificationsGranted && (
         <Pressable onPress={openSettings}>
-          <Glass {...glassProps} style={[styles.warningCard, !hasGlass && styles.warningCardFallback]}>
-            <View style={styles.warningIconWrap}>
-              <Ionicons name="notifications-outline" size={24} color={Colors.warning} />
-            </View>
+          <Glass {...glassProps} style={[styles.cloudCard, !hasGlass && styles.cloudCardFallback]}>
+            <Image
+              source={require('../../../assets/icons/bell.png')}
+              style={styles.cloudCardIcon}
+              resizeMode="contain"
+            />
             <View style={styles.warningContent}>
               <Text style={styles.warningTitle}>Enable Notifications</Text>
               <Text style={styles.warningText}>
-                Allow notifications to get visa warnings, tax residency alerts, and city arrival updates. Tap to open Settings.
+                Turn this on to receive Visa and other warnings. Tap to open Settings
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
@@ -590,6 +592,25 @@ const styles = StyleSheet.create({
   },
   warningCardFallback: {
     backgroundColor: Colors.warning + '0A',
+  },
+  cloudCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderRadius: 16,
+    padding: 16,
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: 'rgba(77,193,255,0.55)',
+    backgroundColor: 'rgba(138,211,255,0.22)',
+  },
+  cloudCardFallback: {
+    backgroundColor: 'rgba(138,211,255,0.22)',
+  },
+  cloudCardIcon: {
+    width: 44,
+    height: 44,
   },
   warningIconWrap: {
     width: 40,

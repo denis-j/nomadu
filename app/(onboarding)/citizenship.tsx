@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
   FlatList,
@@ -26,6 +26,7 @@ import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { useAuth } from '../../hooks/useAuth';
 import { LOCAL_ONBOARDING_UID, setCitizenship } from '../../lib/onboarding';
+import { playSuccessSound, playTapSound } from '../../lib/sound';
 import {
   getCountryCode,
   getPopularCountries,
@@ -98,6 +99,21 @@ function SearchRow({ name, index, onPress }: {
   );
 }
 
+// High-altitude initial view that we zoom down from on mount, like the
+// camera is descending out of the welcome-screen flight.
+const APPROACH_REGION = {
+  latitude: 30,
+  longitude: 10,
+  latitudeDelta: 160,
+  longitudeDelta: 160,
+};
+const LANDED_REGION = {
+  latitude: 30,
+  longitude: 10,
+  latitudeDelta: 100,
+  longitudeDelta: 100,
+};
+
 export default function CitizenshipScreen() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
@@ -105,6 +121,17 @@ export default function CitizenshipScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const mapRef = useRef<MapView>(null);
+
+  // Touchdown: after the MapView has a chance to settle, zoom from the high
+  // approach altitude down to the default view. The delay is important because
+  // animateToRegion fired before the map is fully laid out has been known to
+  // wedge react-native-maps.
+  useEffect(() => {
+    const zoom = setTimeout(() => {
+      mapRef.current?.animateToRegion(LANDED_REGION, 900);
+    }, 400);
+    return () => clearTimeout(zoom);
+  }, []);
 
   const isSearching = query.trim().length > 0;
   const popularCountries = useMemo(() => getPopularCountries(), []);
@@ -118,6 +145,7 @@ export default function CitizenshipScreen() {
     setSelected(countryName);
     setHoveredCountry(countryName);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    playSuccessSound();
     const code = getCountryCode(countryName);
     const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
     await setCitizenship(uid, countryName, code);
@@ -139,6 +167,7 @@ export default function CitizenshipScreen() {
 
   const handleMarkerPress = (countryName: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    playTapSound();
     setHoveredCountry(countryName);
 
     const coords = COUNTRY_COORDS[countryName];
@@ -160,12 +189,7 @@ export default function CitizenshipScreen() {
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         provider={PROVIDER_DEFAULT}
-        initialRegion={{
-          latitude: 30,
-          longitude: 10,
-          latitudeDelta: 100,
-          longitudeDelta: 100,
-        }}
+        initialRegion={APPROACH_REGION}
         scrollEnabled={true}
         zoomEnabled={true}
         rotateEnabled={false}

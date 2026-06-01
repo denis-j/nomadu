@@ -26,27 +26,42 @@ import { requestLocationPermissions } from '../../lib/location';
 import { requestNotificationPermissions } from '../../lib/notifications';
 
 
+// Minimum visible loading time on the permissions screen before we hand off
+// to /loading. Without this, accepting/denying the iOS dialog or skipping
+// teleports the user to the loading screen so fast that it reads as a flicker.
+const MIN_HOLD_MS = 800;
+
 export default function PermissionsScreen() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  const goNextAfterHold = async (started: number) => {
+    const elapsed = Date.now() - started;
+    const remaining = MIN_HOLD_MS - elapsed;
+    if (remaining > 0) {
+      await new Promise((resolve) => setTimeout(resolve, remaining));
+    }
+    router.push('/(onboarding)/loading');
+  };
+
   const handleEnable = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
+    const started = Date.now();
     try {
       await requestLocationPermissions();
       await requestNotificationPermissions();
     } catch {
       // User denied or error. Continue anyway.
-    } finally {
-      setLoading(false);
-      router.push('/(onboarding)/loading');
     }
+    await goNextAfterHold(started);
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    if (loading) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(onboarding)/loading');
+    setLoading(true);
+    await goNextAfterHold(Date.now());
   };
 
   return (

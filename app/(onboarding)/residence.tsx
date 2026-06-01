@@ -16,6 +16,7 @@ import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { useAuth } from '../../hooks/useAuth';
 import { LOCAL_ONBOARDING_UID, setHasFixedResidence } from '../../lib/onboarding';
+import { playCardTapSound } from '../../lib/sound';
 import {
   ENTER_DURATION,
   TITLE_DELAY,
@@ -60,6 +61,7 @@ export default function ResidenceScreen() {
     if (!choice) return;
     setSelected(choice);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    playCardTapSound();
     const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
     setHasFixedResidence(uid, choice === 'yes');
     router.push('/(onboarding)/permissions');

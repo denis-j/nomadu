@@ -1,39 +1,39 @@
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
-import { useOnboarding } from '../../contexts/OnboardingContext';
+import { setCelebrating } from '../../lib/celebration';
 import { useSubscription } from '../../hooks/useSubscription';
-import { useAuth } from '../../hooks/useAuth';
-import { getOnboardingGoal } from '../../lib/onboarding';
-
-function landingRouteForGoal(goal: Awaited<ReturnType<typeof getOnboardingGoal>>): string {
-  switch (goal) {
-    case 'tax': return '/(tabs)/(stats)/tax';
-    case 'visa': return '/(tabs)/(stats)/visa';
-    case 'history': return '/(tabs)/(timeline)';
-    default: return '/(tabs)';
-  }
-}
 
 export default function OnboardingPaywallScreen() {
   const router = useRouter();
-  const { markOnboardingComplete } = useOnboarding();
-  const { refresh } = useSubscription();
-  const { user } = useAuth();
+  const { isPro } = useSubscription();
+  const navigatedRef = useRef(false);
 
-  const handleCompleted = async () => {
-    await refresh();
-    await markOnboardingComplete();
-    const goal = user ? await getOnboardingGoal(user.uid) : null;
-    router.replace(landingRouteForGoal(goal) as never);
+  const goToCelebrate = () => {
+    if (navigatedRef.current) return;
+    navigatedRef.current = true;
+    // Flag the celebration FIRST so RootNavigator's customer-info-triggered
+    // re-route bails out instead of yanking us to /(tabs).
+    setCelebrating(true);
+    router.replace('/(onboarding)/celebrate');
   };
+
+  // The RevenueCatUI paywall's onPurchaseCompleted callback is unreliable in
+  // some environments (Test Store, simulator), so we also watch isPro directly.
+  // The CustomerInfo update listener flips isPro the instant the purchase
+  // succeeds, which is the canonical "purchase done" signal.
+  useEffect(() => {
+    if (isPro) {
+      goToCelebrate();
+    }
+  }, [isPro]);
 
   const RevenueCatUI = require('react-native-purchases-ui').default;
   return (
     <View style={{ flex: 1 }}>
       <RevenueCatUI.Paywall
-        onPurchaseCompleted={handleCompleted}
-        onRestoreCompleted={handleCompleted}
+        onPurchaseCompleted={goToCelebrate}
+        onRestoreCompleted={goToCelebrate}
       />
     </View>
   );

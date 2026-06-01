@@ -28,6 +28,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useSubscription } from '../hooks/useSubscription';
 import { configureRevenueCat, identifyUser } from '../lib/revenueCat';
 import { prefetchAll, prefetchUserData } from '../lib/prefetch';
+import { isCelebrating } from '../lib/celebration';
 import { ToastContainer } from '../components/Toast';
 
 // Force light mode globally
@@ -47,6 +48,9 @@ function RootNavigator() {
     // already completed it under the LOCAL_ONBOARDING_UID placeholder.
     if (onboardingDone === null) return;
     if (user && subLoading) return;
+    // Paywall just kicked off the celebration screen. Keep our hands off the
+    // router until the celebrate screen unmounts itself.
+    if (isCelebrating()) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboardingGroup = segments[0] === '(onboarding)';

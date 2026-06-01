@@ -1,0 +1,11 @@
+appId: com.nomady.app
+---
+- clearState
+- launchApp
+- waitForAnimationToEnd:
+    timeout: 5000
+- runFlow: 00-dismiss-system-dialogs.yaml
+- tapOn: "Get started"
+- extendedWaitUntil:
+    visible: "Where's home?"
+    timeout: 10000

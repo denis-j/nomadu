@@ -19,6 +19,7 @@ import { CloudyButton } from '../../components/CloudyButton';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { resetPassword } from '../../lib/auth';
+import { showToast } from '../../lib/toast';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -43,13 +44,11 @@ export default function ForgotPasswordScreen() {
   const emailRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
   const handleReset = async () => {
-    setError(null);
     if (!email) {
-      setError('Please enter your email address.');
+      showToast('Please enter your email address.', 'error');
       return;
     }
     setLoading(true);
@@ -57,7 +56,7 @@ export default function ForgotPasswordScreen() {
       await resetPassword(email.trim());
       setSent(true);
     } catch (e: any) {
-      setError(e.message ?? 'Could not send reset email.');
+      showToast(e.message ?? 'Could not send reset email.', 'error');
     } finally {
       setLoading(false);
     }
@@ -96,7 +95,7 @@ export default function ForgotPasswordScreen() {
           {/* Title */}
           <Animated.View entering={FadeIn.duration(400)} style={styles.titleContainer}>
             <Image
-              source={require('../../assets/icons/nomadu_cloud_text.png')}
+              source={require('../../assets/icons/app-icon.png')}
               style={styles.appIcon}
               resizeMode="contain"
             />
@@ -129,10 +128,9 @@ export default function ForgotPasswordScreen() {
               </Pressable>
             </Glass>
 
-            {error && <Text style={styles.errorText}>{error}</Text>}
             {sent && (
               <Text style={styles.successText}>
-                Reset email sent — check your inbox.
+                Reset email sent. Check your inbox.
               </Text>
             )}
 
@@ -203,8 +201,8 @@ const styles = StyleSheet.create({
     marginBottom: 44,
   },
   appIcon: {
-    width: 150,
-    height: 32,
+    width: 80,
+    height: 80,
     marginBottom: 30,
   },
   title: {
@@ -241,11 +239,6 @@ const styles = StyleSheet.create({
   input: {
     ...Typography.titleSmall,
     fontWeight: '400',
-  },
-  errorText: {
-    ...Typography.bodySmall,
-    color: Colors.error,
-    marginTop: 8,
   },
   successText: {
     ...Typography.bodySmall,
