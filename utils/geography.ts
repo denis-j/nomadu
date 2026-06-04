@@ -126,6 +126,13 @@ export function getCountryCode(countryName: string): string {
   return resolveIsoCode(countryName);
 }
 
+export function getCountryName(isoCode: string): string | undefined {
+  ensureCountries();
+  return _allCountries!.find(
+    (c) => c.isoCode.toLowerCase() === isoCode.toLowerCase(),
+  )?.name;
+}
+
 export function getCountryFlag(countryName: string): string | undefined {
   ensureCountries();
   return _allCountries!.find(

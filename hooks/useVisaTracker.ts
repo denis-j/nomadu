@@ -5,6 +5,7 @@ import { getCitizenship } from '../lib/onboarding';
 import { getAllTripsRaw } from '../lib/database';
 import { calculateAllVisaStatuses, VisaStatus } from '../lib/visaCalculations';
 import { getVisaStatusesCache } from '../lib/prefetch';
+import { getAllUserVisas } from '../lib/userVisas';
 
 export function useVisaTracker() {
   const { user } = useAuth();
@@ -33,8 +34,11 @@ export function useVisaTracker() {
       setCitizenshipCode(citizenship.countryCode);
       setCitizenshipCountry(citizenship.country);
 
-      const trips = await getAllTripsRaw();
-      const statuses = calculateAllVisaStatuses(trips, citizenship.countryCode);
+      const [trips, userVisas] = await Promise.all([
+        getAllTripsRaw(),
+        getAllUserVisas(),
+      ]);
+      const statuses = calculateAllVisaStatuses(trips, citizenship.countryCode, userVisas);
       setVisaStatuses(statuses);
     } catch (error) {
       console.error('Failed to load visa statuses:', error);

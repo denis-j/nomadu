@@ -82,6 +82,27 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
     );
   `);
 
+  // User-entered visas. These override the citizenship-aware defaults in
+  // constants/visaPolicies.ts when an active visa exists for a country.
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS user_visas (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      country_code        TEXT NOT NULL,
+      label               TEXT NOT NULL,
+      valid_from          TEXT NOT NULL,
+      valid_to            TEXT NOT NULL,
+      max_days_per_stay   INTEGER,
+      max_days_per_window INTEGER,
+      window_days         INTEGER,
+      entries_allowed     TEXT NOT NULL DEFAULT 'multiple',
+      notes               TEXT,
+      created_at          TEXT DEFAULT (datetime('now')),
+      updated_at          TEXT,
+      sync_id             TEXT,
+      deleted             INTEGER DEFAULT 0
+    );
+  `);
+
   // Migration: add sync columns
   const columns = await database.getAllAsync<{ name: string }>(
     `PRAGMA table_info(trips)`,

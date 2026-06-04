@@ -6,17 +6,31 @@ export default function StatsStack() {
       <Stack.Screen
         name="index"
         options={{
-          title: 'Stats',
+          title: 'Tracking',
           headerLargeTitle: true,
         }}
-
       />
       <Stack.Screen
         name="visa"
         options={{
-          title: 'Visa Tracker',
+          title: 'Visa',
           headerBackButtonDisplayMode: 'minimal',
-          headerTransparent: true
+        }}
+      />
+      <Stack.Screen
+        name="visa-edit"
+        options={{
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          headerBackButtonDisplayMode: 'minimal',
+        }}
+      />
+      <Stack.Screen
+        name="visa-country-picker"
+        options={{
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          headerBackButtonDisplayMode: 'minimal',
         }}
       />
       <Stack.Screen

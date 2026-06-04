@@ -35,12 +35,14 @@ export async function prefetchUserData(uid: string): Promise<void> {
     if (!citizenship) return;
     citizenshipCache = { country: citizenship.country, countryCode: citizenship.countryCode };
 
-    const [trips, hasFixedResidence] = await Promise.all([
+    const { getAllUserVisas } = await import('./userVisas');
+    const [trips, hasFixedResidence, userVisas] = await Promise.all([
       getAllTripsRaw(),
       getHasFixedResidence(uid),
+      getAllUserVisas(),
     ]);
 
-    visaStatusesCache = calculateAllVisaStatuses(trips, citizenship.countryCode);
+    visaStatusesCache = calculateAllVisaStatuses(trips, citizenship.countryCode, userVisas);
     taxStatusesCache = calculateAllTaxStatuses(trips, citizenship.countryCode, hasFixedResidence ?? true);
   } catch (err) {
     console.error('User data prefetch failed:', err);

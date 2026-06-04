@@ -14,8 +14,7 @@ import {
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
-import { useAuth } from '../../hooks/useAuth';
-import { LOCAL_ONBOARDING_UID, OnboardingGoal, setOnboardingGoal } from '../../lib/onboarding';
+import { setExperimentalsEnabled } from '../../lib/onboarding';
 import { playCardTapSound } from '../../lib/sound';
 import {
   ENTER_DURATION,
@@ -28,8 +27,10 @@ const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
+type ExperimentalsChoice = 'yes' | 'no' | null;
+
 interface Option {
-  goal: OnboardingGoal;
+  choice: 'yes' | 'no';
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   description: string;
@@ -37,38 +38,30 @@ interface Option {
 
 const OPTIONS: Option[] = [
   {
-    goal: 'tax',
-    icon: 'shield-checkmark',
-    title: 'Avoid tax residency traps',
-    description: 'Stay ahead of 183-day rules and substantial-presence tests.',
+    choice: 'yes',
+    icon: 'flask',
+    title: 'Yes, give me the new stuff',
+    description: 'Plan upcoming trips and try features still in the works.',
   },
   {
-    goal: 'visa',
-    icon: 'airplane',
-    title: 'Track visa limits easily',
-    description: 'Never overstay a Schengen, ESTA, or tourist allowance again.',
-  },
-  {
-    goal: 'history',
-    icon: 'map',
-    title: 'Build a travel history',
-    description: 'A clean map of every country and city you have ever lived in.',
+    choice: 'no',
+    icon: 'checkmark-done',
+    title: 'No, keep it simple',
+    description: 'Stick to the polished, stable experience for now.',
   },
 ];
 
-export default function GoalScreen() {
-  const [selected, setSelected] = useState<OnboardingGoal | null>(null);
+export default function ExperimentalsScreen() {
+  const [selected, setSelected] = useState<ExperimentalsChoice>(null);
   const router = useRouter();
-  const { user } = useAuth();
 
-  const handleSelect = (goal: OnboardingGoal) => {
-    if (selected) return;
-    setSelected(goal);
+  const handleSelect = (choice: ExperimentalsChoice) => {
+    if (!choice) return;
+    setSelected(choice);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     playCardTapSound();
-    const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
-    setOnboardingGoal(uid, goal);
-    router.push('/(onboarding)/residence');
+    setExperimentalsEnabled(choice === 'yes').catch(() => {});
+    router.push('/(onboarding)/permissions');
   };
 
   return (
@@ -80,18 +73,20 @@ export default function GoalScreen() {
             entering={FadeIn.delay(TITLE_DELAY).duration(ENTER_DURATION)}
             style={styles.header}
           >
-            <Text style={styles.title}>What brings you here?</Text>
-            <Text style={styles.subtitle}>Pick what fits you best. We'll tailor the rest.</Text>
+            <Text style={styles.title}>Try experimental features?</Text>
+            <Text style={styles.subtitle}>
+              Get early access to things like trip planning before they ship to everyone.
+            </Text>
           </Animated.View>
 
           <View style={styles.options}>
             {OPTIONS.map((opt, i) => (
               <Animated.View
-                key={opt.goal}
+                key={opt.choice}
                 entering={FadeIn.delay(OPTION_BASE_DELAY + i * OPTION_STAGGER).duration(ENTER_DURATION)}
               >
                 <TouchableOpacity
-                  onPress={() => handleSelect(opt.goal)}
+                  onPress={() => handleSelect(opt.choice)}
                   activeOpacity={0.85}
                   disabled={selected !== null}
                 >
@@ -114,10 +109,10 @@ export default function GoalScreen() {
           </View>
 
           <Animated.View
-            entering={FadeIn.delay(OPTION_BASE_DELAY + 3 * OPTION_STAGGER + 80).duration(ENTER_DURATION)}
+            entering={FadeIn.delay(OPTION_BASE_DELAY + 2 * OPTION_STAGGER + 80).duration(ENTER_DURATION)}
             style={styles.footer}
           >
-            <Text style={styles.footerText}>You can change this anytime in Settings.</Text>
+            <Text style={styles.footerText}>You can toggle this anytime in Settings.</Text>
           </Animated.View>
         </View>
       </SafeAreaView>
@@ -140,7 +135,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...Typography.brandDisplay,
-    fontSize: 42,
+    fontSize: 44,
     marginBottom: 8,
     textAlign: 'center',
   },

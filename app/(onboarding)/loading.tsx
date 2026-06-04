@@ -27,42 +27,79 @@ import { useAuth } from '../../hooks/useAuth';
 import { useOnboarding } from '../../contexts/OnboardingContext';
 import {
   getCitizenship,
+  getExperimentalsEnabled,
+  getHasFixedResidence,
   getOnboardingGoal,
   LOCAL_ONBOARDING_UID,
   type OnboardingGoal,
 } from '../../lib/onboarding';
+import { getCloudSyncEnabled } from '../../lib/sync';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
+interface Profile {
+  country: string;
+  goal: OnboardingGoal | null;
+  hasFixedResidence: boolean | null;
+  cloudSync: boolean;
+  experimentals: boolean;
+}
+
 interface Stage {
-  /** message rendered to the user */
-  text: (country: string) => string;
-  /** dwell duration in ms */
+  text: (p: Profile) => string;
   duration: number;
 }
 
-const BASE_STAGES: Stage[] = [
-  { text: () => 'Setting up your tracking engine…', duration: 1100 },
-  { text: () => '', duration: 1300 }, // personalized, filled in based on goal
-  { text: () => 'Loading 195 visa rules…', duration: 1100 },
-  { text: () => 'Ready.', duration: 700 },
-];
+/**
+ * Loading stages are deliberately personalised — research on the "labor
+ * illusion" (Buell & Norton, 2011) shows users perceive a service as more
+ * valuable when they SEE concrete, specific work being done on their behalf.
+ * Concrete numbers, the user's own country, and choices they just made all
+ * reinforce that the app is already tailored to them before they ever land in
+ * the product. Total ~8s — long enough to feel substantial, short enough to
+ * not annoy.
+ */
+function buildStages(p: Profile): Stage[] {
+  const goalLine: Stage = (() => {
+    switch (p.goal) {
+      case 'visa':
+        return { text: ({ country }) => `Mapping visa rules for ${country} passport…`, duration: 1300 };
+      case 'history':
+        return { text: () => 'Importing world map data…', duration: 1300 };
+      case 'tax':
+      default:
+        return { text: ({ country }) => `Calibrating tax rules for ${country}…`, duration: 1300 };
+    }
+  })();
 
-function personalizedStage(goal: OnboardingGoal | null): Stage['text'] {
-  switch (goal) {
-    case 'visa':
-      return (c) => `Mapping visa rules for ${c} passport…`;
-    case 'history':
-      return () => 'Importing world map data…';
-    case 'tax':
-    default:
-      return (c) => `Calibrating tax rules for ${c}…`;
+  const residenceLine: Stage = p.hasFixedResidence === false
+    ? { text: () => 'Configuring your nomadic profile…', duration: 1100 }
+    : { text: ({ country }) => `Setting your home base to ${country}…`, duration: 1100 };
+
+  const storageLine: Stage = p.cloudSync
+    ? { text: () => 'Preparing secure cloud sync…', duration: 1000 }
+    : { text: () => 'Locking your data to this device…', duration: 1000 };
+
+  const stages: Stage[] = [
+    { text: () => 'Setting up your tracking engine…', duration: 1100 },
+    goalLine,
+    { text: () => 'Loading 195 country profiles…', duration: 1000 },
+    { text: () => 'Cross-checking 230+ tax residency rules…', duration: 1100 },
+    residenceLine,
+    storageLine,
+  ];
+
+  if (p.experimentals) {
+    stages.push({ text: () => 'Unlocking experimental features…', duration: 900 });
   }
-}
 
-const TOTAL_DURATION = BASE_STAGES.reduce((a, s) => a + s.duration, 0);
+  stages.push({ text: () => 'Almost ready…', duration: 800 });
+  stages.push({ text: () => 'Ready.', duration: 700 });
+
+  return stages;
+}
 
 /**
  * One ring that breathes outward and fades. Stacked three deep with a stagger
@@ -122,25 +159,40 @@ export default function LoadingScreen() {
   const { user } = useAuth();
   const { markOnboardingComplete } = useOnboarding();
   const [stageIndex, setStageIndex] = useState(0);
-  const [country, setCountry] = useState('your home country');
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [countryCode, setCountryCode] = useState<string | null>(null);
-  const [goal, setGoal] = useState<OnboardingGoal | null>(null);
 
   const progress = useSharedValue(0);
   const bubbleScale = useSharedValue(1);
 
   useEffect(() => {
     const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
-    getCitizenship(uid).then((c) => {
-      if (c?.country) setCountry(c.country);
-      if (c?.countryCode) setCountryCode(c.countryCode);
-    });
-    getOnboardingGoal(uid).then(setGoal);
+    (async () => {
+      const [citizenship, goal, residence, cloudSync, experimentals] = await Promise.all([
+        getCitizenship(uid),
+        getOnboardingGoal(uid),
+        getHasFixedResidence(uid),
+        user ? getCloudSyncEnabled(user.uid) : Promise.resolve(false),
+        getExperimentalsEnabled(),
+      ]);
+      if (citizenship?.countryCode) setCountryCode(citizenship.countryCode);
+      setProfile({
+        country: citizenship?.country ?? 'your home country',
+        goal,
+        hasFixedResidence: residence,
+        cloudSync,
+        experimentals,
+      });
+    })();
   }, [user]);
 
   useEffect(() => {
+    if (!profile) return;
+    const stages = buildStages(profile);
+    const totalDuration = stages.reduce((a, s) => a + s.duration, 0);
+
     progress.value = withTiming(1, {
-      duration: TOTAL_DURATION,
+      duration: totalDuration,
       easing: Easing.inOut(Easing.cubic),
     });
 
@@ -156,10 +208,10 @@ export default function LoadingScreen() {
 
     const timeouts: ReturnType<typeof setTimeout>[] = [];
     let elapsed = 0;
-    for (let i = 0; i < BASE_STAGES.length; i++) {
+    for (let i = 0; i < stages.length; i++) {
       const t = setTimeout(() => setStageIndex(i), elapsed);
       timeouts.push(t);
-      elapsed += BASE_STAGES[i].duration;
+      elapsed += stages[i].duration;
     }
 
     const exit = setTimeout(async () => {
@@ -167,11 +219,11 @@ export default function LoadingScreen() {
       // so a re-launch picks up on /sign-up instead of restarting citizenship.
       await markOnboardingComplete();
       router.replace('/(auth)/sign-up');
-    }, TOTAL_DURATION + 300);
+    }, totalDuration + 300);
     timeouts.push(exit);
 
     return () => timeouts.forEach(clearTimeout);
-  }, [router, markOnboardingComplete]);
+  }, [profile, router, markOnboardingComplete]);
 
   const fillStyle = useAnimatedStyle(() => ({
     width: `${progress.value * 100}%`,
@@ -181,9 +233,7 @@ export default function LoadingScreen() {
     transform: [{ scale: bubbleScale.value }],
   }));
 
-  const stages: Stage[] = BASE_STAGES.map((s, i) =>
-    i === 1 ? { ...s, text: personalizedStage(goal) } : s,
-  );
+  const stages = profile ? buildStages(profile) : [];
   const currentStage = stages[stageIndex];
 
   return (
@@ -211,14 +261,16 @@ export default function LoadingScreen() {
             </View>
           </View>
 
-          <Animated.Text
-            key={stageIndex}
-            entering={FadeIn.duration(320)}
-            exiting={FadeOut.duration(200)}
-            style={styles.stageText}
-          >
-            {currentStage.text(country)}
-          </Animated.Text>
+          {currentStage && profile && (
+            <Animated.Text
+              key={stageIndex}
+              entering={FadeIn.duration(320)}
+              exiting={FadeOut.duration(200)}
+              style={styles.stageText}
+            >
+              {currentStage.text(profile)}
+            </Animated.Text>
+          )}
 
           <View style={styles.progressTrack}>
             <Animated.View style={[styles.progressFill, fillStyle]} />

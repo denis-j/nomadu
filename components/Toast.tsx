@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, FadeOut, SlideInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,9 +11,9 @@ export function ToastContainer() {
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    registerToast((data) => {
-      setToast(data);
-    });
+    // registerToast returns its unregister fn — invoke on unmount so a
+    // mounted sheet-level container can pop and let the root take over again.
+    return registerToast((data) => setToast(data));
   }, []);
 
   useEffect(() => {
@@ -23,7 +23,6 @@ export function ToastContainer() {
   }, [toast]);
 
   if (!toast) return null;
-
   const isError = toast.type === 'error';
 
   return (

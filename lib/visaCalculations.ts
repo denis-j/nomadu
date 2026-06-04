@@ -1,6 +1,7 @@
 import { Trip } from './database';
-import { getApplicableRules, ApplicableRule } from '../constants/visaRules';
+import { getApplicableRules } from '../constants/visaRules';
 import { countryCodeToFlag } from './geocoding';
+import type { UserVisa } from './userVisas';
 
 export interface VisaStatus {
   destination: string;
@@ -11,7 +12,15 @@ export interface VisaStatus {
   daysUsed: number;
   daysRemaining: number;
   percentUsed: number;
-  status: 'ok' | 'warning' | 'critical' | 'exceeded';
+  status: 'ok' | 'warning' | 'critical' | 'exceeded' | 'visa_needed' | 'expired';
+  /** Optional URL to verify the rule (e.g. Wikipedia). */
+  source?: string;
+  /** True when this status was generated from a user-entered visa. */
+  isUserVisa?: boolean;
+  /** The user_visa row id — set when isUserVisa is true. */
+  userVisaId?: number;
+  /** YYYY-MM-DD expiry from the user_visa, if applicable. */
+  validUntil?: string;
 }
 
 function daysBetween(a: Date, b: Date): number {
@@ -142,13 +151,30 @@ function getStatusFromPercent(percent: number): VisaStatus['status'] {
   return 'ok';
 }
 
-// Destination code to human-readable name
+// Destination code to human-readable name. Falls back to the ISO code when
+// a destination doesn't have an explicit entry, so even rules added later
+// without a name still render coherently.
 const DESTINATION_NAMES: Record<string, string> = {
   SCHENGEN: 'Schengen Area',
-  TH: 'Thailand', JP: 'Japan', US: 'United States', GB: 'United Kingdom',
-  AU: 'Australia', ID: 'Indonesia', MX: 'Mexico', KR: 'South Korea',
-  CO: 'Colombia', GE: 'Georgia', TR: 'Turkey', ME: 'Montenegro',
-  RS: 'Serbia', AL: 'Albania', BR: 'Brazil',
+  // Americas
+  US: 'United States', CA: 'Canada', MX: 'Mexico', BR: 'Brazil',
+  AR: 'Argentina', CL: 'Chile', UY: 'Uruguay', PE: 'Peru', EC: 'Ecuador',
+  CO: 'Colombia', CR: 'Costa Rica', PA: 'Panama', DO: 'Dominican Republic',
+  // Europe (non-Schengen)
+  GB: 'United Kingdom', IE: 'Ireland',
+  AL: 'Albania', RS: 'Serbia', ME: 'Montenegro', BA: 'Bosnia and Herzegovina',
+  MK: 'North Macedonia', XK: 'Kosovo', TR: 'Turkey',
+  GE: 'Georgia', AM: 'Armenia', UA: 'Ukraine', MD: 'Moldova',
+  // Asia
+  TH: 'Thailand', JP: 'Japan', KR: 'South Korea', ID: 'Indonesia',
+  MY: 'Malaysia', SG: 'Singapore', PH: 'Philippines', VN: 'Vietnam',
+  TW: 'Taiwan', IN: 'India',
+  // Oceania
+  AU: 'Australia', NZ: 'New Zealand',
+  // Middle East
+  AE: 'United Arab Emirates', IL: 'Israel', JO: 'Jordan',
+  // Africa
+  MA: 'Morocco', EG: 'Egypt', ZA: 'South Africa',
 };
 
 function getDestinationName(code: string): string {
@@ -161,25 +187,95 @@ function getFlag(code: string): string {
 }
 
 /**
- * Master function: calculates visa status for all applicable rules.
+ * Build a VisaStatus from a user-entered visa. Day-counting respects whichever
+ * cap the user filled in (rolling window > per-stay > none/expiry-only).
+ */
+function buildUserVisaStatus(trips: Trip[], uv: UserVisa): VisaStatus {
+  const todayStr = today().toISOString().slice(0, 10);
+  const isExpired = uv.valid_to < todayStr;
+
+  let daysUsed = 0;
+  let daysAllowed = 0;
+  let ruleLabel = uv.label;
+
+  if (uv.max_days_per_window && uv.window_days) {
+    daysUsed = countDaysInRollingWindow(trips, [uv.country_code], uv.window_days);
+    daysAllowed = uv.max_days_per_window;
+    ruleLabel = `${uv.label} — ${uv.max_days_per_window}/${uv.window_days}`;
+  } else if (uv.max_days_per_stay) {
+    daysUsed = countCurrentStayDays(trips, uv.country_code);
+    daysAllowed = uv.max_days_per_stay;
+    ruleLabel = `${uv.label} — max ${uv.max_days_per_stay}d/stay`;
+  }
+
+  const daysRemaining = Math.max(0, daysAllowed - daysUsed);
+  const percentUsed = daysAllowed > 0 ? (daysUsed / daysAllowed) * 100 : 0;
+
+  const status: VisaStatus['status'] = isExpired
+    ? 'expired'
+    : daysAllowed > 0
+      ? getStatusFromPercent(percentUsed)
+      : 'ok';
+
+  return {
+    destination: getDestinationName(uv.country_code),
+    destinationCode: uv.country_code,
+    flag: getFlag(uv.country_code),
+    ruleLabel,
+    daysAllowed,
+    daysUsed,
+    daysRemaining,
+    percentUsed,
+    status,
+    isUserVisa: true,
+    userVisaId: uv.id,
+    validUntil: uv.valid_to,
+  };
+}
+
+/**
+ * Master function: calculates visa status for all applicable rules. When a
+ * user-visa exists for a country, it replaces the default per-country rule
+ * (Schengen aggregate is left alone — a national long-stay visa doesn't
+ * formally override the 90/180 short-stay rule for other Schengen states).
  */
 export function calculateAllVisaStatuses(
   trips: Trip[],
   citizenshipCode: string,
+  userVisas: UserVisa[] = [],
 ): VisaStatus[] {
+  const userVisasByCountry = new Map<string, UserVisa>();
+  for (const uv of userVisas) userVisasByCountry.set(uv.country_code, uv);
+
   const visitedCodes = [...new Set(trips.map((t) => t.country_code))];
   const applicableRules = getApplicableRules(citizenshipCode, visitedCodes);
 
-  const statuses: VisaStatus[] = applicableRules.map((ar) => {
+  // Default per-destination statuses, skipping anything the user has a visa for.
+  const statuses: VisaStatus[] = applicableRules
+    .filter((ar) => !userVisasByCountry.has(ar.destinationCode))
+    .map((ar) => {
     const { rule, countryCodes, destinationCode } = ar;
-    let daysUsed: number;
 
-    if (rule.ruleType === 'rolling_window') {
-      daysUsed = countDaysInRollingWindow(trips, countryCodes, rule.windowDays);
-    } else {
-      // visa_free: count current/most recent stay
-      daysUsed = countCurrentStayDays(trips, destinationCode);
+    // 'visa_required' rules are surfaced as a passive "Visa needed" card —
+    // we can't auto-track usage, so daysUsed/Allowed/Remaining are zeroed.
+    if (rule.ruleType === 'visa_required') {
+      return {
+        destination: getDestinationName(destinationCode),
+        destinationCode,
+        flag: getFlag(destinationCode),
+        ruleLabel: rule.label,
+        daysAllowed: 0,
+        daysUsed: 0,
+        daysRemaining: 0,
+        percentUsed: 0,
+        status: 'visa_needed' as const,
+        source: rule.source,
+      };
     }
+
+    const daysUsed = rule.ruleType === 'rolling_window'
+      ? countDaysInRollingWindow(trips, countryCodes, rule.windowDays)
+      : countCurrentStayDays(trips, destinationCode);
 
     const daysRemaining = Math.max(0, rule.allowedDays - daysUsed);
     const percentUsed = rule.allowedDays > 0 ? (daysUsed / rule.allowedDays) * 100 : 0;
@@ -194,11 +290,20 @@ export function calculateAllVisaStatuses(
       daysRemaining,
       percentUsed,
       status: getStatusFromPercent(percentUsed),
+      source: rule.source,
     };
   });
 
-  // Sort by urgency: exceeded → critical → warning → ok, then by percent desc
-  const statusOrder = { exceeded: 0, critical: 1, warning: 2, ok: 3 };
+  // User-entered visas always get a card, even with no trips yet — so the
+  // user can see expiry and refresh from any tab.
+  for (const uv of userVisas) {
+    if (uv.country_code === citizenshipCode) continue;
+    statuses.push(buildUserVisaStatus(trips, uv));
+  }
+
+  // Sort by urgency: expired → exceeded → critical → warning → ok → visa_needed,
+  // then by percent desc within each bucket.
+  const statusOrder = { expired: 0, exceeded: 1, critical: 2, warning: 3, ok: 4, visa_needed: 5 };
   statuses.sort((a, b) => {
     const orderDiff = statusOrder[a.status] - statusOrder[b.status];
     if (orderDiff !== 0) return orderDiff;

@@ -114,6 +114,7 @@ export default function StatsScreen() {
             <TrackerCard
               accentColor={Colors.cloudyBlue}
               title="Visa"
+              count={visaStatuses.length}
               code={mostCritical.destinationCode}
               country={mostCritical.destination}
               daysLeft={mostCritical.daysRemaining}
@@ -137,6 +138,7 @@ export default function StatsScreen() {
             <TrackerCard
               accentColor={Colors.accent}
               title="Tax"
+              count={taxStatuses.length}
               code={mostCriticalTax.countryCode}
               country={mostCriticalTax.country}
               daysLeft={mostCriticalTax.daysRemaining}
@@ -403,6 +405,7 @@ const miniStyles = StyleSheet.create({
 function TrackerCard({
   accentColor,
   title,
+  count,
   code,
   country,
   daysLeft,
@@ -411,6 +414,7 @@ function TrackerCard({
 }: {
   accentColor: string;
   title: string;
+  count?: number;
   code: string;
   country: string;
   daysLeft: number;
@@ -432,9 +436,16 @@ function TrackerCard({
         style={[trackerStyles.card, !hasGlass && trackerStyles.cardFallback]}
       >
         <View style={trackerStyles.headerBlock}>
-          <Text style={trackerStyles.title}>{title}</Text>
+          <View style={trackerStyles.titleRow}>
+            <Text style={trackerStyles.title}>{title}</Text>
+            {count && count > 1 ? (
+              <View style={[trackerStyles.countBadge, { backgroundColor: accentColor + '22' }]}>
+                <Text style={[trackerStyles.countBadgeText, { color: accentColor }]}>+{count - 1}</Text>
+              </View>
+            ) : null}
+          </View>
           <View style={trackerStyles.countryRow}>
-            <Flag code={code} size={14} />
+            <Flag code={code} size={16} />
             <Text style={trackerStyles.country} numberOfLines={1}>
               {country}
             </Text>
@@ -456,6 +467,10 @@ function TrackerCard({
               ]}
             />
           </View>
+        </View>
+
+        <View style={trackerStyles.cornerChevron}>
+          <Ionicons name="chevron-forward" size={13} color={Colors.textTertiary} />
         </View>
       </Glass>
     </Pressable>
@@ -518,10 +533,33 @@ const trackerStyles = StyleSheet.create({
   headerBlock: {
     gap: 6,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   title: {
     ...Typography.eyebrow,
     fontSize: 10,
     color: Colors.textTertiary,
+  },
+  countBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderCurve: 'continuous',
+  },
+  countBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 0.2,
+  },
+  cornerChevron: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    opacity: 0.55,
   },
   countryRow: {
     flexDirection: 'row',
@@ -531,7 +569,7 @@ const trackerStyles = StyleSheet.create({
   country: {
     ...Typography.bodySmall,
     fontWeight: '700',
-    color: Colors.textSecondary,
+    color: Colors.text,
     flex: 1,
   },
   dataBlock: {

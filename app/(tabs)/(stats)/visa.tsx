@@ -1,12 +1,14 @@
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useLayoutEffect, useState } from 'react';
+import { ActivityIndicator, PlatformColor, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { useNavigation, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { SymbolView } from 'expo-symbols';
 import { useVisaTracker } from '../../../hooks/useVisaTracker';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { Flag } from '../../../components/Flag';
-import { EmptyState } from '../../../components/EmptyState';
 import { VisaStatus } from '../../../lib/visaCalculations';
 
 const hasGlass = isLiquidGlassAvailable();
@@ -25,6 +27,8 @@ function getStatusLabel(status: VisaStatus['status']): string {
     case 'critical': return 'Critical';
     case 'warning': return 'Warning';
     case 'ok': return 'OK';
+    case 'visa_needed': return 'Visa needed';
+    case 'expired': return 'Expired';
   }
 }
 
@@ -34,60 +38,147 @@ function getStatusColor(status: VisaStatus['status']): string {
     case 'critical': return Colors.error;
     case 'warning': return Colors.warning;
     case 'ok': return Colors.success;
+    case 'visa_needed': return Colors.textSecondary;
+    case 'expired': return Colors.error;
   }
 }
 
-function VisaCard({ visa }: { visa: VisaStatus }) {
-  const progressColor = getProgressColor(visa.percentUsed);
+function CardHeader({ visa, interactive }: { visa: VisaStatus; interactive?: boolean }) {
   const statusColor = getStatusColor(visa.status);
-  const progressWidth = Math.min(visa.percentUsed, 100);
-
   return (
-    <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardTitle}>
-          <Flag code={visa.destinationCode} size={24} />
-          <View style={styles.titleText}>
-            <Text style={styles.destination}>{visa.destination}</Text>
-            <Text style={styles.ruleLabel}>{visa.ruleLabel}</Text>
-          </View>
+    <View style={styles.cardHeader}>
+      <View style={styles.cardTitle}>
+        <Flag code={visa.destinationCode} size={24} />
+        <View style={styles.titleText}>
+          <Text style={styles.destination}>{visa.destination}</Text>
+          <Text style={styles.ruleLabel}>{visa.ruleLabel}</Text>
         </View>
+      </View>
+      <View style={styles.headerRight}>
         <View style={[styles.statusBadge, { backgroundColor: statusColor + '18' }]}>
           <Text style={[styles.statusText, { color: statusColor }]}>
             {getStatusLabel(visa.status)}
           </Text>
         </View>
+        {interactive && (
+          <Ionicons name="chevron-forward" size={14} color={Colors.textTertiary} />
+        )}
       </View>
+    </View>
+  );
+}
 
-      <View style={styles.progressContainer}>
-        <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressBar,
-              { width: `${progressWidth}%`, backgroundColor: progressColor },
-            ]}
-          />
-        </View>
-      </View>
+function VisaNeededCard({ visa, onPress }: { visa: VisaStatus; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress}>
+      <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
+        <CardHeader visa={visa} interactive />
+        <Text style={styles.visaNeededHint}>
+          Add your visa to track days used and expiry.
+        </Text>
+      </Glass>
+    </Pressable>
+  );
+}
 
-      <View style={styles.cardFooter}>
-        <Text style={styles.daysText}>
-          <Text style={styles.daysUsed}>{visa.daysUsed}</Text>
-          <Text style={styles.daysOf}> of </Text>
-          <Text style={styles.daysAllowed}>{visa.daysAllowed}</Text>
-          <Text style={styles.daysOf}> days used</Text>
+function ExpiredVisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void }) {
+  return (
+    <Pressable onPress={onPress}>
+      <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
+        <CardHeader visa={visa} interactive={!!onPress} />
+        <Text style={styles.visaNeededHint}>
+          {visa.validUntil ? `Expired on ${visa.validUntil}. Update or remove this visa.` : 'Expired.'}
         </Text>
-        <Text style={[styles.daysRemaining, { color: progressColor }]}>
-          {visa.daysRemaining}d left
-        </Text>
-      </View>
+      </Glass>
+    </Pressable>
+  );
+}
+
+function VisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void }) {
+  if (visa.status === 'visa_needed') {
+    return <VisaNeededCard visa={visa} onPress={() => onPress?.()} />;
+  }
+  if (visa.status === 'expired') {
+    return <ExpiredVisaCard visa={visa} onPress={onPress} />;
+  }
+
+  const progressColor = getProgressColor(visa.percentUsed);
+  const progressWidth = Math.min(visa.percentUsed, 100);
+
+  const body = (
+    <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
+      <CardHeader visa={visa} interactive={!!onPress} />
+
+      {visa.daysAllowed > 0 ? (
+        <>
+          <View style={styles.progressContainer}>
+            <View style={styles.progressTrack}>
+              <View
+                style={[
+                  styles.progressBar,
+                  { width: `${progressWidth}%`, backgroundColor: progressColor },
+                ]}
+              />
+            </View>
+          </View>
+
+          <View style={styles.cardFooter}>
+            <Text style={styles.daysText}>
+              <Text style={styles.daysUsed}>{visa.daysUsed}</Text>
+              <Text style={styles.daysOf}> of </Text>
+              <Text style={styles.daysAllowed}>{visa.daysAllowed}</Text>
+              <Text style={styles.daysOf}> days used</Text>
+            </Text>
+            <Text style={[styles.daysRemaining, { color: progressColor }]}>
+              {visa.daysRemaining}d left
+            </Text>
+          </View>
+        </>
+      ) : (
+        visa.validUntil && (
+          <Text style={styles.visaNeededHint}>Valid until {visa.validUntil}</Text>
+        )
+      )}
+
+      {!visa.isUserVisa && (
+        <Text style={styles.overrideHint}>Tap to add your own visa</Text>
+      )}
     </Glass>
   );
+
+  return onPress ? <Pressable onPress={onPress}>{body}</Pressable> : body;
 }
 
 export default function VisaScreen() {
   const { visaStatuses, loading, citizenshipCode, citizenshipCountry, refresh } = useVisaTracker();
   const [refreshing, setRefreshing] = useState(false);
+  const router = useRouter();
+  const navigation = useNavigation();
+
+  const goToAdd = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(tabs)/(stats)/visa-edit');
+  }, [router]);
+
+  const goToEdit = useCallback((id: number) => {
+    Haptics.selectionAsync();
+    router.push(`/(tabs)/(stats)/visa-edit?id=${id}`);
+  }, [router]);
+
+  const goToOverride = useCallback((countryCode: string) => {
+    Haptics.selectionAsync();
+    router.push(`/(tabs)/(stats)/visa-edit?country=${countryCode}`);
+  }, [router]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable hitSlop={12} onPress={goToAdd}>
+          <Ionicons name="add" size={26} color={Colors.text} />
+        </Pressable>
+      ),
+    });
+  }, [navigation, goToAdd]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -106,21 +197,33 @@ export default function VisaScreen() {
 
   if (!citizenshipCode) {
     return (
-      <EmptyState
-        icon="🛂"
-        title="No citizenship set"
-        subtitle="Set your citizenship in Settings to see visa tracking."
-      />
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.emptyScroll}
+      >
+        <View style={styles.emptyInner}>
+          <SymbolView name="person.text.rectangle" size={48} tintColor={PlatformColor('tertiaryLabel')} weight="regular" />
+          <Text style={styles.emptyTitle}>No citizenship set</Text>
+          <Text style={styles.emptySubtitle}>Set your citizenship in Settings to see visa tracking.</Text>
+        </View>
+      </ScrollView>
     );
   }
 
   if (visaStatuses.length === 0) {
     return (
-      <EmptyState
-        icon="🌍"
-        title="No visa rules found"
-        subtitle="Visit countries with known visa rules to see tracking here."
-      />
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.emptyScroll}
+      >
+        <View style={styles.emptyInner}>
+          <SymbolView name="doc.text" size={48} tintColor={PlatformColor('tertiaryLabel')} weight="regular" />
+          <Text style={styles.emptyTitle}>No visas tracked yet</Text>
+          <Text style={styles.emptySubtitle}>
+            Visit a country with a known rule, or tap + to add your own visa.
+          </Text>
+        </View>
+      </ScrollView>
     );
   }
 
@@ -137,7 +240,17 @@ export default function VisaScreen() {
       </View>
 
       {visaStatuses.map((visa) => (
-        <VisaCard key={visa.destinationCode} visa={visa} />
+        <VisaCard
+          key={visa.isUserVisa ? `uv-${visa.userVisaId}` : visa.destinationCode}
+          visa={visa}
+          onPress={visa.isUserVisa && visa.userVisaId
+            ? () => goToEdit(visa.userVisaId!)
+            : visa.status === 'visa_needed'
+              ? goToAdd
+              : visa.destinationCode !== 'SCHENGEN'
+                ? () => goToOverride(visa.destinationCode)
+                : undefined}
+        />
       ))}
 
       <Text style={styles.disclaimer}>
@@ -152,6 +265,32 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
     paddingBottom: 100,
+  },
+  emptyScroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingBottom: 80,
+  },
+  emptyInner: {
+    alignItems: 'center',
+    maxWidth: 320,
+  },
+  emptyTitle: {
+    ...Typography.titleLarge,
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  emptySubtitle: {
+    ...Typography.body,
+    fontSize: 15,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 21,
+    marginTop: 6,
   },
   centered: {
     flex: 1,
@@ -197,6 +336,11 @@ const styles = StyleSheet.create({
   titleText: {
     flex: 1,
     gap: 2,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   destination: {
     ...Typography.bodyLarge,
@@ -254,6 +398,18 @@ const styles = StyleSheet.create({
     ...Typography.button,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
+  },
+  visaNeededHint: {
+    ...Typography.bodySmall,
+    fontSize: 13.5,
+    color: Colors.textSecondary,
+    lineHeight: 19,
+  },
+  overrideHint: {
+    ...Typography.caption,
+    fontSize: 12,
+    color: Colors.textTertiary,
+    marginTop: 4,
   },
   disclaimer: {
     ...Typography.caption,

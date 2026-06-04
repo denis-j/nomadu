@@ -8,10 +8,18 @@ export interface ToastData {
   type: ToastType;
 }
 
-let _show: ((data: ToastData) => void) | null = null;
+// Handler stack: multiple ToastContainers can be mounted (e.g. one at the
+// root and another inside a presented formSheet). The most-recently-mounted
+// handler wins — that's the one visually closest to the user. When the
+// in-sheet container unmounts, the root container takes over again.
+const _handlers: Array<(data: ToastData) => void> = [];
 
-export function registerToast(fn: (data: ToastData) => void) {
-  _show = fn;
+export function registerToast(fn: (data: ToastData) => void): () => void {
+  _handlers.push(fn);
+  return () => {
+    const i = _handlers.lastIndexOf(fn);
+    if (i >= 0) _handlers.splice(i, 1);
+  };
 }
 
 export function showToast(message: string, type: ToastType = 'success') {
@@ -21,5 +29,5 @@ export function showToast(message: string, type: ToastType = 'success') {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     playErrorSound();
   }
-  _show?.({ message, type });
+  _handlers[_handlers.length - 1]?.({ message, type });
 }

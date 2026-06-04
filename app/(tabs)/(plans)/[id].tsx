@@ -33,7 +33,7 @@ import {
 import { getCitizenship, getHasFixedResidence } from '../../../lib/onboarding';
 import { calculateAllVisaStatuses, VisaStatus } from '../../../lib/visaCalculations';
 import { calculateAllTaxStatuses, TaxStatus } from '../../../lib/taxCalculations';
-import { SCHENGEN_COUNTRIES, DEFAULT_VISA_RULES } from '../../../constants/visaRules';
+import { SCHENGEN_COUNTRIES, getDefaultRuleForCountry } from '../../../constants/visaRules';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { getCountryCode } from '../../../utils/geography';
 import { Flag } from '../../../components/Flag';
@@ -282,8 +282,10 @@ const LegCard = React.memo(function LegCard({
   const TAX_THRESHOLD = 183;
   const plannedDays = days; // already calculated above
 
-  // Visa: check against known rule or Schengen 90-day limit
-  const visaRule = leg.country_code ? DEFAULT_VISA_RULES[leg.country_code] : undefined;
+  // Visa: check against known rule or Schengen 90-day limit. Uses the
+  // citizenship-agnostic default since chips here are a quick projection,
+  // not the authoritative tracking shown on the Visa tab.
+  const visaRule = leg.country_code ? getDefaultRuleForCountry(leg.country_code) : null;
   const visaLimit = isSchengen ? 90 : visaRule?.allowedDays;
   const plannedVisaExceeds = visaLimit !== undefined && plannedDays > visaLimit;
 

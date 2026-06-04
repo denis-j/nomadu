@@ -22,21 +22,26 @@ export default function AnimatedGradientBackground({
   const animatedValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const animate = () => {
+    // Loop on the UI thread so the gradient crossfade keeps animating smoothly
+    // even when the JS thread is busy (screen transitions, font loading,
+    // useEffect chains). `Animated.loop` also avoids the 1-frame gap that a
+    // recursive `start(() => animate())` callback would introduce.
+    const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(animatedValue, {
           toValue: 1,
           duration,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
         Animated.timing(animatedValue, {
           toValue: 0,
           duration,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
-      ]).start(() => animate());
-    };
-    animate();
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
   }, [duration]);
 
   if (colorSets.length === 0) return null;

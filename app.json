@@ -38,7 +38,8 @@
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "appleTeamId": "Y6KMGQ9398"
+      "appleTeamId": "Y6KMGQ9398",
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
@@ -57,7 +58,8 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
-      "package": "com.nomady.app"
+      "package": "com.nomady.app",
+      "versionCode": 2
     },
     "web": {
       "favicon": "./assets/favicon.png"

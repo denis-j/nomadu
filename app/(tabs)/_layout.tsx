@@ -39,7 +39,7 @@ export default function TabLayout() {
       </Trigger>
       <Trigger name="(stats)">
         <Trigger.Icon sf={{ default: 'chart.bar', selected: 'chart.bar.fill' }} />
-        <Trigger.Label>Stats</Trigger.Label>
+        <Trigger.Label>Tracking</Trigger.Label>
       </Trigger>
       <Trigger name="(settings)">
         <Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill'}} />
