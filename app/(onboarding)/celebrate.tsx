@@ -16,24 +16,12 @@ import { ConfettiBurst } from '../../components/ConfettiBurst';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { useOnboarding } from '../../contexts/OnboardingContext';
-import { useAuth } from '../../hooks/useAuth';
 import { useSubscription } from '../../hooks/useSubscription';
 import { setCelebrating } from '../../lib/celebration';
-import { getOnboardingGoal } from '../../lib/onboarding';
 import { playAirHornSound } from '../../lib/sound';
-
-function landingRouteForGoal(goal: Awaited<ReturnType<typeof getOnboardingGoal>>): string {
-  switch (goal) {
-    case 'tax': return '/(tabs)/(stats)/tax';
-    case 'visa': return '/(tabs)/(stats)/visa';
-    case 'history': return '/(tabs)/(timeline)';
-    default: return '/(tabs)';
-  }
-}
 
 export default function CelebrateScreen() {
   const router = useRouter();
-  const { user } = useAuth();
   const { refresh } = useSubscription();
   const { markOnboardingComplete } = useOnboarding();
 
@@ -54,10 +42,9 @@ export default function CelebrateScreen() {
     };
   }, []);
 
-  const handleContinue = async () => {
-    const goal = user ? await getOnboardingGoal(user.uid) : null;
+  const handleContinue = () => {
     setCelebrating(false);
-    router.replace(landingRouteForGoal(goal) as never);
+    router.replace('/(tabs)');
   };
 
   return (

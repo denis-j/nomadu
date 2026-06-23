@@ -1,4 +1,5 @@
 import { getDatabase } from './database';
+import { rescheduleVisaExpiryReminders } from './notifications';
 
 export type EntriesAllowed = 'single' | 'multiple';
 
@@ -61,6 +62,9 @@ export async function insertUserVisa(input: UserVisaInput): Promise<number> {
       input.notes ?? null,
     ],
   );
+  // Re-schedule expiry reminders so the newly-added visa gets its 30/7/1-day
+  // countdowns set up. Fire-and-forget — the insert succeeded either way.
+  syncExpiryReminders();
   return result.lastInsertRowId;
 }
 
@@ -85,6 +89,7 @@ export async function updateUserVisa(id: number, input: UserVisaInput): Promise<
       id,
     ],
   );
+  syncExpiryReminders();
 }
 
 export async function getAllUserVisas(): Promise<UserVisa[]> {
@@ -128,4 +133,16 @@ export async function markUserVisaDeleted(id: number): Promise<void> {
     `UPDATE user_visas SET deleted = 1, updated_at = datetime('now') WHERE id = ?`,
     [id],
   );
+  syncExpiryReminders();
+}
+
+/**
+ * Refresh the OS-level visa expiry reminders to match the current set of
+ * active user-visas. Fire-and-forget; failures are non-fatal (the data write
+ * already succeeded).
+ */
+function syncExpiryReminders(): void {
+  getAllUserVisas()
+    .then((all) => rescheduleVisaExpiryReminders(all))
+    .catch((err) => console.warn('Failed to reschedule visa expiry reminders:', err));
 }

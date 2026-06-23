@@ -13,8 +13,10 @@ export interface VisaStatus {
   daysRemaining: number;
   percentUsed: number;
   status: 'ok' | 'warning' | 'critical' | 'exceeded' | 'visa_needed' | 'expired';
-  /** Optional URL to verify the rule (e.g. Wikipedia). */
+  /** Optional URL to verify the rule (e.g. Wikipedia, embassy). */
   source?: string;
+  /** YYYY-MM-DD — when the underlying rule was last audited. */
+  lastVerified?: string;
   /** True when this status was generated from a user-entered visa. */
   isUserVisa?: boolean;
   /** The user_visa row id — set when isUserVisa is true. */
@@ -270,6 +272,7 @@ export function calculateAllVisaStatuses(
         percentUsed: 0,
         status: 'visa_needed' as const,
         source: rule.source,
+        lastVerified: rule.lastVerified,
       };
     }
 
@@ -291,6 +294,7 @@ export function calculateAllVisaStatuses(
       percentUsed,
       status: getStatusFromPercent(percentUsed),
       source: rule.source,
+      lastVerified: rule.lastVerified,
     };
   });
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, PlatformColor, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Dimensions, Keyboard, PlatformColor, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Animated, {
   Easing,
@@ -16,7 +16,7 @@ import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { useAuth } from '../../../hooks/useAuth';
 import { getCitizenship, setCitizenship } from '../../../lib/onboarding';
-import { searchCountries, getCountryCode } from '../../../utils/geography';
+import { searchCountries, getCountryCode, getCountryNames, getPopularCountries } from '../../../utils/geography';
 import { Flag } from '../../../components/Flag';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -33,6 +33,21 @@ export default function PassportScreen() {
 
   // Morph chip state
   const [chipWidth, setChipWidth] = useState(0);
+
+  // Track the keyboard so the floating chip stays visible while the user
+  // is typing. iOS reports the height inclusive of the system accessory bar,
+  // so we just add it to the chip's bottom offset.
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', (e) =>
+      setKeyboardHeight(e.endCoordinates.height),
+    );
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   const [rowHeight, setRowHeight] = useState(0);
   const [inputHeight, setInputHeight] = useState(0);
   const progress = useSharedValue(0);
@@ -49,7 +64,17 @@ export default function PassportScreen() {
     });
   }, [user]);
 
-  const results = searchCountries(query);
+  // When idle: show Popular block + full A-Z list. When searching: filtered.
+  const isSearching = query.trim().length > 0;
+  const popularList = getPopularCountries();
+  const allCountriesSorted = (() => {
+    if (isSearching) return [];
+    const popularSet = new Set(popularList);
+    return getCountryNames()
+      .filter((c) => !popularSet.has(c))
+      .sort((a, b) => a.localeCompare(b));
+  })();
+  const searchResults = isSearching ? searchCountries(query) : [];
 
   const handleSelect = useCallback(async (countryName: string) => {
     if (!user) return;
@@ -116,32 +141,52 @@ export default function PassportScreen() {
         )}
 
         {/* Country list */}
-        {results.map((name, i) => {
-          const code = getCountryCode(name);
-          const isSelected = name === currentCountry;
-
-          return (
-            <Pressable
-              key={`${name}-${i}`}
-              style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
-              onPress={() => handleSelect(name)}
-            >
-              <Flag code={code} size={22} />
-              <Text style={styles.itemText}>{name}</Text>
-              {isSelected && (
-                <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
-              )}
-            </Pressable>
-          );
-        })}
-
-        {results.length === 0 && (
-          <Text style={styles.empty}>No countries found</Text>
+        {isSearching ? (
+          <>
+            {searchResults.map((name, i) => (
+              <CountryRow
+                key={`s-${name}-${i}`}
+                name={name}
+                isSelected={name === currentCountry}
+                onPress={() => handleSelect(name)}
+              />
+            ))}
+            {searchResults.length === 0 && (
+              <Text style={styles.empty}>No countries found</Text>
+            )}
+          </>
+        ) : (
+          <>
+            <Text style={styles.sectionLabel}>Popular</Text>
+            {popularList.map((name, i) => (
+              <CountryRow
+                key={`p-${name}-${i}`}
+                name={name}
+                isSelected={name === currentCountry}
+                onPress={() => handleSelect(name)}
+              />
+            ))}
+            <Text style={styles.sectionLabel}>All countries</Text>
+            {allCountriesSorted.map((name, i) => (
+              <CountryRow
+                key={`a-${name}-${i}`}
+                name={name}
+                isSelected={name === currentCountry}
+                onPress={() => handleSelect(name)}
+              />
+            ))}
+          </>
         )}
       </ScrollView>
 
-      {/* Floating morph chip */}
-      <View style={styles.chipContainer}>
+      {/* Floating morph chip — sits above the tab bar when idle, snaps to
+          just above the keyboard when typing (no doubled-up cushion). */}
+      <View
+        style={[
+          styles.chipContainer,
+          { bottom: keyboardHeight > 0 ? keyboardHeight + 12 : 100 },
+        ]}
+      >
         <Pressable onPress={handleChipPress}>
           <Animated.View
             style={[styles.morphContainer, containerStyle]}
@@ -206,7 +251,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   list: {
-    paddingBottom: 160,
+    // Enough room that the last country row clears the floating chip and the
+    // tab bar below it. The chip sits at bottom: 100 and is ~60pt tall, so
+    // a 200pt cushion gives breathing room.
+    paddingBottom: 200,
   },
   currentSection: {
     flexDirection: 'row',
@@ -251,6 +299,16 @@ const styles = StyleSheet.create({
     color: PlatformColor('tertiaryLabel'),
     paddingTop: 40,
     fontSize: 15,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: PlatformColor('secondaryLabel'),
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 6,
   },
   // ─── Morph Chip ───
   chipContainer: {
@@ -300,3 +358,27 @@ const styles = StyleSheet.create({
     padding: 0,
   },
 });
+
+function CountryRow({
+  name,
+  isSelected,
+  onPress,
+}: {
+  name: string;
+  isSelected: boolean;
+  onPress: () => void;
+}) {
+  const code = getCountryCode(name);
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+      onPress={onPress}
+    >
+      <Flag code={code} size={22} />
+      <Text style={styles.itemText}>{name}</Text>
+      {isSelected && (
+        <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+      )}
+    </Pressable>
+  );
+}

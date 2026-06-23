@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import { sendNewCityNotification, checkAndNotifyVisaTax, requestNotificationPermissions } from '../../../lib/notifications';
+import { fireArrivalIfNew, runUsageThresholdCheck, resetArrivalState, resetUsageThresholdState, rescheduleVisaExpiryReminders, requestNotificationPermissions } from '../../../lib/notifications';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 
@@ -97,13 +96,13 @@ export default function DebugScreen() {
         <DebugButton
           label="🇹🇭 Arrived in Bangkok"
           sublabel="New city welcome notification"
-          onPress={() => sendNewCityNotification('Bangkok', 'Thailand', 'TH')}
+          onPress={() => fireArrivalIfNew('Bangkok', 'Thailand', 'TH')}
         />
         <View style={styles.sep} />
         <DebugButton
           label="🇩🇪 Arrived in Berlin"
           sublabel="New city welcome notification"
-          onPress={() => sendNewCityNotification('Berlin', 'Germany', 'DE')}
+          onPress={() => fireArrivalIfNew('Berlin', 'Germany', 'DE')}
         />
       </Glass>
 
@@ -113,7 +112,7 @@ export default function DebugScreen() {
         <DebugButton
           label="Visa heads-up (75%)"
           sublabel="Thailand · 15d of 60d remaining"
-          onPress={() => checkAndNotifyVisaTax(
+          onPress={() => runUsageThresholdCheck(
             [{ destination: 'Thailand', destinationCode: 'TH', flag: '🇹🇭', ruleLabel: '60 days visa-free', daysAllowed: 60, daysUsed: 45, daysRemaining: 15, percentUsed: 75, status: 'warning' }],
             [],
           )}
@@ -122,7 +121,7 @@ export default function DebugScreen() {
         <DebugButton
           label="Visa warning (90%)"
           sublabel="Thailand · 6d of 60d remaining"
-          onPress={() => checkAndNotifyVisaTax(
+          onPress={() => runUsageThresholdCheck(
             [{ destination: 'Thailand', destinationCode: 'TH_90', flag: '🇹🇭', ruleLabel: '60 days visa-free', daysAllowed: 60, daysUsed: 54, daysRemaining: 6, percentUsed: 90, status: 'critical' }],
             [],
           )}
@@ -131,7 +130,7 @@ export default function DebugScreen() {
         <DebugButton
           label="Visa overstay (100%)"
           sublabel="Thailand · 0d remaining"
-          onPress={() => checkAndNotifyVisaTax(
+          onPress={() => runUsageThresholdCheck(
             [{ destination: 'Thailand', destinationCode: 'TH_100', flag: '🇹🇭', ruleLabel: '60 days visa-free', daysAllowed: 60, daysUsed: 61, daysRemaining: 0, percentUsed: 102, status: 'exceeded' }],
             [],
           )}
@@ -144,7 +143,7 @@ export default function DebugScreen() {
         <DebugButton
           label="Tax alert (75%)"
           sublabel="France · 137 of 183 days"
-          onPress={() => checkAndNotifyVisaTax(
+          onPress={() => runUsageThresholdCheck(
             [],
             [{ country: 'France', countryCode: 'FR_75', flag: '🇫🇷', ruleLabel: `183 days in ${new Date().getFullYear()}`, year: new Date().getFullYear(), thresholdDays: 183, daysPresent: 137, daysRemaining: 46, percentUsed: 75, status: 'caution' }],
           )}
@@ -153,7 +152,7 @@ export default function DebugScreen() {
         <DebugButton
           label="Tax warning (90%)"
           sublabel="France · 165 of 183 days"
-          onPress={() => checkAndNotifyVisaTax(
+          onPress={() => runUsageThresholdCheck(
             [],
             [{ country: 'France', countryCode: 'FR_90', flag: '🇫🇷', ruleLabel: `183 days in ${new Date().getFullYear()}`, year: new Date().getFullYear(), thresholdDays: 183, daysPresent: 165, daysRemaining: 18, percentUsed: 90, status: 'warning' }],
           )}
@@ -162,7 +161,7 @@ export default function DebugScreen() {
         <DebugButton
           label="Tax resident (100%)"
           sublabel="France · 183+ days reached"
-          onPress={() => checkAndNotifyVisaTax(
+          onPress={() => runUsageThresholdCheck(
             [],
             [{ country: 'France', countryCode: 'FR_100', flag: '🇫🇷', ruleLabel: `183 days in ${new Date().getFullYear()}`, year: new Date().getFullYear(), thresholdDays: 183, daysPresent: 185, daysRemaining: 0, percentUsed: 101, status: 'resident' }],
           )}
@@ -173,14 +172,17 @@ export default function DebugScreen() {
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
         <Text style={styles.sectionTitle}>Reset</Text>
         <DebugButton
-          label="Clear notification history"
-          sublabel="Allows all threshold alerts to fire again"
+          label="Clear threshold notif state"
+          sublabel="Allows all visa/tax threshold alerts to fire again"
           destructive
-          onPress={async () => {
-            const keys = await AsyncStorage.getAllKeys();
-            const notifKeys = keys.filter((k) => k.startsWith('notif_'));
-            await AsyncStorage.multiRemove(notifKeys);
-          }}
+          onPress={resetUsageThresholdState}
+        />
+        <View style={styles.sep} />
+        <DebugButton
+          label="Clear arrival dedup"
+          sublabel="Next location update will notify even for the current city"
+          destructive
+          onPress={resetArrivalState}
         />
       </Glass>
     </ScrollView>

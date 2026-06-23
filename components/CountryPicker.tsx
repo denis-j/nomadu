@@ -1,6 +1,7 @@
+import { useMemo } from 'react';
 import { PlatformColor, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { Flag } from './Flag';
-import { getCountryCode, getPopularCountries, searchCountries } from '../utils/geography';
+import { getCountryCode, getCountryNames, getPopularCountries, searchCountries } from '../utils/geography';
 
 const popularCountries = getPopularCountries();
 
@@ -37,9 +38,31 @@ export function CountryPicker({
 }: CountryPickerProps) {
   const trimmed = query.trim();
   const isSearching = trimmed.length > 0;
-  const filtered = isSearching
-    ? searchCountries(trimmed)
-    : showPopularWhenEmpty ? popularCountries : [];
+
+  // Idle view shows a curated Popular block on top + the full A-Z list below
+  // so the user can browse the entire ~250-country catalogue without having
+  // to type. Cheap memo — getCountryNames is itself cached.
+  const allCountriesSorted = useMemo(() => {
+    const popularSet = new Set(popularCountries);
+    return getCountryNames()
+      .filter((c) => !popularSet.has(c))
+      .sort((a, b) => a.localeCompare(b));
+  }, []);
+
+  const renderRow = (name: string) => {
+    const code = getCountryCode(name);
+    return (
+      <Pressable
+        key={name}
+        style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+        onPress={() => onSelect(name, code)}
+      >
+        {code && <Flag code={code} size={20} />}
+        <Text style={styles.itemText}>{name}</Text>
+        <Text style={styles.chevron}>›</Text>
+      </Pressable>
+    );
+  };
 
   return (
     <ScrollView
@@ -47,25 +70,24 @@ export function CountryPicker({
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.list}
     >
-      {!isSearching && showPopularWhenEmpty && (
-        <Text style={styles.sectionLabel}>{popularLabel}</Text>
-      )}
-      {filtered.map((name) => {
-        const code = getCountryCode(name);
-        return (
-          <Pressable
-            key={name}
-            style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
-            onPress={() => onSelect(name, code)}
-          >
-            {code && <Flag code={code} size={20} />}
-            <Text style={styles.itemText}>{name}</Text>
-            <Text style={styles.chevron}>›</Text>
-          </Pressable>
-        );
-      })}
-      {isSearching && filtered.length === 0 && (
-        <Text style={styles.empty}>No countries found</Text>
+      {isSearching ? (
+        <>
+          {searchCountries(trimmed).map(renderRow)}
+          {searchCountries(trimmed).length === 0 && (
+            <Text style={styles.empty}>No countries found</Text>
+          )}
+        </>
+      ) : (
+        <>
+          {showPopularWhenEmpty && (
+            <>
+              <Text style={styles.sectionLabel}>{popularLabel}</Text>
+              {popularCountries.map(renderRow)}
+            </>
+          )}
+          <Text style={styles.sectionLabel}>All countries</Text>
+          {allCountriesSorted.map(renderRow)}
+        </>
       )}
     </ScrollView>
   );

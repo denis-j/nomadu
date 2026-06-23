@@ -1,16 +1,22 @@
 /**
- * Visa policy seed data.
+ * Manual visa policy overrides.
  *
- * Each destination declares a `default` rule plus optional `overrides` for
- * specific citizenships or citizenship groups. Lookup logic lives in
- * `./visaRules.ts`.
+ * Most destinations are now served by the bulk dataset in
+ * `./visa-data.json` (~199×199 passport-index matrix). Entries here are
+ * for cases the dataset CAN'T express:
  *
- * Last verified: 2026-06-01.
+ *   - Schengen Area aggregate (90/180 rolling window across all member states)
+ *   - US Visa Waiver Program (citizenship-group ESTA override)
+ *   - Ireland Common Travel Area (UK + EU citizens skip the rule entirely)
+ *   - Rolling-window rules (UK 180/365, AE 90/180, …) — the dataset only
+ *     stores per-stay numbers, so multi-window logic needs a manual entry
  *
- * Sources are linked per-rule (`source` field). When in doubt, Wikipedia's
- * "Visa policy of <country>" article is treated as the canonical reference.
- * Rules CHANGE — this dataset is a best-effort snapshot, not legal advice.
- * The disclaimer on the visa screen makes that clear to users.
+ * When in doubt, the dataset's per-citizenship number is probably more
+ * accurate than a hand-curated default. Keep this file lean.
+ *
+ * Each rule should carry a `source` URL (Wikipedia "Visa policy of <country>"
+ * is treated as canonical) and an optional `lastVerified` date. Otherwise the
+ * dataset's refresh timestamp (`VISA_DATA_REFRESHED_AT`) is used.
  */
 
 import type { DestinationPolicy, VisaRule } from './visaRules';

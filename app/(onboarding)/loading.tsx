@@ -6,7 +6,6 @@ import {
   SafeAreaView,
   StatusBar,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import Animated, {
@@ -20,86 +19,34 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { Flag } from '../../components/Flag';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
-import { useAuth } from '../../hooks/useAuth';
 import { useOnboarding } from '../../contexts/OnboardingContext';
-import {
-  getCitizenship,
-  getExperimentalsEnabled,
-  getHasFixedResidence,
-  getOnboardingGoal,
-  LOCAL_ONBOARDING_UID,
-  type OnboardingGoal,
-} from '../../lib/onboarding';
-import { getCloudSyncEnabled } from '../../lib/sync';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
-interface Profile {
-  country: string;
-  goal: OnboardingGoal | null;
-  hasFixedResidence: boolean | null;
-  cloudSync: boolean;
-  experimentals: boolean;
-}
-
 interface Stage {
-  text: (p: Profile) => string;
+  text: string;
   duration: number;
 }
 
-/**
- * Loading stages are deliberately personalised — research on the "labor
- * illusion" (Buell & Norton, 2011) shows users perceive a service as more
- * valuable when they SEE concrete, specific work being done on their behalf.
- * Concrete numbers, the user's own country, and choices they just made all
- * reinforce that the app is already tailored to them before they ever land in
- * the product. Total ~8s — long enough to feel substantial, short enough to
- * not annoy.
- */
-function buildStages(p: Profile): Stage[] {
-  const goalLine: Stage = (() => {
-    switch (p.goal) {
-      case 'visa':
-        return { text: ({ country }) => `Mapping visa rules for ${country} passport…`, duration: 1300 };
-      case 'history':
-        return { text: () => 'Importing world map data…', duration: 1300 };
-      case 'tax':
-      default:
-        return { text: ({ country }) => `Calibrating tax rules for ${country}…`, duration: 1300 };
-    }
-  })();
+// Static loading stages. Onboarding preferences are still collected for
+// future use, but personalisation (per-goal, per-citizenship, per-residence
+// copy) is deliberately turned off here for now — the screen reads the same
+// for every user.
+const STAGES: Stage[] = [
+  { text: 'Setting up your tracking engine…', duration: 1100 },
+  { text: 'Loading 195 country profiles…', duration: 1000 },
+  { text: 'Cross-checking visa rules…', duration: 1100 },
+  { text: 'Cross-checking 230+ tax residency rules…', duration: 1100 },
+  { text: 'Preparing your dashboard…', duration: 1000 },
+  { text: 'Almost ready…', duration: 800 },
+  { text: 'Ready.', duration: 700 },
+];
 
-  const residenceLine: Stage = p.hasFixedResidence === false
-    ? { text: () => 'Configuring your nomadic profile…', duration: 1100 }
-    : { text: ({ country }) => `Setting your home base to ${country}…`, duration: 1100 };
-
-  const storageLine: Stage = p.cloudSync
-    ? { text: () => 'Preparing secure cloud sync…', duration: 1000 }
-    : { text: () => 'Locking your data to this device…', duration: 1000 };
-
-  const stages: Stage[] = [
-    { text: () => 'Setting up your tracking engine…', duration: 1100 },
-    goalLine,
-    { text: () => 'Loading 195 country profiles…', duration: 1000 },
-    { text: () => 'Cross-checking 230+ tax residency rules…', duration: 1100 },
-    residenceLine,
-    storageLine,
-  ];
-
-  if (p.experimentals) {
-    stages.push({ text: () => 'Unlocking experimental features…', duration: 900 });
-  }
-
-  stages.push({ text: () => 'Almost ready…', duration: 800 });
-  stages.push({ text: () => 'Ready.', duration: 700 });
-
-  return stages;
-}
+const TOTAL_DURATION = STAGES.reduce((a, s) => a + s.duration, 0);
 
 /**
  * One ring that breathes outward and fades. Stacked three deep with a stagger
@@ -156,43 +103,15 @@ function PulsingRing({ delay, size }: { delay: number; size: number }) {
 
 export default function LoadingScreen() {
   const router = useRouter();
-  const { user } = useAuth();
   const { markOnboardingComplete } = useOnboarding();
   const [stageIndex, setStageIndex] = useState(0);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [countryCode, setCountryCode] = useState<string | null>(null);
 
   const progress = useSharedValue(0);
   const bubbleScale = useSharedValue(1);
 
   useEffect(() => {
-    const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
-    (async () => {
-      const [citizenship, goal, residence, cloudSync, experimentals] = await Promise.all([
-        getCitizenship(uid),
-        getOnboardingGoal(uid),
-        getHasFixedResidence(uid),
-        user ? getCloudSyncEnabled(user.uid) : Promise.resolve(false),
-        getExperimentalsEnabled(),
-      ]);
-      if (citizenship?.countryCode) setCountryCode(citizenship.countryCode);
-      setProfile({
-        country: citizenship?.country ?? 'your home country',
-        goal,
-        hasFixedResidence: residence,
-        cloudSync,
-        experimentals,
-      });
-    })();
-  }, [user]);
-
-  useEffect(() => {
-    if (!profile) return;
-    const stages = buildStages(profile);
-    const totalDuration = stages.reduce((a, s) => a + s.duration, 0);
-
     progress.value = withTiming(1, {
-      duration: totalDuration,
+      duration: TOTAL_DURATION,
       easing: Easing.inOut(Easing.cubic),
     });
 
@@ -208,10 +127,10 @@ export default function LoadingScreen() {
 
     const timeouts: ReturnType<typeof setTimeout>[] = [];
     let elapsed = 0;
-    for (let i = 0; i < stages.length; i++) {
+    for (let i = 0; i < STAGES.length; i++) {
       const t = setTimeout(() => setStageIndex(i), elapsed);
       timeouts.push(t);
-      elapsed += stages[i].duration;
+      elapsed += STAGES[i].duration;
     }
 
     const exit = setTimeout(async () => {
@@ -219,11 +138,11 @@ export default function LoadingScreen() {
       // so a re-launch picks up on /sign-up instead of restarting citizenship.
       await markOnboardingComplete();
       router.replace('/(auth)/sign-up');
-    }, totalDuration + 300);
+    }, TOTAL_DURATION + 300);
     timeouts.push(exit);
 
     return () => timeouts.forEach(clearTimeout);
-  }, [profile, router, markOnboardingComplete]);
+  }, [router, markOnboardingComplete]);
 
   const fillStyle = useAnimatedStyle(() => ({
     width: `${progress.value * 100}%`,
@@ -233,8 +152,7 @@ export default function LoadingScreen() {
     transform: [{ scale: bubbleScale.value }],
   }));
 
-  const stages = profile ? buildStages(profile) : [];
-  const currentStage = stages[stageIndex];
+  const currentStage = STAGES[stageIndex];
 
   return (
     <View style={styles.container}>
@@ -251,26 +169,20 @@ export default function LoadingScreen() {
                   {...glassProps}
                   style={[styles.centerBubble, !hasGlass && styles.centerBubbleFallback]}
                 >
-                  {countryCode ? (
-                    <Flag code={countryCode} size={36} />
-                  ) : (
-                    <Ionicons name="globe-outline" size={32} color={Colors.cloudyButtonText} />
-                  )}
+                  <Ionicons name="globe-outline" size={32} color={Colors.cloudyButtonText} />
                 </Glass>
               </Animated.View>
             </View>
           </View>
 
-          {currentStage && profile && (
-            <Animated.Text
-              key={stageIndex}
-              entering={FadeIn.duration(320)}
-              exiting={FadeOut.duration(200)}
-              style={styles.stageText}
-            >
-              {currentStage.text(profile)}
-            </Animated.Text>
-          )}
+          <Animated.Text
+            key={stageIndex}
+            entering={FadeIn.duration(320)}
+            exiting={FadeOut.duration(200)}
+            style={styles.stageText}
+          >
+            {currentStage.text}
+          </Animated.Text>
 
           <View style={styles.progressTrack}>
             <Animated.View style={[styles.progressFill, fillStyle]} />

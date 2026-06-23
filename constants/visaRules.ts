@@ -23,6 +23,7 @@ import {
   SCHENGEN_AREA_POLICY,
   DESTINATION_POLICIES,
 } from './visaPolicies';
+import { lookupFromDataset, VISA_DATA_REFRESHED_AT } from './visaDataLookup';
 
 export { SCHENGEN_COUNTRIES, EU_EEA_CH_CITIZENS };
 
@@ -39,8 +40,10 @@ export interface VisaRule {
   ruleType: RuleType;
   /** Short label rendered in the UI. */
   label: string;
-  /** URL to authoritative source (e.g. Wikipedia) for verification. */
+  /** URL to authoritative source (e.g. Wikipedia, embassy) for verification. */
   source?: string;
+  /** YYYY-MM-DD — when this rule was last cross-checked against its source. */
+  lastVerified?: string;
 }
 
 export interface DestinationPolicy {
@@ -66,6 +69,13 @@ export interface ApplicableRule {
 }
 
 /**
+ * Date the seed dataset was last cross-checked. Per-rule `lastVerified` wins
+ * when present, but most policies share the same audit timestamp so a single
+ * fallback keeps the policy file readable.
+ */
+export const VISA_DATA_LAST_VERIFIED = VISA_DATA_REFRESHED_AT;
+
+/**
  * Returns the `default` rule for a destination (citizenship-agnostic) — used
  * by the plans screen to project planned-leg days against the most common
  * visa allowance for that country. For citizenship-aware behaviour, use
@@ -83,14 +93,20 @@ export function resolvePolicy(
   citizenshipCode: string,
   policy: DestinationPolicy,
 ): VisaRule | null {
-  if (policy.overrides) {
-    for (const override of policy.overrides) {
-      if (override.citizens.includes(citizenshipCode)) {
-        return override.rule;
+  const raw = (() => {
+    if (policy.overrides) {
+      for (const override of policy.overrides) {
+        if (override.citizens.includes(citizenshipCode)) {
+          return override.rule;
+        }
       }
     }
-  }
-  return policy.default;
+    return policy.default;
+  })();
+  if (!raw) return null;
+  // Fill in the dataset-wide audit timestamp so the UI always has something
+  // to surface, without forcing every policy entry to repeat the same date.
+  return raw.lastVerified ? raw : { ...raw, lastVerified: VISA_DATA_LAST_VERIFIED };
 }
 
 /**
@@ -124,14 +140,17 @@ export function getApplicableRules(
   }
 
   // 2. Per-destination rules for every non-Schengen country the user visited.
+  //    Lookup priority:
+  //      a) hand-curated DESTINATION_POLICIES entry (US VWP, IE CTA, etc.)
+  //      b) bulk dataset lookup (passport-index, ~200×200 matrix fallback)
   for (const code of visited) {
     if (code === citizenshipCode) continue;
     if ((SCHENGEN_COUNTRIES as readonly string[]).includes(code)) continue;
 
     const policy = DESTINATION_POLICIES[code];
-    if (!policy) continue;
-
-    const rule = resolvePolicy(citizenshipCode, policy);
+    const rule = policy
+      ? resolvePolicy(citizenshipCode, policy)
+      : lookupFromDataset(citizenshipCode, code);
     if (!rule) continue;
 
     rules.push({

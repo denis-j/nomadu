@@ -1,5 +1,6 @@
-import { useCallback, useLayoutEffect, useState } from 'react';
-import { ActivityIndicator, PlatformColor, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ActivityIndicator, Linking, Modal, PlatformColor, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useNavigation, useRouter } from 'expo-router';
@@ -8,6 +9,7 @@ import { SymbolView } from 'expo-symbols';
 import { useVisaTracker } from '../../../hooks/useVisaTracker';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
+import { CloudyButton } from '../../../components/CloudyButton';
 import { Flag } from '../../../components/Flag';
 import { VisaStatus } from '../../../lib/visaCalculations';
 
@@ -140,6 +142,7 @@ function VisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void })
         )
       )}
 
+      {!visa.isUserVisa && <SourceFooter visa={visa} />}
       {!visa.isUserVisa && (
         <Text style={styles.overrideHint}>Tap to add your own visa</Text>
       )}
@@ -149,9 +152,50 @@ function VisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void })
   return onPress ? <Pressable onPress={onPress}>{body}</Pressable> : body;
 }
 
+/**
+ * Shown on auto-rule cards (not user-visas): "Verified YYYY-MM-DD" + a tappable
+ * "Open official source" link. Reduces our liability surface by making it
+ * obvious that the data is a reference estimate, not the destination's word.
+ */
+function SourceFooter({ visa }: { visa: VisaStatus }) {
+  if (!visa.lastVerified && !visa.source) return null;
+  return (
+    <View style={styles.sourceFooter}>
+      {visa.lastVerified && (
+        <Text style={styles.sourceText}>Verified {visa.lastVerified}</Text>
+      )}
+      {visa.source && (
+        <Pressable
+          hitSlop={6}
+          onPress={(e) => {
+            e.stopPropagation?.();
+            Linking.openURL(visa.source!);
+          }}
+        >
+          <Text style={styles.sourceLink}>Open official source ›</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+const VISA_DISCLAIMER_SEEN_KEY = '@visa_disclaimer_seen';
+
 export default function VisaScreen() {
   const { visaStatuses, loading, citizenshipCode, citizenshipCountry, refresh } = useVisaTracker();
   const [refreshing, setRefreshing] = useState(false);
+  const [showFirstRunDisclaimer, setShowFirstRunDisclaimer] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(VISA_DISCLAIMER_SEEN_KEY).then((seen) => {
+      if (!seen) setShowFirstRunDisclaimer(true);
+    });
+  }, []);
+
+  const dismissFirstRunDisclaimer = useCallback(async () => {
+    await AsyncStorage.setItem(VISA_DISCLAIMER_SEEN_KEY, '1');
+    setShowFirstRunDisclaimer(false);
+  }, []);
   const router = useRouter();
   const navigation = useNavigation();
 
@@ -253,10 +297,70 @@ export default function VisaScreen() {
         />
       ))}
 
-      <Text style={styles.disclaimer}>
-        Visa rules are approximate and may change. Always verify with official sources before traveling.
-      </Text>
+      <Glass {...glassProps} style={[styles.disclaimerBlock, !hasGlass && styles.disclaimerBlockFallback]}>
+        <View style={styles.disclaimerIconWrap}>
+          <Ionicons name="information-circle" size={22} color={Colors.cloudyButtonText} />
+        </View>
+        <Text style={styles.disclaimerTitle}>Reference data, not legal advice</Text>
+        <Text style={styles.disclaimer}>
+          Visa rules in Nomadu are reference estimates aggregated from public sources
+          and may be out of date or incorrect. Always verify with your destination&rsquo;s
+          embassy or consulate before you travel.
+        </Text>
+        <Pressable
+          hitSlop={6}
+          onPress={() => Linking.openURL('https://www.iatatravelcentre.com/')}
+          style={styles.disclaimerLinkRow}
+        >
+          <Text style={styles.disclaimerLink}>Open IATA Travel Centre</Text>
+          <Ionicons name="open-outline" size={13} color={Colors.cloudyButtonText} />
+        </Pressable>
+      </Glass>
+
+      <FirstRunDisclaimerModal
+        visible={showFirstRunDisclaimer}
+        onDismiss={dismissFirstRunDisclaimer}
+      />
     </ScrollView>
+  );
+}
+
+function FirstRunDisclaimerModal({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      presentationStyle="overFullScreen"
+      onRequestClose={onDismiss}
+    >
+      <View style={styles.modalBackdrop}>
+        <Glass
+          {...glassProps}
+          style={[styles.modalCard, !hasGlass && styles.modalCardFallback]}
+        >
+          <View style={styles.modalIconWrap}>
+            <Ionicons name="information-circle" size={32} color={Colors.cloudyButtonText} />
+          </View>
+          <Text style={styles.modalTitle}>Before you trust this tab</Text>
+          <Text style={styles.modalBody}>
+            Visa rules in Nomadu are reference estimates aggregated from public sources.
+            They may be out of date, incorrect, or differ from your specific situation.
+            {'\n\n'}
+            Always verify with your destination&rsquo;s embassy or an official source before
+            you travel. Nomadu is not liable for visa overstays, denied entry, or any other
+            consequences of relying on this data.
+          </Text>
+          <CloudyButton
+            onPress={onDismiss}
+            style={styles.modalButton}
+            innerStyle={styles.modalButtonInner}
+          >
+            <Text style={styles.modalButtonText}>I understand</Text>
+          </CloudyButton>
+        </Glass>
+      </View>
+    </Modal>
   );
 }
 
@@ -411,11 +515,140 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     marginTop: 4,
   },
+  sourceFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(0,0,0,0.08)',
+  },
+  sourceText: {
+    ...Typography.caption,
+    fontSize: 11,
+    color: Colors.textTertiary,
+    fontVariant: ['tabular-nums'],
+  },
+  sourceLink: {
+    ...Typography.caption,
+    fontSize: 11,
+    color: Colors.cloudyButtonText,
+    fontWeight: '600',
+  },
   disclaimer: {
     ...Typography.caption,
+    fontSize: 12.5,
+    color: Colors.textSecondary,
     textAlign: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 8,
     lineHeight: 18,
+    paddingHorizontal: 4,
+  },
+  disclaimerBlock: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 20,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+    backgroundColor: 'rgba(138, 211, 255, 0.18)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(77, 193, 255, 0.35)',
+  },
+  disclaimerBlockFallback: {
+    backgroundColor: 'rgba(219, 240, 255, 0.7)',
+  },
+  disclaimerIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(77, 193, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  disclaimerTitle: {
+    ...Typography.titleSmall,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  disclaimerLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(77, 193, 255, 0.18)',
+  },
+  disclaimerLink: {
+    ...Typography.caption,
+    fontSize: 12.5,
+    color: Colors.cloudyButtonText,
+    fontWeight: '700',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(11, 37, 65, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 28,
+    borderCurve: 'continuous',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 22,
+    alignItems: 'center',
+    gap: 10,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.7)',
+  },
+  modalCardFallback: {
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    borderColor: Colors.border,
+  },
+  modalIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(77, 193, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  modalTitle: {
+    ...Typography.brandDisplay,
+    fontSize: 24,
+    textAlign: 'center',
+  },
+  modalBody: {
+    ...Typography.body,
+    fontSize: 14.5,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  modalButton: {
+    marginTop: 4,
+    width: '100%',
+  },
+  modalButtonInner: {
+    justifyContent: 'center',
+  },
+  modalButtonText: {
+    ...Typography.buttonLarge,
+    color: Colors.cloudyButtonText,
+    textAlign: 'center',
   },
 });

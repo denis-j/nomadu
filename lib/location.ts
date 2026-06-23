@@ -3,7 +3,7 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { getCurrentTrip, insertTrip, insertVisit, updateTripEndDate } from './database';
 import { reverseGeocode, isSignificantMove } from './geocoding';
-import { sendNewCityNotification } from './notifications';
+import { fireArrivalIfNew } from './notifications';
 import { getDetailedTracking } from './onboarding';
 import { auth } from './firebase';
 
@@ -17,18 +17,32 @@ const CITY_RADIUS_KM = 20;
  * Shared logic for processing a location update (used by both background task
  * and foreground check). Reverse-geocodes the coordinates, logs a visit, and
  * creates / updates the current trip.
+ *
+ * `source` controls whether to fire the "welcome to {city}" arrival
+ * notification: only the `background` task notifies, because the foreground
+ * code path runs every time the user opens the app — surfacing a duplicate
+ * "welcome" notif there is exactly the spam the user reported. The arrival
+ * helper itself is also dedup'd by AsyncStorage as a second safety net.
  */
-async function processLocationUpdate(latitude: number, longitude: number): Promise<void> {
+async function processLocationUpdate(
+  latitude: number,
+  longitude: number,
+  source: 'background' | 'foreground',
+): Promise<void> {
   const geo = await reverseGeocode(latitude, longitude);
   await insertVisit(latitude, longitude, geo.city, geo.country, geo.countryCode);
 
   const currentTrip = await getCurrentTrip();
+  const notify = (city: string, country: string, code: string) => {
+    if (source !== 'background') return;
+    fireArrivalIfNew(city, country, code).catch(() => {});
+  };
 
   if (!currentTrip) {
     // First trip ever
     if (geo.city && geo.country && geo.countryCode) {
       await insertTrip(geo.city, geo.country, geo.countryCode, latitude, longitude);
-      sendNewCityNotification(geo.city, geo.country, geo.countryCode).catch(() => {});
+      notify(geo.city, geo.country, geo.countryCode);
     }
   } else if (
     geo.city &&
@@ -59,7 +73,7 @@ async function processLocationUpdate(latitude: number, longitude: number): Promi
       // Genuinely new city — close current trip and start new one
       await updateTripEndDate(currentTrip.id);
       await insertTrip(geo.city, geo.country, geo.countryCode, latitude, longitude);
-      sendNewCityNotification(geo.city, geo.country, geo.countryCode).catch(() => {});
+      notify(geo.city, geo.country, geo.countryCode);
     }
   } else {
     // Same city — update end date
@@ -92,7 +106,11 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
 
   const location = locations[locations.length - 1];
   try {
-    await processLocationUpdate(location.coords.latitude, location.coords.longitude);
+    await processLocationUpdate(
+      location.coords.latitude,
+      location.coords.longitude,
+      'background',
+    );
   } catch (err) {
     console.error('Error processing background location:', err);
   }
@@ -193,7 +211,11 @@ export async function foregroundLocationCheck(): Promise<void> {
   try {
     const location = await getCurrentLocation();
     if (!location) return;
-    await processLocationUpdate(location.coords.latitude, location.coords.longitude);
+    await processLocationUpdate(
+      location.coords.latitude,
+      location.coords.longitude,
+      'foreground',
+    );
   } catch (err) {
     console.error('Foreground location check failed:', err);
   }
