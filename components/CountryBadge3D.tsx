@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 import { Asset } from 'expo-asset';
 import {
   Gesture,
@@ -148,64 +148,52 @@ function Scene({
   );
 }
 
-// ─── Lightweight non-interactive preview ────────────────────────────────────
-// Used inside small tiles (stats badges row, library grid). No gestures,
-// fixed camera, blends with the surrounding tile via backgroundColor.
+// ─── Non-interactive preview ────────────────────────────────────────────────
+// Used inside small tiles (stats badges row, library grid).
+//
+// These used to mount a <FilamentScene> per tile, and each one is a complete
+// Filament engine: its own Metal context, swapchain and render thread. Measured
+// on an iPhone 17 Pro simulator, opening the badge library with seven earned
+// badges took the app from 213 MB to 508 MB, about 42 MB per tile. That cost is
+// the engine itself, not the model, so shrinking the GLBs does nothing for it,
+// and it scales with the number of countries.
+//
+// The tiles never animated (fixed camera, orbitSpeed 0, one frame per second),
+// so a baked image is indistinguishable from what the engine drew. Real 3D is
+// still used in the fullscreen badge screen, where it can be rotated.
+//
+// The images were rendered by the app itself and cropped to the tile stage, so
+// the lighting matches exactly. To regenerate one, render
+// <CountryBadge3DPreview> full-bleed on Colors.surface, screenshot it, and crop
+// the square stage.
+
+const BADGE_IMAGES: Record<string, number> = {
+  TH: require('../assets/badges/th.webp'),
+  VN: require('../assets/badges/vn.webp'),
+  ID: require('../assets/badges/id.webp'),
+  CN: require('../assets/badges/cn.webp'),
+  IT: require('../assets/badges/it.webp'),
+  ES: require('../assets/badges/es.webp'),
+  PL: require('../assets/badges/pl.webp'),
+};
 
 interface CountryBadge3DPreviewProps {
   countryCode: string;
-  /** Tile background — Filament needs an opaque colour for the skybox to blend cleanly. */
+  /** Tile background, shown around the badge image. */
   backgroundColor?: string;
-  /** Model scale multiplier — default 2.7 fills small tile previews nicely. */
-  scale?: number;
 }
 
 export function CountryBadge3DPreview({
   countryCode,
   backgroundColor = '#FFFFFF',
-  scale = 3.5,
 }: CountryBadge3DPreviewProps) {
-  const source = COUNTRY_BADGES[countryCode.toUpperCase()];
+  const source = BADGE_IMAGES[countryCode.toUpperCase()];
   if (!source) return null;
 
   return (
     <View style={[styles.previewWrap, { backgroundColor }]} pointerEvents="none">
-      {/* interval: 60 → roughly 1fps. Badge previews never animate, so we don't need 60fps
-          per tile — this drops GPU load by ~60x while still keeping the model rendered. */}
-      <FilamentScene frameRateOptions={{ interval: 60 }}>
-        <PreviewScene source={source} backgroundColor={backgroundColor} scale={scale} />
-      </FilamentScene>
+      <Image source={source} style={styles.previewImage} resizeMode="cover" />
     </View>
-  );
-}
-
-function PreviewScene({
-  source,
-  backgroundColor,
-  scale,
-}: {
-  source: number;
-  backgroundColor: string;
-  scale: number;
-}) {
-  // envIntensity: 0 → skybox renders as the exact color we pass (no IBL warm cast).
-  // The model is still lit by <DefaultLight /> below.
-  useSkybox({ color: backgroundColor, envIntensity: 0 });
-
-  const cameraManipulator = useCameraManipulator({
-    orbitHomePosition: [0, 0, 11],
-    targetPosition: [0, 0, 0],
-    orbitSpeed: [0, 0],
-  });
-
-  const uri = useGlbUri(source);
-
-  return (
-    <FilamentView style={styles.filament}>
-      <Camera cameraManipulator={cameraManipulator} />
-      <DefaultLight />
-      {uri && <Model source={{ uri }} scale={[scale, scale, scale]} />}
-    </FilamentView>
   );
 }
 
@@ -218,5 +206,9 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     overflow: 'hidden',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
   },
 });

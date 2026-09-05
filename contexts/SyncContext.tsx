@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { reportError } from '../lib/monitoring';
 import {
   getCloudSyncEnabled,
   getLastSyncTime,
@@ -70,7 +71,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       setLastSynced(time);
       setSyncStatus('idle');
     } catch (err) {
-      console.error('Sync error:', err);
+      // The UI only shows an error pill, so without this the failure is
+      // invisible to us: nobody reports "the little dot was orange".
+      reportError(err, 'sync');
       setSyncStatus('error');
     } finally {
       syncingRef.current = false;

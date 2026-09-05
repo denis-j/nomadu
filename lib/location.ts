@@ -4,8 +4,7 @@ import * as TaskManager from 'expo-task-manager';
 import { getCurrentTrip, insertTrip, insertVisit, updateTripEndDate } from './database';
 import { reverseGeocode, isSignificantMove } from './geocoding';
 import { fireArrivalIfNew } from './notifications';
-import { getDetailedTracking } from './onboarding';
-import { auth } from './firebase';
+import { reportError } from './monitoring';
 
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
 
@@ -51,11 +50,10 @@ async function processLocationUpdate(
     (currentTrip.city !== geo.city || currentTrip.country !== geo.country)
   ) {
     // Names differ — check if this is really a new city or just a different
-    // district within the same area.
-    const detailedTracking = await getDetailedTrackingSafe();
-
+    // district within the same area. Reverse geocoders happily return a
+    // sub-district ("Ratsada" instead of "Phuket"), and those must not become
+    // separate trips.
     const nearCurrentTrip =
-      !detailedTracking &&
       currentTrip.latitude != null &&
       currentTrip.longitude != null &&
       !isSignificantMove(
@@ -81,23 +79,11 @@ async function processLocationUpdate(
   }
 }
 
-/** Read the detailed-tracking preference. Returns false if the user is not
- *  signed in or if the read fails (safe default = city-level only). */
-async function getDetailedTrackingSafe(): Promise<boolean> {
-  try {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return false;
-    return await getDetailedTracking(uid);
-  } catch {
-    return false;
-  }
-}
-
 // ─── Background task ───────────────────────────────────────────────────────────
 
 TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
   if (error) {
-    console.error('Background location error:', error);
+    reportError(error, 'location:background-task');
     return;
   }
 
@@ -112,7 +98,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       'background',
     );
   } catch (err) {
-    console.error('Error processing background location:', err);
+    // Runs with no UI attached, so this is the only way we ever hear about it.
+    reportError(err, 'location:background-process');
   }
 });
 
@@ -217,6 +204,6 @@ export async function foregroundLocationCheck(): Promise<void> {
       'foreground',
     );
   } catch (err) {
-    console.error('Foreground location check failed:', err);
+    reportError(err, 'location:foreground-check');
   }
 }

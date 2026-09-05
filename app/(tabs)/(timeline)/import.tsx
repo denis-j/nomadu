@@ -424,7 +424,7 @@ function CandidateRow({
         pressed && rowStyles.rowPressed,
       ]}
     >
-      <View style={dup && rowStyles.dimmed}>
+      <View style={dup && rowStyles.dimmedFlag}>
         <Flag code={candidate.countryCode} size={18} />
       </View>
       <View style={rowStyles.body}>
@@ -541,6 +541,10 @@ const rowStyles = StyleSheet.create({
   rowSelected: { backgroundColor: Colors.primary + '0E' },
   rowDup: { opacity: 0.6 },
   dimmed: { color: Colors.textTertiary },
+  // The flag is an image inside a View, so it cannot be dimmed with `color`
+  // the way the text rows are. It was set to `dimmed` too, which silently did
+  // nothing: duplicates showed a full-strength flag next to greyed-out text.
+  dimmedFlag: { opacity: 0.4 },
   body: { flex: 1, minWidth: 0, gap: 2 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   city: { ...Typography.titleSmall, flexShrink: 1 },

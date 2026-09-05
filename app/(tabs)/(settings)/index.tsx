@@ -18,7 +18,7 @@ import { clearAllTravelData, startRealtimeSync } from '../../../lib/sync';
 import { restorePurchases } from '../../../lib/revenueCat';
 import { useSync } from '../../../contexts/SyncContext';
 import { Flag } from '../../../components/Flag';
-import { getHasFixedResidence, setHasFixedResidence, getDetailedTracking, setDetailedTracking, setExperimentalsEnabled } from '../../../lib/onboarding';
+import { getHasFixedResidence, setHasFixedResidence, setExperimentalsEnabled } from '../../../lib/onboarding';
 import { useExperimentals } from '../../../hooks/useExperimentals';
 import { IslandSheet } from '../../../components/IslandSheet';
 
@@ -36,7 +36,6 @@ export default function SettingsScreen() {
   const { granted: notificationsGranted } = useNotificationPermission();
   const router = useRouter();
   const [fixedResidence, setFixedResidence] = useState(true);
-  const [detailedTracking, setDetailedTrackingState] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const experimentalsEnabled = useExperimentals();
 
@@ -45,7 +44,6 @@ export default function SettingsScreen() {
       getHasFixedResidence(user.uid).then((val) => {
         if (val !== null) setFixedResidence(val);
       });
-      getDetailedTracking(user.uid).then(setDetailedTrackingState);
     }
   }, [user]);
 
@@ -54,11 +52,26 @@ export default function SettingsScreen() {
 
   const handleDeleteAccount = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
+    // Deleting the account does not touch the store subscription: that is
+    // billed by Apple/Google, not by us, and keeps renewing until the user
+    // cancels it there. Saying so is both fair and something App Review looks
+    // for on apps that combine subscriptions with account deletion.
+    const store = Platform.OS === 'ios' ? 'the App Store' : 'Google Play';
+    const message =
+      'This permanently deletes your account, all trips and all data, both on this device and in the cloud. It cannot be undone.' +
+      (isPro
+        ? `\n\nYour subscription is billed by ${store} and will keep renewing. Cancel it there first, otherwise you will still be charged.`
+        : '');
+
     Alert.alert(
       'Delete Account',
-      'This will permanently delete your account, all trips, and all data — both locally and in the cloud. This cannot be undone.',
+      message,
       [
         { text: 'Cancel', style: 'cancel' },
+        ...(isPro
+          ? [{ text: 'Manage Subscription', onPress: handleManageSubscription }]
+          : []),
         {
           text: 'Delete Account',
           style: 'destructive',
@@ -67,15 +80,12 @@ export default function SettingsScreen() {
               await deleteAccount();
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (error: any) {
+              // deleteAccount() only rejects when nothing was deleted, so the
+              // account is still intact and retrying is safe. Its message is
+              // already written for the user.
               console.error('deleteAccount error:', error);
-              if (error?.code === 'auth/requires-recent-login') {
-                Alert.alert(
-                  'Sign in again',
-                  'For security, please sign out and sign in again before deleting your account.',
-                );
-              } else {
-                Alert.alert('Error', `Failed to delete account: ${error?.message ?? error}`);
-              }
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              Alert.alert('Account not deleted', error?.message ?? 'Please try again.');
             }
           },
         },
@@ -368,22 +378,6 @@ export default function SettingsScreen() {
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Status</Text>
           <StatusBadge granted={permissions.background} label={permissions.background ? 'Active' : 'Inactive'} />
-        </View>
-        <View style={styles.separator} />
-        <View style={styles.row}>
-          <View style={styles.rowContent}>
-            <Text style={styles.rowLabel}>Detailed Tracking</Text>
-            <Text style={styles.rowDescription}>
-              Track districts and neighborhoods within cities. Uses more battery.
-            </Text>
-          </View>
-          <Switch
-            value={detailedTracking}
-            onValueChange={(val) => {
-              setDetailedTrackingState(val);
-              if (user) setDetailedTracking(user.uid, val);
-            }}
-          />
         </View>
         <View style={styles.separator} />
         <Pressable

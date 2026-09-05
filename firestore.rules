@@ -19,6 +19,14 @@ service cloud.firestore {
       }
     }
 
+    // AI call budget, written only by the Cloud Functions via the Admin SDK
+    // (which bypasses these rules). Spelled out rather than left to the
+    // catch-all below so it is obvious that clients must never touch it:
+    // a user who could edit their own counter could reset their daily limit.
+    match /ai_usage/{docId} {
+      allow read, write: if false;
+    }
+
     // Deny everything else by default
     match /{document=**} {
       allow read, write: if false;

@@ -6,7 +6,7 @@ import {
   Platform,
   Pressable,
   RefreshControl,
-  ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -30,7 +30,6 @@ import { Typography } from '../../../constants/typography';
 import { Trip, markTripDeleted, parseDate } from '../../../lib/database';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { Flag } from '../../../components/Flag';
-import { LinearGradient } from 'expo-linear-gradient';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -49,6 +48,7 @@ function GapIndicator({ fromDate, toDate, days, onAdd }: {
   const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return (
     <TouchableOpacity style={gapStyles.row} onPress={() => onAdd(fromDate, toDate)} activeOpacity={0.7}>
+      <View style={gapStyles.lineSegment} pointerEvents="none" />
       <View style={gapStyles.dotCol} />
       <View style={gapStyles.card}>
         <View style={gapStyles.left}>
@@ -68,6 +68,14 @@ const gapStyles = StyleSheet.create({
   },
   dotCol: {
     width: 28,
+  },
+  lineSegment: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 28 / 2 - 1,
+    width: 2,
+    backgroundColor: Colors.primary + '30',
   },
   card: {
     flex: 1,
@@ -312,6 +320,7 @@ function CountryGroupCard({
         activeOpacity={0.7}
         style={groupStyles.row}
       >
+        <View style={groupStyles.lineSegment} pointerEvents="none" />
         <View style={groupStyles.timelineCol}>
           <View style={groupStyles.dotSpacer} />
           <View style={[groupStyles.dot, isActive && groupStyles.dotFilled]} />
@@ -383,6 +392,14 @@ const groupStyles = StyleSheet.create({
   timelineCol: {
     width: TIMELINE_WIDTH,
     alignItems: 'center',
+  },
+  lineSegment: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: TIMELINE_WIDTH / 2 - 1,
+    width: 2,
+    backgroundColor: Colors.primary + '30',
   },
   dotSpacer: {
     height: 20,
@@ -529,11 +546,27 @@ function computeGaps(trips: Trip[], monthStart: Date, effectiveEnd: Date): GapIn
 
 // ─── Types ───
 
+/**
+ * One rendered row: either a single trip or a run of consecutive trips in the
+ * same country, collapsed into one card.
+ *
+ * `key` is baked in during the memo because SectionList flattens every section
+ * into one virtualized list, so keys have to be unique across the whole screen,
+ * and a trip spanning two months legitimately appears in both.
+ */
+type TimelineRow = (CountryGroupData | { trip: Trip; daysInMonth: number }) & {
+  key: string;
+};
+
 interface Section {
   title: string;
-  data: { trip: Trip; daysInMonth: number }[];
+  /** The rows SectionList renders, newest first. */
+  data: TimelineRow[];
+  /** Trip count for the header pill; `data` is grouped and would undercount. */
+  tripCount: number;
   totalDays: number;
   hasOverlap: boolean;
+  /** Sorted newest first, matching the card order. */
   gaps: GapInterval[];
   monthStart: Date;
   monthEnd: Date;
@@ -580,21 +613,43 @@ export default function TimelineScreen() {
 
   // ─── Overlap detection (global across all trips) ───
 
+  /**
+   * Ids of trips that overlap at least one other trip.
+   *
+   * The previous version compared every pair and parsed both dates of both
+   * trips inside the inner loop: at 600 trips that is ~181k iterations and
+   * ~724k date parses, and it ran on the main screen. Dates are now parsed once
+   * up front, and a sweep over start-sorted spans replaces the pair loop, so
+   * the work scales with the number of actual overlaps rather than with n².
+   */
   const overlappingTripIds = useMemo(() => {
     const ids = new Set<number>();
-    for (let i = 0; i < trips.length; i++) {
-      for (let j = i + 1; j < trips.length; j++) {
-        const a = trips[i];
-        const b = trips[j];
-        const aStart = parseDate(a.start_date).getTime();
-        const aEnd = a.end_date ? parseDate(a.end_date).getTime() : Date.now();
-        const bStart = parseDate(b.start_date).getTime();
-        const bEnd = b.end_date ? parseDate(b.end_date).getTime() : Date.now();
-        if (aStart < bEnd && bStart < aEnd) {
-          ids.add(a.id);
-          ids.add(b.id);
+    const now = Date.now();
+
+    const spans = trips
+      .map((t) => ({
+        id: t.id,
+        start: parseDate(t.start_date).getTime(),
+        end: t.end_date ? parseDate(t.end_date).getTime() : now,
+      }))
+      .sort((a, b) => a.start - b.start);
+
+    // Spans that are still running at the current start. Anything that ended
+    // earlier can never overlap what follows, so it drops out.
+    const active: { id: number; start: number; end: number }[] = [];
+    for (const span of spans) {
+      for (let k = active.length - 1; k >= 0; k--) {
+        if (active[k].end <= span.start) active.splice(k, 1);
+      }
+      for (const other of active) {
+        // Same strict condition as before: touching at a travel-day boundary
+        // does not count as an overlap.
+        if (span.start < other.end && other.start < span.end) {
+          ids.add(span.id);
+          ids.add(other.id);
         }
       }
+      active.push(span);
     }
     return ids;
   }, [trips]);
@@ -689,7 +744,28 @@ export default function TimelineScreen() {
         const effectiveEnd = monthEnd < today ? monthEnd : today;
         const gaps = computeGaps(data, monthStart, effectiveEnd);
 
-        return { title, data: dataWithDays, totalDays: cappedDays, hasOverlap, gaps, monthStart, monthEnd };
+        const rows: TimelineRow[] = groupByCountryRuns(
+          [...dataWithDays].sort(
+            (a, b) => parseDate(b.trip.start_date).getTime() - parseDate(a.trip.start_date).getTime(),
+          ),
+        ).map((item, idx) => ({
+          ...item,
+          key: isCountryGroup(item)
+            ? `grp-${item.countryCode}-${title}-${idx}`
+            : `${item.trip.id}-${title}`,
+        }));
+        const sortedGaps = [...gaps].sort((a, b) => b.from.getTime() - a.from.getTime());
+
+        return {
+          title,
+          data: rows,
+          tripCount: dataWithDays.length,
+          totalDays: cappedDays,
+          hasOverlap,
+          gaps: sortedGaps,
+          monthStart,
+          monthEnd,
+        };
       });
   }, [trips]);
 
@@ -788,24 +864,25 @@ export default function TimelineScreen() {
       return <TimelineEmpty onAdd={() => openSheet()} onImport={openImport} />;
     }
     return (
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-      >
-        {/* One continuous line behind everything */}
-        <View style={styles.timelineLine}>
-          <LinearGradient
-            colors={['transparent', Colors.primary + '30', Colors.primary + '30', 'transparent']}
-            locations={[0, 0.1, 0.9, 1]}
-            style={{ flex: 1 }}
-          />
-        </View>
-
-        {sections.map((section) => (
-          <View key={section.title}>
-            {/* Section header */}
+      <View style={styles.listWrap}>
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item.key}
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={styles.content}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          stickySectionHeadersEnabled={false}
+          // Trip cards are a fixed height, so the list can place them without
+          // measuring first, which is what keeps scrolling smooth on long
+          // histories. Country group cards expand, hence onLayout corrections
+          // are still allowed rather than a hard getItemLayout.
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          removeClippedSubviews
+          renderSectionHeader={({ section }) => (
             <View style={styles.sectionHeader}>
+              <View style={styles.lineSegment} pointerEvents="none" />
               <View style={styles.sectionLineCol} />
               <PillShell
                 {...(hasGlass
@@ -815,8 +892,8 @@ export default function TimelineScreen() {
                 <Text style={styles.sectionTitle}>{section.title}</Text>
               </PillShell>
               <View style={styles.sectionStats}>
-                <Text style={styles.sectionStatValue}>{section.data.length}</Text>
-                <Text style={styles.sectionStatLabel}>{section.data.length === 1 ? 'trip' : 'trips'}</Text>
+                <Text style={styles.sectionStatValue}>{section.tripCount}</Text>
+                <Text style={styles.sectionStatLabel}>{section.tripCount === 1 ? 'trip' : 'trips'}</Text>
                 <Text style={styles.sectionStatSep}>·</Text>
                 <Text style={styles.sectionStatValue}>{section.totalDays}</Text>
                 <Text style={styles.sectionStatLabel}>days</Text>
@@ -828,49 +905,37 @@ export default function TimelineScreen() {
                 {!section.hasOverlap && section.gaps.length > 0 && (
                   <View style={styles.gapBadge}>
                     <Text style={styles.gapBadgeText}>
-                      {section.gaps.reduce((s, g) => s + g.days, 0)}d gap
+                      {section.gaps.reduce((sum, g) => sum + g.days, 0)}d gap
                     </Text>
                   </View>
                 )}
               </View>
             </View>
-
-            {/* Trip cards — grouped by consecutive same-country runs */}
-            {(() => {
-              const sorted = [...section.data].sort(
-                (a, b) => parseDate(b.trip.start_date).getTime() - parseDate(a.trip.start_date).getTime(),
+          )}
+          renderItem={({ item }) => {
+            if (isCountryGroup(item)) {
+              return (
+                <CountryGroupCard
+                  group={item}
+                  overlappingTripIds={overlappingTripIds}
+                  onDelete={handleDelete}
+                  onEdit={openEditSheet}
+                />
               );
-              const grouped = groupByCountryRuns(sorted);
-              return grouped.map((item, idx) => {
-                if (isCountryGroup(item)) {
-                  return (
-                    <CountryGroupCard
-                      key={`grp-${item.countryCode}-${section.title}-${idx}`}
-                      group={item}
-                      overlappingTripIds={overlappingTripIds}
-                      onDelete={handleDelete}
-                      onEdit={openEditSheet}
-                    />
-                  );
-                }
-                const { trip, daysInMonth } = item;
-                return (
-                  <TripCard
-                    key={`${trip.id}-${section.title}`}
-                    trip={trip}
-                    daysOverride={daysInMonth}
-                    hasOverlap={overlappingTripIds.has(trip.id)}
-                    onDelete={handleDelete}
-                    onEdit={openEditSheet}
-                  />
-                );
-              });
-            })()}
-
-            {/* Gap indicators — sorted newest first to match card order */}
-            {[...section.gaps]
-              .sort((a, b) => b.from.getTime() - a.from.getTime())
-              .map((gap) => (
+            }
+            return (
+              <TripCard
+                trip={item.trip}
+                daysOverride={item.daysInMonth}
+                hasOverlap={overlappingTripIds.has(item.trip.id)}
+                onDelete={handleDelete}
+                onEdit={openEditSheet}
+              />
+            );
+          }}
+          renderSectionFooter={({ section }) => (
+            <>
+              {section.gaps.map((gap) => (
                 <GapIndicator
                   key={`gap-${section.title}-${gap.from.toISOString()}`}
                   fromDate={gap.from}
@@ -879,9 +944,10 @@ export default function TimelineScreen() {
                   onAdd={(from, to) => openSheet(from, to)}
                 />
               ))}
-          </View>
-        ))}
-      </ScrollView>
+            </>
+          )}
+        />
+      </View>
     );
   };
 
@@ -902,18 +968,30 @@ export default function TimelineScreen() {
 // ─── Styles ───
 
 const styles = StyleSheet.create({
+  listWrap: {
+    flex: 1,
+    position: 'relative',
+  },
   content: {
     paddingBottom: 100,
     paddingLeft: 16,
-    position: 'relative',
   },
-  timelineLine: {
+  /**
+   * The timeline line, drawn once per row instead of once for the whole list.
+   *
+   * It used to be a single absolutely positioned gradient stretched over the
+   * full scroll content. A virtualized list does not know that height up front,
+   * and a screen-height version ran behind the navigation title. Every row
+   * container abuts the next with no vertical margin, so per-row segments join
+   * into one continuous line, and they virtualize along with their rows.
+   */
+  lineSegment: {
     position: 'absolute',
     top: 0,
     bottom: 0,
-    left: 16 + 28 / 2 - 1, // paddingLeft + half timeline col - half line width
+    left: 28 / 2 - 1, // centred in the 28pt timeline column
     width: 2,
-    overflow: 'hidden',
+    backgroundColor: Colors.primary + '30',
   },
   sectionHeader: {
     flexDirection: 'row',

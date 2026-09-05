@@ -2,6 +2,24 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Appearance, LogBox } from 'react-native';
 import { useFonts, InstrumentSerif_400Regular_Italic } from '@expo-google-fonts/instrument-serif';
+import SplashScreen from '../components/SplashScreen';
+import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
+import { SyncProvider } from '../contexts/SyncContext';
+import { useAuth } from '../hooks/useAuth';
+import { useSubscription } from '../hooks/useSubscription';
+import { configureRevenueCat, identifyUser } from '../lib/revenueCat';
+import { prefetchAll, prefetchUserData } from '../lib/prefetch';
+import { isCelebrating } from '../lib/celebration';
+import { ToastContainer } from '../components/Toast';
+import { UpdateBanner } from '../components/UpdateBanner';
+import { useOTAUpdates } from '../hooks/useOTAUpdates';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { initMonitoring, setMonitoringUser } from '../lib/monitoring';
+
+// First statement in the module, so a failure anywhere below is still
+// reported. Imports are hoisted above this either way, which is why nothing
+// with side effects may sit between them and this call.
+initMonitoring();
 
 // Suppress noisy non-fatal native warnings that pop the dev LogBox overlay
 LogBox.ignoreLogs([
@@ -21,15 +39,6 @@ if (__DEV__) {
     originalError(...args);
   };
 }
-import SplashScreen from '../components/SplashScreen';
-import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
-import { SyncProvider } from '../contexts/SyncContext';
-import { useAuth } from '../hooks/useAuth';
-import { useSubscription } from '../hooks/useSubscription';
-import { configureRevenueCat, identifyUser } from '../lib/revenueCat';
-import { prefetchAll, prefetchUserData } from '../lib/prefetch';
-import { isCelebrating } from '../lib/celebration';
-import { ToastContainer } from '../components/Toast';
 
 // Force light mode globally
 Appearance.setColorScheme('light');
@@ -69,22 +78,26 @@ function RootNavigator() {
     } else if (!onboardingDone) {
       // Signed-in user whose onboarding flag isn't set for this UID
       // (typically a brand-new account or a fresh device).
-      identifyUser(user.uid);
       if (!inOnboardingGroup) {
         router.replace('/(onboarding)/welcome');
       }
     } else if (!isPro) {
-      identifyUser(user.uid);
       if (segments[0] !== '(onboarding)' || segments[1] !== 'paywall') {
         router.replace('/(onboarding)/paywall');
       }
     } else {
-      identifyUser(user.uid);
       if (inAuthGroup || inOnboardingGroup) {
         router.replace('/(tabs)');
       }
     }
   }, [user, authLoading, segments, onboardingDone, isPro, subLoading]);
+
+  // Identify against RevenueCat once per signed-in user. This used to sit
+  // inside the effect above, which depends on `segments` and therefore reruns
+  // on every navigation: each tab switch fired a Purchases.logIn network call.
+  useEffect(() => {
+    if (user) identifyUser(user.uid);
+  }, [user?.uid]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -147,6 +160,7 @@ export default function RootLayout() {
   const [showSplash, setShowSplash] = useState(true);
   const { user, loading: authLoading } = useAuth();
   const [fontsLoaded] = useFonts({ InstrumentSerif_400Regular_Italic });
+  const { isUpdatePending, applyUpdate } = useOTAUpdates();
 
   useEffect(() => {
     Promise.all([configureRevenueCat(), prefetchAll()]).then(() => setReady(true));
@@ -157,10 +171,15 @@ export default function RootLayout() {
     prefetchUserData(user.uid).then(() => setUserDataReady(true));
   }, [user?.uid]);
 
+  // Tag reports with the signed-in user (uid only, never the email address).
+  useEffect(() => {
+    setMonitoringUser(user?.uid ?? null);
+  }, [user?.uid]);
+
   const appReady = ready && fontsLoaded && !authLoading && (!user || userDataReady);
 
   return (
-    <>
+    <ErrorBoundary>
       {appReady && (
         <OnboardingProvider>
           <SyncProvider>
@@ -171,7 +190,8 @@ export default function RootLayout() {
       {showSplash && (
         <SplashScreen ready={appReady} onDone={() => setShowSplash(false)} />
       )}
+      <UpdateBanner visible={isUpdatePending} onApply={applyUpdate} />
       <ToastContainer />
-    </>
+    </ErrorBoundary>
   );
 }

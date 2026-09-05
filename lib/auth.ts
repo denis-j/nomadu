@@ -5,15 +5,15 @@ import {
   OAuthProvider,
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
-  deleteUser,
   sendPasswordResetEmail,
   signInWithCredential,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth';
-import { collection, deleteDoc, doc, getDocs, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { httpsCallable, type FunctionsError } from 'firebase/functions';
+import { auth, db, functions } from './firebase';
 import { identifyUser, logOutUser } from './revenueCat';
 import { clearAllData } from './database';
 
@@ -46,7 +46,11 @@ export async function signUpWithEmail(email: string, password: string) {
 }
 
 export async function signInWithApple() {
-  const nonce = Math.random().toString(36).substring(2, 10);
+  // The nonce is what stops a captured Apple identity token from being
+  // replayed, so it has to be unpredictable. Math.random() is not a
+  // cryptographic generator and the old 8-character slice left roughly 41 bits
+  // to guess; randomUUID() is backed by the platform CSPRNG.
+  const nonce = Crypto.randomUUID();
   const hashedNonce = await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
     nonce,
@@ -96,28 +100,45 @@ export async function signOut() {
   await logOutUser();
 }
 
+/**
+ * Delete the account and everything attached to it.
+ *
+ * The cloud side (Firestore documents plus the Auth record) is handled by the
+ * `deleteAccount` Cloud Function. It runs on the Admin SDK, which is not
+ * subject to `auth/requires-recent-login` and so cannot leave the user in the
+ * old broken state: data deleted, account still alive, "please sign in again".
+ *
+ * Local cleanup only happens once the server confirms. If the call fails,
+ * nothing on this device is touched and the user can simply try again.
+ */
 export async function deleteAccount(): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('No user logged in');
 
-  const uid = user.uid;
+  try {
+    const fn = httpsCallable<Record<string, never>, { deleted: boolean }>(
+      functions,
+      'deleteAccount',
+    );
+    await fn({});
+  } catch (err) {
+    const message = (err as FunctionsError)?.message;
+    throw new Error(message || 'Your account could not be deleted. Please try again.');
+  }
 
-  // 1. Delete all Firestore trips
-  const tripsSnap = await getDocs(collection(db, 'users', uid, 'trips'));
-  await Promise.all(tripsSnap.docs.map((d) => deleteDoc(d.ref)));
+  // Past this point the account is gone server-side. Local cleanup must not
+  // throw, or the user is left signed into an account that no longer exists.
+  await clearAllData().catch(() => {});
 
-  // 2. Delete user document
-  await deleteDoc(doc(db, 'users', uid));
+  // Everything this app writes is either uid-scoped or "@"-prefixed. The user
+  // is leaving, so both go: preferences, badge progress, notification dedup
+  // keys and cached AI answers.
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const ours = keys.filter((k) => k.includes(user.uid) || k.startsWith('@'));
+    if (ours.length > 0) await AsyncStorage.multiRemove(ours);
+  } catch {}
 
-  // 3. Clear local SQLite data
-  await clearAllData();
-
-  // 4. Clear AsyncStorage (citizenship, preferences, sync keys)
-  const keys = await AsyncStorage.getAllKeys();
-  const userKeys = keys.filter((k) => k.includes(uid) || k.startsWith('@'));
-  if (userKeys.length > 0) await AsyncStorage.multiRemove(userKeys);
-
-  // 5. Delete Firebase Auth account & sign out of RevenueCat
-  await logOutUser();
-  await deleteUser(user);
+  await logOutUser().catch(() => {});
+  await firebaseSignOut(auth).catch(() => {});
 }

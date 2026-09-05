@@ -110,7 +110,11 @@ export function TripCard({ trip, daysOverride, hasOverlap, compact, onDelete, on
 
   return (
     <View style={styles.row}>
-      {/* Dot only — the line is drawn once in the parent ScrollView */}
+      {/* This row's slice of the timeline line, sitting on the row itself so it
+          also covers any vertical padding. Rows abut with no vertical margin,
+          so the slices join into one continuous line, and they virtualize
+          along with the row. */}
+      <View style={styles.lineSegment} pointerEvents="none" />
       <View style={styles.timelineCol}>
         <View style={styles.dotSpacer} />
         <View style={[styles.dot, isActive && styles.dotActive]} />
@@ -132,6 +136,14 @@ const styles = StyleSheet.create({
   timelineCol: {
     width: TIMELINE_WIDTH,
     alignItems: 'center',
+  },
+  lineSegment: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: TIMELINE_WIDTH / 2 - 1,
+    width: 2,
+    backgroundColor: Colors.primary + '30',
   },
   dotSpacer: {
     height: 20,

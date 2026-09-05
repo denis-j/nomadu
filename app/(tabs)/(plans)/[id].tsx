@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Animated, {
   useSharedValue, useAnimatedStyle,
   withTiming, withSpring, interpolate, Easing,
@@ -47,28 +47,34 @@ const hasGlass = isLiquidGlassAvailable();
 
 // ─── Morph Text (crossfade on value change) ──────────────────────────────────
 
-function MorphText({ children, style }: { children: string; style?: any }) {
+/**
+ * Text that cross-fades when its content changes.
+ *
+ * The comparison runs on the flattened string, not on the `children` prop.
+ * JSX like `{days}d` or `{from} – {to}` hands over a fresh array on every
+ * render, so comparing the prop by reference reported a change every time the
+ * parent re-rendered and replayed the 350ms fade even though the text was
+ * identical. Two of the three call sites on this screen were doing exactly
+ * that.
+ */
+function MorphText({ children, style }: { children: React.ReactNode; style?: any }) {
+  const text = Children.toArray(children).join('');
   const opacity = useSharedValue(1);
-  const [displayed, setDisplayed] = useState(children);
-  const prevRef = useRef(children);
+  const [displayed, setDisplayed] = useState(text);
+  const prevRef = useRef(text);
 
   useEffect(() => {
-    if (children !== prevRef.current) {
+    if (text !== prevRef.current) {
       // Fade out, swap text, fade in
-      opacity.value = withTiming(0, { duration: 150 }, (finished) => {
-        if (finished) {
-          // runOnJS doesn't work here directly, use withTiming callback
-        }
-      });
-      // Schedule text swap + fade in
+      opacity.value = withTiming(0, { duration: 150 });
       const t = setTimeout(() => {
-        setDisplayed(children);
-        prevRef.current = children;
+        setDisplayed(text);
+        prevRef.current = text;
         opacity.value = withTiming(1, { duration: 200 });
       }, 150);
       return () => clearTimeout(t);
     }
-  }, [children]);
+  }, [text]);
 
   const animStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

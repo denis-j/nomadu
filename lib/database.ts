@@ -1,12 +1,37 @@
 import * as SQLite from 'expo-sqlite';
 
 let db: SQLite.SQLiteDatabase | null = null;
+let opening: Promise<SQLite.SQLiteDatabase> | null = null;
 
+/**
+ * Open the database, running migrations once.
+ *
+ * The in-flight promise is memoised, not just the finished handle. Callers
+ * arrive in parallel (`prefetchAll` alone fires getAllTrips, getStats and
+ * getAllJourneys through Promise.all), and each `await` yields before `db` is
+ * assigned. Guarding on the handle alone let all three past the check, so all
+ * three ran `migrate()` at once: they read `PRAGMA table_info(trips)` before
+ * any of them had added a column, then each issued the same ALTER TABLE and
+ * two failed with "duplicate column name: sync_id".
+ *
+ * That happened on every fresh install, where the ALTERs actually have work to
+ * do, and left the first launch with an empty prefetch cache.
+ */
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
-  db = await SQLite.openDatabaseAsync('nomad.db');
-  await migrate(db);
-  return db;
+  if (!opening) {
+    opening = (async () => {
+      const database = await SQLite.openDatabaseAsync('nomad.db');
+      await migrate(database);
+      db = database;
+      return database;
+    })().catch((err) => {
+      // Let the next caller retry instead of being stuck on a rejected promise.
+      opening = null;
+      throw err;
+    });
+  }
+  return opening;
 }
 
 async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
@@ -248,10 +273,37 @@ export async function updateTripEndDate(tripId: number): Promise<void> {
   );
 }
 
+/**
+ * The trip the user is on right now, as far as the local data can tell.
+ *
+ * Used by the background location task to decide whether a new position means
+ * a new city. Getting it wrong is expensive: comparing against the wrong trip
+ * creates a duplicate and fires a "welcome to" notification for a city the
+ * user never left.
+ *
+ * The previous version ordered by `start_date` alone, so it had three ways to
+ * pick the wrong row:
+ *
+ *   - It ignored `end_date`, so a finished trip that merely started later beat
+ *     the one still running. A screenshot import, a manual entry or a sync from
+ *     a second device is enough to trigger that.
+ *   - It ignored `deleted`, so a soft-deleted trip could come back as current.
+ *   - It ignored today's date, so a trip starting next month counted as
+ *     current.
+ *
+ * Ordering now puts still-running trips first (`end_date IS NULL` yields 1),
+ * then the latest start. Trips that have not begun yet are excluded outright.
+ */
 export async function getCurrentTrip(): Promise<Trip | null> {
   const database = await getDatabase();
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   return database.getFirstAsync<Trip>(
-    `SELECT * FROM trips ORDER BY start_date DESC, id DESC LIMIT 1`,
+    `SELECT * FROM trips
+     WHERE deleted = 0 AND start_date <= ?
+     ORDER BY (end_date IS NULL) DESC, start_date DESC, id DESC
+     LIMIT 1`,
+    [todayStr],
   );
 }
 

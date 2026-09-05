@@ -1,7 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeApp } from 'firebase/app';
 import { getReactNativePersistence, initializeAuth } from 'firebase/auth';
 import { initializeFirestore } from 'firebase/firestore';
+import { getFunctions } from 'firebase/functions';
+import { secureAuthStorage } from './secureAuthStorage';
 
 
 const firebaseConfig = {
@@ -14,10 +15,15 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
+// Session lives in the keychain, not in AsyncStorage. See secureAuthStorage.ts
+// for why the key is hashed, the value chunked, and old sessions migrated.
 export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage),
+  persistence: getReactNativePersistence(secureAuthStorage),
 });
 
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
 });
+
+// Region must match `options.region` in functions/src/index.ts.
+export const functions = getFunctions(app, 'us-central1');
