@@ -1,6 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import { extractTripsFromImage, type ExtractedTrip } from './ai';
 import { countryToCode, forwardGeocode } from './geocoding';
+import { getCountryName, nearestCity } from '../utils/geography';
 import { getAllTripsRaw, insertTripManual, type Trip } from './database';
 
 const MAX_IMPORT_IMAGES = 10;
@@ -109,10 +110,22 @@ export async function importFromImage(
         const code = normalizeCountryCode(e);
         const coords = await forwardGeocode(`${e.city}, ${e.country}`).catch(() => null);
         const dup = findDuplicate(existingTrips, { city: e.city, startDate: e.startDate });
+
+        // The model reads whatever the screenshot said, so it may hand back
+        // "Holland", "Czechia" or a district name. Trips created here have to
+        // sit in the same vocabulary as the ones the picker and the background
+        // tracker write, or the same place ends up as two entries in the stats
+        // and visa screens. Both fall back to the model's answer when we cannot
+        // do better: a place too small for the dataset is still worth keeping.
+        const city =
+          (coords ? nearestCity(coords.latitude, coords.longitude, code)?.name : null) ??
+          e.city.trim();
+        const country = getCountryName(code) ?? e.country.trim();
+
         return {
           id: `${imageIndex}-${i}-${Date.now()}`,
-          city: e.city.trim(),
-          country: e.country.trim(),
+          city,
+          country,
           countryCode: code,
           startDate: e.startDate,
           endDate: e.endDate ?? null,

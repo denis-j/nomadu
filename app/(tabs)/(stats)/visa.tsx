@@ -11,7 +11,7 @@ import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { CloudyButton } from '../../../components/CloudyButton';
 import { Flag } from '../../../components/Flag';
-import { VisaStatus } from '../../../lib/visaCalculations';
+import { todayStr, VisaStatus } from '../../../lib/visaCalculations';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -23,8 +23,15 @@ function getProgressColor(percent: number): string {
   return Colors.success;
 }
 
-function getStatusLabel(status: VisaStatus['status']): string {
-  switch (status) {
+/** True when the visa is past its own expiry date, as opposed to used up. */
+function isDateExpired(visa: VisaStatus): boolean {
+  return !!visa.validUntil && visa.validUntil < todayStr();
+}
+
+function getStatusLabel(visa: VisaStatus): string {
+  // A spent single-entry visa is 'expired' too, but "Used" is what happened.
+  if (visa.singleEntryUsed && !isDateExpired(visa)) return 'Used';
+  switch (visa.status) {
     case 'exceeded': return 'Exceeded';
     case 'critical': return 'Critical';
     case 'warning': return 'Warning';
@@ -59,7 +66,7 @@ function CardHeader({ visa, interactive }: { visa: VisaStatus; interactive?: boo
       <View style={styles.headerRight}>
         <View style={[styles.statusBadge, { backgroundColor: statusColor + '18' }]}>
           <Text style={[styles.statusText, { color: statusColor }]}>
-            {getStatusLabel(visa.status)}
+            {getStatusLabel(visa)}
           </Text>
         </View>
         {interactive && (
@@ -89,7 +96,11 @@ function ExpiredVisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => 
       <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
         <CardHeader visa={visa} interactive={!!onPress} />
         <Text style={styles.visaNeededHint}>
-          {visa.validUntil ? `Expired on ${visa.validUntil}. Update or remove this visa.` : 'Expired.'}
+          {isDateExpired(visa)
+            ? `Expired on ${visa.validUntil}. Update or remove this visa.`
+            : visa.singleEntryUsed
+              ? `Single entry, used up when you left on ${visa.leftOn}. A new entry needs a new visa.`
+              : 'Expired.'}
         </Text>
       </Glass>
     </Pressable>
@@ -106,12 +117,20 @@ function VisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void })
 
   const progressColor = getProgressColor(visa.percentUsed);
   const progressWidth = Math.min(visa.percentUsed, 100);
+  // Per-stay rules stop counting on exit. Showing an empty bar would suggest
+  // the allowance is running and unused; naming the exit date is the truth.
+  const stayOver = !!visa.leftOn && visa.daysUsed === 0;
 
   const body = (
     <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
       <CardHeader visa={visa} interactive={!!onPress} />
 
-      {visa.daysAllowed > 0 ? (
+      {visa.daysAllowed > 0 && stayOver ? (
+        <Text style={styles.visaNeededHint}>
+          Counter reset when you left on {visa.leftOn}.
+          {visa.lastStayDays ? ` Last stay: ${visa.lastStayDays} of ${visa.daysAllowed} days.` : ''}
+        </Text>
+      ) : visa.daysAllowed > 0 ? (
         <>
           <View style={styles.progressContainer}>
             <View style={styles.progressTrack}>
@@ -179,12 +198,72 @@ function SourceFooter({ visa }: { visa: VisaStatus }) {
   );
 }
 
+/**
+ * Which of the three groups a card belongs to.
+ *
+ * The flat, urgency-sorted list put expired visas at the very top and kept a
+ * card for every country ever visited, so after a few years of travel the
+ * screen was mostly history. Splitting it means the first thing you see is
+ * what is actually running.
+ */
+type Group = 'active' | 'expiredVisa' | 'pastCountry';
+
+function groupOf(visa: VisaStatus): Group {
+  if (visa.isUserVisa) {
+    return visa.status === 'expired' ? 'expiredVisa' : 'active';
+  }
+  // An auto rule whose stay is over: you were there, you are not now.
+  return visa.leftOn && visa.daysUsed === 0 ? 'pastCountry' : 'active';
+}
+
+function SectionHeader({
+  title,
+  count,
+  collapsed,
+  onToggle,
+}: {
+  title: string;
+  count: number;
+  collapsed?: boolean;
+  onToggle?: () => void;
+}) {
+  const body = (
+    <>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionMeta}>
+        <Text style={styles.sectionCount}>{count}</Text>
+        {onToggle && (
+          <Ionicons
+            name={collapsed ? 'chevron-down' : 'chevron-up'}
+            size={14}
+            color={Colors.textTertiary}
+          />
+        )}
+      </View>
+    </>
+  );
+
+  if (!onToggle) {
+    return <View style={styles.sectionHeader}>{body}</View>;
+  }
+  return (
+    <Pressable
+      onPress={onToggle}
+      hitSlop={8}
+      style={({ pressed }) => [styles.sectionHeader, pressed && { opacity: 0.6 }]}
+    >
+      {body}
+    </Pressable>
+  );
+}
+
 const VISA_DISCLAIMER_SEEN_KEY = '@visa_disclaimer_seen';
 
 export default function VisaScreen() {
   const { visaStatuses, loading, citizenshipCode, citizenshipCountry, refresh } = useVisaTracker();
   const [refreshing, setRefreshing] = useState(false);
   const [showFirstRunDisclaimer, setShowFirstRunDisclaimer] = useState(false);
+  const [showPastCountries, setShowPastCountries] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(VISA_DISCLAIMER_SEEN_KEY).then((seen) => {
@@ -271,6 +350,28 @@ export default function VisaScreen() {
     );
   }
 
+  const active = visaStatuses.filter((v) => groupOf(v) === 'active');
+  const expiredVisas = visaStatuses.filter((v) => groupOf(v) === 'expiredVisa');
+  // Most recently left first: the country you were in last month is the one
+  // you are most likely to be looking for.
+  const pastCountries = visaStatuses
+    .filter((v) => groupOf(v) === 'pastCountry')
+    .sort((a, b) => (b.leftOn ?? '').localeCompare(a.leftOn ?? ''));
+
+  const renderCard = (visa: VisaStatus) => (
+    <VisaCard
+      key={visa.isUserVisa ? `uv-${visa.userVisaId}` : visa.destinationCode}
+      visa={visa}
+      onPress={visa.isUserVisa && visa.userVisaId
+        ? () => goToEdit(visa.userVisaId!)
+        : visa.status === 'visa_needed'
+          ? goToAdd
+          : visa.destinationCode !== 'SCHENGEN'
+            ? () => goToOverride(visa.destinationCode)
+            : undefined}
+    />
+  );
+
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
@@ -283,19 +384,29 @@ export default function VisaScreen() {
         <Text style={styles.subtitle}> {citizenshipCountry} passport</Text>
       </View>
 
-      {visaStatuses.map((visa) => (
-        <VisaCard
-          key={visa.isUserVisa ? `uv-${visa.userVisaId}` : visa.destinationCode}
-          visa={visa}
-          onPress={visa.isUserVisa && visa.userVisaId
-            ? () => goToEdit(visa.userVisaId!)
-            : visa.status === 'visa_needed'
-              ? goToAdd
-              : visa.destinationCode !== 'SCHENGEN'
-                ? () => goToOverride(visa.destinationCode)
-                : undefined}
-        />
-      ))}
+      {active.map(renderCard)}
+
+      {expiredVisas.length > 0 && (
+        <>
+          <SectionHeader title="Expired visas" count={expiredVisas.length} />
+          {expiredVisas.map(renderCard)}
+        </>
+      )}
+
+      {pastCountries.length > 0 && (
+        <>
+          <SectionHeader
+            title="Countries you've left"
+            count={pastCountries.length}
+            collapsed={!showPastCountries}
+            onToggle={() => {
+              Haptics.selectionAsync();
+              setShowPastCountries((v) => !v);
+            }}
+          />
+          {showPastCountries && pastCountries.map(renderCard)}
+        </>
+      )}
 
       <Glass {...glassProps} style={[styles.disclaimerBlock, !hasGlass && styles.disclaimerBlockFallback]}>
         <View style={styles.disclaimerIconWrap}>
@@ -431,6 +542,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     flex: 1,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingLeft: 4,
+    paddingRight: 4,
+    marginTop: 18,
+    marginBottom: 2,
+  },
+  sectionTitle: {
+    ...Typography.eyebrow,
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  sectionMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  sectionCount: {
+    ...Typography.bodySmall,
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textTertiary,
   },
   subtitleRow: {
     flexDirection: 'row',

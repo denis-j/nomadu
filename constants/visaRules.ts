@@ -76,16 +76,6 @@ export interface ApplicableRule {
 export const VISA_DATA_LAST_VERIFIED = VISA_DATA_REFRESHED_AT;
 
 /**
- * Returns the `default` rule for a destination (citizenship-agnostic) — used
- * by the plans screen to project planned-leg days against the most common
- * visa allowance for that country. For citizenship-aware behaviour, use
- * `getApplicableRules` instead.
- */
-export function getDefaultRuleForCountry(countryCode: string): VisaRule | null {
-  return DESTINATION_POLICIES[countryCode]?.default ?? null;
-}
-
-/**
  * Resolve which rule applies to a given citizen for a destination policy.
  * Returns null when no rule applies (freedom of movement, home country, etc.).
  */
@@ -107,6 +97,33 @@ export function resolvePolicy(
   // Fill in the dataset-wide audit timestamp so the UI always has something
   // to surface, without forcing every policy entry to repeat the same date.
   return raw.lastVerified ? raw : { ...raw, lastVerified: VISA_DATA_LAST_VERIFIED };
+}
+
+/**
+ * The rule that applies to one citizen in one destination, whether or not they
+ * have ever been there.
+ *
+ * Same resolution order as `getApplicableRules` (Schengen aggregate, then the
+ * hand-curated policy, then the bulk dataset), so a planned first trip is
+ * projected against the same allowance the Visa tab shows once the trip is
+ * real. The citizenship-agnostic variant this replaced answered a different
+ * question: it returned the US "visa required" default even for a German
+ * passport that gets 90 days on ESTA.
+ */
+export function getRuleForCitizen(
+  citizenshipCode: string,
+  destinationCode: string,
+): VisaRule | null {
+  if (!destinationCode || destinationCode === citizenshipCode) return null;
+
+  if ((SCHENGEN_COUNTRIES as readonly string[]).includes(destinationCode)) {
+    return resolvePolicy(citizenshipCode, SCHENGEN_AREA_POLICY);
+  }
+
+  const policy = DESTINATION_POLICIES[destinationCode];
+  return policy
+    ? resolvePolicy(citizenshipCode, policy)
+    : lookupFromDataset(citizenshipCode, destinationCode);
 }
 
 /**

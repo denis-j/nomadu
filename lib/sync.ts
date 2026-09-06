@@ -19,6 +19,12 @@ import {
   upsertTripFromCloud,
   type Trip,
 } from './database';
+import {
+  getAllUserVisasForSync,
+  setUserVisaSyncId,
+  upsertUserVisaFromCloud,
+  type EntriesAllowed,
+} from './userVisas';
 import { clearBadgeProgress } from './badges';
 
 const CLOUD_SYNC_KEY = (uid: string) => `@cloud_sync_enabled_${uid}`;
@@ -47,6 +53,10 @@ async function setLastSyncTime(uid: string): Promise<void> {
 
 function tripsCollection(uid: string) {
   return collection(db, 'users', uid, 'trips');
+}
+
+function visasCollection(uid: string) {
+  return collection(db, 'users', uid, 'visas');
 }
 
 /**
@@ -177,12 +187,125 @@ export async function pullTripsFromCloud(uid: string): Promise<void> {
   }
 }
 
+// ─── Visas (local ↔ cloud) ───
+
+/**
+ * Mirror `user_visas` to `users/<uid>/visas`.
+ *
+ * Visas are typed in by hand and exist nowhere else: no GPS trail, no import,
+ * no way to reconstruct them. Until this existed, a reinstall restored every
+ * trip and silently dropped every visa the user had entered.
+ *
+ * Same shape as the trip push: one read for the whole collection, batched
+ * writes, UUID ids minted locally and only persisted after the commit.
+ */
+export async function pushVisasToCloud(uid: string): Promise<void> {
+  const visas = await getAllUserVisasForSync();
+  if (visas.length === 0) return;
+
+  const visas_ = visasCollection(uid);
+
+  const snapshot = await getDocs(visas_);
+  const cloud = new Map<string, DocumentData>();
+  snapshot.forEach((docSnap) => cloud.set(docSnap.id, docSnap.data()));
+
+  const idsToPersist: { visaId: number; syncId: string }[] = [];
+
+  let batch = writeBatch(db);
+  let ops = 0;
+
+  const commit = async () => {
+    if (ops === 0) return;
+    await batch.commit();
+    batch = writeBatch(db);
+    ops = 0;
+  };
+
+  for (const visa of visas) {
+    const needsNewId = !visa.sync_id;
+    const syncId = needsNewId ? Crypto.randomUUID() : visa.sync_id!;
+
+    const localUpdatedAt = visa.updated_at ? new Date(visa.updated_at) : new Date();
+
+    const cloudData = cloud.get(syncId);
+    if (cloudData) {
+      const cloudUpdatedAt =
+        cloudData.updated_at instanceof Timestamp
+          ? cloudData.updated_at.toDate()
+          : new Date(0);
+      if (cloudUpdatedAt >= localUpdatedAt) continue;
+    }
+
+    batch.set(
+      doc(visas_, syncId),
+      {
+        country_code: visa.country_code,
+        label: visa.label,
+        valid_from: visa.valid_from,
+        valid_to: visa.valid_to,
+        max_days_per_stay: visa.max_days_per_stay,
+        max_days_per_window: visa.max_days_per_window,
+        window_days: visa.window_days,
+        entries_allowed: visa.entries_allowed,
+        notes: visa.notes,
+        local_id: visa.id,
+        updated_at: Timestamp.fromDate(localUpdatedAt),
+        deleted: visa.deleted === 1,
+      },
+      { merge: true },
+    );
+    ops++;
+
+    if (needsNewId) idsToPersist.push({ visaId: visa.id, syncId });
+
+    if (ops >= BATCH_LIMIT) await commit();
+  }
+
+  await commit();
+
+  for (const { visaId, syncId } of idsToPersist) {
+    await setUserVisaSyncId(visaId, syncId);
+  }
+}
+
+export async function pullVisasFromCloud(uid: string): Promise<void> {
+  const snapshot = await getDocs(visasCollection(uid));
+
+  for (const docSnap of snapshot.docs) {
+    const data = docSnap.data();
+    const updatedAt = data.updated_at instanceof Timestamp
+      ? data.updated_at.toDate().toISOString()
+      : new Date().toISOString();
+
+    await upsertUserVisaFromCloud({
+      sync_id: docSnap.id,
+      country_code: data.country_code,
+      label: data.label,
+      valid_from: data.valid_from,
+      valid_to: data.valid_to,
+      max_days_per_stay: data.max_days_per_stay ?? null,
+      max_days_per_window: data.max_days_per_window ?? null,
+      window_days: data.window_days ?? null,
+      entries_allowed: (data.entries_allowed as EntriesAllowed) ?? 'multiple',
+      notes: data.notes ?? null,
+      updated_at: updatedAt,
+      deleted: data.deleted === true,
+    });
+  }
+}
+
 // ─── Bidirectional Sync ───
 
-export async function syncTrips(uid: string): Promise<void> {
-  // Pull first so cloud data is never overwritten by an empty/stale local DB
+/**
+ * Trips and visas, both directions. Pull first so cloud data is never
+ * overwritten by an empty or stale local database, which is exactly the state
+ * right after a reinstall.
+ */
+export async function syncAll(uid: string): Promise<void> {
   await pullTripsFromCloud(uid);
   await pushTripsToCloud(uid);
+  await pullVisasFromCloud(uid);
+  await pushVisasToCloud(uid);
   await setLastSyncTime(uid);
 }
 

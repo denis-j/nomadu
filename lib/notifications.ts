@@ -108,9 +108,23 @@ export async function fireArrivalIfNew(
 
 const THRESHOLDS = [75, 90, 100] as const;
 
-function usageKey(type: 'visa' | 'tax', code: string, threshold: number): string {
-  const year = new Date().getFullYear();
-  return `@notif_${type}_${code}_${threshold}_${year}`;
+/**
+ * De-duplication key for a threshold warning.
+ *
+ * `period` is what makes the warning fire again when it should. Tax residency
+ * runs on the calendar year, so the year is the right period there. A visa
+ * does not: a per-stay allowance resets the moment you leave the country, and
+ * keying those by year meant a second stay in Thailand in the same year got no
+ * warning at all. Visa statuses therefore carry their own `usagePeriod`, the
+ * start date of the running stay.
+ */
+function usageKey(
+  type: 'visa' | 'tax',
+  code: string,
+  threshold: number,
+  period: string,
+): string {
+  return `@notif_${type}_${code}_${threshold}_${period}`;
 }
 
 async function alreadySent(key: string): Promise<boolean> {
@@ -138,7 +152,7 @@ export async function runUsageThresholdCheck(
 
     for (const threshold of THRESHOLDS) {
       if (visa.percentUsed < threshold) continue;
-      const key = usageKey('visa', visa.destinationCode, threshold);
+      const key = usageKey('visa', visa.destinationCode, threshold, visa.usagePeriod);
       if (await alreadySent(key)) continue;
       await markSent(key);
 
@@ -162,7 +176,7 @@ export async function runUsageThresholdCheck(
   for (const tax of taxStatuses) {
     for (const threshold of THRESHOLDS) {
       if (tax.percentUsed < threshold) continue;
-      const key = usageKey('tax', tax.countryCode, threshold);
+      const key = usageKey('tax', tax.countryCode, threshold, String(new Date().getFullYear()));
       if (await alreadySent(key)) continue;
       await markSent(key);
 
@@ -189,14 +203,25 @@ export async function runUsageThresholdCheck(
 const EXPIRY_REMINDER_DAYS = [30, 7, 1] as const;
 const EXPIRY_ID_PREFIX = 'visa-expiry-';
 
+/**
+ * How many expiry reminders we are willing to hold.
+ *
+ * iOS keeps at most 64 pending local notifications per app and drops the rest
+ * without an error. Measured twice in the simulator: 90 scheduled, 64 kept,
+ * and both times the survivors were the last 64 *registered*, not the 64 that
+ * fire soonest. Since visas are loaded soonest-expiring first, the naive loop
+ * threw away exactly the reminders that mattered most.
+ *
+ * The headroom below 64 is for the arrival and threshold notifications, which
+ * are delivered immediately but still occupy a slot briefly.
+ */
+const MAX_EXPIRY_REMINDERS = 60;
+
 function expiryIdentifier(visaId: number, daysBefore: number): string {
   return `${EXPIRY_ID_PREFIX}${visaId}-${daysBefore}`;
 }
 
-/**
- * Parse a YYYY-MM-DD string as a Date at 9:00 AM local time. 9am keeps the
- * reminder from arriving in the middle of the night.
- */
+/** Reminders fire at 09:00 local, not at midnight. */
 function parseExpiryDate(ymd: string): Date {
   const [y, m, d] = ymd.split('-').map(Number);
   return new Date(y, m - 1, d, 9, 0, 0);
@@ -207,8 +232,9 @@ function parseExpiryDate(ymd: string): Date {
  * fresh ones from the current user_visas list. Call this whenever the user
  * adds, edits, or deletes a visa.
  *
- * Schedules three reminders per visa: 30, 7, and 1 day before valid_to.
- * Reminders whose trigger time has already passed are skipped.
+ * Schedules three reminders per visa (30, 7 and 1 day before valid_to), skips
+ * any whose moment has passed, and keeps the soonest MAX_EXPIRY_REMINDERS. If
+ * something has to give, it is the reminder furthest in the future.
  */
 export async function rescheduleVisaExpiryReminders(
   userVisas: UserVisa[],
@@ -226,6 +252,13 @@ export async function rescheduleVisaExpiryReminders(
 
   const now = new Date();
 
+  interface Reminder {
+    trigger: Date;
+    visa: UserVisa;
+    daysBefore: number;
+  }
+  const candidates: Reminder[] = [];
+
   for (const visa of userVisas) {
     if (visa.deleted) continue;
     const validTo = parseExpiryDate(visa.valid_to);
@@ -234,28 +267,33 @@ export async function rescheduleVisaExpiryReminders(
     for (const daysBefore of EXPIRY_REMINDER_DAYS) {
       const trigger = new Date(validTo.getTime() - daysBefore * 24 * 60 * 60 * 1000);
       if (trigger < now) continue;
-
-      const flag = countryCodeToFlag(visa.country_code);
-      const isLast = daysBefore === 1;
-
-      await Notifications.scheduleNotificationAsync({
-        identifier: expiryIdentifier(visa.id, daysBefore),
-        content: {
-          title: isLast
-            ? `Visa expires tomorrow: ${visa.label} ${flag}`
-            : `Visa expires in ${daysBefore} days: ${visa.label} ${flag}`,
-          body: isLast
-            ? `${visa.label} for ${visa.country_code} expires on ${visa.valid_to}. Make sure you've left or renewed.`
-            : `${visa.label} for ${visa.country_code} expires on ${visa.valid_to}.`,
-          sound: true,
-          data: { type: 'visa-expiry', userVisaId: visa.id, daysBefore },
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: trigger,
-        },
-      });
+      candidates.push({ trigger, visa, daysBefore });
     }
+  }
+
+  candidates.sort((a, b) => a.trigger.getTime() - b.trigger.getTime());
+
+  for (const { trigger, visa, daysBefore } of candidates.slice(0, MAX_EXPIRY_REMINDERS)) {
+    const flag = countryCodeToFlag(visa.country_code);
+    const isLast = daysBefore === 1;
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: expiryIdentifier(visa.id, daysBefore),
+      content: {
+        title: isLast
+          ? `Visa expires tomorrow: ${visa.label} ${flag}`
+          : `Visa expires in ${daysBefore} days: ${visa.label} ${flag}`,
+        body: isLast
+          ? `${visa.label} for ${visa.country_code} expires on ${visa.valid_to}. Make sure you've left or renewed.`
+          : `${visa.label} for ${visa.country_code} expires on ${visa.valid_to}.`,
+        sound: true,
+        data: { type: 'visa-expiry', userVisaId: visa.id, daysBefore },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: trigger,
+      },
+    });
   }
 }
 

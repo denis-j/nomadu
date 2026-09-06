@@ -113,7 +113,7 @@ export default function DebugScreen() {
           label="Visa heads-up (75%)"
           sublabel="Thailand · 15d of 60d remaining"
           onPress={() => runUsageThresholdCheck(
-            [{ destination: 'Thailand', destinationCode: 'TH', flag: '🇹🇭', ruleLabel: '60 days visa-free', daysAllowed: 60, daysUsed: 45, daysRemaining: 15, percentUsed: 75, status: 'warning' }],
+            [{ destination: 'Thailand', destinationCode: 'TH', flag: '🇹🇭', ruleLabel: '60 days visa-free', daysAllowed: 60, daysUsed: 45, daysRemaining: 15, percentUsed: 75, status: 'warning', usagePeriod: 'debug' }],
             [],
           )}
         />
@@ -122,7 +122,7 @@ export default function DebugScreen() {
           label="Visa warning (90%)"
           sublabel="Thailand · 6d of 60d remaining"
           onPress={() => runUsageThresholdCheck(
-            [{ destination: 'Thailand', destinationCode: 'TH_90', flag: '🇹🇭', ruleLabel: '60 days visa-free', daysAllowed: 60, daysUsed: 54, daysRemaining: 6, percentUsed: 90, status: 'critical' }],
+            [{ destination: 'Thailand', destinationCode: 'TH_90', flag: '🇹🇭', ruleLabel: '60 days visa-free', daysAllowed: 60, daysUsed: 54, daysRemaining: 6, percentUsed: 90, status: 'critical', usagePeriod: 'debug' }],
             [],
           )}
         />
@@ -131,7 +131,7 @@ export default function DebugScreen() {
           label="Visa overstay (100%)"
           sublabel="Thailand · 0d remaining"
           onPress={() => runUsageThresholdCheck(
-            [{ destination: 'Thailand', destinationCode: 'TH_100', flag: '🇹🇭', ruleLabel: '60 days visa-free', daysAllowed: 60, daysUsed: 61, daysRemaining: 0, percentUsed: 102, status: 'exceeded' }],
+            [{ destination: 'Thailand', destinationCode: 'TH_100', flag: '🇹🇭', ruleLabel: '60 days visa-free', daysAllowed: 60, daysUsed: 61, daysRemaining: 0, percentUsed: 102, status: 'exceeded', usagePeriod: 'debug' }],
             [],
           )}
         />

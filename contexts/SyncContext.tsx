@@ -7,7 +7,7 @@ import {
   setCloudSyncEnabled as setCloudSyncEnabledStorage,
   startRealtimeSync,
   stopRealtimeSync,
-  syncTrips,
+  syncAll,
 } from '../lib/sync';
 
 type SyncStatus = 'idle' | 'syncing' | 'error';
@@ -66,7 +66,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     syncingRef.current = true;
     setSyncStatus('syncing');
     try {
-      await syncTrips(uid);
+      await syncAll(uid);
       const time = await getLastSyncTime(uid);
       setLastSynced(time);
       setSyncStatus('idle');

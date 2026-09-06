@@ -17,6 +17,15 @@ service cloud.firestore {
         allow update: if request.auth != null && request.auth.uid == userId;
         allow delete: if request.auth != null && request.auth.uid == userId;
       }
+
+      // Visas the user entered by hand. Same auth pattern; removed together
+      // with the user document by the deleteAccount function's recursiveDelete.
+      match /visas/{visaId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     // AI call budget, written only by the Cloud Functions via the Admin SDK

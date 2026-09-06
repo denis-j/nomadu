@@ -32,8 +32,9 @@ import {
 } from '../../../lib/database';
 import { getCitizenship, getHasFixedResidence } from '../../../lib/onboarding';
 import { calculateAllVisaStatuses, VisaStatus } from '../../../lib/visaCalculations';
+import { getAllUserVisas } from '../../../lib/userVisas';
 import { calculateAllTaxStatuses, TaxStatus } from '../../../lib/taxCalculations';
-import { SCHENGEN_COUNTRIES, getDefaultRuleForCountry } from '../../../constants/visaRules';
+import { SCHENGEN_COUNTRIES, getRuleForCitizen } from '../../../constants/visaRules';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { getCountryCode } from '../../../utils/geography';
 import { Flag } from '../../../components/Flag';
@@ -260,6 +261,7 @@ type LegCardProps = {
   onDrag?: () => void;
   visaStatuses: VisaStatus[];
   taxStatuses: TaxStatus[];
+  citizenshipCode: string | null;
 };
 
 const LegCard = React.memo(function LegCard({
@@ -270,6 +272,7 @@ const LegCard = React.memo(function LegCard({
   onDrag,
   visaStatuses,
   taxStatuses,
+  citizenshipCode,
 }: LegCardProps) {
   const emojiFlag = countryCodeToFlag(leg.country_code); // used in chip labels
   const days = legDays(leg.start_date, leg.end_date);
@@ -288,11 +291,16 @@ const LegCard = React.memo(function LegCard({
   const TAX_THRESHOLD = 183;
   const plannedDays = days; // already calculated above
 
-  // Visa: check against known rule or Schengen 90-day limit. Uses the
-  // citizenship-agnostic default since chips here are a quick projection,
-  // not the authoritative tracking shown on the Visa tab.
-  const visaRule = leg.country_code ? getDefaultRuleForCountry(leg.country_code) : null;
-  const visaLimit = isSchengen ? 90 : visaRule?.allowedDays;
+  // Visa: project the leg against the rule that applies to THIS passport. The
+  // citizenship-agnostic default used to answer here, which told a German
+  // planning a first US trip "12d > 0d visa" although ESTA gives them 90.
+  // Rules with no trackable allowance (visa required, e-visa) get no number.
+  const visaRule = citizenshipCode && leg.country_code
+    ? getRuleForCitizen(citizenshipCode, leg.country_code)
+    : null;
+  const visaLimit = visaRule && visaRule.ruleType !== 'visa_required'
+    ? visaRule.allowedDays
+    : undefined;
   const plannedVisaExceeds = visaLimit !== undefined && plannedDays > visaLimit;
 
   // Tax: any stay ≥ 183 days is a risk
@@ -705,18 +713,25 @@ export default function JourneyDetailScreen() {
   const { user } = useAuth();
   const [visaStatuses, setVisaStatuses] = useState<VisaStatus[]>([]);
   const [taxStatuses, setTaxStatuses] = useState<TaxStatus[]>([]);
+  const [citizenshipCode, setCitizenshipCode] = useState<string | null>(null);
   const visaTaxRef = useRef<{ visaTaxContext: string } | null>(null);
 
   useEffect(() => {
     const uid = user?.uid;
     if (!uid) return;
-    Promise.all([getCitizenship(uid), getAllTripsRaw(), getHasFixedResidence(uid)])
-      .then(([citizenship, trips, hasFixedResidence]) => {
+    Promise.all([
+      getCitizenship(uid),
+      getAllTripsRaw(),
+      getHasFixedResidence(uid),
+      getAllUserVisas(),
+    ])
+      .then(([citizenship, trips, hasFixedResidence, userVisas]) => {
         if (!citizenship) {
           console.log('[JourneyDetail] no citizenship set — skipping visa/tax');
           return;
         }
-        const visa = calculateAllVisaStatuses(trips, citizenship.countryCode);
+        const visa = calculateAllVisaStatuses(trips, citizenship.countryCode, userVisas);
+        setCitizenshipCode(citizenship.countryCode);
         const tax = calculateAllTaxStatuses(trips, citizenship.countryCode, hasFixedResidence ?? true);
         console.log('[JourneyDetail] visa:', visa.length, 'tax:', tax.length, 'trips:', trips.length);
         setVisaStatuses(visa);
@@ -920,6 +935,7 @@ export default function JourneyDetailScreen() {
           onDrag={drag}
           visaStatuses={visaStatuses}
           taxStatuses={taxStatuses}
+          citizenshipCode={citizenshipCode}
         />
       </ScaleDecorator>
     );

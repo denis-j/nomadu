@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { getCountryName, nearestCity } from '../utils/geography';
 
 // Country code to flag emoji
 export function countryCodeToFlag(code: string): string {
@@ -31,8 +32,19 @@ export async function reverseGeocode(
       const code = result.isoCountryCode ?? null;
       if (city && code) {
         return {
-          city,
-          country: codeToEnglishCountry(code) ?? result.country ?? null,
+          // Apple's `city` is not consistently a city. In Germany a coordinate
+          // in Kreuzberg correctly yields "Berlin", but central Bangkok yields
+          // "Phra Nakhon District", and Phuket yields the sub-district
+          // "Ratsada". Snapping to the nearest city we know keeps trip names on
+          // the same vocabulary the picker offers, so the timeline never shows
+          // a district. If nothing is close enough, the geocoder's answer
+          // stands: small places are missing from any population-filtered list.
+          city: nearestCity(latitude, longitude, code)?.name ?? city,
+          // One source of truth for country names. Apple returns them in the
+          // device language ("Deutschland" on a German phone), and these are
+          // stored on the trip and grouped on in stats and visa screens, so
+          // they have to match what the country picker writes.
+          country: getCountryName(code) ?? result.country ?? null,
           countryCode: code,
         };
       }
@@ -60,10 +72,13 @@ export async function reverseGeocode(
           addr.state ??
           null;
         if (city) {
+          const code = addr.country_code.toUpperCase();
           return {
-            city,
-            country: addr.country ?? null,
-            countryCode: addr.country_code.toUpperCase(),
+            // Same snapping and the same country names as the branch above, so
+            // a trip does not depend on which geocoder happened to answer.
+            city: nearestCity(latitude, longitude, code)?.name ?? city,
+            country: getCountryName(code) ?? addr.country ?? null,
+            countryCode: code,
           };
         }
       }
@@ -75,38 +90,6 @@ export async function reverseGeocode(
   return { city: null, country: null, countryCode: null };
 }
 
-// Fallback: map country code → English name (for when Nominatim is unavailable)
-function codeToEnglishCountry(code: string): string | null {
-  const map: Record<string, string> = {
-    AF: 'Afghanistan', AL: 'Albania', DZ: 'Algeria', AR: 'Argentina',
-    AT: 'Austria', AU: 'Australia', BD: 'Bangladesh', BE: 'Belgium',
-    BG: 'Bulgaria', BR: 'Brazil', CA: 'Canada', CH: 'Switzerland',
-    CL: 'Chile', CN: 'China', CO: 'Colombia', CR: 'Costa Rica',
-    CU: 'Cuba', CZ: 'Czech Republic', DE: 'Germany', DK: 'Denmark',
-    DO: 'Dominican Republic', EC: 'Ecuador', EE: 'Estonia', EG: 'Egypt',
-    ES: 'Spain', ET: 'Ethiopia', FI: 'Finland', FR: 'France',
-    GB: 'United Kingdom', GE: 'Georgia', GR: 'Greece', GT: 'Guatemala',
-    HN: 'Honduras', HR: 'Croatia', HU: 'Hungary', ID: 'Indonesia',
-    IE: 'Ireland', IL: 'Israel', IN: 'India', IQ: 'Iraq',
-    IR: 'Iran', IS: 'Iceland', IT: 'Italy', JM: 'Jamaica',
-    JO: 'Jordan', JP: 'Japan', KE: 'Kenya', KH: 'Cambodia',
-    KR: 'South Korea', KW: 'Kuwait', LA: 'Laos', LB: 'Lebanon',
-    LT: 'Lithuania', LU: 'Luxembourg', LV: 'Latvia', MA: 'Morocco',
-    ME: 'Montenegro', MK: 'North Macedonia', MM: 'Myanmar', MN: 'Mongolia',
-    MT: 'Malta', MV: 'Maldives', MX: 'Mexico', MY: 'Malaysia',
-    NG: 'Nigeria', NI: 'Nicaragua', NL: 'Netherlands', NO: 'Norway',
-    NP: 'Nepal', NZ: 'New Zealand', OM: 'Oman', PA: 'Panama',
-    PE: 'Peru', PH: 'Philippines', PK: 'Pakistan', PL: 'Poland',
-    PT: 'Portugal', PY: 'Paraguay', QA: 'Qatar', RO: 'Romania',
-    RS: 'Serbia', RU: 'Russia', SA: 'Saudi Arabia', SE: 'Sweden',
-    SG: 'Singapore', SI: 'Slovenia', SK: 'Slovakia', SV: 'El Salvador',
-    TH: 'Thailand', TR: 'Turkey', TW: 'Taiwan', TZ: 'Tanzania',
-    UA: 'Ukraine', AE: 'United Arab Emirates', US: 'United States',
-    UY: 'Uruguay', UZ: 'Uzbekistan', VE: 'Venezuela', VN: 'Vietnam',
-    ZA: 'South Africa', ZM: 'Zambia', ZW: 'Zimbabwe', LK: 'Sri Lanka',
-  };
-  return map[code.toUpperCase()] ?? null;
-}
 
 // Forward geocode: address string → coordinates
 export async function forwardGeocode(
