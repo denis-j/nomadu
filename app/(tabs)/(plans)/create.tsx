@@ -21,12 +21,10 @@ export default function CreateJourneyScreen() {
     try {
       const id = await insertJourney(title.trim());
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.dismiss();
+      // One navigation update: the sheet goes, the trip comes. Dismissing and
+      // pushing on a timer raced the sheet's dismissal and crashed the stack.
+      router.replace(`/(tabs)/(plans)/${id}` as any);
       showToast('Journey created');
-      // Navigate to the new journey after dismissing
-      setTimeout(() => {
-        router.push(`/(tabs)/(plans)/${id}?add=1` as any);
-      }, 350);
     } catch (err) {
       console.error('Failed to create journey:', err);
       setSaving(false);

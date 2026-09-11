@@ -28,6 +28,8 @@ type Params = {
   end: string;
   transport: string;
   notes?: string;
+  /** '1' when the start is fixed by the previous stop and only the length is chosen. */
+  lockStart?: string;
 };
 
 const TRANSPORTS: { type: TransportType; icon: string; label: string }[] = [
@@ -63,8 +65,21 @@ export default function EditStopScreen() {
 
   // ─── Calendar ───────────────────────────────────────────────────────────────
 
+  // Stops chain: every stop after the first starts the day after the
+  // previous one ends, so here only the last day is up for choosing.
+  const lockStart = params.lockStart === '1';
+
   const handleDayPress = (day: DateData) => {
     const d = parseDate(day.dateString);
+    if (lockStart) {
+      if (d < startDate) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        return;
+      }
+      Haptics.selectionAsync();
+      setEndDate(d);
+      return;
+    }
     Haptics.selectionAsync();
     if (!pickingEnd) {
       setStartDate(d);
@@ -161,9 +176,14 @@ export default function EditStopScreen() {
 
         {/* Calendar */}
         <Text style={styles.sectionTitle}>Dates</Text>
-        <Text style={styles.hint}>{pickingEnd ? 'Tap end date' : 'Tap start date'}</Text>
+        <Text style={styles.hint}>
+          {lockStart
+            ? 'Start is set by the previous stop. Tap the last day.'
+            : pickingEnd ? 'Tap end date' : 'Tap start date'}
+        </Text>
         <View style={styles.calendarCard}>
           <Calendar
+            current={fmtDate(startDate)}
             markingType="period"
             markedDates={markedDates}
             onDayPress={handleDayPress}

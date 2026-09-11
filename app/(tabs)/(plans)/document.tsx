@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -8,7 +8,7 @@ import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
-import { deleteJourneyDocument, getJourneyDocument, JourneyDocument } from '../../../lib/database';
+import { deleteJourneyDocument, getJourneyDocument, getJourneyTravellers, JourneyDocument, parseDate } from '../../../lib/database';
 import { documentExists, documentUri, isImageMime, kindMeta, removeDocumentFile } from '../../../lib/documents';
 import { showToast } from '../../../lib/toast';
 
@@ -23,12 +23,16 @@ export default function DocumentScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
   const [doc, setDoc] = useState<JourneyDocument | null>(null);
+  const [owner, setOwner] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
 
   useEffect(() => {
-    getJourneyDocument(Number(params.id)).then((d) => {
+    getJourneyDocument(Number(params.id)).then(async (d) => {
       setDoc(d);
-      if (d && !documentExists(d.file_name)) setMissing(true);
+      if (!d) return;
+      if (!documentExists(d.file_name)) setMissing(true);
+      const travellers = await getJourneyTravellers(d.journey_id);
+      setOwner(travellers.find((t) => t.id === d.traveller_id)?.name ?? (travellers.length > 1 ? 'Everyone' : null));
     });
   }, [params.id]);
 
@@ -91,7 +95,19 @@ export default function DocumentScreen() {
             </Text>
           </View>
         ) : isImageMime(doc.mime) ? (
-          <Image source={{ uri: uri! }} style={styles.image} contentFit="contain" />
+          // Pinch to zoom: at the gate the QR code has to be big.
+          <ScrollView
+            style={styles.image}
+            contentContainerStyle={styles.zoomContent}
+            maximumZoomScale={5}
+            minimumZoomScale={1}
+            bouncesZoom
+            centerContent
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+          >
+            <Image source={{ uri: uri! }} style={styles.image} contentFit="contain" />
+          </ScrollView>
         ) : (
           <WebView
             source={{ uri: uri! }}
@@ -104,8 +120,13 @@ export default function DocumentScreen() {
         )}
         {doc && meta && !missing && (
           <View style={styles.caption}>
-            <Ionicons name={meta.icon} size={14} color={Colors.textSecondary} />
-            <Text style={styles.captionText}>{meta.label}</Text>
+            <View style={[styles.kindPill, { backgroundColor: meta.color }]}>
+              <Ionicons name={meta.icon} size={12} color="#fff" />
+              <Text style={styles.kindPillText}>{meta.short}</Text>
+            </View>
+            <Text style={styles.captionText} numberOfLines={1}>
+              {owner ? `${owner} · ` : ''}Added {parseDate(doc.created_at.slice(0, 10)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </Text>
           </View>
         )}
       </View>
@@ -117,15 +138,26 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 18 },
   image: { flex: 1 },
+  zoomContent: { flex: 1 },
   web: { flex: 1, backgroundColor: Colors.background },
   caption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    paddingBottom: 28,
+    gap: 10,
+    paddingTop: 12,
+    // Clears the floating tab bar.
+    paddingBottom: 96,
   },
+  kindPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  kindPillText: { fontSize: 11, fontWeight: '700', color: '#fff', letterSpacing: 0.2 },
   captionText: { ...Typography.bodySmall, color: Colors.textSecondary },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
   missingTitle: { ...Typography.titleSmall },

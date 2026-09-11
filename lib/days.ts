@@ -41,3 +41,32 @@ export function countDays(from: Date, to: Date): number {
   if (b < a) return 0;
   return Math.round((b - a) / 86400000) + 1;
 }
+
+/** Parse YYYY-MM-DD as a local date at noon. */
+export function fromYmd(ymd: string): Date {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(y, m - 1, d, 12);
+}
+
+/**
+ * An itinerary is a chain: each stop starts the day after the previous one
+ * ends, and a stop's length is what it owns. Reordering, inserting or
+ * deleting a stop therefore re-flows every date after it, and the first
+ * stop's start is the trip's start. `anchor` overrides that start.
+ */
+export function chainDates<T extends { start_date: string; end_date: string }>(
+  legs: T[],
+  anchor?: string,
+): { start_date: string; end_date: string }[] {
+  let cursor = anchor ?? legs[0]?.start_date;
+  return legs.map((l) => {
+    const days = Math.max(1, countDays(fromYmd(l.start_date), fromYmd(l.end_date)));
+    const start = cursor;
+    const endDate = fromYmd(start);
+    endDate.setDate(endDate.getDate() + days - 1);
+    const next = new Date(endDate);
+    next.setDate(next.getDate() + 1);
+    cursor = toYmd(next);
+    return { start_date: start, end_date: toYmd(endDate) };
+  });
+}

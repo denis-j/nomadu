@@ -20,7 +20,8 @@ import * as Haptics from 'expo-haptics';
 import { useJourneys } from '../../../hooks/useJourneys';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
-import { deleteJourney, insertJourney, insertJourneyLeg, parseDate, TransportType } from '../../../lib/database';
+import { insertJourney, insertJourneyLeg, parseDate, TransportType } from '../../../lib/database';
+import { deleteJourneyWithDocuments } from '../../../lib/documents';
 import { Flag } from '../../../components/Flag';
 
 const hasGlass = isLiquidGlassAvailable();
@@ -49,7 +50,7 @@ interface TemplateLeg {
 
 interface FeaturedDestination {
   id: string;
-  flag: string; // emoji — used only in the Alert title (native iOS modals render emoji fine)
+  flag: string; // emoji, used only in the Alert title (native iOS modals render emoji fine)
   countryCode: string;
   country: string;
   tagline: string;
@@ -133,7 +134,7 @@ const FEATURED: FeaturedDestination[] = [
       { name: 'Airbnb', domain: 'airbnb.com' },
       { name: 'Wise', domain: 'wise.com' },
     ],
-    tips: ['NHR tax regime for new residents', 'Schengen — max 90 / 180 days', 'Fibre wifi standard in Airbnbs'],
+    tips: ['NHR tax regime for new residents', 'Schengen: max 90 / 180 days', 'Fibre wifi standard in Airbnbs'],
     legs: [
       { city: 'Lisbon', country: 'Portugal', countryCode: 'PT', startOffset: 1,  endOffset: 8,  transport: 'flight', latitude: 38.7169, longitude: -9.1399  },
       { city: 'Porto',  country: 'Portugal', countryCode: 'PT', startOffset: 10, endOffset: 14, transport: 'train',  latitude: 41.1579, longitude: -8.6291  },
@@ -219,6 +220,16 @@ function fmtDate(dateStr: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+/** "Sep 12 – 30" inside one month, "Sep 28 – Oct 3" across. */
+function fmtRange(start: string, end: string): string {
+  const s = parseDate(start);
+  const e = parseDate(end);
+  if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) {
+    return `${fmtDate(start)} – ${e.getDate()}`;
+  }
+  return `${fmtDate(start)} – ${fmtDate(end)}`;
+}
+
 function computeTotalDays(firstStart: string, lastEnd: string): number {
   const start = parseDate(firstStart);
   const end = parseDate(lastEnd);
@@ -259,7 +270,7 @@ function JourneyCard({
   const hasLegs = (journey.leg_count ?? 0) > 0;
   const dateRange =
     hasLegs && journey.first_start && journey.last_end
-      ? `${fmtDate(journey.first_start)} – ${fmtDate(journey.last_end)}`
+      ? fmtRange(journey.first_start, journey.last_end)
       : 'No dates yet';
 
   const totalDays =
@@ -357,7 +368,7 @@ export default function JourneysScreen() {
   }, [router]);
 
   const handleDelete = useCallback(async (id: number) => {
-    await deleteJourney(id);
+    await deleteJourneyWithDocuments(id);
     refresh();
   }, [refresh]);
 
@@ -419,7 +430,7 @@ export default function JourneysScreen() {
           <View style={styles.inlineEmpty}>
             <Text style={styles.inlineEmptyIcon}>🗺️</Text>
             <Text style={styles.inlineEmptyTitle}>No journeys yet</Text>
-            <Text style={styles.inlineEmptySub}>Plan your next adventure — tap + to create one.</Text>
+            <Text style={styles.inlineEmptySub}>Plan your next adventure. Tap + to create one.</Text>
           </View>
         ) : (
           journeys.map((j) => (

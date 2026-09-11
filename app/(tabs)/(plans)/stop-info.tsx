@@ -28,6 +28,8 @@ type Params = {
   end: string;
   transport: string;
   notes?: string;
+  /** '1' when the start is fixed by the previous stop and only the length is chosen. */
+  lockStart?: string;
 };
 
 const TRANSPORT_LABELS: Record<string, { icon: string; label: string }> = {
@@ -137,22 +139,24 @@ export default function StopInfoScreen() {
   }, [city, country]);
 
   const handleEdit = () => {
-    nav.goBack();
-    setTimeout(() => {
-      router.push({
-        pathname: '/(tabs)/(plans)/edit-stop',
-        params: {
-          legId: params.legId,
-          journeyId: params.journeyId,
-          country,
-          city,
-          start: params.start,
-          end: params.end,
-          transport: params.transport,
-          ...(params.notes && { notes: params.notes }),
-        },
-      });
-    }, 350);
+    // Swap this sheet for the editor in one navigation update. A first version
+    // dismissed and then pushed after a timer; when the dismissal was still
+    // running, the editor was presented on top of it and react-native-screens
+    // asserted ("modally presented controllers are being reshuffled").
+    router.replace({
+      pathname: '/(tabs)/(plans)/edit-stop',
+      params: {
+        legId: params.legId,
+        journeyId: params.journeyId,
+        country,
+        city,
+        start: params.start,
+        end: params.end,
+        transport: params.transport,
+        ...(params.notes && { notes: params.notes }),
+        ...(params.lockStart && { lockStart: params.lockStart }),
+      },
+    });
   };
 
   const handleDelete = () => {
@@ -221,6 +225,18 @@ export default function StopInfoScreen() {
           </>
         ) : null}
 
+        {/* Actions: above the tips, which can run long */}
+        <View style={styles.actions}>
+          <Pressable style={styles.editButton} onPress={handleEdit}>
+            <Ionicons name="pencil" size={16} color={PlatformColor('label') as any} />
+            <Text style={styles.editButtonText}>Edit Stop</Text>
+          </Pressable>
+          <Pressable style={styles.deleteButton} onPress={handleDelete}>
+            <Ionicons name="trash-outline" size={16} color={Colors.error} />
+            <Text style={styles.deleteButtonText}>Delete</Text>
+          </Pressable>
+        </View>
+
         {/* Tips */}
         <Text style={styles.sectionTitle}>Tips for {city}</Text>
         <View style={styles.card}>
@@ -240,17 +256,6 @@ export default function StopInfoScreen() {
           )}
         </View>
 
-        {/* Actions */}
-        <View style={styles.actions}>
-          <Pressable style={styles.editButton} onPress={handleEdit}>
-            <Ionicons name="pencil" size={16} color={PlatformColor('label') as any} />
-            <Text style={styles.editButtonText}>Edit Stop</Text>
-          </Pressable>
-          <Pressable style={styles.deleteButton} onPress={handleDelete}>
-            <Ionicons name="trash-outline" size={16} color={Colors.error} />
-            <Text style={styles.deleteButtonText}>Delete</Text>
-          </Pressable>
-        </View>
       </ScrollView>
     </>
   );

@@ -3,6 +3,7 @@ import { ActionSheetIOS, Alert, Pressable, ScrollView, StyleSheet, Text, View } 
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { WebView } from 'react-native-webview';
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { PillRow } from '../../../components/PillRow';
@@ -16,7 +17,8 @@ import {
   JourneyTraveller,
   renameJourneyTraveller,
 } from '../../../lib/database';
-import { DocumentKind, documentUri, isImageMime, kindMeta } from '../../../lib/documents';
+import { DocumentKind, documentUri, isImageMime, isPdfMime, kindMeta } from '../../../lib/documents';
+import { parseDate } from '../../../lib/database';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -187,14 +189,25 @@ export default function DocumentsScreen() {
         ) : (
           groups.map((g) => (
             <View key={g.key} style={styles.group}>
-              {g.title && <Text style={styles.groupTitle}>{g.title}</Text>}
+              {g.title && (
+                <View style={styles.groupHead}>
+                  <View style={[styles.groupAvatar, g.key === 'shared' && styles.groupAvatarShared]}>
+                    {g.key === 'shared'
+                      ? <Ionicons name="people" size={11} color={Colors.text} />
+                      : <Text style={styles.groupAvatarText}>{g.title.trim().charAt(0).toUpperCase()}</Text>}
+                  </View>
+                  <Text style={styles.groupTitle}>{g.title}</Text>
+                </View>
+              )}
               <View style={styles.grid}>
-                {g.docs.map((d) => (
+                {g.docs.map((d, i) => (
                   <DocumentTile
                     key={d.id}
                     doc={d}
                     // In a traveller's tab a group booking needs saying so.
                     note={current && isShared(d) ? 'Everyone' : null}
+                    // Live PDF previews are web views; a handful is fine, a wall is not.
+                    preview={i < 8}
                     onPress={() => openDocument(d)}
                   />
                 ))}
@@ -211,32 +224,67 @@ export default function DocumentsScreen() {
 function DocumentTile({
   doc,
   note,
+  preview,
   onPress,
 }: {
   doc: JourneyDocument;
   note: string | null;
+  preview: boolean;
   onPress: () => void;
 }) {
   const meta = kindMeta(doc.kind);
+  const uri = documentUri(doc.file_name);
   const image = isImageMime(doc.mime);
+  const pdf = isPdfMime(doc.mime);
+  const added = parseDate(doc.created_at.slice(0, 10)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.tileWrap, pressed && { opacity: 0.7 }]}>
       <Glass {...glassProps} style={[styles.tile, !hasGlass && styles.tileFallback]}>
-        {image ? (
-          <Image source={{ uri: documentUri(doc.file_name) }} style={styles.thumb} contentFit="cover" />
-        ) : (
-          <View style={[styles.thumb, styles.thumbIcon]}>
-            <Ionicons name={meta.icon} size={30} color={Colors.textSecondary} />
+        <View style={styles.thumb}>
+          {image ? (
+            <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+          ) : pdf && preview ? (
+            // The first page, as iOS draws it. Touches pass through to the tile.
+            <WebView
+              source={{ uri }}
+              style={styles.thumbWeb}
+              pointerEvents="none"
+              scrollEnabled={false}
+              originWhitelist={['*']}
+              allowFileAccess
+              allowFileAccessFromFileURLs
+              allowingReadAccessToURL={uri.slice(0, uri.lastIndexOf('/'))}
+            />
+          ) : (
+            <Paper icon={meta.icon} color={meta.color} />
+          )}
+          <View style={[styles.kindPill, { backgroundColor: meta.color }]}>
+            <Ionicons name={meta.icon} size={11} color="#fff" />
+            <Text style={styles.kindPillText}>{meta.short}</Text>
           </View>
-        )}
+        </View>
         <View style={styles.tileText}>
           <Text style={styles.tileTitle} numberOfLines={1}>{doc.title}</Text>
-          <Text style={styles.tileKind} numberOfLines={1}>
-            {note ? `${meta.short} · ${note}` : meta.short}
-          </Text>
+          <Text style={styles.tileSub} numberOfLines={1}>{note ? `${note} · ` : ''}Added {added}</Text>
         </View>
       </Glass>
     </Pressable>
+  );
+}
+
+/** A sheet of paper with faint lines, for files that have no preview. */
+function Paper({ icon, color }: { icon: keyof typeof Ionicons.glyphMap; color: string }) {
+  return (
+    <View style={styles.paper}>
+      <View style={styles.paperSheet}>
+        {[0.7, 0.5, 0.8, 0.45, 0.6].map((w, i) => (
+          <View key={i} style={[styles.paperLine, { width: `${w * 100}%` }]} />
+        ))}
+        <View style={[styles.paperIcon, { backgroundColor: color + '1A' }]}>
+          <Ionicons name={icon} size={20} color={color} />
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -283,11 +331,21 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 100, gap: 20 },
 
   group: { gap: 10 },
+  groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 },
+  groupAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: Colors.text,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupAvatarShared: { backgroundColor: Colors.surfaceSecondary },
+  groupAvatarText: { fontSize: 11, fontWeight: '700', color: Colors.white },
   groupTitle: {
     ...Typography.eyebrow,
     fontSize: 13,
     color: Colors.textSecondary,
-    paddingHorizontal: 4,
   },
   grid: {
     flexDirection: 'row',
@@ -305,11 +363,53 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  thumb: { width: '100%', aspectRatio: 4 / 3, backgroundColor: Colors.surfaceSecondary },
-  thumbIcon: { alignItems: 'center', justifyContent: 'center' },
+  // Portrait: boarding passes, eVisas and phone screenshots are all taller
+  // than wide, and a landscape box showed a strip of each.
+  thumb: { width: '100%', aspectRatio: 4 / 5, backgroundColor: Colors.surfaceSecondary, overflow: 'hidden' },
+  thumbWeb: { ...StyleSheet.absoluteFillObject, backgroundColor: Colors.surfaceSecondary, opacity: 0.99 },
+  kindPill: {
+    position: 'absolute',
+    left: 10,
+    bottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  kindPillText: { fontSize: 11, fontWeight: '700', color: '#fff', letterSpacing: 0.2 },
   tileText: { padding: 12, gap: 2 },
-  tileTitle: { ...Typography.titleSmall, fontWeight: '500' },
-  tileKind: { ...Typography.bodySmall, color: Colors.textSecondary },
+  tileTitle: { ...Typography.titleSmall, fontWeight: '600' },
+  tileSub: { ...Typography.caption, color: Colors.textSecondary },
+  paper: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', padding: 22 },
+  paperSheet: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: Colors.surface,
+    borderRadius: 6,
+    padding: 14,
+    gap: 9,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  paperLine: { height: 4, borderRadius: 2, backgroundColor: Colors.border },
+  paperIcon: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   starter: { gap: 16 },
   starterHead: { gap: 4, paddingHorizontal: 4 },

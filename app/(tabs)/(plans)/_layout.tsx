@@ -13,8 +13,14 @@ export default function PlansStack() {
       <Stack.Screen
         name="[id]"
         options={{
+          // Static header setup lives here so the first frame already has it;
+          // set from inside the screen it arrived a frame late and flickered.
           headerBackTitle: 'Journeys',
           headerLargeTitle: false,
+          headerTransparent: true,
+          headerShadowVisible: false,
+          headerBackButtonDisplayMode: 'minimal',
+          title: '',
         }}
       />
       <Stack.Screen
@@ -64,6 +70,15 @@ export default function PlansStack() {
       <Stack.Screen
         name="document"
         options={{
+          headerBackButtonDisplayMode: 'minimal',
+        }}
+      />
+      <Stack.Screen
+        name="journey-map"
+        options={{
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.92, 1.0],
           headerBackButtonDisplayMode: 'minimal',
         }}
       />

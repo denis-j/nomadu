@@ -15,6 +15,8 @@ type Params = {
   end?: string;
   transport?: string;
   notes?: string;
+  /** '1' when the start is fixed by the previous stop and only the length is chosen. */
+  lockStart?: string;
 };
 
 const fmt = (d: Date) =>
@@ -39,14 +41,27 @@ export default function AddStopDatesScreen() {
   const initialStart = params.start ? parseDate(params.start) : today;
   const initialEnd = params.end ? parseDate(params.end) : defaultEnd;
 
+  // Stops chain: every stop after the first starts the day after the
+  // previous one ends, so here only the last day is up for choosing.
+  const lockStart = params.lockStart === '1';
+
   const [startDate, setStartDate] = useState(initialStart);
   const [endDate, setEndDate] = useState(initialEnd);
-  const [pickingEnd, setPickingEnd] = useState(false);
+  const [pickingEnd, setPickingEnd] = useState(lockStart);
 
   const days = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1);
 
   const handleDayPress = (day: DateData) => {
     const d = parseDate(day.dateString);
+    if (lockStart) {
+      if (d < startDate) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        return;
+      }
+      Haptics.selectionAsync();
+      setEndDate(d);
+      return;
+    }
     Haptics.selectionAsync();
 
     if (!pickingEnd) {
@@ -115,7 +130,7 @@ export default function AddStopDatesScreen() {
     <>
       <Stack.Screen
         options={{
-          title: isEditing ? 'Edit Dates' : 'Trip Dates',
+          title: isEditing ? 'Edit Dates' : 'Dates',
           headerRight: () => (
             <Pressable onPress={handleNext} hitSlop={8}>
               <SymbolView
@@ -142,16 +157,19 @@ export default function AddStopDatesScreen() {
 
         {/* Date range display */}
         <Text style={styles.dateRange}>
-          {fmtDisplay(startDate)} — {fmtDisplay(endDate)}
+          {fmtDisplay(startDate)} – {fmtDisplay(endDate)}
         </Text>
 
         {/* Hint */}
         <Text style={styles.hint}>
-          {pickingEnd ? 'Tap a date for the end' : 'Tap a date for the start'}
+          {lockStart
+            ? `Starts ${fmtDisplay(startDate)}, right after the previous stop. Tap the last day.`
+            : pickingEnd ? 'Tap a date for the end' : 'Tap a date for the start'}
         </Text>
 
         {/* Calendar */}
         <Calendar
+          current={fmt(startDate)}
           onDayPress={handleDayPress}
           markingType="period"
           markedDates={markedDates}

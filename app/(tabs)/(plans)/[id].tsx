@@ -1,12 +1,17 @@
 import React, { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Animated, {
   useSharedValue, useAnimatedStyle,
-  withTiming, withSpring, interpolate, Easing,
+  withTiming, withSpring,
   FadeIn, FadeOut,
 } from 'react-native-reanimated';
 import {
+  ActionSheetIOS,
+  ActivityIndicator,
+  Alert,
+  LayoutAnimation,
   PlatformColor,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -24,6 +29,7 @@ import { useJourneyDocuments } from '../../../hooks/useJourneyDocuments';
 import { DocumentsEntryCard } from '../../../components/JourneyDocuments';
 import { useAuth } from '../../../hooks/useAuth';
 import { EmptyState } from '../../../components/EmptyState';
+import { CloudyButton } from '../../../components/CloudyButton';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import {
@@ -31,16 +37,21 @@ import {
   parseDate,
   getAllTripsRaw,
   reorderJourneyLegs,
+  updateJourneyTitle,
 } from '../../../lib/database';
+import { deleteJourneyWithDocuments } from '../../../lib/documents';
 import { getCitizenship, getHasFixedResidence } from '../../../lib/onboarding';
 import { calculateAllVisaStatuses, VisaStatus } from '../../../lib/visaCalculations';
 import { getAllUserVisas } from '../../../lib/userVisas';
 import { calculateAllTaxStatuses, TaxStatus } from '../../../lib/taxCalculations';
 import { SCHENGEN_COUNTRIES, getRuleForCitizen } from '../../../constants/visaRules';
 import { countryCodeToFlag } from '../../../lib/geocoding';
+import { chainDates, countDays, fromYmd, toYmd } from '../../../lib/days';
 import { getCountryCode } from '../../../utils/geography';
 import { Flag } from '../../../components/Flag';
 import { suggestNextStops, StopSuggestion } from '../../../lib/ai';
+import { cachedMapSnapshot, storeMapSnapshot } from '../../../lib/mapSnapshot';
+import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -110,134 +121,256 @@ function fmtShort(dateStr: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+/** "Sep 12 – 18" inside one month, "Sep 28 – Oct 3" across. */
+function fmtRange(start: string, end: string): string {
+  const s = parseDate(start);
+  const e = parseDate(end);
+  if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) {
+    return `${fmtShort(start)} – ${e.getDate()}`;
+  }
+  return `${fmtShort(start)} – ${fmtShort(end)}`;
+}
+
+/**
+ * Where a suggested stop would actually land: the day after the trip's last
+ * stop, for as long as the model proposed. The model's own dates are only a
+ * guess about the trip's end, and the chain decides anyway.
+ */
+function chainedSuggestion(s: StopSuggestion, legs: JourneyLeg[]): StopSuggestion {
+  const last = legs[legs.length - 1];
+  if (!last) return s;
+  const days = legDays(s.startDate, s.endDate);
+  const start = fromYmd(last.end_date);
+  start.setDate(start.getDate() + 1);
+  const end = new Date(start);
+  end.setDate(end.getDate() + days - 1);
+  return { ...s, startDate: toYmd(start), endDate: toYmd(end) };
+}
+
 function legDays(start: string, end: string): number {
   const s = parseDate(start);
   const e = parseDate(end);
   return Math.max(1, Math.round((e.getTime() - s.getTime()) / 86_400_000) + 1);
 }
 
-// ─── Trip Summary ────────────────────────────────────────────────────────────
-
-function TripSummary({ legs }: { legs: JourneyLeg[] }) {
-  const stats = useMemo(() => {
-    if (legs.length === 0) return null;
-    const totalDays = legs.reduce((sum, l) => sum + legDays(l.start_date, l.end_date), 0);
-    const countries = new Set(legs.map((l) => l.country)).size;
-    const cities = new Set(legs.map((l) => l.city)).size;
-    const firstDate = legs.reduce((min, l) => l.start_date < min ? l.start_date : min, legs[0].start_date);
-    const lastDate = legs.reduce((max, l) => l.end_date > max ? l.end_date : max, legs[0].end_date);
-    return { totalDays, countries, cities, firstDate, lastDate };
-  }, [legs]);
-
-  if (!stats) return null;
-
-  const CardWrap = hasGlass ? GlassView : View;
-  const cardProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
-
-  return (
-    <CardWrap {...cardProps} style={[styles.summaryBar, !hasGlass && styles.summaryBarFallback]}>
-      <View style={styles.summaryItem}>
-        <Text style={styles.summaryValue}>{stats.totalDays}</Text>
-        <Text style={styles.summaryLabel}>days</Text>
-      </View>
-      <View style={styles.summaryDivider} />
-      <View style={styles.summaryItem}>
-        <Text style={styles.summaryValue}>{stats.cities}</Text>
-        <Text style={styles.summaryLabel}>{stats.cities === 1 ? 'city' : 'cities'}</Text>
-      </View>
-      <View style={styles.summaryDivider} />
-      <View style={styles.summaryItem}>
-        <Text style={styles.summaryValue}>{stats.countries}</Text>
-        <Text style={styles.summaryLabel}>{stats.countries === 1 ? 'country' : 'countries'}</Text>
-      </View>
-      <View style={styles.summaryDivider} />
-      <View style={styles.summaryItem}>
-        <Text style={styles.summaryValue}>{fmtShort(stats.firstDate)}</Text>
-        <Text style={styles.summaryLabel}>{fmtShort(stats.lastDate)}</Text>
-      </View>
-    </CardWrap>
-  );
-}
-
 // ─── Journey Map Card ─────────────────────────────────────────────────────────
 
-function JourneyMapCard({ legs, headerHeight, scrollY }: { legs: JourneyLeg[]; headerHeight: number; scrollY: Animated.SharedValue<number> }) {
+const MAP_HEIGHT = 360;
+/** Breathing room under the lowest pin. */
+const MAP_CHIP_ZONE = 36;
+/** Span shown around a single stop: the city and its surroundings, not the continent. */
+const SINGLE_STOP_DELTA = 1.2;
+/** Bump when the drawing changes (route style, padding) so old pictures are not reused. */
+const SNAPSHOT_STYLE = 'v8';
+const MAP_PIN = require('../../../assets/icons/map-pin.png');
+
+/**
+ * A picture of the route, not a map.
+ *
+ * The live MKMapView is only mounted until MKMapSnapshotter has drawn it once
+ * (pins and dashed route included); from then on the card is an image, cached
+ * per set of stops, so scrolling the itinerary costs nothing and reopening the
+ * trip shows the map instantly. If the snapshot fails (offline) the live map
+ * stays as the fallback.
+ *
+ * Styled like the Map tab: the standard map and Apple's marker (redrawn as an
+ * image, the native one does not survive the snapshotter). The transparent
+ * header covers the top, so a lone stop is centred below it and several are
+ * fitted into the visible window.
+ */
+function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; headerHeight: number; onPress: () => void }) {
+  const mapRef = useRef<RNMapView>(null);
+
   const coordLegs = useMemo(
     () => legs.filter((l) => l.latitude != null && l.longitude != null),
     [legs],
   );
+  const coords = useMemo(
+    () => coordLegs.map((l) => ({ latitude: l.latitude as number, longitude: l.longitude as number })),
+    [coordLegs],
+  );
+  const coordsKey = coords.map((c) => `${c.latitude},${c.longitude}`).join('|');
+  const cacheKey = `${SNAPSHOT_STYLE}|${Math.round(headerHeight)}|${coordsKey}`;
 
-  const region = useMemo(() => {
-    if (coordLegs.length === 0) return null;
-    const lats = coordLegs.map((l) => l.latitude as number);
-    const lngs = coordLegs.map((l) => l.longitude as number);
+  const [snapshot, setSnapshot] = useState<string | null>(() => (coords.length ? cachedMapSnapshot(cacheKey) : null));
+  const [ready, setReady] = useState(false);
+  const [live, setLive] = useState(false);
+
+  useEffect(() => {
+    setSnapshot(coords.length ? cachedMapSnapshot(cacheKey) : null);
+    setReady(false);
+    setLive(false);
+  }, [cacheKey]);
+
+  const initialRegion = useMemo(() => {
+    if (coords.length === 0) return undefined;
+    const lats = coords.map((c) => c.latitude);
+    const lngs = coords.map((c) => c.longitude);
     const minLat = Math.min(...lats);
     const maxLat = Math.max(...lats);
     const minLng = Math.min(...lngs);
     const maxLng = Math.max(...lngs);
-    const pad = 0.3;
-    const latDelta = Math.max(8, (maxLat - minLat) * (1 + pad));
-    const lngDelta = Math.max(8, (maxLng - minLng) * (1 + pad));
+    const latDelta = Math.max(SINGLE_STOP_DELTA, (maxLat - minLat) * 1.6);
+    const lngDelta = Math.max(SINGLE_STOP_DELTA, (maxLng - minLng) * 1.6);
+    // Shift the centre so the pin lands mid-way in the uncovered part.
+    const shift = latDelta * ((headerHeight - MAP_CHIP_ZONE) / 2) / MAP_HEIGHT;
     return {
-      latitude: (minLat + maxLat) / 2,
+      latitude: (minLat + maxLat) / 2 + shift,
       longitude: (minLng + maxLng) / 2,
       latitudeDelta: latDelta,
       longitudeDelta: lngDelta,
     };
-  }, [coordLegs]);
+  }, [coordsKey, headerHeight]);
 
-  const MAP_HEIGHT = 360;
+  useEffect(() => {
+    if (!ready || snapshot || live) return;
+    const map = mapRef.current;
+    if (!map) return;
+    if (coords.length > 1) {
+      map.fitToCoordinates(coords, {
+        edgePadding: { top: headerHeight + 28, bottom: MAP_CHIP_ZONE + 16, left: 48, right: 48 },
+        animated: false,
+      });
+    }
+    // The snapshotter renders its own tiles; it only needs the final region.
+    // It has to be passed explicitly: left out, the bridge sends an empty
+    // object, which the native side reads as 0°/0° and draws open ocean.
+    const t = setTimeout(async () => {
+      try {
+        const b = await map.getMapBoundaries();
+        const region = {
+          latitude: (b.northEast.latitude + b.southWest.latitude) / 2,
+          longitude: (b.northEast.longitude + b.southWest.longitude) / 2,
+          latitudeDelta: b.northEast.latitude - b.southWest.latitude,
+          longitudeDelta: b.northEast.longitude - b.southWest.longitude,
+        };
+        const path = await map.takeSnapshot({ region, format: 'png', quality: 1, result: 'file' });
+        setSnapshot(storeMapSnapshot(cacheKey, path));
+      } catch (err) {
+        console.warn('[JourneyMap] snapshot failed, keeping the live map:', err);
+        setLive(true);
+      }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [ready, snapshot, live, cacheKey, headerHeight]);
 
-  const stretchStyle = useAnimatedStyle(() => {
-    // Only stretch when actively pulling down (ignore initial small negative offsets)
-    const overscroll = Math.max(0, -scrollY.value - 110);
-    if (overscroll <= 0) return {};
-    const scale = 1 + overscroll / MAP_HEIGHT;
-    return {
-      transform: [
-        { translateY: -overscroll / 2 },
-        { scale },
-      ],
-    };
-  });
-
-  if (coordLegs.length === 0 || !region) return null;
-
-  const polyCoords = coordLegs.map((l) => ({
-    latitude: l.latitude as number,
-    longitude: l.longitude as number,
-  }));
+  if (coords.length === 0 || !initialRegion) return null;
 
   return (
-    <Animated.View style={[styles.mapCard, { marginTop: -headerHeight }, stretchStyle]}>
-      <RNMapView
-        style={styles.map}
-        provider={PROVIDER_DEFAULT}
-        region={region}
-        scrollEnabled={false}
-        zoomEnabled={false}
-        rotateEnabled={false}
-        pitchEnabled={false}
-        mapType="standard"
-      >
-        {coordLegs.length > 1 && (
-          <Polyline
-            coordinates={polyCoords}
-            strokeColor={Colors.primary}
-            strokeWidth={2}
-            lineDashPattern={[6, 4]}
-          />
-        )}
-        {coordLegs.map((leg) => (
-          <Marker
-            key={leg.id}
-            coordinate={{ latitude: leg.latitude as number, longitude: leg.longitude as number }}
-            title={leg.city}
-          />
-        ))}
-      </RNMapView>
-    </Animated.View>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Open the route on a map" style={[styles.mapCard, { marginTop: -headerHeight }]}>
+      {snapshot ? (
+        <Image source={{ uri: snapshot }} style={styles.map} contentFit="cover" transition={180} />
+      ) : (
+        <>
+          <RNMapView
+            ref={mapRef}
+            style={styles.map}
+            provider={PROVIDER_DEFAULT}
+            initialRegion={initialRegion}
+            onMapReady={() => setReady(true)}
+            scrollEnabled={false}
+            zoomEnabled={false}
+            rotateEnabled={false}
+            pitchEnabled={false}
+            mapType="standard"
+          >
+            {coords.length > 1 && (
+              <Polyline
+                coordinates={coords}
+                strokeColor="rgba(0,0,0,0.45)"
+                strokeWidth={1.5}
+                lineDashPattern={[4, 6]}
+              />
+            )}
+            {coordLegs.map((leg) => (
+              <Marker
+                key={leg.id}
+                coordinate={{ latitude: leg.latitude as number, longitude: leg.longitude as number }}
+                // Own pin image: the snapshotter draws images cleanly, while
+                // Apple's balloon annotation comes out as a black square.
+                image={MAP_PIN}
+                anchor={{ x: 0.5, y: 1 }}
+              />
+            ))}
+          </RNMapView>
+          {!live && (
+            <View pointerEvents="none" style={styles.mapPlaceholder}>
+              <ActivityIndicator color={Colors.textTertiary} />
+            </View>
+          )}
+        </>
+      )}
+      {/* A whisper of the background behind the header, for the title over sea. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={[Colors.background + 'B3', Colors.background + '00']}
+        style={[styles.mapFade, { height: headerHeight + 16 }]}
+      />
+    </Pressable>
   );
+}
+
+const ChipShell = hasGlass ? GlassView : View;
+const chipShellProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
+
+/**
+ * The header title as the Map tab's glass chip: name on top, dates and length
+ * underneath. Same height as the glass back and add buttons beside it.
+ *
+ * Fixed height and a minimum width from the first frame, and no text until
+ * the journey is loaded: the capsule must not grow from a one-line "Trip" to
+ * two lines a moment later, that moved the whole header centre.
+ */
+function TripTitleChip({
+  title,
+  legs,
+  ready,
+  onLongPress,
+}: {
+  title: string;
+  legs: JourneyLeg[];
+  ready: boolean;
+  onLongPress: () => void;
+}) {
+  const span = tripSpan(legs);
+  return (
+    <Pressable onLongPress={onLongPress} delayLongPress={350} accessibilityRole="header">
+    <ChipShell {...chipShellProps} style={[styles.titleChip, !hasGlass && styles.titleChipFallback]}>
+      {ready && (
+        <>
+          <Text style={styles.titleChipTitle} numberOfLines={1}>{title}</Text>
+          <Text style={styles.titleChipSub} numberOfLines={1}>
+            {span ? span.status : 'No stops yet'}
+          </Text>
+        </>
+      )}
+    </ChipShell>
+    </Pressable>
+  );
+}
+
+/** Span of the trip and its countries, for the chip and the summary bar. */
+function tripSpan(legs: JourneyLeg[]) {
+  if (legs.length === 0) return null;
+  const start = legs.reduce((min, l) => (l.start_date < min ? l.start_date : min), legs[0].start_date);
+  const end = legs.reduce((max, l) => (l.end_date > max ? l.end_date : max), legs[0].end_date);
+  const totalDays = countDays(parseDate(start), parseDate(end));
+  const codes: string[] = [];
+  for (const l of legs) if (l.country_code && !codes.includes(l.country_code)) codes.push(l.country_code);
+  const range = fmtRange(start, end);
+
+  // What matters while planning: how far away it is, or how far in you are.
+  const today = toYmd(new Date());
+  let status: string;
+  if (today < start) {
+    const until = countDays(parseDate(today), parseDate(start)) - 1;
+    status = until === 1 ? `Starts tomorrow · ${totalDays} days` : `Starts in ${until} days · ${totalDays} days`;
+  } else if (today > end) {
+    status = `${range} · ${totalDays} ${totalDays === 1 ? 'day' : 'days'}`;
+  } else {
+    status = `Day ${countDays(parseDate(start), parseDate(today))} of ${totalDays}`;
+  }
+  return { start, end, totalDays, codes, range, status };
 }
 
 // ─── Leg Card ─────────────────────────────────────────────────────────────────
@@ -257,8 +390,8 @@ function taxChipColor(status: TaxStatus['status']) {
 
 type LegCardProps = {
   leg: JourneyLeg;
-  prevCity: string | null;
-  isFirst: boolean;
+  /** No earlier stop in the same country: the place to say how much visa is left. */
+  firstInCountry: boolean;
   onPress: (leg: JourneyLeg) => void;
   onDrag?: () => void;
   visaStatuses: VisaStatus[];
@@ -268,8 +401,7 @@ type LegCardProps = {
 
 const LegCard = React.memo(function LegCard({
   leg,
-  prevCity,
-  isFirst,
+  firstInCountry,
   onPress,
   onDrag,
   visaStatuses,
@@ -312,14 +444,15 @@ const LegCard = React.memo(function LegCard({
   interface Chip { label: string; color: string }
   const chips: Chip[] = [];
 
-  if (trackedVisa) {
-    // Show actual remaining days from tracked history
+  // A green "180d left" under every Thai stop is noise: say it once per
+  // country, and always when it is a warning.
+  if (trackedVisa && (trackedVisa.status !== 'ok' || firstInCountry)) {
     const color = visaChipColor(trackedVisa.status);
     const label = isSchengen
       ? `🇪🇺 ${trackedVisa.daysRemaining}d Schengen left`
       : `${emojiFlag} ${trackedVisa.daysRemaining}d visa left`;
     chips.push({ label, color });
-  } else if (plannedVisaExceeds) {
+  } else if (!trackedVisa && plannedVisaExceeds) {
     // No tracked data but this leg alone exceeds the limit
     const label = isSchengen
       ? `🇪🇺 ${plannedDays}d > ${visaLimit}d Schengen`
@@ -338,30 +471,24 @@ const LegCard = React.memo(function LegCard({
   const CardWrap = hasGlass ? GlassView : View;
   const cardProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
+  // How you get there sits on the line before the stop, for the first one
+  // too: a trip starts with a flight. Stops chain, so there is nothing else
+  // for the connector to say.
+  const transport = TRANSPORTS.find((t) => t.type === leg.transport) ?? TRANSPORTS[0];
+
   return (
     <View style={styles.legWrapper}>
-      {/* Connector between legs */}
-      {!isFirst && (
-        <Animated.View
-          entering={FadeIn.duration(250)}
-          exiting={FadeOut.duration(150)}
-          style={styles.connector}
-        >
-          <View style={styles.dotCol} />
-          <View style={styles.connectorBadge}>
-            <Ionicons
-              name={transportIcon(leg.transport) as any}
-              size={13}
-              color={Colors.textSecondary}
-            />
-            {prevCity ? (
-              <MorphText style={styles.connectorText}>
-                {`from ${prevCity}`}
-              </MorphText>
-            ) : null}
-          </View>
-        </Animated.View>
-      )}
+      <Animated.View
+        entering={FadeIn.duration(250)}
+        exiting={FadeOut.duration(150)}
+        style={styles.connector}
+      >
+        <View style={styles.dotCol} />
+        <View style={styles.connectorBadge}>
+          <Ionicons name={transport.icon as any} size={13} color={Colors.textSecondary} />
+          <MorphText style={styles.connectorText}>{transport.label}</MorphText>
+        </View>
+      </Animated.View>
 
       {/* Leg row: dot col + card */}
       <Pressable
@@ -383,7 +510,7 @@ const LegCard = React.memo(function LegCard({
               <Text style={styles.legCity}>{leg.city}</Text>
               <Text style={styles.legCountry}>{leg.country}</Text>
               <MorphText style={styles.legDates}>
-                {fmtShort(leg.start_date)} – {fmtShort(leg.end_date)}
+                {fmtRange(leg.start_date, leg.end_date)}
               </MorphText>
               {leg.notes ? (
                 <Text style={styles.legNotes} numberOfLines={2}>{leg.notes}</Text>
@@ -404,13 +531,6 @@ const LegCard = React.memo(function LegCard({
               <View style={styles.daysBadge}>
                 <MorphText style={styles.daysText}>{days}d</MorphText>
               </View>
-              <View style={styles.transportBadge}>
-                <Ionicons
-                  name={transportIcon(leg.transport) as any}
-                  size={14}
-                  color={Colors.primary}
-                />
-              </View>
             </View>
           </CardWrap>
         </View>
@@ -425,12 +545,16 @@ const LegCard = React.memo(function LegCard({
   prev.leg.notes === next.leg.notes &&
   prev.leg.city === next.leg.city &&
   prev.leg.country === next.leg.country &&
-  prev.prevCity === next.prevCity &&
-  prev.isFirst === next.isFirst
+  prev.firstInCountry === next.firstInCountry
 );
 
 // ─── Suggestion Leg Card ──────────────────────────────────────────────────────
 
+/**
+ * A suggested stop looks like a leg that is not there yet: same anatomy as
+ * LegCard, dashed outline instead of a surface, hollow timeline dot. The whole
+ * card adds it; there is no second button.
+ */
 function SuggestionLegCard({
   suggestion,
   onAdd,
@@ -442,273 +566,239 @@ function SuggestionLegCard({
 }) {
   const countryCode = getCountryCode(suggestion.country);
   const days = legDays(suggestion.startDate, suggestion.endDate);
-  const CardShell = hasGlass ? GlassView : View;
 
   return (
-    <View style={styles.suggRow}>
-      {/* Hollow dot — same structure as TripCard inactive dot */}
-      <View style={styles.suggTimelineCol}>
-        <View style={styles.suggDotSpacer} />
+    <View style={styles.legRow}>
+      <View style={styles.dotCol}>
         <View style={styles.suggDot} />
       </View>
-
-      {/* Card — mirrors TripCard layout exactly */}
       <Pressable
-        style={({ pressed }) => [styles.suggCardPressable, pressed && !disabled && { opacity: 0.75 }, disabled && { opacity: 0.5 }]}
         onPress={onAdd}
         disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={`Add ${suggestion.city}, ${suggestion.country}`}
+        style={({ pressed }) => [styles.suggCard, pressed && { opacity: 0.6 }, disabled && { opacity: 0.5 }]}
       >
-        <CardShell
-          {...(hasGlass
-            ? { glassEffectStyle: 'regular' as const, style: styles.suggCard }
-            : { style: [styles.suggCard, styles.suggCardFallback] }
-          )}
-        >
-          {/* Top row: flag + badges */}
-          <View style={styles.suggCardTop}>
-            <Flag code={countryCode} size={24} />
-            <View style={styles.suggCardTopRight}>
-              <View style={styles.aiBadge}>
-                <Text style={styles.aiBadgeText}>AI</Text>
-              </View>
-              <View style={styles.daysBadge}>
-                <Text style={styles.daysText}>{days}d</Text>
-              </View>
-            </View>
+        <Flag code={countryCode} size={28} style={styles.legFlagWrap} />
+        <View style={styles.legCenter}>
+          <Text style={styles.legCity}>{suggestion.city}</Text>
+          <Text style={styles.legCountry}>{suggestion.country}</Text>
+          <Text style={styles.legDates}>
+            {fmtShort(suggestion.startDate)} – {fmtShort(suggestion.endDate)}
+          </Text>
+          <Text style={styles.suggReason}>{suggestion.reason}</Text>
+          <View style={styles.suggAdd}>
+            <Ionicons name="add" size={14} color={Colors.text} />
+            <Text style={styles.suggAddText}>Add this stop</Text>
           </View>
-
-          {/* City + country */}
-          <Text style={styles.suggCity}>{suggestion.city}</Text>
-          <Text style={styles.suggCountry}>{suggestion.country}</Text>
-
-          {/* Dates + transport */}
-          <View style={styles.suggCardBottom}>
-            <Text style={styles.suggDates}>
-              {fmtShort(suggestion.startDate)} – {fmtShort(suggestion.endDate)}
-            </Text>
-            <View style={styles.suggTransportChip}>
-              <Ionicons name={transportIcon(suggestion.transport) as any} size={11} color={Colors.textTertiary} />
-              <Text style={styles.suggTransportText}>{suggestion.transport}</Text>
-            </View>
+        </View>
+        <View style={styles.legRight}>
+          <View style={styles.daysBadge}>
+            <Text style={styles.daysText}>{days}d</Text>
           </View>
-
-          {/* Reason */}
-          <Text style={styles.suggReason} numberOfLines={2}>{suggestion.reason}</Text>
-
-          {/* Add button */}
-          <TouchableOpacity
-            style={[styles.suggAddBtn, disabled && { opacity: 0.4 }]}
-            onPress={onAdd}
-            activeOpacity={0.85}
-            disabled={disabled}
-          >
-            <Ionicons name="add" size={16} color={Colors.white} />
-            <Text style={styles.suggAddText}>{disabled ? 'Loading…' : 'Add this stop'}</Text>
-          </TouchableOpacity>
-        </CardShell>
+          <View style={styles.transportBadge}>
+            <Ionicons name={transportIcon(suggestion.transport) as any} size={14} color={Colors.primary} />
+          </View>
+        </View>
       </Pressable>
+    </View>
+  );
+}
+
+function SuggestionSkeleton() {
+  return (
+    <View style={styles.legRow}>
+      <View style={styles.dotCol}>
+        <View style={styles.suggDot} />
+      </View>
+      <View style={styles.suggCard}>
+        <View style={styles.skeletonFlag} />
+        <View style={styles.legCenter}>
+          <View style={[styles.skeletonBar, { width: '55%' }]} />
+          <View style={[styles.skeletonBar, { width: '35%' }]} />
+          <View style={[styles.skeletonBar, { width: '80%', marginTop: 8 }]} />
+        </View>
+      </View>
     </View>
   );
 }
 
 // ─── AI Suggestions Section ───────────────────────────────────────────────────
 
+const PREFERENCE_CHIPS = ['Beaches', 'Islands', 'Mountains', 'Cheap cities', 'Nightlife', 'Culture'];
+
 function AISuggestionsSection({
-  suggestions, suggestionsLoading, suggestionsError,
-  collapsed, onToggleCollapse, onRefresh, onAdd, hasGlass,
-  preference, onPreferenceChange, onPreferenceSubmit,
+  suggestions, loading, error,
+  collapsed, onToggleCollapse, onRefresh, onAdd,
+  preference, onRefine,
 }: {
   suggestions: StopSuggestion[];
-  suggestionsLoading: boolean;
-  suggestionsError: boolean;
+  loading: boolean;
+  error: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onRefresh: () => void;
   onAdd: (s: StopSuggestion) => void;
-  hasGlass: boolean;
   preference: string;
-  onPreferenceChange: (text: string) => void;
-  onPreferenceSubmit: () => void;
+  /** Reload with a new wish ('' clears it). */
+  onRefine: (preference: string) => void;
 }) {
-  const [showInput, setShowInput] = useState(false);
   const PillShell = hasGlass ? GlassView : View;
+  const custom = preference.trim() !== '' && !PREFERENCE_CHIPS.includes(preference);
+  const [showInput, setShowInput] = useState(custom);
+  const [draft, setDraft] = useState(custom ? preference : '');
+  // The wish is restored from the cache after mount; keep the field in step.
+  useEffect(() => { if (custom) setDraft(preference); }, [custom, preference]);
 
-  // Shared values
-  const progress = useSharedValue(collapsed ? 0 : 1); // 1 = expanded, 0 = collapsed
-  const contentHeight = useSharedValue(0);
-  const measured = useSharedValue(false);
+  // Only the chevron is animated by hand. The content itself is mounted or
+  // not; the parent wraps the toggle in a LayoutAnimation, so the list grows
+  // and shrinks natively. A first version tweened the height with Reanimated,
+  // which re-laid out the whole list on every frame and stuttered.
   const chevronRotation = useSharedValue(collapsed ? -90 : 0);
-
   useEffect(() => {
-    const target = collapsed ? 0 : 1;
-    progress.value = withTiming(target, { duration: 380, easing: Easing.bezier(0.4, 0, 0.2, 1) });
     chevronRotation.value = withSpring(collapsed ? -90 : 0, { damping: 18, stiffness: 200 });
   }, [collapsed]);
-
-  const contentStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 0.4, 1], [0, 0, 1]),
-    height: measured.value
-      ? interpolate(progress.value, [0, 1], [0, contentHeight.value])
-      : undefined,
-    overflow: 'hidden',
-  }));
-
   const chevronStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${chevronRotation.value}deg` }],
   }));
 
-  const statusStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0.6, 1], [0, 1]),
-    transform: [{ translateX: interpolate(progress.value, [0.6, 1], [8, 0]) }],
-  }));
+  const pickChip = (chip: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowInput(false);
+    onRefine(preference === chip ? '' : chip);
+  };
+
+  const submitDraft = () => {
+    const next = draft.trim();
+    if (!next) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onRefine(next);
+  };
 
   return (
     <>
       <View style={styles.aiSectionHeader}>
         <View style={styles.aiSectionLineCol} />
-        <TouchableOpacity onPress={onToggleCollapse} activeOpacity={0.7}>
+        <TouchableOpacity onPress={onToggleCollapse} activeOpacity={0.7} accessibilityRole="button" accessibilityState={{ expanded: !collapsed }}>
           <PillShell
             {...(hasGlass
               ? { glassEffectStyle: 'regular' as const, style: styles.aiPill }
               : { style: [styles.aiPill, styles.aiPillFallback] }
             )}
           >
-            <Text style={styles.aiPillText}>✨ AI suggestions</Text>
-            <View style={styles.betaBadge}><Text style={styles.betaBadgeText}>BETA</Text></View>
+            <Ionicons name="sparkles" size={12} color={Colors.text} />
+            <Text style={styles.aiPillText}>AI suggestions</Text>
             <Animated.View style={chevronStyle}>
-              <Ionicons name="chevron-down" size={13} color={Colors.primary} />
+              <Ionicons name="chevron-down" size={13} color={Colors.textSecondary} />
             </Animated.View>
           </PillShell>
         </TouchableOpacity>
-
-        <Animated.View style={[styles.aiPillRight, statusStyle]}>
-          {suggestionsLoading && (
-            <Text style={styles.aiPillStatus}>Finding stops…</Text>
+        {!collapsed && (
+        <View style={styles.aiHeaderRight}>
+          {loading ? (
+            <Text style={styles.aiStatus}>Finding stops…</Text>
+          ) : (
+            <TouchableOpacity onPress={onRefresh} hitSlop={10} accessibilityLabel="New suggestions">
+              <Ionicons name="refresh" size={16} color={Colors.textSecondary} />
+            </TouchableOpacity>
           )}
-          {suggestionsError && !suggestionsLoading && (
-            <Text style={[styles.aiPillStatus, { color: Colors.error }]}>Failed</Text>
-          )}
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setShowInput((v) => !v);
-            }}
-            disabled={suggestionsLoading}
-            hitSlop={8}
-          >
-            <Ionicons
-              name="create-outline"
-              size={15}
-              color={Colors.primary}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onRefresh} disabled={suggestionsLoading} hitSlop={8}>
-            <Ionicons
-              name="refresh"
-              size={15}
-              color={suggestionsLoading ? Colors.textTertiary : Colors.primary}
-            />
-          </TouchableOpacity>
-        </Animated.View>
+        </View>
+        )}
       </View>
 
-      <Animated.View style={contentStyle}>
-        <View
-          onLayout={(e) => {
-            const h = e.nativeEvent.layout.height;
-            if (h > 0) {
-              contentHeight.value = h;
-              measured.value = true;
-            }
-          }}
-        >
-          {showInput && (
-            <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={styles.aiInputWrap}>
-              <View style={styles.aiInputRow}>
-                <TextInput
-                  style={styles.aiInput}
-                  value={preference}
-                  onChangeText={onPreferenceChange}
-                  placeholder="Beautiful islands, cheap cities..."
-                  placeholderTextColor={PlatformColor('placeholderText')}
-                  returnKeyType="search"
-                  onSubmitEditing={onPreferenceSubmit}
-                  maxLength={120}
-                  editable={!suggestionsLoading}
-                  autoFocus
-                />
-                <TouchableOpacity
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    onPreferenceSubmit();
-                  }}
-                  disabled={suggestionsLoading || !preference.trim()}
-                  style={[styles.aiInputButton, { opacity: !preference.trim() || suggestionsLoading ? 0.3 : 1 }]}
-                  hitSlop={8}
+      {!collapsed && (
+        <View>
+          {/* One tap steers the next batch; the last chip opens free text. */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.aiChipsRow}>
+            {PREFERENCE_CHIPS.map((chip) => {
+              const active = preference === chip;
+              return (
+                <Pressable
+                  key={chip}
+                  onPress={() => pickChip(chip)}
+                  disabled={loading}
+                  style={[styles.aiChip, active && styles.aiChipActive]}
                 >
-                  <Ionicons name="arrow-up-circle" size={28} color={Colors.primary} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.aiChipsRow}>
-                {['Beaches', 'Mountains', 'Islands', 'Cheap cities', 'Nightlife', 'Culture'].map((chip) => (
-                  <Pressable
-                    key={chip}
-                    style={styles.aiChip}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      onPreferenceChange(chip);
-                    }}
-                  >
-                    <Text style={styles.aiChipText}>{chip}</Text>
-                  </Pressable>
-                ))}
-              </View>
+                  <Text style={[styles.aiChipText, active && styles.aiChipTextActive]}>{chip}</Text>
+                </Pressable>
+              );
+            })}
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowInput((v) => !v);
+              }}
+              disabled={loading}
+              style={[styles.aiChip, (custom || showInput) && styles.aiChipActive]}
+            >
+              <Ionicons name="create-outline" size={12} color={custom || showInput ? Colors.white : Colors.text} />
+              <Text style={[styles.aiChipText, (custom || showInput) && styles.aiChipTextActive]}>
+                {custom ? preference : 'Something else'}
+              </Text>
+            </Pressable>
+          </ScrollView>
+
+          {showInput && (
+            <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={styles.aiInputRow}>
+              <TextInput
+                style={styles.aiInput}
+                value={draft}
+                onChangeText={setDraft}
+                placeholder="Somewhere quiet by the sea, good coffee…"
+                placeholderTextColor={PlatformColor('placeholderText')}
+                returnKeyType="search"
+                onSubmitEditing={submitDraft}
+                maxLength={120}
+                editable={!loading}
+                autoFocus
+              />
+              <TouchableOpacity
+                onPress={submitDraft}
+                disabled={loading || !draft.trim()}
+                style={{ opacity: !draft.trim() || loading ? 0.3 : 1 }}
+                hitSlop={8}
+              >
+                <Ionicons name="arrow-up-circle" size={28} color={Colors.text} />
+              </TouchableOpacity>
             </Animated.View>
           )}
+
+          {error && !loading && (
+            <Pressable onPress={onRefresh} style={styles.legRow}>
+              <View style={styles.dotCol}>
+                <View style={styles.suggDot} />
+              </View>
+              <View style={[styles.suggCard, styles.aiErrorCard]}>
+                <Ionicons name="cloud-offline-outline" size={18} color={Colors.textSecondary} />
+                <Text style={styles.aiErrorText}>Could not reach the AI. Tap to try again.</Text>
+              </View>
+            </Pressable>
+          )}
+
+          {loading && suggestions.length === 0 && (
+            <>
+              <SuggestionSkeleton />
+              <SuggestionSkeleton />
+            </>
+          )}
+
           {suggestions.map((s, i) => (
-            <SuggestionLegCard key={i} suggestion={s} onAdd={() => onAdd(s)} disabled={suggestionsLoading} />
+            <SuggestionLegCard key={`${s.city}-${i}`} suggestion={s} onAdd={() => onAdd(s)} disabled={loading} />
           ))}
         </View>
-      </Animated.View>
+      )}
     </>
-  );
-}
-
-// ─── Timeline Line (scrolls with content but stays put during drag) ──────────
-
-function TimelineLine({ scrollY, topOffset, lineHeight }: { scrollY: Animated.SharedValue<number>; topOffset: number; lineHeight: number }) {
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -scrollY.value }],
-  }));
-
-  const lineColor = Colors.primary + '20';
-
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={[
-        styles.timelineLine,
-        { top: topOffset, height: lineHeight || 5000 },
-        animStyle,
-      ]}
-    >
-      <LinearGradient
-        colors={['transparent', lineColor, lineColor, 'transparent']}
-        locations={[0, 0.04, 0.96, 1]}
-        style={{ flex: 1 }}
-      />
-    </Animated.View>
   );
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function JourneyDetailScreen() {
-  const headerHeight = useHeaderHeight();
   const router = useRouter();
-  const { id, add } = useLocalSearchParams<{ id: string; add?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const journeyId = Number(id);
   const { journey, loading, refresh, setJourney } = useJourney(journeyId);
+  const headerHeight = useHeaderHeight();
   const docs = useJourneyDocuments(journeyId);
 
   // ─── Visa / Tax statuses ─────────────────────────────────────────────────────
@@ -730,7 +820,7 @@ export default function JourneyDetailScreen() {
     ])
       .then(([citizenship, trips, hasFixedResidence, userVisas]) => {
         if (!citizenship) {
-          console.log('[JourneyDetail] no citizenship set — skipping visa/tax');
+          console.log('[JourneyDetail] no citizenship set, skipping visa/tax');
           return;
         }
         const visa = calculateAllVisaStatuses(trips, citizenship.countryCode, userVisas);
@@ -741,12 +831,12 @@ export default function JourneyDetailScreen() {
         setTaxStatuses(tax);
 
         const visaLines = visa.map((v) =>
-          `  ${v.flag} ${v.destination}: ${v.daysRemaining}d remaining / ${v.daysAllowed}d (${v.ruleLabel}) — ${v.status}`
+          `  ${v.flag} ${v.destination}: ${v.daysRemaining}d remaining / ${v.daysAllowed}d (${v.ruleLabel}), ${v.status}`
         );
         const taxLines = tax
           .filter((t) => t.status !== 'safe')
           .map((t) =>
-            `  ${t.flag} ${t.country}: ${t.daysPresent}/${t.thresholdDays}d (${Math.round(t.percentUsed)}%) — ${t.status}`
+            `  ${t.flag} ${t.country}: ${t.daysPresent}/${t.thresholdDays}d (${Math.round(t.percentUsed)}%), ${t.status}`
           );
         const lines = [`Citizenship: ${citizenship.country} (${citizenship.countryCode})`];
         if (visaLines.length) lines.push('Visa:\n' + visaLines.join('\n'));
@@ -765,6 +855,9 @@ export default function JourneyDetailScreen() {
   const [aiPreference, setAiPreference] = useState('');
 
   const cacheKey = `ai_sugg_${journeyId}`;
+  // Collapsed is remembered per trip: a finished itinerary should not grow
+  // three ghost stops every time it is opened.
+  const collapsedKey = `ai_sugg_collapsed_${journeyId}`;
 
   // Returns a stable fingerprint of current legs to detect changes
   const legFingerprint = (legs: JourneyLeg[]) =>
@@ -808,40 +901,64 @@ export default function JourneyDetailScreen() {
     }
   }, [journey, cacheKey]);
 
-  // Auto-load when journey is ready — restore preference from cache
+  // When the journey is ready: restore the wish and the collapsed state, then
+  // ask the AI only if the section is actually open. Collapsed costs nothing.
   useEffect(() => {
-    if (journey && journey.legs.length > 0) {
-      AsyncStorage.getItem(cacheKey).then((raw) => {
-        if (raw) {
-          const { pref } = JSON.parse(raw);
-          if (pref) setAiPreference(pref);
-          loadSuggestions(false, pref || undefined);
-        } else {
-          loadSuggestions(false);
-        }
-      }).catch(() => loadSuggestions(false));
-    }
+    if (!journey || journey.legs.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      let pref = '';
+      let collapsed = false;
+      try {
+        const [flag, raw] = await Promise.all([
+          AsyncStorage.getItem(collapsedKey),
+          AsyncStorage.getItem(cacheKey),
+        ]);
+        collapsed = flag === '1';
+        if (raw) pref = JSON.parse(raw).pref ?? '';
+      } catch {}
+      if (cancelled) return;
+      setSuggestionsCollapsed(collapsed);
+      if (pref) setAiPreference(pref);
+      if (!collapsed) loadSuggestions(false, pref || undefined);
+    })();
+    return () => { cancelled = true; };
   }, [journey?.id, journey?.legs.length]);
+
+  const toggleSuggestions = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const next = !suggestionsCollapsed;
+    LayoutAnimation.configureNext(LayoutAnimation.create(280, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
+    setSuggestionsCollapsed(next);
+    AsyncStorage.setItem(collapsedKey, next ? '1' : '0').catch(() => {});
+    if (!next && suggestions.length === 0) loadSuggestions(false, aiPreference || undefined);
+  }, [suggestionsCollapsed, suggestions.length, aiPreference, loadSuggestions, collapsedKey]);
+
+  const refineSuggestions = useCallback((pref: string) => {
+    setAiPreference(pref);
+    loadSuggestions(true, pref || undefined);
+  }, [loadSuggestions]);
 
   // ─── Navigation helpers ────────────────────────────────────────────────────
 
   const openAddSheet = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // The next stop starts the day after the last one ends; only its length
+    // is up for choosing. A week is the starting point.
+    const last = journey?.legs[journey.legs.length - 1];
+    let chained: { start: string; end: string; lockStart: string } | null = null;
+    if (last) {
+      const start = fromYmd(last.end_date);
+      start.setDate(start.getDate() + 1);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      chained = { start: toYmd(start), end: toYmd(end), lockStart: '1' };
+    }
     router.push({
       pathname: '/(tabs)/(plans)/add-stop/country',
-      params: { journeyId: String(journeyId) },
+      params: { journeyId: String(journeyId), ...(chained ?? {}) },
     });
-  }, [router, journeyId]);
-
-  // Auto-open add sheet once when navigated from a fresh journey creation
-  const didAutoOpen = useRef(false);
-  useEffect(() => {
-    if (add === '1' && !loading && !didAutoOpen.current) {
-      didAutoOpen.current = true;
-      const t = setTimeout(openAddSheet, 300);
-      return () => clearTimeout(t);
-    }
-  }, [add, loading, openAddSheet]);
+  }, [router, journeyId, journey?.legs]);
 
   const openStopInfo = useCallback((leg: JourneyLeg) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -857,9 +974,10 @@ export default function JourneyDetailScreen() {
         end: leg.end_date,
         transport: leg.transport,
         ...(leg.notes && { notes: leg.notes }),
+        ...(journey?.legs[0]?.id !== leg.id && { lockStart: '1' }),
       },
     });
-  }, [router, journeyId]);
+  }, [router, journeyId, journey?.legs]);
 
   const handleAddSuggestion = useCallback((s: StopSuggestion) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -888,11 +1006,41 @@ export default function JourneyDetailScreen() {
   );
 
   const legs = journey?.legs ?? [];
-  const hasMap = legs.some((l) => l.latitude != null && l.longitude != null);
 
-  // ─── Scroll tracking for stretchy map ────────────────────────────────────────
+  const openMap = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({ pathname: '/(tabs)/(plans)/journey-map', params: { journeyId: String(journeyId) } });
+  }, [router, journeyId]);
 
-  const scrollY = useSharedValue(0);
+  // Long press on the title: the same sheet the trip list offers, so a trip
+  // can be renamed or removed from where you are looking at it.
+  const tripActions = useCallback(() => {
+    if (!journey) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    ActionSheetIOS.showActionSheetWithOptions(
+      { title: journey.title, options: ['Rename', 'Delete trip', 'Cancel'], destructiveButtonIndex: 1, cancelButtonIndex: 2 },
+      (i) => {
+        if (i === 0) {
+          Alert.prompt('Rename trip', undefined, async (name) => {
+            const next = (name ?? '').trim();
+            if (!next || next === journey.title) return;
+            await updateJourneyTitle(journeyId, next);
+            refresh();
+          }, 'plain-text', journey.title);
+        } else if (i === 1) {
+          Alert.alert('Delete this trip?', 'Stops and documents go with it.', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete', style: 'destructive', onPress: async () => { await deleteJourneyWithDocuments(journeyId); router.back(); } },
+          ]);
+        }
+      },
+    );
+  }, [journey, journeyId, refresh, router]);
+
+  const headerTitle = useCallback(
+    () => <TripTitleChip title={journey?.title ?? ''} legs={legs} ready={!!journey} onLongPress={tripActions} />,
+    [journey?.title, legs, journey, tripActions],
+  );
 
   // ─── Timeline line offset ──────────────────────────────────────────────────
   const [timelineTop, setTimelineTop] = useState(0);
@@ -902,26 +1050,18 @@ export default function JourneyDetailScreen() {
   // ─── Drag & Drop reorder ─────────────────────────────────────────────────────
 
   const handleReorder = useCallback(({ data }: { data: JourneyLeg[] }) => {
-    // Date slots stay at their positions — only the stops move
-    const originalDateSlots = legs.map((l) => ({
-      start_date: l.start_date,
-      end_date: l.end_date,
-    }));
-
-    // Assign original date slots to new positions
-    const reorderedLegs = data.map((leg, i) => ({
-      ...leg,
-      start_date: originalDateSlots[i].start_date,
-      end_date: originalDateSlots[i].end_date,
-    }));
+    // A stop takes its length with it; the trip keeps its start date and the
+    // dates re-flow along the new order.
+    const anchor = legs[0]?.start_date;
+    const dates = chainDates(data, anchor);
+    const reorderedLegs = data.map((leg, i) => ({ ...leg, ...dates[i] }));
 
     // Optimistic update
     setJourney((prev) => prev ? { ...prev, legs: reorderedLegs } : prev);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     // Persist in background
-    const ids = reorderedLegs.map((l) => l.id);
-    reorderJourneyLegs(journeyId, ids, originalDateSlots).catch((err) =>
+    reorderJourneyLegs(journeyId, reorderedLegs.map((l) => l.id), anchor).catch((err) =>
       console.error('Failed to persist reorder:', err),
     );
   }, [journeyId, legs, setJourney]);
@@ -932,8 +1072,7 @@ export default function JourneyDetailScreen() {
       <ScaleDecorator>
         <LegCard
           leg={item}
-          prevCity={index > 0 ? legs[index - 1]?.city ?? null : null}
-          isFirst={index === 0}
+          firstInCountry={!legs.slice(0, index).some((l) => l.country_code === item.country_code)}
           onPress={openStopInfo}
           onDrag={drag}
           visaStatuses={visaStatuses}
@@ -948,35 +1087,43 @@ export default function JourneyDetailScreen() {
     setTimelineTop(e.nativeEvent.layout.height);
   }, []);
 
+  // The line runs from the header down to the end cap. It lives inside the
+  // header so it scrolls natively with the content; a first version moved it
+  // by hand from scroll events, which arrive on the JS thread a frame late.
+  const lineHeight = contentSize > timelineTop ? contentSize - timelineTop - footerHeight - 70 : 0;
+  const lineColor = Colors.primary + '20';
+
   const listHeader = useMemo(() => (
     <View onLayout={onHeaderLayout}>
-      <JourneyMapCard legs={legs} headerHeight={headerHeight} scrollY={scrollY} />
-      <TripSummary legs={legs} />
+      <JourneyMapCard legs={legs} headerHeight={headerHeight} onPress={openMap} />
       <DocumentsEntryCard journeyId={journeyId} documents={docs.documents} travellers={docs.travellers} />
+      {legs.length > 0 && timelineTop > 0 && lineHeight > 0 && (
+        <View pointerEvents="none" style={[styles.timelineLine, { top: timelineTop, height: lineHeight }]}>
+          <LinearGradient
+            colors={['transparent', lineColor, lineColor, 'transparent']}
+            locations={[0, 0.04, 0.96, 1]}
+            style={{ flex: 1 }}
+          />
+        </View>
+      )}
     </View>
-  ), [legs, headerHeight, scrollY, onHeaderLayout, journeyId, docs.documents, docs.travellers]);
+  ), [legs, headerHeight, onHeaderLayout, journeyId, docs.documents, docs.travellers, timelineTop, lineHeight, openMap]);
+
+  const chainedSuggestions = useMemo(() => suggestions.map((s) => chainedSuggestion(s, legs)), [suggestions, legs]);
 
   const listFooter = useMemo(() => (
     <>
       {legs.length > 0 && (
         <AISuggestionsSection
-          suggestions={suggestions}
-          suggestionsLoading={suggestionsLoading}
-          suggestionsError={suggestionsError}
+          suggestions={chainedSuggestions}
+          loading={suggestionsLoading}
+          error={suggestionsError}
           collapsed={suggestionsCollapsed}
-          onToggleCollapse={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setSuggestionsCollapsed((c) => !c);
-          }}
+          onToggleCollapse={toggleSuggestions}
           onRefresh={() => loadSuggestions(true, aiPreference || undefined)}
           onAdd={handleAddSuggestion}
-          hasGlass={hasGlass}
           preference={aiPreference}
-          onPreferenceChange={setAiPreference}
-          onPreferenceSubmit={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            loadSuggestions(true, aiPreference || undefined);
-          }}
+          onRefine={refineSuggestions}
         />
       )}
       {legs.length > 0 && (
@@ -987,7 +1134,7 @@ export default function JourneyDetailScreen() {
         </View>
       )}
     </>
-  ), [legs.length, suggestions, suggestionsLoading, suggestionsError, suggestionsCollapsed, aiPreference, handleAddSuggestion, loadSuggestions]);
+  ), [legs.length, chainedSuggestions, suggestionsLoading, suggestionsError, suggestionsCollapsed, aiPreference, handleAddSuggestion, loadSuggestions, toggleSuggestions, refineSuggestions]);
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
@@ -998,35 +1145,36 @@ export default function JourneyDetailScreen() {
       <Stack.Screen
         options={{
           title: tripName,
-          headerTransparent: true,
-          headerShadowVisible: false,
+          headerTitle: headerTitle,
           headerTintColor: Colors.text,
-          headerBackButtonDisplayMode: 'minimal',
           headerRight,
         }}
       />
 
       {!loading && legs.length === 0 ? (
-        <EmptyState
-          icon="✈️"
-          title="No stops yet"
-          subtitle="Tap + to add your first destination — city, dates, and how you'll get there."
-        />
+        <View style={styles.emptyWrap}>
+          <EmptyState
+            icon="✈️"
+            title="No stops yet"
+            subtitle="City, dates, and how you'll get there. The rest builds from that."
+          />
+          <View style={styles.emptyCta}>
+            <CloudyButton onPress={openAddSheet} style={{ width: '100%' }} innerStyle={{ justifyContent: 'center' }}>
+              <Text style={styles.emptyCtaText}>Add your first stop</Text>
+            </CloudyButton>
+          </View>
+        </View>
       ) : (
         <GestureHandlerRootView style={{ flex: 1 }}>
-          {/* Static timeline line — doesn't move during drag */}
-          {legs.length > 0 && timelineTop > 0 && (
-            <TimelineLine scrollY={scrollY} topOffset={timelineTop} lineHeight={contentSize > timelineTop ? contentSize - timelineTop - footerHeight - 70 : 5000} />
-          )}
           <DraggableFlatList
             data={legs}
             keyExtractor={(item) => String(item.id)}
             renderItem={renderItem}
             onDragEnd={handleReorder}
-            onScrollOffsetChange={(offset) => { scrollY.value = offset; }}
             ListHeaderComponent={listHeader}
             ListFooterComponent={listFooter}
             contentInsetAdjustmentBehavior="never"
+            // Without a map nothing pushes the content below the transparent header.
             contentContainerStyle={styles.content}
             activationDistance={15}
             onContentSizeChange={(_, h) => setContentSize(h)}
@@ -1047,49 +1195,15 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
 
-  // ─── Summary bar ───
-  summaryBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    borderRadius: 16,
-    borderCurve: 'continuous',
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  summaryBarFallback: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  summaryItem: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  summaryValue: {
-    ...Typography.titleSmall,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  summaryLabel: {
-    ...Typography.eyebrow,
-    fontWeight: '500',
-    letterSpacing: 0.3,
-  },
-  summaryDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: Colors.border,
-  },
+  emptyWrap: { flex: 1 },
+  emptyCta: { paddingHorizontal: 32, paddingBottom: 140 },
+  emptyCtaText: { ...Typography.buttonLarge, color: Colors.cloudyButtonText, textAlign: 'center' },
 
   // ─── Timeline ───
   timelineLine: {
     position: 'absolute',
-    left: 16 + 14 - 1, // paddingLeft + half dotCol - half lineWidth
+    left: 14 - 1, // half dotCol - half lineWidth (the header sits inside the padded content)
     width: 2,
-    zIndex: 0,
     overflow: 'hidden',
   },
   timelineEndCap: {
@@ -1259,9 +1373,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 100,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
     overflow: 'hidden',
-    gap: 4,
+    gap: 6,
   },
   aiPillFallback: {
     backgroundColor: Colors.surfaceSecondary,
@@ -1271,199 +1385,176 @@ const styles = StyleSheet.create({
   aiPillText: {
     ...Typography.bodySmall,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: Colors.text,
   },
-  betaBadge: {
-    backgroundColor: Colors.primary + '20',
-    borderRadius: 6,
-    borderCurve: 'continuous',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-  },
-  betaBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: Colors.primary,
-    letterSpacing: 0.5,
-  },
-  aiPillRight: {
+  aiHeaderRight: {
+    marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginLeft: 10,
   },
-  aiPillStatus: {
+  aiStatus: {
     ...Typography.caption,
+    color: Colors.textSecondary,
   },
-  aiInputWrap: {
-    marginLeft: 28,
-    marginRight: 16,
-    marginBottom: 12,
-    gap: 10,
+
+  // ─── Refine (chips + optional free text) ───
+  aiChipsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingLeft: 28,
+    paddingRight: 16,
+    paddingBottom: 10,
+  },
+  aiChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  aiChipActive: {
+    backgroundColor: Colors.text,
+    borderColor: Colors.text,
+  },
+  aiChipText: {
+    ...Typography.caption,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  aiChipTextActive: {
+    color: Colors.white,
   },
   aiInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  aiChipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  aiChip: {
-    backgroundColor: Colors.primary + '18',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  aiChipText: {
-    ...Typography.bodySmall,
-    fontWeight: '700',
-    color: Colors.primary,
+    marginLeft: 28,
+    marginRight: 16,
+    marginBottom: 10,
   },
   aiInput: {
     flex: 1,
-    backgroundColor: PlatformColor('secondarySystemGroupedBackground'),
-    borderRadius: 12,
-    borderCurve: 'continuous',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: PlatformColor('label'),
-  },
-  aiInputButton: {
-    padding: 2,
-  },
-
-  // ─── Suggestion card (mirrors TripCard) ───
-  suggRow: {
-    flexDirection: 'row',
-    paddingRight: 16,
-  },
-  suggTimelineCol: {
-    width: 28,
-    alignItems: 'center',
-  },
-  suggDotSpacer: {
-    height: 20,
-  },
-  suggDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2.5,
-    borderColor: Colors.primary,
-    backgroundColor: Colors.background,
-    zIndex: 1,
-  },
-  suggCardPressable: {
-    flex: 1,
-  },
-  suggCard: {
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 6,
-    marginTop: 2,
-    overflow: 'hidden',
-  },
-  suggCardFallback: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.primary + '35',
-  },
-  suggCardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  suggCardTopRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  aiBadge: {
-    backgroundColor: Colors.primary + '18',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  aiBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  suggCity: {
-    ...Typography.bodyLarge,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  suggCountry: {
     ...Typography.bodySmall,
     fontSize: 14,
-    color: Colors.textSecondary,
-    marginBottom: 8,
+    color: Colors.text,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
   },
-  suggCardBottom: {
+
+  // ─── Suggestion card (a leg that is not there yet) ───
+  suggDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.background,
+  },
+  suggCard: {
+    flex: 1,
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: Colors.border,
+    padding: 16,
+    marginBottom: 4,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  suggDates: {
-    ...Typography.bodySmall,
-    color: Colors.textTertiary,
-  },
-  suggTransportChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: Colors.surfaceSecondary,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  suggTransportText: {
-    fontSize: 11,
-    color: Colors.textTertiary,
-    fontWeight: '500',
-    textTransform: 'capitalize',
+    alignItems: 'flex-start',
+    gap: 12,
   },
   suggReason: {
     ...Typography.bodySmall,
-    color: Colors.textTertiary,
+    color: Colors.textSecondary,
     lineHeight: 18,
     marginTop: 6,
   },
-  suggAddBtn: {
-    marginTop: 12,
+  suggAdd: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingVertical: 10,
+    gap: 2,
+    marginTop: 10,
   },
   suggAddText: {
+    ...Typography.caption,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  skeletonFlag: {
+    width: 28,
+    height: 20,
+    borderRadius: 4,
+    backgroundColor: Colors.border,
+    marginTop: 2,
+  },
+  skeletonBar: {
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.border,
+    marginTop: 6,
+  },
+  aiErrorCard: {
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  aiErrorText: {
     ...Typography.bodySmall,
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.white,
+    color: Colors.textSecondary,
+    flex: 1,
   },
 
   // ─── Journey map ───
   mapCard: {
-    height: 360,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    overflow: 'hidden',
+    height: MAP_HEIGHT,
     marginHorizontal: -16,
-    marginTop: -20,
-    marginBottom: 20,
+    marginBottom: 16,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: Colors.surfaceSecondary,
   },
+  // ─── Title chip in the header (same material as the Map tab's chip) ───
+  titleChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    minWidth: 200,
+    maxWidth: 250,
+    height: 44,
+    overflow: 'hidden',
+  },
+  titleChipFallback: {
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+  },
+  titleChipTitle: { ...Typography.button, fontSize: 15 },
+  titleChipSub: { ...Typography.caption, color: Colors.textSecondary, marginTop: 1, fontVariant: ['tabular-nums'] },
   map: {
     flex: 1,
   },
-
+  mapFade: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  mapPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

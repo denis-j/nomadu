@@ -16,6 +16,8 @@ type Params = {
   end?: string;
   transport?: string;
   notes?: string;
+  /** '1' when the start is fixed by the previous stop and only the length is chosen. */
+  lockStart?: string;
 };
 
 export default function AddStopCountryScreen() {
@@ -37,6 +39,7 @@ export default function AddStopCountryScreen() {
         ...(params.city && { city: params.city }),
         ...(params.start && { start: params.start }),
         ...(params.end && { end: params.end }),
+        ...(params.lockStart && { lockStart: params.lockStart }),
         ...(params.transport && { transport: params.transport }),
         ...(params.notes && { notes: params.notes }),
       },

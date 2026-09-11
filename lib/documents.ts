@@ -1,6 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Crypto from 'expo-crypto';
 import type { Ionicons } from '@expo/vector-icons';
+import { deleteJourney, getJourneyDocuments } from './database';
 
 /**
  * Travel documents: the files a trip needs at the border and the desk.
@@ -29,13 +30,15 @@ export const DOCUMENT_KINDS: {
   short: string;
   plural: string;
   icon: keyof typeof Ionicons.glyphMap;
+  /** Accent for the kind pill on tiles, so a wallet scans by colour. */
+  color: string;
 }[] = [
-  { kind: 'ticket', label: 'Flight or train ticket', short: 'Ticket', plural: 'tickets', icon: 'airplane-outline' },
-  { kind: 'visa', label: 'Visa or eVisa', short: 'Visa', plural: 'visas', icon: 'document-text-outline' },
-  { kind: 'arrival', label: 'Arrival card', short: 'Arrival card', plural: 'arrival cards', icon: 'card-outline' },
-  { kind: 'booking', label: 'Hotel or booking', short: 'Booking', plural: 'bookings', icon: 'bed-outline' },
-  { kind: 'insurance', label: 'Insurance', short: 'Insurance', plural: 'insurances', icon: 'shield-checkmark-outline' },
-  { kind: 'other', label: 'Something else', short: 'Other', plural: 'others', icon: 'folder-outline' },
+  { kind: 'ticket', label: 'Flight or train ticket', short: 'Ticket', plural: 'tickets', icon: 'airplane-outline', color: '#2F80ED' },
+  { kind: 'visa', label: 'Visa or eVisa', short: 'Visa', plural: 'visas', icon: 'document-text-outline', color: '#27AE60' },
+  { kind: 'arrival', label: 'Arrival card', short: 'Arrival card', plural: 'arrival cards', icon: 'card-outline', color: '#F2994A' },
+  { kind: 'booking', label: 'Hotel or booking', short: 'Booking', plural: 'bookings', icon: 'bed-outline', color: '#9B51E0' },
+  { kind: 'insurance', label: 'Insurance', short: 'Insurance', plural: 'insurances', icon: 'shield-checkmark-outline', color: '#0FA3B1' },
+  { kind: 'other', label: 'Something else', short: 'Other', plural: 'others', icon: 'folder-outline', color: '#8E8E93' },
 ];
 
 /** "2 tickets · 1 visa · 1 booking", in the picker's order. */
@@ -104,4 +107,21 @@ function extensionOf(name: string): string {
   const dot = clean.lastIndexOf('.');
   if (dot < 0 || dot === clean.length - 1) return '';
   return clean.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Delete a trip together with the files its documents point to. The rows go
+ * by cascade; the bytes in the documents folder would not, and a deleted
+ * trip's boarding passes are not something to keep around unlisted.
+ */
+export async function deleteJourneyWithDocuments(journeyId: number): Promise<void> {
+  const docs = await getJourneyDocuments(journeyId);
+  for (const d of docs) {
+    try {
+      removeDocumentFile(d.file_name);
+    } catch (err) {
+      console.warn('[documents] could not remove file', d.file_name, err);
+    }
+  }
+  await deleteJourney(journeyId);
 }

@@ -1,6 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { localIsNewer } from './syncTime';
-import { countDays, eachDay } from './days';
+import { chainDates, countDays, eachDay } from './days';
 
 let db: SQLite.SQLiteDatabase | null = null;
 let opening: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -182,6 +182,21 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_trips_sync_id ON trips(sync_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_user_visas_sync_id ON user_visas(sync_id);
   `);
+
+  // Migration: itineraries are chains (see `chainDates`). Trips planned before
+  // that rule could hold gaps between stops; close them once.
+  const journeyRows = await database.getAllAsync<{ id: number }>('SELECT id FROM journeys');
+  for (const j of journeyRows) {
+    const legs = await database.getAllAsync<JourneyLeg>(
+      'SELECT * FROM journey_legs WHERE journey_id = ? ORDER BY sort_order ASC, start_date ASC',
+      [j.id],
+    );
+    const dates = chainDates(legs);
+    for (let i = 0; i < legs.length; i++) {
+      if (legs[i].start_date === dates[i].start_date && legs[i].end_date === dates[i].end_date) continue;
+      await database.runAsync('UPDATE journey_legs SET start_date = ?, end_date = ? WHERE id = ?', [dates[i].start_date, dates[i].end_date, legs[i].id]);
+    }
+  }
 }
 
 // Parses YYYY-MM-DD as local time (not UTC) to avoid off-by-one day in timezones ahead of UTC
@@ -584,6 +599,7 @@ export async function insertJourneyLeg(
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [journeyId, city, country, countryCode, latitude ?? null, longitude ?? null, startDate, endDate, transport, notes ?? null, nextOrder],
   );
+  await rechainJourneyLegs(journeyId);
   // Also bump parent journey updated_at
   await database.runAsync(
     `UPDATE journeys SET updated_at = datetime('now') WHERE id = ?`,
@@ -618,6 +634,7 @@ export async function updateJourneyLeg(
     [id],
   );
   if (leg) {
+    await rechainJourneyLegs(leg.journey_id);
     await database.runAsync(
       `UPDATE journeys SET updated_at = datetime('now') WHERE id = ?`,
       [leg.journey_id],
@@ -625,22 +642,34 @@ export async function updateJourneyLeg(
   }
 }
 
-export async function reorderJourneyLegs(
-  journeyId: number,
-  legIds: number[],
-  dateSlots?: { start_date: string; end_date: string }[],
-): Promise<void> {
+/**
+ * Re-flow the dates so the stops form a chain (see `chainDates`). Runs after
+ * every write to a journey's legs, so no screen can leave a gap or an overlap
+ * behind. `anchor` pins the trip's start; by default the first stop keeps its
+ * own start date.
+ */
+export async function rechainJourneyLegs(journeyId: number, anchor?: string): Promise<void> {
+  const database = await getDatabase();
+  const legs = await database.getAllAsync<JourneyLeg>(
+    'SELECT * FROM journey_legs WHERE journey_id = ? ORDER BY sort_order ASC, start_date ASC',
+    [journeyId],
+  );
+  const dates = chainDates(legs, anchor);
+  for (let i = 0; i < legs.length; i++) {
+    if (legs[i].start_date === dates[i].start_date && legs[i].end_date === dates[i].end_date) continue;
+    await database.runAsync(
+      'UPDATE journey_legs SET start_date = ?, end_date = ? WHERE id = ?',
+      [dates[i].start_date, dates[i].end_date, legs[i].id],
+    );
+  }
+}
+
+export async function reorderJourneyLegs(journeyId: number, legIds: number[], anchor?: string): Promise<void> {
   const database = await getDatabase();
   for (let i = 0; i < legIds.length; i++) {
-    if (dateSlots && dateSlots[i]) {
-      await database.runAsync(
-        'UPDATE journey_legs SET sort_order = ?, start_date = ?, end_date = ? WHERE id = ?',
-        [i, dateSlots[i].start_date, dateSlots[i].end_date, legIds[i]],
-      );
-    } else {
-      await database.runAsync('UPDATE journey_legs SET sort_order = ? WHERE id = ?', [i, legIds[i]]);
-    }
+    await database.runAsync('UPDATE journey_legs SET sort_order = ? WHERE id = ?', [i, legIds[i]]);
   }
+  await rechainJourneyLegs(journeyId, anchor);
   await database.runAsync(
     `UPDATE journeys SET updated_at = datetime('now') WHERE id = ?`,
     [journeyId],
@@ -655,6 +684,7 @@ export async function deleteJourneyLeg(id: number): Promise<void> {
   );
   await database.runAsync('DELETE FROM journey_legs WHERE id = ?', [id]);
   if (leg) {
+    await rechainJourneyLegs(leg.journey_id);
     await database.runAsync(
       `UPDATE journeys SET updated_at = datetime('now') WHERE id = ?`,
       [leg.journey_id],
