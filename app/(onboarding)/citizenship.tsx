@@ -334,7 +334,6 @@ const styles = StyleSheet.create({
   },
   title: {
     ...Typography.brandDisplay,
-    fontSize: 40,
     marginBottom: 2,
   },
   subtitle: {

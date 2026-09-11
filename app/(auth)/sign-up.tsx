@@ -248,7 +248,6 @@ const styles = StyleSheet.create({
   },
   title: {
     ...Typography.brandDisplay,
-    fontSize: 46,
     textAlign: 'center',
   },
   subtitle: {

@@ -17,23 +17,29 @@ import { Colors } from './colors';
  *   genuinely needs it (oversized hero numerals, decorative outliers).
  * - For numeric displays add `fontVariant: ['tabular-nums']` so digits don't
  *   shimmer when they change. The dedicated `numericLarge` already includes it.
- * - Brand styles (Instrument Serif Italic) are *editorial accents* — use them
- *   sparingly for welcome moments, NOT for ordinary section headings.
+ * - Brand styles are the big welcome lines; use them for those moments,
+ *   not for ordinary section headings.
  */
 
 // Identity helper so each entry is typed as TextStyle without losing inference.
 const T = <S extends TextStyle>(s: S): S => s;
 
 export const Typography = {
-  // ─── Brand — editorial accents only ──────────────────────────────────────
+  // ─── Brand: the big welcome lines ───────────────────────────────────────
+  // Once Instrument Serif Italic; the app is set in the system sans
+  // everywhere else, and a second face only on the sign-in and onboarding
+  // screens read as a different product. Same voice now, just bigger.
   brandDisplay: T({
-    fontFamily: 'InstrumentSerif_400Regular_Italic',
-    fontSize: 44,
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: -0.9,
+    lineHeight: 40,
     color: Colors.text,
   }),
   brandTitle: T({
-    fontFamily: 'InstrumentSerif_400Regular_Italic',
-    fontSize: 32,
+    fontSize: 26,
+    fontWeight: '700',
+    letterSpacing: -0.5,
     color: Colors.text,
   }),
 

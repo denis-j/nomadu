@@ -249,9 +249,8 @@ const HERO_PATCHES: CloudPatch[] = [
  *
  * A flat gradient made it read like any dashboard tile. The CloudBackdrop is
  * the same rendering the primary button uses, so the card belongs to the app
- * instead of to a template. The number is set in the system face, heavy and
- * tabular: the brand serif is for words, and on digits it ran the 1 and the 9
- * together.
+ * instead of to a template. The number is heavy and tabular so digits do not
+ * shimmer when they change.
  */
 function StatsHero({
   stats,

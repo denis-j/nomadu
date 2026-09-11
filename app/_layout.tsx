@@ -1,7 +1,6 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Appearance, LogBox } from 'react-native';
-import { useFonts, InstrumentSerif_400Regular_Italic } from '@expo-google-fonts/instrument-serif';
 import SplashScreen from '../components/SplashScreen';
 import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
 import { SyncProvider } from '../contexts/SyncContext';
@@ -159,7 +158,6 @@ export default function RootLayout() {
   const [userDataReady, setUserDataReady] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const { user, loading: authLoading } = useAuth();
-  const [fontsLoaded] = useFonts({ InstrumentSerif_400Regular_Italic });
   const { isUpdatePending, applyUpdate } = useOTAUpdates();
 
   useEffect(() => {
@@ -176,7 +174,7 @@ export default function RootLayout() {
     setMonitoringUser(user?.uid ?? null);
   }, [user?.uid]);
 
-  const appReady = ready && fontsLoaded && !authLoading && (!user || userDataReady);
+  const appReady = ready && !authLoading && (!user || userDataReady);
 
   return (
     <ErrorBoundary>

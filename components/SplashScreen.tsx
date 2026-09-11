@@ -122,7 +122,6 @@ const styles = StyleSheet.create({
   },
   appName: {
     ...Typography.brandDisplay,
-    fontSize: 48,
     textAlign: 'center',
   },
   tagline: {
