@@ -103,7 +103,7 @@ export function stayRuleLabel(name: string, choice: StayChoice): string {
 // ─── Building blocks ────────────────────────────────────────────────────────
 
 /** A tappable row in a single-choice list. Checkmark on the selected one. */
-function ChoiceRow({
+export function ChoiceRow({
   title,
   subtitle,
   selected,

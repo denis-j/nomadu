@@ -46,6 +46,28 @@ export default function PlansStack() {
         }}
       />
       <Stack.Screen
+        name="documents"
+        options={{
+          headerBackButtonDisplayMode: 'minimal',
+          headerLargeTitle: false,
+        }}
+      />
+      <Stack.Screen
+        name="add-document"
+        options={{
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          headerBackButtonDisplayMode: 'minimal',
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
+      />
+      <Stack.Screen
+        name="document"
+        options={{
+          headerBackButtonDisplayMode: 'minimal',
+        }}
+      />
+      <Stack.Screen
         name="create"
         options={{
           presentation: 'formSheet',

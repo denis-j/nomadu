@@ -94,7 +94,8 @@
           "project": "nomadu-ios",
           "url": "https://de.sentry.io/"
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "extra": {
       "router": {},

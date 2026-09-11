@@ -107,6 +107,22 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
       sort_order   INTEGER DEFAULT 0,
       created_at   TEXT DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS journey_travellers (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      journey_id INTEGER NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+      name       TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS journey_documents (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      journey_id   INTEGER NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+      traveller_id INTEGER REFERENCES journey_travellers(id) ON DELETE SET NULL,
+      kind         TEXT NOT NULL,
+      title        TEXT NOT NULL,
+      file_name    TEXT NOT NULL,
+      mime         TEXT,
+      created_at   TEXT DEFAULT (datetime('now'))
+    );
   `);
 
   // User-entered visas. These override the citizenship-aware defaults in
@@ -717,6 +733,119 @@ export async function upsertTripFromCloud(trip: {
 export async function setSyncId(tripId: number, syncId: string): Promise<void> {
   const database = await getDatabase();
   await database.runAsync('UPDATE trips SET sync_id = ? WHERE id = ?', [syncId, tripId]);
+}
+
+
+// ─── Travellers and documents ───
+
+export interface JourneyTraveller {
+  id: number;
+  journey_id: number;
+  name: string;
+  sort_order: number;
+}
+
+export interface JourneyDocument {
+  id: number;
+  journey_id: number;
+  traveller_id: number | null;
+  kind: string;
+  title: string;
+  file_name: string;
+  mime: string | null;
+  created_at: string;
+}
+
+export async function getJourneyTravellers(journeyId: number): Promise<JourneyTraveller[]> {
+  const database = await getDatabase();
+  return database.getAllAsync<JourneyTraveller>(
+    'SELECT * FROM journey_travellers WHERE journey_id = ? ORDER BY sort_order ASC, id ASC',
+    [journeyId],
+  );
+}
+
+export async function addJourneyTraveller(journeyId: number, name: string): Promise<number> {
+  const database = await getDatabase();
+  const result = await database.runAsync(
+    `INSERT INTO journey_travellers (journey_id, name, sort_order)
+     VALUES (?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM journey_travellers WHERE journey_id = ?))`,
+    [journeyId, name.trim(), journeyId],
+  );
+  return result.lastInsertRowId;
+}
+
+/**
+ * The user is always a traveller on their own trip. Created lazily the first
+ * time a journey's wallet is used, so journeys that never touch documents
+ * carry no rows.
+ */
+export async function ensureSelfTraveller(journeyId: number): Promise<JourneyTraveller[]> {
+  const existing = await getJourneyTravellers(journeyId);
+  if (existing.length > 0) return existing;
+  const database = await getDatabase();
+  await database.runAsync(
+    'INSERT INTO journey_travellers (journey_id, name, sort_order) VALUES (?, ?, 0)',
+    [journeyId, 'You'],
+  );
+  return getJourneyTravellers(journeyId);
+}
+
+export async function renameJourneyTraveller(id: number, name: string): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync('UPDATE journey_travellers SET name = ? WHERE id = ?', [name.trim(), id]);
+}
+
+export async function deleteJourneyTraveller(id: number): Promise<void> {
+  const database = await getDatabase();
+  // Documents keep their file; they just stop being assigned to anyone.
+  await database.runAsync('DELETE FROM journey_travellers WHERE id = ?', [id]);
+}
+
+export async function getJourneyDocuments(journeyId: number): Promise<JourneyDocument[]> {
+  const database = await getDatabase();
+  return database.getAllAsync<JourneyDocument>(
+    'SELECT * FROM journey_documents WHERE journey_id = ? ORDER BY traveller_id ASC, kind ASC, id ASC',
+    [journeyId],
+  );
+}
+
+export async function getJourneyDocument(id: number): Promise<JourneyDocument | null> {
+  const database = await getDatabase();
+  return database.getFirstAsync<JourneyDocument>('SELECT * FROM journey_documents WHERE id = ?', [id]);
+}
+
+export async function addJourneyDocument(input: {
+  journey_id: number;
+  traveller_id: number | null;
+  kind: string;
+  title: string;
+  file_name: string;
+  mime: string | null;
+}): Promise<number> {
+  const database = await getDatabase();
+  const result = await database.runAsync(
+    `INSERT INTO journey_documents (journey_id, traveller_id, kind, title, file_name, mime)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [input.journey_id, input.traveller_id, input.kind, input.title.trim(), input.file_name, input.mime],
+  );
+  return result.lastInsertRowId;
+}
+
+export async function updateJourneyDocument(
+  id: number,
+  input: { traveller_id: number | null; kind: string; title: string },
+): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    'UPDATE journey_documents SET traveller_id = ?, kind = ?, title = ? WHERE id = ?',
+    [input.traveller_id, input.kind, input.title.trim(), id],
+  );
+}
+
+/** Removes the row. The caller deletes the file, so the two never drift. */
+export async function deleteJourneyDocument(id: number): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync('DELETE FROM journey_documents WHERE id = ?', [id]);
 }
 
 // ─── Stats Queries ───

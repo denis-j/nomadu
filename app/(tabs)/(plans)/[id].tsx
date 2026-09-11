@@ -20,6 +20,8 @@ import { Ionicons } from '@expo/vector-icons';
 import RNMapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Haptics from 'expo-haptics';
 import { useJourney } from '../../../hooks/useJourney';
+import { useJourneyDocuments } from '../../../hooks/useJourneyDocuments';
+import { DocumentsEntryCard } from '../../../components/JourneyDocuments';
 import { useAuth } from '../../../hooks/useAuth';
 import { EmptyState } from '../../../components/EmptyState';
 import { Colors } from '../../../constants/colors';
@@ -707,6 +709,7 @@ export default function JourneyDetailScreen() {
   const { id, add } = useLocalSearchParams<{ id: string; add?: string }>();
   const journeyId = Number(id);
   const { journey, loading, refresh, setJourney } = useJourney(journeyId);
+  const docs = useJourneyDocuments(journeyId);
 
   // ─── Visa / Tax statuses ─────────────────────────────────────────────────────
 
@@ -949,8 +952,9 @@ export default function JourneyDetailScreen() {
     <View onLayout={onHeaderLayout}>
       <JourneyMapCard legs={legs} headerHeight={headerHeight} scrollY={scrollY} />
       <TripSummary legs={legs} />
+      <DocumentsEntryCard journeyId={journeyId} documents={docs.documents} travellers={docs.travellers} />
     </View>
-  ), [legs, headerHeight, scrollY, onHeaderLayout]);
+  ), [legs, headerHeight, scrollY, onHeaderLayout, journeyId, docs.documents, docs.travellers]);
 
   const listFooter = useMemo(() => (
     <>
