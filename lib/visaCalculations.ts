@@ -2,6 +2,7 @@ import { Trip } from './database';
 import { getApplicableRules } from '../constants/visaRules';
 import { countryCodeToFlag } from './geocoding';
 import { getCountryName } from '../utils/geography';
+import { eachDay, toYmd } from './days';
 import type { EntriesAllowed, UserVisa } from './userVisas';
 
 export interface VisaStatus {
@@ -60,17 +61,7 @@ export function today(): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-/**
- * Local YYYY-MM-DD.
- *
- * Deliberately not `toISOString().slice(0, 10)`: that converts local midnight
- * to UTC, which lands in the previous day for every timezone east of
- * Greenwich. A visa that ran out yesterday would still read as valid, which is
- * the one direction this app must never be wrong in.
- */
-export function toYmd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+export { toYmd };
 
 export function todayStr(): string {
   return toYmd(today());
@@ -112,11 +103,7 @@ export function countDaysInRollingWindow(
     const overlapEnd = tripEnd < refDate ? tripEnd : new Date(refDate);
 
     if (overlapStart <= overlapEnd) {
-      const cursor = new Date(overlapStart);
-      while (cursor <= overlapEnd) {
-        uniqueDays.add(toYmd(cursor));
-        cursor.setDate(cursor.getDate() + 1);
-      }
+      eachDay(overlapStart, overlapEnd, (day) => uniqueDays.add(day));
     }
   }
 
@@ -245,11 +232,7 @@ export function getCurrentStay(
 
   const uniqueDays = new Set<string>();
   const addDays = (start: Date, end: Date) => {
-    const cursor = new Date(start);
-    while (cursor <= end) {
-      uniqueDays.add(toYmd(cursor));
-      cursor.setDate(cursor.getDate() + 1);
-    }
+    eachDay(start, end, (day) => uniqueDays.add(day));
   };
 
   const abroad = travelSpans ?? buildTravelSpans(trips, refDate);

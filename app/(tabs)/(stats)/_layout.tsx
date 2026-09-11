@@ -25,6 +25,17 @@ export default function StatsStack() {
           headerBackButtonDisplayMode: 'minimal',
         }}
       />
+      {/* Three-step add flow. Its own stack supplies the per-step headers,
+          so the sheet itself shows none. Same setup as the trip-create sheet. */}
+      <Stack.Screen
+        name="visa-new"
+        options={{
+          presentation: 'formSheet',
+          headerShown: false,
+          sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
+      />
       <Stack.Screen
         name="visa-country-picker"
         options={{

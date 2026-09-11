@@ -12,6 +12,8 @@ import { Typography } from '../../../constants/typography';
 import { CloudyButton } from '../../../components/CloudyButton';
 import { Flag } from '../../../components/Flag';
 import { todayStr, VisaStatus } from '../../../lib/visaCalculations';
+import { hasNoExpiry } from '../../../lib/userVisas';
+import { getCountryName } from '../../../utils/geography';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -25,7 +27,8 @@ function getProgressColor(percent: number): string {
 
 /** True when the visa is past its own expiry date, as opposed to used up. */
 function isDateExpired(visa: VisaStatus): boolean {
-  return !!visa.validUntil && visa.validUntil < todayStr();
+  if (!visa.validUntil || hasNoExpiry(visa.validUntil)) return false;
+  return visa.validUntil < todayStr();
 }
 
 function getStatusLabel(visa: VisaStatus): string {
@@ -157,7 +160,11 @@ function VisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void })
         </>
       ) : (
         visa.validUntil && (
-          <Text style={styles.visaNeededHint}>Valid until {visa.validUntil}</Text>
+          <Text style={styles.visaNeededHint}>
+            {hasNoExpiry(visa.validUntil)
+              ? 'No expiry date. Only your days are counted.'
+              : `Valid until ${visa.validUntil}`}
+          </Text>
         )
       )}
 
@@ -278,9 +285,10 @@ export default function VisaScreen() {
   const router = useRouter();
   const navigation = useNavigation();
 
+  // Adding walks the three-step flow; editing opens the single-screen form.
   const goToAdd = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(tabs)/(stats)/visa-edit');
+    router.push('/(tabs)/(stats)/visa-new/country');
   }, [router]);
 
   const goToEdit = useCallback((id: number) => {
@@ -288,9 +296,14 @@ export default function VisaScreen() {
     router.push(`/(tabs)/(stats)/visa-edit?id=${id}`);
   }, [router]);
 
+  // Tapping an auto-rule card already answers step one, so skip straight to it.
   const goToOverride = useCallback((countryCode: string) => {
     Haptics.selectionAsync();
-    router.push(`/(tabs)/(stats)/visa-edit?country=${countryCode}`);
+    const name = getCountryName(countryCode) ?? countryCode;
+    router.push({
+      pathname: '/(tabs)/(stats)/visa-new/stay',
+      params: { code: countryCode, name },
+    });
   }, [router]);
 
   useLayoutEffect(() => {

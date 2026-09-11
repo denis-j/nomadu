@@ -3,21 +3,21 @@
  *
  * Three categories:
  *
- *   1. **Arrival**       — "Welcome to Bangkok 🇹🇭". Fired ONLY from the
+ *   1. **Arrival**       "Welcome to Bangkok 🇹🇭". Fired ONLY from the
  *                          background location task. Dedup'd by AsyncStorage
  *                          so two near-simultaneous triggers (e.g. background
  *                          task + race with foreground catch-up) can't fire
  *                          twice for the same city. Foreground location
- *                          checks deliberately do NOT fire arrival notifs —
+ *                          checks deliberately do NOT fire arrival notifs,
  *                          the user already sees the new city inside the app.
  *
- *   2. **Usage threshold** — "Schengen 90/180: 75% used". Reactive: we fire
+ *   2. **Usage threshold** "Schengen 90/180: 75% used". Reactive: we fire
  *                            these whenever we recalculate visa/tax statuses
  *                            (app open, trip insert, visa edit). State-keyed
  *                            by (type, code, threshold, year) so we send each
  *                            warning once per calendar year.
  *
- *   3. **Expiry reminder** — "Your Spain DN visa expires in 7 days". Absolute
+ *   3. **Expiry reminder** "Your Spain DN visa expires in 7 days". Absolute
  *                            time, scheduled via OS at the exact reminder date
  *                            (30 / 7 / 1 day before valid_to). Cancelled and
  *                            rescheduled on every user_visa add/edit/delete.
@@ -32,7 +32,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { countryCodeToFlag } from './geocoding';
 import type { VisaStatus } from './visaCalculations';
 import type { TaxStatus } from './taxCalculations';
-import type { UserVisa } from './userVisas';
+import { hasNoExpiry, type UserVisa } from './userVisas';
 
 // Show notifications even when the app is in the foreground.
 Notifications.setNotificationHandler({
@@ -73,7 +73,7 @@ const LAST_ARRIVAL_KEY = '@notif_last_arrival';
  * to a new city. Dedup'd by AsyncStorage so concurrent triggers (background
  * task + race) can't fire twice for the same city.
  *
- * Designed to be called from the background location task only — foreground
+ * Designed to be called from the background location task only, foreground
  * code paths should NOT call this, since the user already sees the change
  * in-app.
  */
@@ -137,7 +137,7 @@ async function markSent(key: string): Promise<void> {
 
 /**
  * Fire any visa-usage or tax-residency threshold warnings that have been
- * crossed since the last check. Idempotent — each (entity, threshold, year)
+ * crossed since the last check. Idempotent: each (entity, threshold, period)
  * tuple fires at most once. Safe to call frequently.
  */
 export async function runUsageThresholdCheck(
@@ -261,11 +261,17 @@ export async function rescheduleVisaExpiryReminders(
 
   for (const visa of userVisas) {
     if (visa.deleted) continue;
+    // Nothing to remind about, and three slots of the 64 saved.
+    if (hasNoExpiry(visa.valid_to)) continue;
     const validTo = parseExpiryDate(visa.valid_to);
     if (validTo < now) continue; // already expired, skip
 
     for (const daysBefore of EXPIRY_REMINDER_DAYS) {
-      const trigger = new Date(validTo.getTime() - daysBefore * 24 * 60 * 60 * 1000);
+      // Calendar arithmetic, not milliseconds. Thirty times 24 hours is not
+      // thirty days across a clock change, so subtracting the span landed the
+      // reminder an hour off in every timezone that observes summer time.
+      const trigger = new Date(validTo);
+      trigger.setDate(trigger.getDate() - daysBefore);
       if (trigger < now) continue;
       candidates.push({ trigger, visa, daysBefore });
     }

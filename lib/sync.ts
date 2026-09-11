@@ -25,6 +25,7 @@ import {
   upsertUserVisaFromCloud,
   type EntriesAllowed,
 } from './userVisas';
+import { parseSyncStamp } from './syncTime';
 import { clearBadgeProgress } from './badges';
 
 const CLOUD_SYNC_KEY = (uid: string) => `@cloud_sync_enabled_${uid}`;
@@ -108,7 +109,7 @@ export async function pushTripsToCloud(uid: string): Promise<void> {
     const needsNewId = !trip.sync_id || legacyId !== null;
     const syncId = needsNewId ? Crypto.randomUUID() : trip.sync_id!;
 
-    const localUpdatedAt = trip.updated_at ? new Date(trip.updated_at) : new Date();
+    const localUpdatedAt = trip.updated_at ? parseSyncStamp(trip.updated_at) : new Date();
 
     // A freshly minted UUID is never in `cloud`, so this only skips trips that
     // already had a stable id and whose cloud copy is at least as new.
@@ -225,7 +226,7 @@ export async function pushVisasToCloud(uid: string): Promise<void> {
     const needsNewId = !visa.sync_id;
     const syncId = needsNewId ? Crypto.randomUUID() : visa.sync_id!;
 
-    const localUpdatedAt = visa.updated_at ? new Date(visa.updated_at) : new Date();
+    const localUpdatedAt = visa.updated_at ? parseSyncStamp(visa.updated_at) : new Date();
 
     const cloudData = cloud.get(syncId);
     if (cloudData) {

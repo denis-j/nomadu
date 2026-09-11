@@ -1,4 +1,6 @@
 import * as SQLite from 'expo-sqlite';
+import { localIsNewer } from './syncTime';
+import { countDays, eachDay } from './days';
 
 let db: SQLite.SQLiteDatabase | null = null;
 let opening: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -142,6 +144,28 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
   if (!colNames.includes('deleted')) {
     await database.execAsync(`ALTER TABLE trips ADD COLUMN deleted INTEGER DEFAULT 0`);
   }
+
+  // Migration: one row per cloud document.
+  //
+  // `sync_id` is the Firestore document id, so it can only ever describe one
+  // local row. Nothing enforced that, and two writers raced: the first
+  // onSnapshot callback delivers the whole collection as "added" while
+  // pullTripsFromCloud fetches the same documents. Both did SELECT-then-INSERT,
+  // both missed, both inserted. Every synced trip existed twice, which doubled
+  // every day count downstream.
+  //
+  // Duplicates are exact copies of the same document, so the lowest id wins and
+  // the rest go. The index then makes the race impossible rather than unlikely.
+  await database.execAsync(`
+    DELETE FROM trips WHERE sync_id IS NOT NULL AND id NOT IN (
+      SELECT MIN(id) FROM trips WHERE sync_id IS NOT NULL GROUP BY sync_id
+    );
+    DELETE FROM user_visas WHERE sync_id IS NOT NULL AND id NOT IN (
+      SELECT MIN(id) FROM user_visas WHERE sync_id IS NOT NULL GROUP BY sync_id
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_trips_sync_id ON trips(sync_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_user_visas_sync_id ON user_visas(sync_id);
+  `);
 }
 
 // Parses YYYY-MM-DD as local time (not UTC) to avoid off-by-one day in timezones ahead of UTC
@@ -662,8 +686,9 @@ export async function upsertTripFromCloud(trip: {
   );
 
   if (existing) {
-    // Last-write-wins: only update if cloud is newer
-    if (existing.updated_at && existing.updated_at >= trip.updated_at) {
+    // Last-write-wins: only update if cloud is newer. Compared as instants,
+    // not as text: the two stamp formats do not sort against each other.
+    if (localIsNewer(existing.updated_at, trip.updated_at)) {
       return; // local is newer or same, skip
     }
     if (trip.deleted) {
@@ -678,8 +703,10 @@ export async function upsertTripFromCloud(trip: {
       );
     }
   } else if (!trip.deleted) {
+    // OR IGNORE, not plain INSERT: the unique index above turns a concurrent
+    // second insert of the same document into a no-op instead of a crash.
     await database.runAsync(
-      `INSERT INTO trips (city, country, country_code, latitude, longitude, start_date, end_date, days, sync_id, updated_at)
+      `INSERT OR IGNORE INTO trips (city, country, country_code, latitude, longitude, start_date, end_date, days, sync_id, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [trip.city, trip.country, trip.country_code, trip.latitude, trip.longitude,
        trip.start_date, trip.end_date, trip.days, trip.sync_id, trip.updated_at],
@@ -695,86 +722,142 @@ export async function setSyncId(tripId: number, syncId: string): Promise<void> {
 // ─── Stats Queries ───
 
 export interface Stats {
+  /** Countries and cities with at least one day inside the window. */
   totalCountries: number;
   totalCities: number;
-  totalDays: number;
+  /**
+   * Distinct days spent outside the home country.
+   *
+   * The headline figure, and the only day count here that says anything about
+   * how someone travelled. "Days tracked" cannot: a person is always
+   * somewhere, so that number either equals the days elapsed or reveals a gap
+   * in the location history, and neither is an achievement.
+   */
+  daysAway: number;
+  /** Coverage. Shown as a quiet data-quality line, not as a score. */
+  daysTracked: number;
+  daysInWindow: number;
+  /** Separate stays in the window, and the average length of one. */
+  stops: number;
+  avgStayDays: number;
+  /** Countries in this window that had never been visited before it. */
+  newCountries: number;
+  /** Distinct days per country, biggest first. */
   topCountries: { country: string; country_code: string; days: number }[];
   availableYears: number[];
   /** All country codes the user has ever visited (year filter does NOT apply). */
   allTimeCountryCodes: string[];
   /**
-   * Days traveled per calendar month (Jan-Dec, length 12). Only populated when
-   * `year` is set — `null` in all-time mode because per-month aggregation
+   * Days away per calendar month (Jan-Dec, length 12). Only populated when
+   * `year` is set, `null` in all-time mode because per-month aggregation
    * across years isn't meaningful.
    */
-  daysByMonth: number[] | null;
+  daysAwayByMonth: number[] | null;
 }
 
 /**
- * Aggregate stats. Pass `year` to scope counts to a single calendar year;
- * pass `null` (default) to count all-time. When filtering, a trip is included
- * only if it actually has days within the target year, and its day count is
- * clipped to the year boundaries.
+ * Aggregate stats for the tracking screen.
+ *
+ * Every day figure is the size of a set of calendar days, never a sum of trip
+ * lengths. Summing double-counted the day you changed cities, and it also
+ * doubled every number while the sync was inserting each trip twice.
+ *
+ * Pass `year` to scope to a calendar year, `null` for all time. A past year
+ * runs to 31 December; the current year and all-time stop at today, so days
+ * that have not happened yet never sit in a denominator.
  */
-export async function getStats(year: number | null = null): Promise<Stats> {
-  // Use merged trips to avoid double-counting adjacent raw GPS entries
-  const trips = await getAllTrips();
-  // Import lazily to avoid a circular dep (yearFilter imports from database)
-  const { effectiveTripDays, availableYearsFromTrips } = await import('./yearFilter');
+export async function getStats(
+  year: number | null = null,
+  homeCountryCode: string | null = null,
+): Promise<Stats> {
+  const trips = await getAllTripsRaw();
+  const { availableYearsFromTrips } = await import('./yearFilter');
+  const home = homeCountryCode ? homeCountryCode.toUpperCase() : null;
 
-  const countrySet = new Set<string>();
-  const citySet = new Set<string>();
-  let totalDays = 0;
-  const countryDays: Record<string, { country: string; country_code: string; days: number }> = {};
-  // Per-month bucket (Jan..Dec) for the selected year. Skipped when year=null.
-  const monthBuckets = year !== null ? new Array<number>(12).fill(0) : null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  for (const trip of trips) {
-    const days = effectiveTripDays(trip, year);
-    if (days <= 0) continue;
-
-    countrySet.add(trip.country);
-    citySet.add(`${trip.city}|${trip.country}`);
-    totalDays += days;
-
-    const key = trip.country_code;
-    if (!countryDays[key]) {
-      countryDays[key] = { country: trip.country, country_code: trip.country_code, days: 0 };
-    }
-    countryDays[key].days += days;
-
-    if (monthBuckets) {
-      // Walk each day of the trip and bucket it into its calendar month.
-      // Trips are typically days-to-weeks long, so day-level iteration is fine.
-      const start = parseDate(trip.start_date);
-      const end = trip.end_date ? parseDate(trip.end_date) : new Date();
-      const cur = new Date(start);
-      cur.setHours(0, 0, 0, 0);
-      const stop = new Date(end);
-      stop.setHours(0, 0, 0, 0);
-      while (cur <= stop) {
-        if (cur.getFullYear() === year) {
-          monthBuckets[cur.getMonth()] += 1;
-        }
-        cur.setDate(cur.getDate() + 1);
-      }
-    }
+  const windowStart = year === null ? null : new Date(year, 0, 1);
+  let windowEnd = today;
+  if (year !== null) {
+    const yearEnd = new Date(year, 11, 31);
+    windowEnd = yearEnd < today ? yearEnd : today;
   }
 
-  const topCountries = Object.values(countryDays)
+  const trackedDays = new Set<string>();
+  const awayDays = new Set<string>();
+  const perCountry = new Map<string, { country: string; days: Set<string> }>();
+  const countryNames = new Set<string>();
+  const cities = new Set<string>();
+  const codesInWindow = new Set<string>();
+  const codesBefore = new Set<string>();
+  const stayLengths = new Map<string, number>();
+  let earliestStart: Date | null = null;
+
+  for (const trip of trips) {
+    const code = trip.country_code.toUpperCase();
+    const start = parseDate(trip.start_date);
+    const end = trip.end_date ? parseDate(trip.end_date) : today;
+    if (!earliestStart || start < earliestStart) earliestStart = start;
+
+    if (windowStart && start < windowStart) codesBefore.add(code);
+    if (windowStart && end < windowStart) continue;
+    if (start > windowEnd) continue;
+
+    const from = windowStart && start < windowStart ? windowStart : start;
+    const to = end > windowEnd ? windowEnd : end;
+    if (from > to) continue;
+
+    countryNames.add(trip.country);
+    cities.add(`${trip.city}|${trip.country}`);
+    codesInWindow.add(code);
+
+    // Exact duplicates are one stay, not two. Until the sync stops creating
+    // them this is also what keeps the pace figures honest.
+    const stayKey = `${trip.city}|${code}|${trip.start_date}|${trip.end_date ?? ''}`;
+    if (!stayLengths.has(stayKey)) stayLengths.set(stayKey, countDays(from, to));
+
+    let bucket = perCountry.get(code);
+    if (!bucket) {
+      bucket = { country: trip.country, days: new Set<string>() };
+      perCountry.set(code, bucket);
+    }
+
+    eachDay(from, to, (day) => {
+      trackedDays.add(day);
+      bucket!.days.add(day);
+      if (!home || code !== home) awayDays.add(day);
+    });
+  }
+
+  const monthBuckets = year === null ? null : new Array<number>(12).fill(0);
+  if (monthBuckets) {
+    for (const day of awayDays) monthBuckets[Number(day.slice(5, 7)) - 1] += 1;
+  }
+
+  const topCountries = [...perCountry.entries()]
+    .map(([country_code, b]) => ({ country: b.country, country_code, days: b.days.size }))
     .sort((a, b) => b.days - a.days)
     .slice(0, 10);
 
-  const allTimeCountryCodes = [...new Set(trips.map((t) => t.country_code.toUpperCase()))];
+  const stays = [...stayLengths.values()];
+  const rangeStart = windowStart ?? earliestStart;
 
   return {
-    totalCountries: countrySet.size,
-    totalCities: citySet.size,
-    totalDays,
+    totalCountries: countryNames.size,
+    totalCities: cities.size,
+    daysAway: awayDays.size,
+    daysTracked: trackedDays.size,
+    daysInWindow: rangeStart ? countDays(rangeStart, windowEnd) : 0,
+    stops: stays.length,
+    avgStayDays: stays.length
+      ? Math.round(stays.reduce((sum, d) => sum + d, 0) / stays.length)
+      : 0,
+    newCountries: [...codesInWindow].filter((c) => !codesBefore.has(c)).length,
     topCountries,
     availableYears: availableYearsFromTrips(trips),
-    allTimeCountryCodes,
-    daysByMonth: monthBuckets,
+    allTimeCountryCodes: [...new Set(trips.map((t) => t.country_code.toUpperCase()))],
+    daysAwayByMonth: monthBuckets,
   };
 }
 

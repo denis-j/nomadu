@@ -8,8 +8,8 @@ import {
   View,
 } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
+import { CloudBackdrop, type CloudPatch } from '../../../components/CloudBackdrop';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -24,6 +24,7 @@ import { CountryBadge3DPreview } from '../../../components/CountryBadge3D';
 import { Flag } from '../../../components/Flag';
 import { YearPicker } from '../../../components/YearPicker';
 import type { YearFilter } from '../../../lib/yearFilter';
+import type { Stats } from '../../../lib/database';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -31,7 +32,7 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 export default function StatsScreen() {
   const [yearFilter, setYearFilter] = useState<YearFilter>(new Date().getFullYear());
-  const { stats, loading, refresh: refreshStats } = useStats(yearFilter);
+  const { stats, loading, refresh: refreshStats, home } = useStats(yearFilter);
   const { visaStatuses, loading: visaLoading, refresh: refreshVisa } = useVisaTracker();
   const { taxStatuses, loading: taxLoading, refresh: refreshTax } = useTaxTracker();
   const [refreshing, setRefreshing] = useState(false);
@@ -62,7 +63,7 @@ export default function StatsScreen() {
   // Truly empty (no trips at all, ever) → show the placeholder.
   // If only the current year is empty we still want to render the picker so the
   // user can switch years.
-  const hasAnyData = stats.availableYears.length > 1 || stats.totalDays > 0;
+  const hasAnyData = stats.availableYears.length > 1 || stats.daysTracked > 0;
   if (!hasAnyData) {
     return (
       <View style={styles.emptyContainer}>
@@ -87,8 +88,19 @@ export default function StatsScreen() {
         onChange={setYearFilter}
       />
 
-      {/* Hero — days traveled with progress ring */}
-      <StatsHero stats={stats} yearFilter={yearFilter} />
+      {/* Hero: days away, with a share-of-period bar */}
+      <StatsHero stats={stats} yearFilter={yearFilter} home={home} />
+
+      {/* Coverage, stated plainly. It is a data-quality hint, not a score:
+          the gap is days with no recorded location, not days spent at home. */}
+      {yearFilter !== null && stats.daysInWindow > 0 && (
+        <Text style={styles.coverage}>
+          {stats.daysTracked} of {stats.daysInWindow} days tracked
+          {stats.daysTracked < stats.daysInWindow
+            ? ` · ${stats.daysInWindow - stats.daysTracked} with no location`
+            : ''}
+        </Text>
+      )}
 
       {/* 2-col mini grid */}
       <View style={styles.miniRow}>
@@ -97,6 +109,7 @@ export default function StatsScreen() {
           label="Countries"
           icon="earth"
           accentColor={Colors.textSecondary}
+          sublabel={stats.newCountries > 0 ? `${stats.newCountries} new` : undefined}
         />
         <MiniStatCard
           value={stats.totalCities}
@@ -105,8 +118,22 @@ export default function StatsScreen() {
           accentColor={Colors.accent}
         />
       </View>
+      <View style={styles.miniRow}>
+        <MiniStatCard
+          value={stats.stops}
+          label="Stops"
+          icon="footsteps"
+          accentColor={Colors.textSecondary}
+        />
+        <MiniStatCard
+          value={stats.avgStayDays ? `${stats.avgStayDays}d` : '0d'}
+          label="Average stay"
+          icon="time"
+          accentColor={Colors.accent}
+        />
+      </View>
 
-      {/* Active tracking — Visa + Tax side-by-side, always 2-col */}
+      {/* Active tracking: Visa + Tax side-by-side, always 2-col */}
       <View style={styles.countriesSection}>
         <Text style={styles.sectionTitle}>Active tracking</Text>
         <View style={styles.trackerRow}>
@@ -161,15 +188,15 @@ export default function StatsScreen() {
         </View>
       </View>
 
-      {/* Monthly trips bar chart — only in year mode */}
-      {stats.daysByMonth && stats.daysByMonth.some((d) => d > 0) && (
-        <MonthlyChart days={stats.daysByMonth} year={yearFilter as number} />
+      {/* Monthly bar chart, only in year mode */}
+      {stats.daysAwayByMonth && stats.daysAwayByMonth.some((d: number) => d > 0) && (
+        <MonthlyChart days={stats.daysAwayByMonth} year={yearFilter as number} />
       )}
 
-      {/* Badge Library overview — always all-time, year filter does not apply */}
+      {/* Badge Library overview, always all-time; the year filter does not apply */}
       <BadgesSection visitedCodes={new Set(stats.allTimeCountryCodes)} />
 
-      {/* Top destinations — horizontal scroll */}
+      {/* Top destinations, horizontal scroll */}
       {stats.topCountries.length > 0 && (
         <View style={styles.topDestSection}>
           <Text style={[styles.sectionTitle, { paddingLeft: 0 }]}>Top destinations</Text>
@@ -194,48 +221,81 @@ export default function StatsScreen() {
   );
 }
 
-// ─── Hero card — Days + Progress ring ──────────────────────────────────────
+// ─── Hero card ─────────────────────────────────────────────────────────────
 
-const RING_SIZE = 78;
+/** UN member states plus observers, the denominator for "of the world". */
+const TOTAL_COUNTRIES = 195;
+
+const RING_SIZE = 72;
 const RING_STROKE = 6;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-const TOTAL_COUNTRIES = 195;
 
+/**
+ * Cloud patches for the card's proportions. The button's set is tuned for a
+ * low strip; a card has room for a few larger, softer masses, drifting up
+ * from the lower left the way the "N" in the logo does.
+ */
+const HERO_PATCHES: CloudPatch[] = [
+  { x: 0.20, y: 0.78, rx: 0.24, ry: 0.34 },
+  { x: 0.50, y: 0.92, rx: 0.20, ry: 0.26 },
+  { x: 0.80, y: 0.28, rx: 0.18, ry: 0.30 },
+  { x: 0.92, y: 0.80, rx: 0.12, ry: 0.22 },
+  { x: 0.48, y: 0.10, rx: 0.14, ry: 0.16 },
+];
+
+/**
+ * The headline card, painted with the brand's cloud surface.
+ *
+ * A flat gradient made it read like any dashboard tile. The CloudBackdrop is
+ * the same rendering the primary button uses, so the card belongs to the app
+ * instead of to a template. The number is set in the system face, heavy and
+ * tabular: the brand serif is for words, and on digits it ran the 1 and the 9
+ * together.
+ */
 function StatsHero({
   stats,
   yearFilter,
+  home,
 }: {
-  stats: { totalDays: number; totalCountries: number };
+  stats: Stats;
   yearFilter: YearFilter;
+  home: { code: string; country: string } | null;
 }) {
+  const [size, setSize] = useState({ w: 0, h: 0 });
   const isYearMode = yearFilter !== null;
-  const heroValue = isYearMode ? stats.totalDays : stats.totalCountries;
-  const heroUnit = isYearMode ? 'days' : 'countries';
-  const eyebrow = isYearMode ? `${yearFilter}` : 'All time';
 
-  // Ring progress: how full is the period?
-  //  - In year-mode: days traveled vs. days passed (year-to-date) capped at 100
-  //  - In all-time mode: countries vs. UN total
-  const ringPct = isYearMode
-    ? Math.min(100, Math.round((stats.totalDays / 365) * 100))
-    : Math.min(100, Math.round((stats.totalCountries / TOTAL_COUNTRIES) * 100));
-  const ringSubLabel = isYearMode ? 'of year' : 'of world';
-  const dashOffset = RING_CIRCUMFERENCE * (1 - ringPct / 100);
+  // "Days tracked" could only ever answer how complete the location history is,
+  // because a person is always somewhere. Days away from the home country is a
+  // number that separates someone who travelled from someone who didn't.
+  const value = isYearMode ? stats.daysAway : stats.totalCountries;
+  const unit = isYearMode
+    ? `${stats.daysAway === 1 ? 'day' : 'days'} away${home ? ` from ${home.country}` : ''}`
+    : `${stats.totalCountries === 1 ? 'country' : 'countries'} visited`;
+
+  const pct = isYearMode
+    ? (stats.daysInWindow > 0 ? Math.min(100, (stats.daysAway / stats.daysInWindow) * 100) : 0)
+    : Math.min(100, (stats.totalCountries / TOTAL_COUNTRIES) * 100);
+  // One word. The denominator (the days elapsed) is already on screen in the
+  // coverage line right under the card; repeating it inside a 72px ring
+  // squeezed three words into eight-point type.
+  const ringSub = isYearMode ? 'away' : 'of world';
+  const dashOffset = RING_CIRCUMFERENCE * (1 - pct / 100);
 
   return (
-    <View style={heroStyles.card}>
-      <LinearGradient
-        colors={['#4DC1FF', '#8AD3FF', '#DBF0FF']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+    <View
+      style={heroStyles.card}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        if (width !== size.w || height !== size.h) setSize({ w: width, h: height });
+      }}
+    >
+      <CloudBackdrop width={size.w} height={size.h} patches={HERO_PATCHES} blur={7} />
       <View style={heroStyles.row}>
         <View style={heroStyles.textBlock}>
-          <Text style={heroStyles.eyebrow}>{eyebrow}</Text>
-          <Text style={heroStyles.value}>{heroValue}</Text>
-          <Text style={heroStyles.unit}>{heroUnit} explored</Text>
+          <Text style={heroStyles.eyebrow}>{isYearMode ? `${yearFilter}` : 'All time'}</Text>
+          <Text style={heroStyles.value}>{value}</Text>
+          <Text style={heroStyles.unit}>{unit}</Text>
         </View>
         <View style={heroStyles.ringWrap}>
           <Svg width={RING_SIZE} height={RING_SIZE}>
@@ -243,7 +303,7 @@ function StatsHero({
               cx={RING_SIZE / 2}
               cy={RING_SIZE / 2}
               r={RING_RADIUS}
-              stroke={Colors.whiteAlpha35}
+              stroke="rgba(255,255,255,0.45)"
               strokeWidth={RING_STROKE}
               fill="none"
             />
@@ -261,8 +321,8 @@ function StatsHero({
             />
           </Svg>
           <View style={heroStyles.ringCenter}>
-            <Text style={heroStyles.ringPct}>{ringPct}%</Text>
-            <Text style={heroStyles.ringSub}>{ringSubLabel}</Text>
+            <Text style={heroStyles.ringPct}>{Math.round(pct)}%</Text>
+            <Text style={heroStyles.ringSub}>{ringSub}</Text>
           </View>
         </View>
       </View>
@@ -276,7 +336,11 @@ const heroStyles = StyleSheet.create({
     borderCurve: 'continuous',
     overflow: 'hidden',
     padding: 20,
-    minHeight: 130,
+    minHeight: 148,
+    justifyContent: 'center',
+    // Same glassy edge as the button, so the two read as one material.
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.6)',
   },
   row: {
     flexDirection: 'row',
@@ -291,20 +355,20 @@ const heroStyles = StyleSheet.create({
     ...Typography.eyebrow,
     color: Colors.cloudyButtonText,
     opacity: 0.7,
-    marginBottom: 4,
   },
   value: {
-    fontFamily: 'InstrumentSerif_400Regular_Italic',
-    fontSize: 56,
+    fontSize: 52,
+    fontWeight: '800',
     color: Colors.cloudyButtonText,
-    lineHeight: 60,
-    letterSpacing: -1,
+    letterSpacing: -1.5,
+    lineHeight: 58,
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
   },
   unit: {
     ...Typography.bodyMedium,
     color: Colors.cloudyButtonText,
     opacity: 0.75,
-    marginTop: 2,
   },
   ringWrap: {
     width: RING_SIZE,
@@ -318,7 +382,7 @@ const heroStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   ringPct: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     color: Colors.cloudyButtonText,
     letterSpacing: -0.5,
@@ -329,22 +393,26 @@ const heroStyles = StyleSheet.create({
     color: Colors.cloudyButtonText,
     opacity: 0.65,
     letterSpacing: 0.3,
-    marginTop: -2,
+    marginTop: -1,
   },
 });
 
-// ─── Mini stat card — for 2-col grid ───────────────────────────────────────
+
+
+// ─── Mini stat card, for the 2-col grid ───────────────────────────────────
 
 function MiniStatCard({
   value,
   label,
   icon,
   accentColor,
+  sublabel,
 }: {
-  value: number;
+  value: number | string;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   accentColor: string;
+  sublabel?: string;
 }) {
   return (
     <Glass
@@ -358,6 +426,7 @@ function MiniStatCard({
         </View>
       </View>
       <Text style={miniStyles.value}>{value}</Text>
+      {sublabel ? <Text style={miniStyles.sublabel}>{sublabel}</Text> : null}
     </Glass>
   );
 }
@@ -394,13 +463,18 @@ const miniStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  sublabel: {
+    ...Typography.caption,
+    color: Colors.textTertiary,
+    marginTop: 2,
+  },
   value: {
     ...Typography.numericLarge,
     fontSize: 32,
   },
 });
 
-// ─── Tracker card — for Visa / Tax 2-col grid ──────────────────────────────
+// ─── Tracker card, for the Visa / Tax 2-col grid ──────────────────────────
 
 function TrackerCard({
   accentColor,
@@ -421,7 +495,7 @@ function TrackerCard({
   total: number;
   onPress: () => void;
 }) {
-  // Progress shows "how much of the allowance is LEFT" — so a fresh start
+  // Progress shows "how much of the allowance is LEFT", so a fresh start
   // (daysLeft == total) is a full bar, and approaching zero drains it.
   const pct = total > 0 ? Math.max(0, Math.min(100, (daysLeft / total) * 100)) : 0;
   const isUrgent = pct < 15;
@@ -477,7 +551,7 @@ function TrackerCard({
   );
 }
 
-// ─── Empty tracker card — placeholder when a tracker isn't set up ──────────
+// ─── Empty tracker card, shown when a tracker isn't set up ────────────────
 
 function EmptyTrackerCard({
   accentColor,
@@ -635,7 +709,7 @@ function MonthlyChart({ days, year }: { days: number[]; year: number }) {
       style={[chartStyles.card, !hasGlass && chartStyles.cardFallback]}
     >
       <View style={chartStyles.header}>
-        <Text style={chartStyles.eyebrow}>Days by month</Text>
+        <Text style={chartStyles.eyebrow}>Days away by month</Text>
         <Text style={chartStyles.totalValue}>
           {total}
           <Text style={chartStyles.totalUnit}> total</Text>
@@ -771,7 +845,7 @@ const chartStyles = StyleSheet.create({
   },
 });
 
-// ─── Top destination card — horizontal scroll item ────────────────────────
+// ─── Top destination card, a horizontal scroll item ──────────────────────
 
 function TopDestinationCard({
   rank,
@@ -1088,6 +1162,12 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: 12,
+  },
+  coverage: {
+    ...Typography.bodySmall,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: -4,
   },
   miniRow: {
     flexDirection: 'row',

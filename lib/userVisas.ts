@@ -1,8 +1,24 @@
 import * as Crypto from 'expo-crypto';
 import { getDatabase } from './database';
+import { localIsNewer } from './syncTime';
 import { rescheduleVisaExpiryReminders } from './notifications';
 
 export type EntriesAllowed = 'single' | 'multiple';
+
+/**
+ * `valid_to` for a visa that has no expiry date.
+ *
+ * A visa on arrival is issued when you land: there is no document with a date
+ * on it, only an allowance per entry. The column is NOT NULL, so "never" is
+ * spelled as a date far enough out that no comparison mistakes it for real.
+ * Expiry reminders are skipped for these, and `hasNoExpiry` is how every
+ * caller asks, so the sentinel never leaks into the UI.
+ */
+export const NO_EXPIRY = '9999-12-31';
+
+export function hasNoExpiry(validTo: string): boolean {
+  return validTo === NO_EXPIRY;
+}
 
 /**
  * A visa the user has manually entered (e.g. "US B1/B2", "Spain Digital Nomad",
@@ -170,7 +186,7 @@ export async function upsertUserVisaFromCloud(visa: {
   );
 
   if (existing) {
-    if (existing.updated_at && existing.updated_at >= visa.updated_at) return;
+    if (localIsNewer(existing.updated_at, visa.updated_at)) return;
     if (visa.deleted) {
       await db.runAsync(`DELETE FROM user_visas WHERE sync_id = ?`, [visa.sync_id]);
     } else {
@@ -189,7 +205,9 @@ export async function upsertUserVisaFromCloud(visa: {
     }
   } else if (!visa.deleted) {
     await db.runAsync(
-      `INSERT INTO user_visas
+      // OR IGNORE for the same reason as trips: the unique index on sync_id
+      // makes a concurrent second insert of one document a no-op.
+      `INSERT OR IGNORE INTO user_visas
         (country_code, label, valid_from, valid_to,
          max_days_per_stay, max_days_per_window, window_days,
          entries_allowed, notes, sync_id, updated_at)
