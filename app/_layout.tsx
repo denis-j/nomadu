@@ -6,7 +6,7 @@ import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext
 import { SyncProvider } from '../contexts/SyncContext';
 import { useAuth } from '../hooks/useAuth';
 import { useSubscription } from '../hooks/useSubscription';
-import { configureRevenueCat, identifyUser } from '../lib/revenueCat';
+import { configureRevenueCat } from '../lib/revenueCat';
 import { prefetchAll, prefetchUserData } from '../lib/prefetch';
 import { isCelebrating } from '../lib/celebration';
 import { ToastContainer } from '../components/Toast';
@@ -44,7 +44,7 @@ Appearance.setColorScheme('light');
 
 function RootNavigator() {
   const { user, loading: authLoading } = useAuth();
-  const { isPro, loading: subLoading } = useSubscription();
+  const { isPro, loading: subLoading, checkedFor: subCheckedFor } = useSubscription(user?.uid ?? null);
   const { onboardingDone } = useOnboarding();
   const router = useRouter();
   const segments = useSegments();
@@ -55,7 +55,10 @@ function RootNavigator() {
     // so we don't bounce the user to citizenship and back when they've
     // already completed it under the LOCAL_ONBOARDING_UID placeholder.
     if (onboardingDone === null) return;
-    if (user && subLoading) return;
+    // The entitlement has to be the signed-in account's own answer. Right
+    // after sign-in it still describes the anonymous user, and routing on it
+    // sent paying customers to the paywall (and on to "welcome to Pro").
+    if (user && (subLoading || subCheckedFor !== user.uid)) return;
     // Paywall just kicked off the celebration screen. Keep our hands off the
     // router until the celebrate screen unmounts itself.
     if (isCelebrating()) return;
@@ -89,14 +92,7 @@ function RootNavigator() {
         router.replace('/(tabs)');
       }
     }
-  }, [user, authLoading, segments, onboardingDone, isPro, subLoading]);
-
-  // Identify against RevenueCat once per signed-in user. This used to sit
-  // inside the effect above, which depends on `segments` and therefore reruns
-  // on every navigation: each tab switch fired a Purchases.logIn network call.
-  useEffect(() => {
-    if (user) identifyUser(user.uid);
-  }, [user?.uid]);
+  }, [user, authLoading, segments, onboardingDone, isPro, subLoading, subCheckedFor]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

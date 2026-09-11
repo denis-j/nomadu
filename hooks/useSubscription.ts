@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import Purchases, { CustomerInfo } from 'react-native-purchases';
-import { ENTITLEMENT_ID, checkProEntitlement, rememberEntitlement } from '../lib/revenueCat';
+import { ENTITLEMENT_ID, checkProEntitlement, configureRevenueCat, identifyUser, rememberEntitlement } from '../lib/revenueCat';
 
 interface SubscriptionState {
   isPro: boolean;
@@ -13,15 +13,28 @@ interface SubscriptionState {
    */
   verified: boolean;
   loading: boolean;
+  /**
+   * The uid the current answer was checked for (`null` for anonymous,
+   * `undefined` before the first check). Routing must compare this with the
+   * signed-in uid: right after sign-in `isPro` still describes the anonymous
+   * user, and acting on it sent paying customers to the paywall.
+   */
+  checkedFor: string | null | undefined;
   refresh: () => Promise<void>;
 }
 
-export function useSubscription(): SubscriptionState {
+/**
+ * Pro entitlement for the given account. Pass the signed-in uid (or null):
+ * every change identifies against RevenueCat first and re-checks, so the
+ * answer always belongs to the account that is actually signed in.
+ */
+export function useSubscription(uid: string | null = null): SubscriptionState {
   const [isPro, setIsPro] = useState(false);
   const [expirationDate, setExpirationDate] = useState<string | null>(null);
   const [productIdentifier, setProductIdentifier] = useState<string | null>(null);
   const [verified, setVerified] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [checkedFor, setCheckedFor] = useState<string | null | undefined>(undefined);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -33,10 +46,26 @@ export function useSubscription(): SubscriptionState {
     setLoading(false);
   }, []);
 
-  // Check on mount
+  // Check on mount and whenever the account changes.
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      // Child effects run before the root layout's, so make sure the SDK is
+      // configured here rather than assuming it already is (idempotent).
+      await configureRevenueCat();
+      if (uid) await identifyUser(uid);
+      const result = await checkProEntitlement();
+      if (cancelled) return;
+      setIsPro(result.isActive);
+      setExpirationDate(result.expirationDate);
+      setProductIdentifier(result.productIdentifier);
+      setVerified(result.verified);
+      setCheckedFor(uid);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [uid]);
 
   // There is deliberately no refresh-on-focus here. This hook sits in the root
   // layout, so a focus refresh fired on every screen change and asked
@@ -72,5 +101,5 @@ export function useSubscription(): SubscriptionState {
     };
   }, []);
 
-  return { isPro, expirationDate, productIdentifier, verified, loading, refresh };
+  return { isPro, expirationDate, productIdentifier, verified, loading, checkedFor, refresh };
 }
