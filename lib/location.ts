@@ -1,82 +1,117 @@
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCurrentTrip, insertTrip, insertVisit, updateTripEndDate } from './database';
-import { reverseGeocode, isSignificantMove } from './geocoding';
+import { reverseGeocode } from './geocoding';
 import { fireArrivalIfNew } from './notifications';
 import { reportError } from './monitoring';
+import { decide, MAX_ACCURACY_M, MAX_FOREGROUND_AGE_MS, type Candidate, type Fix } from './tracking';
 
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
+const LAST_FIX_KEY = '@tracking_last_fix_at';
+const PENDING_KEY = '@tracking_pending';
 
-/** Distance threshold for city-level tracking (km). Locations within this
- *  range of the current trip are considered the same city. */
-const CITY_RADIUS_KM = 20;
+// ─── Persisted state ──────────────────────────────────────────────────────────
+// Both survive the process: the background task runs in a fresh JS context
+// each time iOS wakes the app, and a candidate seen before a wake must still
+// count after it.
+
+async function loadState(): Promise<{ lastFixAt: number | null; pending: Candidate | null }> {
+  const [last, pend] = await AsyncStorage.multiGet([LAST_FIX_KEY, PENDING_KEY]);
+  const lastFixAt = last[1] ? Number(last[1]) : null;
+  let pending: Candidate | null = null;
+  if (pend[1]) {
+    try { pending = JSON.parse(pend[1]); } catch { pending = null; }
+  }
+  return { lastFixAt: Number.isFinite(lastFixAt) ? lastFixAt : null, pending };
+}
+
+async function saveState(lastFixAt: number, pending: Candidate | null): Promise<void> {
+  await AsyncStorage.multiSet([
+    [LAST_FIX_KEY, String(lastFixAt)],
+    [PENDING_KEY, pending ? JSON.stringify(pending) : ''],
+  ]);
+}
+
+// ─── Serialised processing ────────────────────────────────────────────────────
+// The background task and the foreground check used to run side by side: both
+// read the current trip, both opened a new one, and the timeline got
+// duplicates. Everything now goes through one queue.
+
+let queue: Promise<unknown> = Promise.resolve();
+function serialized<T>(work: () => Promise<T>): Promise<T> {
+  const run = queue.then(work, work);
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+function toFix(location: Location.LocationObject): Fix {
+  return {
+    latitude: location.coords.latitude,
+    longitude: location.coords.longitude,
+    timestamp: location.timestamp,
+    accuracy: location.coords.accuracy ?? null,
+  };
+}
 
 /**
- * Shared logic for processing a location update (used by both background task
- * and foreground check). Reverse-geocodes the coordinates, logs a visit, and
- * creates / updates the current trip.
+ * One fix, start to finish: reject what cannot be trusted, resolve the place,
+ * let `decide` say what it means, write it down.
  *
- * `source` controls whether to fire the "welcome to {city}" arrival
- * notification: only the `background` task notifies, because the foreground
- * code path runs every time the user opens the app — surfacing a duplicate
- * "welcome" notif there is exactly the spam the user reported. The arrival
- * helper itself is also dedup'd by AsyncStorage as a second safety net.
+ * `source` controls the "welcome to {city}" notification: only the background
+ * task notifies, because the foreground path runs every time the app opens.
  */
-async function processLocationUpdate(
-  latitude: number,
-  longitude: number,
-  source: 'background' | 'foreground',
-): Promise<void> {
-  const geo = await reverseGeocode(latitude, longitude);
-  await insertVisit(latitude, longitude, geo.city, geo.country, geo.countryCode);
+async function processFix(fix: Fix, source: 'background' | 'foreground'): Promise<void> {
+  return serialized(async () => {
+    const { lastFixAt, pending } = await loadState();
 
-  const currentTrip = await getCurrentTrip();
-  const notify = (city: string, country: string, code: string) => {
-    if (source !== 'background') return;
-    fireArrivalIfNew(city, country, code).catch(() => {});
-  };
+    // Cheap rejections first, before spending a geocoder call.
+    if (fix.accuracy != null && fix.accuracy > MAX_ACCURACY_M) return;
+    if (lastFixAt != null && fix.timestamp <= lastFixAt) return;
 
-  if (!currentTrip) {
-    // First trip ever
-    if (geo.city && geo.country && geo.countryCode) {
-      await insertTrip(geo.city, geo.country, geo.countryCode, latitude, longitude);
-      notify(geo.city, geo.country, geo.countryCode);
+    const geo = await reverseGeocode(fix.latitude, fix.longitude);
+    await insertVisit(fix.latitude, fix.longitude, geo.city, geo.country, geo.countryCode);
+    if (!geo.city || !geo.country || !geo.countryCode) {
+      await saveState(fix.timestamp, pending);
+      return;
     }
-  } else if (
-    geo.city &&
-    geo.country &&
-    geo.countryCode &&
-    (currentTrip.city !== geo.city || currentTrip.country !== geo.country)
-  ) {
-    // Names differ — check if this is really a new city or just a different
-    // district within the same area. Reverse geocoders happily return a
-    // sub-district ("Ratsada" instead of "Phuket"), and those must not become
-    // separate trips.
-    const nearCurrentTrip =
-      currentTrip.latitude != null &&
-      currentTrip.longitude != null &&
-      !isSignificantMove(
-        currentTrip.latitude,
-        currentTrip.longitude,
-        latitude,
-        longitude,
-        CITY_RADIUS_KM,
-      );
+    const place = {
+      city: geo.city,
+      country: geo.country,
+      countryCode: geo.countryCode,
+      latitude: fix.latitude,
+      longitude: fix.longitude,
+    };
 
-    if (nearCurrentTrip) {
-      // Still in the same city area — just update end date
-      await updateTripEndDate(currentTrip.id);
-    } else {
-      // Genuinely new city — close current trip and start new one
-      await updateTripEndDate(currentTrip.id);
-      await insertTrip(geo.city, geo.country, geo.countryCode, latitude, longitude);
-      notify(geo.city, geo.country, geo.countryCode);
+    const current = await getCurrentTrip();
+    const { decision, pending: nextPending } = decide({ current, place, fix, pending, lastFixAt });
+
+    const notify = () => {
+      if (source !== 'background') return;
+      fireArrivalIfNew(place.city, place.country, place.countryCode).catch(() => {});
+    };
+
+    switch (decision.kind) {
+      case 'ignore':
+        return;
+      case 'start':
+        await insertTrip(place.city, place.country, place.countryCode, place.latitude, place.longitude, decision.date);
+        notify();
+        break;
+      case 'extend':
+        await updateTripEndDate(decision.tripId, decision.date);
+        break;
+      case 'switch':
+        await updateTripEndDate(decision.closeTripId, decision.closeDate);
+        await insertTrip(place.city, place.country, place.countryCode, place.latitude, place.longitude, decision.startDate);
+        notify();
+        break;
+      case 'pending':
+        break;
     }
-  } else {
-    // Same city — update end date
-    await updateTripEndDate(currentTrip.id);
-  }
+    await saveState(fix.timestamp, nextPending);
+  });
 }
 
 // ─── Background task ───────────────────────────────────────────────────────────
@@ -90,16 +125,16 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
   const locations = (data as { locations: Location.LocationObject[] }).locations;
   if (!locations || locations.length === 0) return;
 
-  const location = locations[locations.length - 1];
-  try {
-    await processLocationUpdate(
-      location.coords.latitude,
-      location.coords.longitude,
-      'background',
-    );
-  } catch (err) {
-    // Runs with no UI attached, so this is the only way we ever hear about it.
-    reportError(err, 'location:background-process');
+  // iOS batches deferred updates and does not promise an order. Oldest first,
+  // and anything older than what is already booked is dropped in `decide`.
+  const fixes = locations.map(toFix).sort((a, b) => a.timestamp - b.timestamp);
+  for (const fix of fixes) {
+    try {
+      await processFix(fix, 'background');
+    } catch (err) {
+      // Runs with no UI attached, so this is the only way we ever hear about it.
+      reportError(err, 'location:background-process');
+    }
   }
 });
 
@@ -137,7 +172,7 @@ export async function startBackgroundTracking(): Promise<boolean> {
   if (isTracking) return true;
 
   await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
-    // Low accuracy is fine — we only need city-level precision in the background.
+    // Low accuracy is fine, we only need city-level precision in the background.
     accuracy: Location.Accuracy.Low,
     // Only fire when the user has moved a significant distance (~3 km).
     distanceInterval: 3000,
@@ -148,7 +183,7 @@ export async function startBackgroundTracking(): Promise<boolean> {
     // Let the OS pause updates when the device is stationary.
     pausesUpdatesAutomatically: true,
     activityType: Location.ActivityType.OtherNavigation,
-    // iOS only — use Significant Location Change monitoring. This is the most
+    // iOS only: use Significant Location Change monitoring. This is the most
     // battery-efficient option: the system wakes the app only when the device
     // moves to a new cell tower (~500 m – several km), which is perfect for
     // detecting city/country changes.
@@ -176,11 +211,15 @@ export async function getCurrentLocation(): Promise<Location.LocationObject | nu
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return null;
 
-    // Try cached location first — instant, no GPS warm-up needed.
-    const last = await Location.getLastKnownPositionAsync();
+    // A cached position is instant, but only worth anything if it is recent.
+    // Uncapped, this handed back the fix from before a flight and booked a
+    // trip back to the departure city every time the app was opened.
+    const last = await Location.getLastKnownPositionAsync({
+      maxAge: MAX_FOREGROUND_AGE_MS,
+      requiredAccuracy: MAX_ACCURACY_M,
+    });
     if (last) return last;
 
-    // No cached location available — request a fresh GPS fix.
     return await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
     });
@@ -198,11 +237,7 @@ export async function foregroundLocationCheck(): Promise<void> {
   try {
     const location = await getCurrentLocation();
     if (!location) return;
-    await processLocationUpdate(
-      location.coords.latitude,
-      location.coords.longitude,
-      'foreground',
-    );
+    await processFix(toFix(location), 'foreground');
   } catch (err) {
     reportError(err, 'location:foreground-check');
   }

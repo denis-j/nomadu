@@ -4,5 +4,12 @@
     "strict": true,
     "resolveJsonModule": true,
     "esModuleInterop": true
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "functions",
+    "ios",
+    "android",
+    "scripts"
+  ]
 }

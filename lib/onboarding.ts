@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from './firebase';
 
 /**
  * Reverse funnel placeholder UID used while the user is going through the
@@ -70,6 +72,7 @@ export async function setCitizenship(
     CITIZENSHIP_KEY(uid),
     JSON.stringify({ country, countryCode })
   );
+  pushProfileToCloud(uid).catch(() => {});
 }
 
 export async function getHasFixedResidence(uid: string): Promise<boolean | null> {
@@ -83,6 +86,7 @@ export async function setHasFixedResidence(
   hasFixedResidence: boolean,
 ): Promise<void> {
   await AsyncStorage.setItem(FIXED_RESIDENCE_KEY(uid), String(hasFixedResidence));
+  pushProfileToCloud(uid).catch(() => {});
 }
 
 export async function getOnboardingGoal(uid: string): Promise<OnboardingGoal | null> {
@@ -131,4 +135,26 @@ export async function migrateLocalOnboardingData(realUid: string): Promise<void>
 export async function clearLocalOnboardingData(): Promise<void> {
   const keysToClear = ONBOARDING_KEY_BUILDERS.map((b) => b(LOCAL_ONBOARDING_UID));
   await AsyncStorage.multiRemove(keysToClear);
+}
+
+/**
+ * Mirror the profile into the user document. Citizenship and residence live
+ * in AsyncStorage on the phone; the visa and tax arithmetic needs them, and
+ * so does the server when an agent asks for those numbers. Best effort and
+ * idempotent; the sync calls it on every run as a backfill.
+ */
+export async function pushProfileToCloud(uid: string): Promise<void> {
+  const [citizenship, hasFixedResidence] = await Promise.all([
+    getCitizenship(uid),
+    getHasFixedResidence(uid),
+  ]);
+  if (!citizenship && hasFixedResidence === null) return;
+  await setDoc(
+    doc(db, 'users', uid),
+    {
+      ...(citizenship && { citizenship }),
+      ...(hasFixedResidence !== null && { hasFixedResidence }),
+    },
+    { merge: true },
+  );
 }

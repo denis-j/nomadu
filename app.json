@@ -36,7 +36,7 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "appleTeamId": "Y6KMGQ9398",
-      "buildNumber": "3"
+      "buildNumber": "5"
     },
     "android": {
       "adaptiveIcon": {
@@ -95,7 +95,8 @@
           "url": "https://de.sentry.io/"
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-asset"
     ],
     "extra": {
       "router": {},

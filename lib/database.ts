@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
+import * as Crypto from 'expo-crypto';
 import { localIsNewer } from './syncTime';
-import { chainDates, countDays, eachDay } from './days';
+import { chainDates } from './days';
 
 let db: SQLite.SQLiteDatabase | null = null;
 let opening: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -183,9 +184,31 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_user_visas_sync_id ON user_visas(sync_id);
   `);
 
+  // Migration: plans sync like trips. Each journey, stop and traveller gets a
+  // stable id for the cloud document, and journeys are tombstoned rather than
+  // deleted so the deletion reaches other devices.
+  for (const [table, key] of [['journeys', 'journeys'], ['journey_legs', 'legs'], ['journey_travellers', 'travellers']] as const) {
+    const cols = (await database.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`)).map((c) => c.name);
+    if (!cols.includes('sync_id')) {
+      await database.execAsync(`ALTER TABLE ${table} ADD COLUMN sync_id TEXT`);
+    }
+    if (key === 'journeys' && !cols.includes('deleted')) {
+      await database.execAsync(`ALTER TABLE journeys ADD COLUMN deleted INTEGER DEFAULT 0`);
+    }
+    const missing = await database.getAllAsync<{ id: number }>(`SELECT id FROM ${table} WHERE sync_id IS NULL`);
+    for (const row of missing) {
+      await database.runAsync(`UPDATE ${table} SET sync_id = ? WHERE id = ?`, [Crypto.randomUUID(), row.id]);
+    }
+  }
+  await database.execAsync(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_journeys_sync_id ON journeys(sync_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_journey_legs_sync_id ON journey_legs(sync_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_journey_travellers_sync_id ON journey_travellers(sync_id);
+  `);
+
   // Migration: itineraries are chains (see `chainDates`). Trips planned before
   // that rule could hold gaps between stops; close them once.
-  const journeyRows = await database.getAllAsync<{ id: number }>('SELECT id FROM journeys');
+  const journeyRows = await database.getAllAsync<{ id: number }>('SELECT id FROM journeys WHERE deleted = 0');
   for (const j of journeyRows) {
     const legs = await database.getAllAsync<JourneyLeg>(
       'SELECT * FROM journey_legs WHERE journey_id = ? ORDER BY sort_order ASC, start_date ASC',
@@ -300,32 +323,63 @@ export async function updateTrip(
   );
 }
 
+/**
+ * A tracked trip. `startDate` is the local calendar day of the fix that
+ * started it: SQLite's `date('now')` is UTC, which in Bangkok is yesterday
+ * until 7 in the morning, and `getCurrentTrip` compares with the local day.
+ */
 export async function insertTrip(
   city: string,
   country: string,
   countryCode: string,
   latitude: number,
   longitude: number,
+  startDate: string,
 ): Promise<number> {
   const database = await getDatabase();
   const result = await database.runAsync(
     `INSERT INTO trips (city, country, country_code, latitude, longitude, start_date, days, updated_at)
-     VALUES (?, ?, ?, ?, ?, date('now'), 1, datetime('now'))`,
-    [city, country, countryCode, latitude, longitude],
+     VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'))`,
+    [city, country, countryCode, latitude, longitude, startDate],
   );
   return result.lastInsertRowId;
 }
 
-export async function updateTripEndDate(tripId: number): Promise<void> {
+/** Extend or close a trip to a local calendar day; never moves it backwards. */
+export async function updateTripEndDate(tripId: number, endDate: string): Promise<void> {
   const database = await getDatabase();
   await database.runAsync(
     `UPDATE trips SET
-       end_date = date('now'),
-       days = MAX(1, CAST(julianday(date('now')) - julianday(start_date) AS INTEGER) + 1),
+       end_date = CASE WHEN end_date IS NULL OR end_date < ? THEN ? ELSE end_date END,
+       days = MAX(1, CAST(julianday(MAX(COALESCE(end_date, ?), ?)) - julianday(start_date) AS INTEGER) + 1),
        updated_at = datetime('now')
      WHERE id = ?`,
-    [tripId],
+    [endDate, endDate, endDate, endDate, tripId],
   );
+}
+
+/**
+ * Apply a repair plan from `planRepair`: absorbing trips get their new end,
+ * noise is tombstoned so the deletion syncs like any other.
+ */
+export async function applyTripRepair(plan: { extend: { id: number; end_date: string | null }[]; remove: number[] }): Promise<void> {
+  const database = await getDatabase();
+  for (const { id, end_date } of plan.extend) {
+    await database.runAsync(
+      `UPDATE trips SET
+         end_date = ?,
+         days = MAX(1, CAST(julianday(COALESCE(?, date('now', 'localtime'))) - julianday(start_date) AS INTEGER) + 1),
+         updated_at = datetime('now')
+       WHERE id = ?`,
+      [end_date, end_date, id],
+    );
+  }
+  for (const id of plan.remove) {
+    await database.runAsync(
+      `UPDATE trips SET deleted = 1, updated_at = datetime('now') WHERE id = ?`,
+      [id],
+    );
+  }
 }
 
 /**
@@ -491,6 +545,8 @@ export interface Journey {
   title: string;
   created_at: string;
   updated_at: string;
+  sync_id: string | null;
+  deleted: number;
   // computed fields from getAllJourneys()
   leg_count?: number;
   first_start?: string | null;
@@ -501,6 +557,7 @@ export interface Journey {
 export interface JourneyLeg {
   id: number;
   journey_id: number;
+  sync_id: string | null;
   city: string;
   country: string;
   country_code: string;
@@ -533,6 +590,7 @@ export async function getAllJourneys(): Promise<Journey[]> {
       ) AS countries
     FROM journeys j
     LEFT JOIN journey_legs l ON l.journey_id = j.id
+    WHERE j.deleted = 0
     GROUP BY j.id
     ORDER BY j.created_at DESC
   `);
@@ -541,7 +599,7 @@ export async function getAllJourneys(): Promise<Journey[]> {
 export async function getJourneyWithLegs(id: number): Promise<JourneyWithLegs | null> {
   const database = await getDatabase();
   const journey = await database.getFirstAsync<Journey>(
-    'SELECT * FROM journeys WHERE id = ?',
+    'SELECT * FROM journeys WHERE id = ? AND deleted = 0',
     [id],
   );
   if (!journey) return null;
@@ -555,8 +613,8 @@ export async function getJourneyWithLegs(id: number): Promise<JourneyWithLegs | 
 export async function insertJourney(title: string): Promise<number> {
   const database = await getDatabase();
   const result = await database.runAsync(
-    `INSERT INTO journeys (title) VALUES (?)`,
-    [title],
+    `INSERT INTO journeys (title, sync_id) VALUES (?, ?)`,
+    [title, Crypto.randomUUID()],
   );
   return result.lastInsertRowId;
 }
@@ -569,9 +627,165 @@ export async function updateJourneyTitle(id: number, title: string): Promise<voi
   );
 }
 
+/**
+ * Tombstone, not a delete: the sync carries it to the other devices. Stops
+ * and travellers stay with the tombstone (they are part of its document);
+ * document rows go, they never leave the phone.
+ */
 export async function deleteJourney(id: number): Promise<void> {
   const database = await getDatabase();
-  await database.runAsync('DELETE FROM journeys WHERE id = ?', [id]);
+  await database.runAsync('DELETE FROM journey_documents WHERE journey_id = ?', [id]);
+  await database.runAsync(
+    `UPDATE journeys SET deleted = 1, updated_at = datetime('now') WHERE id = ?`,
+    [id],
+  );
+}
+
+// ─── Journey sync ─────────────────────────────────────────────────────────────
+// A journey syncs as one document: the journey itself plus its stops and
+// travellers, compared as a whole by the journey's updated_at. Stops and
+// travellers carry their own sync ids so a pull can update them in place and
+// local ids stay stable (documents point at traveller ids).
+
+export interface JourneySyncLeg {
+  sync_id: string;
+  city: string;
+  country: string;
+  country_code: string;
+  latitude: number | null;
+  longitude: number | null;
+  start_date: string;
+  end_date: string;
+  transport: TransportType;
+  notes: string | null;
+  sort_order: number;
+}
+
+export interface JourneySyncTraveller {
+  sync_id: string;
+  name: string;
+  sort_order: number;
+}
+
+export interface JourneyForSync {
+  id: number;
+  sync_id: string;
+  title: string;
+  updated_at: string;
+  deleted: boolean;
+  legs: JourneySyncLeg[];
+  travellers: JourneySyncTraveller[];
+}
+
+export async function getAllJourneysForSync(): Promise<JourneyForSync[]> {
+  const database = await getDatabase();
+  const journeys = await database.getAllAsync<Journey>('SELECT * FROM journeys ORDER BY id ASC');
+  const legs = await database.getAllAsync<JourneyLeg>('SELECT * FROM journey_legs ORDER BY journey_id, sort_order, id');
+  const travellers = await database.getAllAsync<JourneyTraveller>('SELECT * FROM journey_travellers ORDER BY journey_id, sort_order, id');
+  return journeys.map((j) => ({
+    id: j.id,
+    sync_id: j.sync_id!,
+    title: j.title,
+    updated_at: j.updated_at,
+    deleted: j.deleted === 1,
+    legs: legs
+      .filter((l) => l.journey_id === j.id)
+      .map((l) => ({
+        sync_id: l.sync_id!,
+        city: l.city,
+        country: l.country,
+        country_code: l.country_code,
+        latitude: l.latitude,
+        longitude: l.longitude,
+        start_date: l.start_date,
+        end_date: l.end_date,
+        transport: l.transport,
+        notes: l.notes,
+        sort_order: l.sort_order,
+      })),
+    travellers: travellers
+      .filter((t) => t.journey_id === j.id)
+      .map((t) => ({ sync_id: t.sync_id!, name: t.name, sort_order: t.sort_order })),
+  }));
+}
+
+/**
+ * Bring one cloud journey into the local database. The newer side wins as a
+ * whole; on a pull, stops and travellers are matched by sync id and updated
+ * in place, extra local ones go, missing ones are inserted.
+ */
+export async function upsertJourneyFromCloud(remote: Omit<JourneyForSync, 'id'>): Promise<void> {
+  const database = await getDatabase();
+  const existing = await database.getFirstAsync<Journey>('SELECT * FROM journeys WHERE sync_id = ?', [remote.sync_id]);
+
+  if (existing && localIsNewer(existing.updated_at, remote.updated_at)) return;
+
+  let journeyId: number;
+  if (existing) {
+    await database.runAsync(
+      'UPDATE journeys SET title = ?, updated_at = ?, deleted = ? WHERE id = ?',
+      [remote.title, remote.updated_at, remote.deleted ? 1 : 0, existing.id],
+    );
+    journeyId = existing.id;
+  } else {
+    if (remote.deleted) return;
+    // OR IGNORE: the unique index on sync_id makes a concurrent second insert
+    // of the same document (snapshot listener racing the pull) a no-op.
+    await database.runAsync(
+      'INSERT OR IGNORE INTO journeys (title, sync_id, updated_at, deleted) VALUES (?, ?, ?, 0)',
+      [remote.title, remote.sync_id, remote.updated_at],
+    );
+    const row = await database.getFirstAsync<{ id: number }>('SELECT id FROM journeys WHERE sync_id = ?', [remote.sync_id]);
+    if (!row) return;
+    journeyId = row.id;
+  }
+  if (remote.deleted) return;
+
+  // Stops
+  const localLegs = await database.getAllAsync<JourneyLeg>('SELECT * FROM journey_legs WHERE journey_id = ?', [journeyId]);
+  const remoteLegIds = new Set(remote.legs.map((l) => l.sync_id));
+  for (const l of localLegs) {
+    if (!l.sync_id || !remoteLegIds.has(l.sync_id)) {
+      await database.runAsync('DELETE FROM journey_legs WHERE id = ?', [l.id]);
+    }
+  }
+  for (const l of remote.legs) {
+    const local = localLegs.find((x) => x.sync_id === l.sync_id);
+    if (local) {
+      await database.runAsync(
+        `UPDATE journey_legs SET city=?, country=?, country_code=?, latitude=?, longitude=?,
+           start_date=?, end_date=?, transport=?, notes=?, sort_order=? WHERE id=?`,
+        [l.city, l.country, l.country_code, l.latitude, l.longitude, l.start_date, l.end_date, l.transport, l.notes, l.sort_order, local.id],
+      );
+    } else {
+      await database.runAsync(
+        `INSERT OR IGNORE INTO journey_legs
+           (journey_id, city, country, country_code, latitude, longitude, start_date, end_date, transport, notes, sort_order, sync_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [journeyId, l.city, l.country, l.country_code, l.latitude, l.longitude, l.start_date, l.end_date, l.transport, l.notes, l.sort_order, l.sync_id],
+      );
+    }
+  }
+
+  // Travellers
+  const localTravellers = await database.getAllAsync<JourneyTraveller>('SELECT * FROM journey_travellers WHERE journey_id = ?', [journeyId]);
+  const remoteTravellerIds = new Set(remote.travellers.map((t) => t.sync_id));
+  for (const t of localTravellers) {
+    if (!t.sync_id || !remoteTravellerIds.has(t.sync_id)) {
+      await database.runAsync('DELETE FROM journey_travellers WHERE id = ?', [t.id]);
+    }
+  }
+  for (const t of remote.travellers) {
+    const local = localTravellers.find((x) => x.sync_id === t.sync_id);
+    if (local) {
+      await database.runAsync('UPDATE journey_travellers SET name = ?, sort_order = ? WHERE id = ?', [t.name, t.sort_order, local.id]);
+    } else {
+      await database.runAsync(
+        'INSERT OR IGNORE INTO journey_travellers (journey_id, name, sort_order, sync_id) VALUES (?, ?, ?, ?)',
+        [journeyId, t.name, t.sort_order, t.sync_id],
+      );
+    }
+  }
 }
 
 export async function insertJourneyLeg(
@@ -595,9 +809,9 @@ export async function insertJourneyLeg(
   const nextOrder = (row?.max_order ?? -1) + 1;
   const result = await database.runAsync(
     `INSERT INTO journey_legs
-       (journey_id, city, country, country_code, latitude, longitude, start_date, end_date, transport, notes, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [journeyId, city, country, countryCode, latitude ?? null, longitude ?? null, startDate, endDate, transport, notes ?? null, nextOrder],
+       (journey_id, city, country, country_code, latitude, longitude, start_date, end_date, transport, notes, sort_order, sync_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [journeyId, city, country, countryCode, latitude ?? null, longitude ?? null, startDate, endDate, transport, notes ?? null, nextOrder, Crypto.randomUUID()],
   );
   await rechainJourneyLegs(journeyId);
   // Also bump parent journey updated_at
@@ -773,6 +987,7 @@ export interface JourneyTraveller {
   journey_id: number;
   name: string;
   sort_order: number;
+  sync_id: string | null;
 }
 
 export interface JourneyDocument {
@@ -797,11 +1012,18 @@ export async function getJourneyTravellers(journeyId: number): Promise<JourneyTr
 export async function addJourneyTraveller(journeyId: number, name: string): Promise<number> {
   const database = await getDatabase();
   const result = await database.runAsync(
-    `INSERT INTO journey_travellers (journey_id, name, sort_order)
-     VALUES (?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM journey_travellers WHERE journey_id = ?))`,
-    [journeyId, name.trim(), journeyId],
+    `INSERT INTO journey_travellers (journey_id, name, sort_order, sync_id)
+     VALUES (?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM journey_travellers WHERE journey_id = ?), ?)`,
+    [journeyId, name.trim(), journeyId, Crypto.randomUUID()],
   );
+  await touchJourney(journeyId);
   return result.lastInsertRowId;
+}
+
+/** Bump a journey's clock: the sync compares whole journeys, stops and travellers included. */
+async function touchJourney(journeyId: number): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(`UPDATE journeys SET updated_at = datetime('now') WHERE id = ?`, [journeyId]);
 }
 
 /**
@@ -814,21 +1036,26 @@ export async function ensureSelfTraveller(journeyId: number): Promise<JourneyTra
   if (existing.length > 0) return existing;
   const database = await getDatabase();
   await database.runAsync(
-    'INSERT INTO journey_travellers (journey_id, name, sort_order) VALUES (?, ?, 0)',
-    [journeyId, 'You'],
+    'INSERT INTO journey_travellers (journey_id, name, sort_order, sync_id) VALUES (?, ?, 0, ?)',
+    [journeyId, 'You', Crypto.randomUUID()],
   );
+  await touchJourney(journeyId);
   return getJourneyTravellers(journeyId);
 }
 
 export async function renameJourneyTraveller(id: number, name: string): Promise<void> {
   const database = await getDatabase();
   await database.runAsync('UPDATE journey_travellers SET name = ? WHERE id = ?', [name.trim(), id]);
+  const row = await database.getFirstAsync<{ journey_id: number }>('SELECT journey_id FROM journey_travellers WHERE id = ?', [id]);
+  if (row) await touchJourney(row.journey_id);
 }
 
 export async function deleteJourneyTraveller(id: number): Promise<void> {
   const database = await getDatabase();
+  const row = await database.getFirstAsync<{ journey_id: number }>('SELECT journey_id FROM journey_travellers WHERE id = ?', [id]);
   // Documents keep their file; they just stop being assigned to anyone.
   await database.runAsync('DELETE FROM journey_travellers WHERE id = ?', [id]);
+  if (row) await touchJourney(row.journey_id);
 }
 
 export async function getJourneyDocuments(journeyId: number): Promise<JourneyDocument[]> {
@@ -880,39 +1107,8 @@ export async function deleteJourneyDocument(id: number): Promise<void> {
 
 // ─── Stats Queries ───
 
-export interface Stats {
-  /** Countries and cities with at least one day inside the window. */
-  totalCountries: number;
-  totalCities: number;
-  /**
-   * Distinct days spent outside the home country.
-   *
-   * The headline figure, and the only day count here that says anything about
-   * how someone travelled. "Days tracked" cannot: a person is always
-   * somewhere, so that number either equals the days elapsed or reveals a gap
-   * in the location history, and neither is an achievement.
-   */
-  daysAway: number;
-  /** Coverage. Shown as a quiet data-quality line, not as a score. */
-  daysTracked: number;
-  daysInWindow: number;
-  /** Separate stays in the window, and the average length of one. */
-  stops: number;
-  avgStayDays: number;
-  /** Countries in this window that had never been visited before it. */
-  newCountries: number;
-  /** Distinct days per country, biggest first. */
-  topCountries: { country: string; country_code: string; days: number }[];
-  availableYears: number[];
-  /** All country codes the user has ever visited (year filter does NOT apply). */
-  allTimeCountryCodes: string[];
-  /**
-   * Days away per calendar month (Jan-Dec, length 12). Only populated when
-   * `year` is set, `null` in all-time mode because per-month aggregation
-   * across years isn't meaningful.
-   */
-  daysAwayByMonth: number[] | null;
-}
+import type { Stats } from './stats';
+export type { Stats } from './stats';
 
 /**
  * Aggregate stats for the tracking screen.
@@ -931,93 +1127,8 @@ export async function getStats(
 ): Promise<Stats> {
   const trips = await getAllTripsRaw();
   const { availableYearsFromTrips } = await import('./yearFilter');
-  const home = homeCountryCode ? homeCountryCode.toUpperCase() : null;
-
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  const windowStart = year === null ? null : new Date(year, 0, 1);
-  let windowEnd = today;
-  if (year !== null) {
-    const yearEnd = new Date(year, 11, 31);
-    windowEnd = yearEnd < today ? yearEnd : today;
-  }
-
-  const trackedDays = new Set<string>();
-  const awayDays = new Set<string>();
-  const perCountry = new Map<string, { country: string; days: Set<string> }>();
-  const countryNames = new Set<string>();
-  const cities = new Set<string>();
-  const codesInWindow = new Set<string>();
-  const codesBefore = new Set<string>();
-  const stayLengths = new Map<string, number>();
-  let earliestStart: Date | null = null;
-
-  for (const trip of trips) {
-    const code = trip.country_code.toUpperCase();
-    const start = parseDate(trip.start_date);
-    const end = trip.end_date ? parseDate(trip.end_date) : today;
-    if (!earliestStart || start < earliestStart) earliestStart = start;
-
-    if (windowStart && start < windowStart) codesBefore.add(code);
-    if (windowStart && end < windowStart) continue;
-    if (start > windowEnd) continue;
-
-    const from = windowStart && start < windowStart ? windowStart : start;
-    const to = end > windowEnd ? windowEnd : end;
-    if (from > to) continue;
-
-    countryNames.add(trip.country);
-    cities.add(`${trip.city}|${trip.country}`);
-    codesInWindow.add(code);
-
-    // Exact duplicates are one stay, not two. Until the sync stops creating
-    // them this is also what keeps the pace figures honest.
-    const stayKey = `${trip.city}|${code}|${trip.start_date}|${trip.end_date ?? ''}`;
-    if (!stayLengths.has(stayKey)) stayLengths.set(stayKey, countDays(from, to));
-
-    let bucket = perCountry.get(code);
-    if (!bucket) {
-      bucket = { country: trip.country, days: new Set<string>() };
-      perCountry.set(code, bucket);
-    }
-
-    eachDay(from, to, (day) => {
-      trackedDays.add(day);
-      bucket!.days.add(day);
-      if (!home || code !== home) awayDays.add(day);
-    });
-  }
-
-  const monthBuckets = year === null ? null : new Array<number>(12).fill(0);
-  if (monthBuckets) {
-    for (const day of awayDays) monthBuckets[Number(day.slice(5, 7)) - 1] += 1;
-  }
-
-  const topCountries = [...perCountry.entries()]
-    .map(([country_code, b]) => ({ country: b.country, country_code, days: b.days.size }))
-    .sort((a, b) => b.days - a.days)
-    .slice(0, 10);
-
-  const stays = [...stayLengths.values()];
-  const rangeStart = windowStart ?? earliestStart;
-
-  return {
-    totalCountries: countryNames.size,
-    totalCities: cities.size,
-    daysAway: awayDays.size,
-    daysTracked: trackedDays.size,
-    daysInWindow: rangeStart ? countDays(rangeStart, windowEnd) : 0,
-    stops: stays.length,
-    avgStayDays: stays.length
-      ? Math.round(stays.reduce((sum, d) => sum + d, 0) / stays.length)
-      : 0,
-    newCountries: [...codesInWindow].filter((c) => !codesBefore.has(c)).length,
-    topCountries,
-    availableYears: availableYearsFromTrips(trips),
-    allTimeCountryCodes: [...new Set(trips.map((t) => t.country_code.toUpperCase()))],
-    daysAwayByMonth: monthBuckets,
-  };
+  const { statsFromTrips } = await import('./stats');
+  return statsFromTrips(trips, year, homeCountryCode, availableYearsFromTrips(trips));
 }
 
 // ─── Data Management ───

@@ -20,6 +20,13 @@ export default function SettingsStack() {
         }}
       />
       <Stack.Screen
+        name="agent"
+        options={{
+          title: 'AI agent',
+          headerBackButtonDisplayMode: 'minimal',
+        }}
+      />
+      <Stack.Screen
         name="debug"
         options={{
           title: 'Debug',

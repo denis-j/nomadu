@@ -206,11 +206,36 @@ export function nearestCity(
     }
   }
 
-  if (covering) return { name: covering[0], distanceKm: coveringKm };
+  if (covering) {
+    // A village that happens to be in the list still belongs to the city next
+    // door: Kamala Beach is 15 km from Phuket Town, outside Phuket's radius
+    // but inside "Ban Kamala", and nobody says they spent a month in Ban
+    // Kamala. Small places hand over to the biggest real city within reach;
+    // two real cities next to each other (Düsseldorf, Neuss) keep their own.
+    if (covering[3] < SMALL_TOWN_POP) {
+      let city: CityRow | null = null;
+      let cityKm = 0;
+      for (const row of rows) {
+        if (row[3] < SMALL_TOWN_POP) continue;
+        const km = haversineKm(latitude, longitude, row[1], row[2]);
+        if (km <= ABSORB_KM && (!city || row[3] > city[3])) {
+          city = row;
+          cityKm = km;
+        }
+      }
+      if (city) return { name: city[0], distanceKm: cityKm };
+    }
+    return { name: covering[0], distanceKm: coveringKm };
+  }
   // Nothing claims the point, so fall back to whatever is closest. This is the
   // normal case in the countryside, where the nearest town is the right answer.
   return nearest && nearestKm <= maxKm ? { name: nearest[0], distanceKm: nearestKm } : null;
 }
+
+/** Below this a place is a town that borrows its city's name when one is near. */
+const SMALL_TOWN_POP = 50_000;
+/** How far a town looks for that city. */
+const ABSORB_KM = 20;
 
 /**
  * How far a city plausibly extends from the coordinate GeoNames gives for it.
@@ -230,7 +255,7 @@ function cityRadiusKm(population: number): number {
 const MIN_CITY_RADIUS_KM = 2;
 const MAX_CITY_RADIUS_KM = 25;
 
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const toRad = (d: number) => (d * Math.PI) / 180;
   const R = 6371;
   const dLat = toRad(lat2 - lat1);
@@ -255,4 +280,21 @@ export function getCountryName(isoCode: string): string | undefined {
 export function getCountryFlag(countryName: string): string | undefined {
   ensureCountries();
   return _byLowerName!.get(countryName.toLowerCase())?.flag;
+}
+
+/**
+ * Coordinates for a city by name, from the bundled dataset. Exact name or
+ * alias, case-insensitive; the biggest match wins when a name repeats. Used
+ * where a geocoder is not available (the server placing an agent's stops).
+ */
+export function findCityCoords(name: string, isoCode: string): { latitude: number; longitude: number; name: string } | null {
+  const rows = RAW.cities[isoCode.toUpperCase()];
+  if (!rows) return null;
+  const wanted = name.trim().toLowerCase();
+  let best: CityRow | null = null;
+  for (const row of rows) {
+    const hit = row[0].toLowerCase() === wanted || row[4].some((alias) => alias.toLowerCase() === wanted);
+    if (hit && (!best || row[3] > best[3])) best = row;
+  }
+  return best ? { latitude: best[1], longitude: best[2], name: best[0] } : null;
 }

@@ -63,7 +63,7 @@ export default function AddDocumentScreen() {
         const trimmed = (name ?? '').trim();
         if (!trimmed) return;
         const id = await addJourneyTraveller(journeyId, trimmed);
-        setTravellers((prev) => [...prev, { id, journey_id: journeyId, name: trimmed, sort_order: prev.length }]);
+        setTravellers((prev) => [...prev, { id, journey_id: journeyId, name: trimmed, sort_order: prev.length, sync_id: null }]);
         setTravellerId(id);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       },

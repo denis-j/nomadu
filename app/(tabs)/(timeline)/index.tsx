@@ -27,7 +27,10 @@ import { takePendingUnlock } from '../../../lib/badges';
 import { BadgeUnlockOverlay } from '../../../components/BadgeUnlockOverlay';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
-import { Trip, markTripDeleted, parseDate } from '../../../lib/database';
+import { Trip, applyTripRepair, getAllTripsRaw, markTripDeleted, parseDate } from '../../../lib/database';
+import { planRepair } from '../../../lib/tracking';
+import { toYmd } from '../../../lib/days';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { Flag } from '../../../components/Flag';
 
@@ -263,7 +266,7 @@ function CountryGroupCard({
   onEdit: (trip: Trip) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  // ActionSheet still uses emoji — native iOS title strings handle it well.
+  // ActionSheet still uses emoji, native iOS title strings handle it well.
   const emojiFlag = countryCodeToFlag(group.countryCode);
 
   const toggle = () => {
@@ -276,7 +279,7 @@ function CountryGroupCard({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     ActionSheetIOS.showActionSheetWithOptions(
       {
-        title: `${emojiFlag} ${group.country} — ${group.items.length} stops`,
+        title: `${emojiFlag} ${group.country} · ${group.items.length} stops`,
         options: ['Delete All Stops', 'Cancel'],
         destructiveButtonIndex: 0,
         cancelButtonIndex: 1,
@@ -575,6 +578,8 @@ interface Section {
 const fmt = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+const REPAIR_DECLINED_KEY = '@timeline_repair_declined';
+
 // ─── Component ───
 
 export default function TimelineScreen() {
@@ -582,7 +587,7 @@ export default function TimelineScreen() {
   const { trips, loading, refresh } = useTrips();
   const [refreshing, setRefreshing] = useState(false);
 
-  // Inline unlock overlay state — avoids pushing a modal route while a form
+  // Inline unlock overlay state: avoids pushing a modal route while a form
   // sheet is animating away (which triggers RNScreens' sheetPresentationController
   // detents warning).
   const [unlockCode, setUnlockCode] = useState<string | null>(null);
@@ -599,6 +604,43 @@ export default function TimelineScreen() {
         clearTimeout(t);
       };
     }, []),
+  );
+
+  // Trips the old tracking rules left behind (duplicates, fragments of one
+  // stay, one-day blips from a cached fix) are offered for cleanup once per
+  // state of the mess: the plan is fingerprinted, and a declined fingerprint
+  // is not asked about again. Only while this screen is actually in front;
+  // the tab is mounted under the paywall too.
+  useFocusEffect(
+    useCallback(() => {
+      if (loading) return;
+      let cancelled = false;
+      (async () => {
+        const raw = await getAllTripsRaw();
+        const plan = planRepair(raw, toYmd(new Date()));
+        const removed = plan.remove.length;
+        if (cancelled || removed === 0) return;
+        const fingerprint = [...plan.remove].sort((a, b) => a - b).join(',');
+        const declined = await AsyncStorage.getItem(REPAIR_DECLINED_KEY);
+        if (cancelled || declined === fingerprint) return;
+        Alert.alert(
+          'Tidy up your timeline?',
+          `${removed} ${removed === 1 ? 'stop is' : 'stops are'} duplicates, fragments of the same stay, or one-day blips from a stale location fix. Merging them leaves your history as it is, just without the noise.`,
+          [
+            { text: 'Not now', style: 'cancel', onPress: () => { AsyncStorage.setItem(REPAIR_DECLINED_KEY, fingerprint).catch(() => {}); } },
+            {
+              text: 'Tidy up',
+              onPress: async () => {
+                await applyTripRepair(plan);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                refresh();
+              },
+            },
+          ],
+        );
+      })();
+      return () => { cancelled = true; };
+    }, [loading, refresh]),
   );
 
   const handleRefresh = useCallback(async () => {

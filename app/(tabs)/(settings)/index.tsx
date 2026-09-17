@@ -233,6 +233,20 @@ export default function SettingsScreen() {
           </View>
         </Pressable>
         <View style={styles.separator} />
+        <Pressable
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/(tabs)/(settings)/agent');
+          }}
+        >
+          <View style={styles.rowContent}>
+            <Text style={styles.rowLabel}>AI agent</Text>
+            <Text style={styles.rowDescription}>Let Hermes or another agent use your data</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+        </Pressable>
+        <View style={styles.separator} />
         <View style={styles.row}>
           <View style={styles.rowContent}>
             <Text style={styles.rowLabel}>Fixed Residence</Text>

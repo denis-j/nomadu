@@ -29,6 +29,7 @@ import { consumeQuota } from './rateLimit';
 initializeApp();
 
 export { deleteAccount } from './deleteAccount';
+export { agentApi, createAgentToken, revokeAgentToken, listAgentTokens } from './agent';
 
 const geminiKey = defineSecret('GEMINI_API_KEY');
 

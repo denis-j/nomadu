@@ -14,9 +14,13 @@ import {
 import { db } from './firebase';
 import {
   clearAllData,
+  getAllJourneysForSync,
   getAllTripsForSync,
   setSyncId,
+  upsertJourneyFromCloud,
   upsertTripFromCloud,
+  type JourneySyncLeg,
+  type JourneySyncTraveller,
   type Trip,
 } from './database';
 import {
@@ -27,6 +31,8 @@ import {
 } from './userVisas';
 import { parseSyncStamp } from './syncTime';
 import { clearBadgeProgress } from './badges';
+import { reportError } from './monitoring';
+import { pushProfileToCloud } from './onboarding';
 
 const CLOUD_SYNC_KEY = (uid: string) => `@cloud_sync_enabled_${uid}`;
 const LAST_SYNC_KEY = (uid: string) => `@last_sync_${uid}`;
@@ -54,6 +60,10 @@ async function setLastSyncTime(uid: string): Promise<void> {
 
 function tripsCollection(uid: string) {
   return collection(db, 'users', uid, 'trips');
+}
+
+function journeysCollection(uid: string) {
+  return collection(db, 'users', uid, 'journeys');
 }
 
 function visasCollection(uid: string) {
@@ -295,18 +305,87 @@ export async function pullVisasFromCloud(uid: string): Promise<void> {
   }
 }
 
+// ─── Journeys ───
+// One document per journey with stops and travellers embedded, compared as
+// a whole by the journey's updated_at. Sync ids are assigned locally on
+// insert (and by the migration), so nothing has to be written back here.
+
+export async function pushJourneysToCloud(uid: string): Promise<void> {
+  const journeys = await getAllJourneysForSync();
+  if (journeys.length === 0) return;
+
+  const journeys_ = journeysCollection(uid);
+  const snapshot = await getDocs(journeys_);
+  const cloud = new Map<string, DocumentData>();
+  snapshot.forEach((docSnap) => cloud.set(docSnap.id, docSnap.data()));
+
+  let batch = writeBatch(db);
+  let ops = 0;
+  const commit = async () => {
+    if (ops === 0) return;
+    await batch.commit();
+    batch = writeBatch(db);
+    ops = 0;
+  };
+
+  for (const journey of journeys) {
+    const localUpdatedAt = journey.updated_at ? parseSyncStamp(journey.updated_at) : new Date();
+    const cloudData = cloud.get(journey.sync_id);
+    if (cloudData) {
+      const cloudUpdatedAt = cloudData.updated_at instanceof Timestamp ? cloudData.updated_at.toDate() : new Date(0);
+      if (cloudUpdatedAt >= localUpdatedAt) continue;
+    }
+    // No merge: a stop removed locally must disappear from the array too.
+    batch.set(doc(journeys_, journey.sync_id), {
+      title: journey.title,
+      legs: journey.legs,
+      travellers: journey.travellers,
+      local_id: journey.id,
+      updated_at: Timestamp.fromDate(localUpdatedAt),
+      deleted: journey.deleted,
+    });
+    ops++;
+    if (ops >= BATCH_LIMIT) await commit();
+  }
+  await commit();
+}
+
+function journeyFromDoc(id: string, data: DocumentData) {
+  const updatedAt = data.updated_at instanceof Timestamp
+    ? data.updated_at.toDate().toISOString()
+    : new Date().toISOString();
+  return {
+    sync_id: id,
+    title: String(data.title ?? 'Trip'),
+    updated_at: updatedAt,
+    deleted: data.deleted === true,
+    legs: (Array.isArray(data.legs) ? data.legs : []) as JourneySyncLeg[],
+    travellers: (Array.isArray(data.travellers) ? data.travellers : []) as JourneySyncTraveller[],
+  };
+}
+
+export async function pullJourneysFromCloud(uid: string): Promise<void> {
+  const snapshot = await getDocs(journeysCollection(uid));
+  for (const docSnap of snapshot.docs) {
+    await upsertJourneyFromCloud(journeyFromDoc(docSnap.id, docSnap.data()));
+  }
+}
+
 // ─── Bidirectional Sync ───
 
 /**
- * Trips and visas, both directions. Pull first so cloud data is never
- * overwritten by an empty or stale local database, which is exactly the state
- * right after a reinstall.
+ * Trips, visas and journeys, both directions. Pull first so cloud data is
+ * never overwritten by an empty or stale local database, which is exactly
+ * the state right after a reinstall.
  */
 export async function syncAll(uid: string): Promise<void> {
   await pullTripsFromCloud(uid);
   await pushTripsToCloud(uid);
   await pullVisasFromCloud(uid);
   await pushVisasToCloud(uid);
+  await pullJourneysFromCloud(uid);
+  await pushJourneysToCloud(uid);
+  await pushProfileToCloud(uid);
   await setLastSyncTime(uid);
 }
 
@@ -317,7 +396,22 @@ let activeUnsubscribe: Unsubscribe | null = null;
 export function startRealtimeSync(uid: string): Unsubscribe {
   stopRealtimeSync();
 
-  const unsubscribe = onSnapshot(tripsCollection(uid), async (snapshot) => {
+  // Journeys: what an agent or another device writes shows up without a
+  // restart. Documents of the same journey edited here in the meantime keep
+  // winning through the updated_at comparison in the upsert.
+  const unsubscribeJourneys = onSnapshot(journeysCollection(uid), async (snapshot) => {
+    for (const change of snapshot.docChanges()) {
+      if (change.type === 'added' || change.type === 'modified') {
+        try {
+          await upsertJourneyFromCloud(journeyFromDoc(change.doc.id, change.doc.data()));
+        } catch (err) {
+          reportError(err, 'sync:journeys-realtime');
+        }
+      }
+    }
+  });
+
+  const unsubscribeTrips = onSnapshot(tripsCollection(uid), async (snapshot) => {
     for (const change of snapshot.docChanges()) {
       if (change.type === 'added' || change.type === 'modified') {
         const data = change.doc.data();
@@ -343,6 +437,10 @@ export function startRealtimeSync(uid: string): Unsubscribe {
     }
   });
 
+  const unsubscribe: Unsubscribe = () => {
+    unsubscribeTrips();
+    unsubscribeJourneys();
+  };
   activeUnsubscribe = unsubscribe;
   return unsubscribe;
 }
