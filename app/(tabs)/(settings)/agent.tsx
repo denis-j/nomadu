@@ -1,15 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { requireOptionalNativeModule } from 'expo-modules-core';
 import { httpsCallable } from 'firebase/functions';
 import { CloudyButton } from '../../../components/CloudyButton';
 import { Card, SectionLabel, visaFormStyles } from '../../../components/visaForm';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
-import { agentSetupText } from '../../../lib/agentSetup';
 import { auth, functions } from '../../../lib/firebase';
 import { showToast } from '../../../lib/toast';
 
@@ -17,6 +16,7 @@ interface AgentToken {
   id: string;
   label: string;
   prefix: string;
+  edit_timeline: boolean;
   created_at: string | null;
   last_used_at: string | null;
 }
@@ -24,26 +24,13 @@ interface AgentToken {
 const cacheKey = () => `@agent_tokens_${auth.currentUser?.uid ?? 'anon'}`;
 
 /**
- * Connecting an AI agent.
- *
- * One button. It makes a token and hands back a text that already has the
- * token, the address of the API and what every request does, so the only
- * thing left is pasting that into the agent. Nobody here needs to know the
- * word "token"; the server keeps a hash of it and the text is shown once.
- * Documents stay on the phone.
+ * Who is connected and what they can do. Connecting happens in a sheet of
+ * its own, so this screen never holds a key; it only lists what the server
+ * knows and refreshes when the sheet closes.
  */
 export default function AgentAccessScreen() {
+  const router = useRouter();
   const [agents, setAgents] = useState<AgentToken[] | null>(null);
-  const [fresh, setFresh] = useState<{ token: string; label: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  // The last known list renders straight away, so coming back to this screen
-  // does not flash a spinner and then reflow. The network refreshes it after.
-  useEffect(() => {
-    AsyncStorage.getItem(cacheKey()).then((raw) => {
-      if (raw) setAgents((prev) => prev ?? JSON.parse(raw));
-    }).catch(() => {});
-  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -57,51 +44,26 @@ export default function AgentAccessScreen() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-
-  const copy = async (value: string, what: string) => {
-    // The clipboard module is native. A build from before it was added must
-    // still work here, so its presence is checked without throwing; without
-    // it, the share sheet gets the value to the same places.
-    if (requireOptionalNativeModule('ExpoClipboard')) {
-      const Clipboard = require('expo-clipboard') as typeof import('expo-clipboard');
-      await Clipboard.setStringAsync(value);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast(`${what} copied`);
-    } else {
-      await Share.share({ message: value });
-    }
-  };
+  // The last known list renders straight away, so coming back to this screen
+  // does not flash a spinner and then reflow. The network refreshes it after,
+  // and again every time the connect sheet closes.
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem(cacheKey()).then((raw) => {
+        if (raw) setAgents((prev) => prev ?? JSON.parse(raw));
+      }).catch(() => {});
+      load();
+    }, [load]),
+  );
 
   const connect = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.prompt(
-      'Name the agent',
-      'So you can tell them apart later.',
-      async (label) => {
-        const trimmed = (label ?? '').trim();
-        if (!trimmed) return;
-        setBusy(true);
-        try {
-          const fn = httpsCallable<{ label: string }, { id: string; token: string; label: string }>(functions, 'createAgentToken');
-          const res = await fn({ label: trimmed });
-          setFresh({ token: res.data.token, label: res.data.label });
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          load();
-        } catch (err: any) {
-          showToast(err?.message ?? 'Could not connect the agent', 'error');
-        } finally {
-          setBusy(false);
-        }
-      },
-      'plain-text',
-      'Hermes',
-    );
+    router.push('/(tabs)/(settings)/agent-connect' as any);
   };
 
   const remove = (t: AgentToken) => {
     Haptics.selectionAsync();
-    Alert.alert(`Remove "${t.label}"?`, 'It loses access immediately. To connect it again, it needs a new text.', [
+    Alert.alert(`Remove "${t.label}"?`, 'It loses access immediately. To connect it again, it needs a new key.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
@@ -110,7 +72,6 @@ export default function AgentAccessScreen() {
           try {
             const fn = httpsCallable<{ id: string }, { ok: boolean }>(functions, 'revokeAgentToken');
             await fn({ id: t.id });
-            if (fresh && t.label === fresh.label) setFresh(null);
             load();
           } catch {
             showToast('Could not remove the agent', 'error');
@@ -120,17 +81,19 @@ export default function AgentAccessScreen() {
     ]);
   };
 
-  const when = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'never';
+  const when = (iso: string) => {
+    const d = new Date(iso);
+    if (d.toDateString() === new Date().toDateString()) return 'today';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
   const hasAgents = agents !== null && agents.length > 0;
 
   const connectButton = (
     <CloudyButton onPress={connect} style={{ width: '100%' }} innerStyle={{ justifyContent: 'center' }}>
-      <Text style={styles.ctaText}>{busy ? 'Connecting…' : hasAgents ? 'Connect another agent' : 'Connect an agent'}</Text>
+      <Text style={styles.ctaText}>{hasAgents ? 'Connect another agent' : 'Connect an agent'}</Text>
     </CloudyButton>
   );
-
   const agentList = (
     <>
       <SectionLabel>Connected agents</SectionLabel>
@@ -144,7 +107,9 @@ export default function AgentAccessScreen() {
               <View style={styles.agentRow}>
                 <View style={styles.agentText}>
                   <Text style={styles.agentLabel}>{t.label}</Text>
-                  <Text style={styles.agentMeta}>connected {when(t.created_at)}  ·  last used {when(t.last_used_at)}</Text>
+                  <Text style={styles.agentMeta} numberOfLines={1}>
+                    {[t.edit_timeline ? 'edits timeline' : 'read only', t.last_used_at ? `last used ${when(t.last_used_at)}` : 'not used yet'].join('  ·  ')}
+                  </Text>
                 </View>
                 <Pressable onPress={() => remove(t)} hitSlop={10} accessibilityLabel={`Remove ${t.label}`}>
                   <Ionicons name="trash-outline" size={18} color={Colors.error} />
@@ -169,7 +134,9 @@ export default function AgentAccessScreen() {
         <View style={styles.separator} />
         <Can icon="map-outline" title="Plan trips" text="Read, create, change and delete your plans. They show up in Plan after the next sync." />
         <View style={styles.separator} />
-        <Can icon="lock-closed-outline" title="Not your documents" text="Tickets, visas and bookings stay on this phone, and it cannot change your timeline." muted />
+        <Can icon="create-outline" title="Fix your timeline, if you allow it" text="Add a stay the tracker missed, correct dates, remove a wrong one. You choose this when connecting." />
+        <View style={styles.separator} />
+        <Can icon="lock-closed-outline" title="Not your documents" text="Tickets, visas and bookings stay on this phone." muted />
       </Card>
     </>
   );
@@ -178,43 +145,16 @@ export default function AgentAccessScreen() {
   // an agent is there, it and the button to add another sit at the top.
   return (
     <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={visaFormStyles.content}>
-      {fresh && (
-        <>
-          <SectionLabel>{`${fresh.label} is ready`}</SectionLabel>
-          <Card>
-            <View style={styles.freshBody}>
-              <Text style={styles.freshText}>
-                Paste this into {fresh.label}'s instructions, memory or system prompt. It tells the agent where your data is, how to sign in and what it can do.
-              </Text>
-              <View style={styles.preview}>
-                <Text style={styles.previewText} numberOfLines={7}>{agentSetupText(fresh.token)}</Text>
-                <View style={styles.previewFade} />
-              </View>
-              <CloudyButton onPress={() => copy(agentSetupText(fresh.token), 'Text')} style={{ width: '100%' }} innerStyle={{ justifyContent: 'center' }}>
-                <View style={styles.ctaRow}>
-                  <Ionicons name="copy-outline" size={18} color={Colors.cloudyButtonText} />
-                  <Text style={styles.ctaText}>Copy for {fresh.label}</Text>
-                </View>
-              </CloudyButton>
-              <Text style={styles.freshWarn}>Shown once. If it gets lost, remove {fresh.label} below and connect it again.</Text>
-            </View>
-          </Card>
-          <Pressable onPress={() => setFresh(null)} style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.6 }]}>
-            <Text style={styles.linkText}>Done, I have pasted it</Text>
-          </Pressable>
-        </>
-      )}
-
       {hasAgents || agents === null ? (
         <>
           {agentList}
-          {!fresh && connectButton}
+          {connectButton}
           {canDo}
         </>
       ) : (
         <>
           {canDo}
-          {!fresh && connectButton}
+          {connectButton}
         </>
       )}
     </ScrollView>
@@ -248,24 +188,7 @@ function AgentSkeleton() {
 }
 
 const styles = StyleSheet.create({
-  freshBody: { paddingVertical: 14, gap: 12 },
-  freshText: { ...Typography.bodySmall, color: Colors.textSecondary, lineHeight: 19 },
-  preview: {
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 10,
-    padding: 12,
-    overflow: 'hidden',
-  },
-  previewText: { fontFamily: 'Menlo', fontSize: 11, lineHeight: 15, color: Colors.text },
-  previewFade: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, height: 36,
-    backgroundColor: Colors.surfaceSecondary, opacity: 0.85,
-  },
-  freshWarn: { ...Typography.caption, color: Colors.textSecondary, textAlign: 'center' },
-  ctaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   ctaText: { ...Typography.buttonLarge, color: Colors.cloudyButtonText, textAlign: 'center' },
-  linkRow: { alignItems: 'center', paddingVertical: 4 },
-  linkText: { ...Typography.label, fontWeight: '600', color: Colors.textSecondary },
   agentRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, minHeight: 66 },
   agentText: { flex: 1, gap: 2 },
   agentLabel: { ...Typography.titleSmall, fontWeight: '500' },

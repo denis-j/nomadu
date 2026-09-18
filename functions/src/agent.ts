@@ -22,7 +22,7 @@ import { calculateAllVisaStatuses } from '../../lib/visaCalculations';
 import { calculateAllTaxStatuses } from '../../lib/taxCalculations';
 import { statsFromTrips } from '../../lib/stats';
 import { availableYearsFromTrips } from '../../lib/yearFilter';
-import { chainDates, toYmd } from '../../lib/days';
+import { chainDates, countDays, fromYmd, toYmd } from '../../lib/days';
 import type { Trip } from '../../lib/database';
 import type { UserVisa } from '../../lib/userVisas';
 import { findCityCoords, getCountryCode, getCountryName } from '../../utils/geography';
@@ -48,6 +48,9 @@ function requireUid(uid: string | undefined): string {
 export const createAgentToken = onCall({ region: REGION }, async (request) => {
   const uid = requireUid(request.auth?.uid);
   const label = typeof request.data?.label === 'string' ? request.data.label.trim().slice(0, 40) : '';
+  // Chosen when the token is made and fixed for its life: whether the agent
+  // may write to the tracked timeline, or only read it.
+  const editTimeline = request.data?.editTimeline === true;
   const db = getFirestore();
 
   const existing = await db.collection(TOKENS).where('uid', '==', uid).get();
@@ -62,12 +65,13 @@ export const createAgentToken = onCall({ region: REGION }, async (request) => {
     label: label || 'Agent',
     // Enough to recognise a token in a config file, useless for guessing it.
     prefix: token.slice(0, TOKEN_PREFIX.length + 6),
+    edit_timeline: editTimeline,
     created_at: FieldValue.serverTimestamp(),
     last_used_at: null,
   });
-  logger.info('agent token created', { uid, id: id.slice(0, 8) });
+  logger.info('agent token created', { uid, id: id.slice(0, 8), editTimeline });
   // The only time the token itself leaves the server.
-  return { id, token, label: label || 'Agent' };
+  return { id, token, label: label || 'Agent', edit_timeline: editTimeline };
 });
 
 export const revokeAgentToken = onCall({ region: REGION }, async (request) => {
@@ -92,6 +96,7 @@ export const listAgentTokens = onCall({ region: REGION }, async (request) => {
         id: d.id,
         label: d.get('label') ?? 'Agent',
         prefix: d.get('prefix') ?? '',
+        edit_timeline: d.get('edit_timeline') === true,
         created_at: stamp(d.get('created_at')),
         last_used_at: stamp(d.get('last_used_at')),
       }))
@@ -107,7 +112,12 @@ class ApiError extends Error {
   }
 }
 
-async function authenticate(req: Request): Promise<string> {
+interface Caller {
+  uid: string;
+  editTimeline: boolean;
+}
+
+async function authenticate(req: Request): Promise<Caller> {
   const header = req.get('authorization') ?? '';
   const match = /^Bearer\s+(\S+)$/i.exec(header);
   if (!match || !match[1].startsWith(TOKEN_PREFIX)) {
@@ -117,7 +127,13 @@ async function authenticate(req: Request): Promise<string> {
   const snap = await ref.get();
   if (!snap.exists) throw new ApiError(401, 'unauthenticated', 'Unknown or revoked token.');
   ref.update({ last_used_at: FieldValue.serverTimestamp() }).catch(() => {});
-  return snap.get('uid') as string;
+  return { uid: snap.get('uid') as string, editTimeline: snap.get('edit_timeline') === true };
+}
+
+function requireTimelineWrite(caller: Caller): void {
+  if (!caller.editTimeline) {
+    throw new ApiError(403, 'forbidden', 'This key can only read the timeline. Ask the user for a key that may edit it.');
+  }
 }
 
 // ── Data ──
@@ -207,6 +223,20 @@ function publicJourney(id: string, x: FirebaseFirestore.DocumentData) {
   };
 }
 
+/**
+ * The country an agent named, as the dataset knows it. A name it does not
+ * know is an error, not "XX": a stay in Atlantis would count for nothing
+ * and show a blank flag.
+ */
+function resolveCountry(raw: { country?: string; country_code?: string }, fallbackCode = '', where = ''): { code: string; country: string } {
+  const code = (typeof raw.country_code === 'string' && raw.country_code.length === 2
+    ? raw.country_code
+    : typeof raw.country === 'string' && raw.country.trim() ? getCountryCode(raw.country) : fallbackCode).toUpperCase();
+  const country = code.length === 2 ? getCountryName(code) : undefined;
+  if (!country) throw new ApiError(400, 'invalid-argument', `${where}country or country_code is required and must be a real country.`);
+  return { code, country };
+}
+
 // ── Stops as an agent describes them ──
 
 interface StopInput {
@@ -235,11 +265,7 @@ function buildLegs(input: unknown, existing: any[] = []) {
   const draft = input.map((raw: StopInput, i) => {
     if (!raw || typeof raw.city !== 'string' || !raw.city.trim()) throw new ApiError(400, 'invalid-argument', `stops[${i}].city is required.`);
     const city = raw.city.trim().slice(0, 80);
-    const code = (typeof raw.country_code === 'string' && raw.country_code.length === 2
-      ? raw.country_code
-      : typeof raw.country === 'string' ? getCountryCode(raw.country) : '').toUpperCase();
-    if (!code || code.length !== 2) throw new ApiError(400, 'invalid-argument', `stops[${i}]: country or country_code is required.`);
-    const country = getCountryName(code) ?? (typeof raw.country === 'string' ? raw.country : code);
+    const { code, country } = resolveCountry(raw, '', `stops[${i}]: `);
     const transport = typeof raw.transport === 'string' && TRANSPORTS.has(raw.transport) ? raw.transport : 'flight';
     const notes = typeof raw.notes === 'string' ? raw.notes.trim().slice(0, 500) || null : null;
 
@@ -281,6 +307,63 @@ function buildLegs(input: unknown, existing: any[] = []) {
   return draft.map((l, i) => ({ ...l, ...dates[i] }));
 }
 
+// ── Stays as an agent describes them ──
+
+interface StayInput {
+  city?: string;
+  country?: string;
+  country_code?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+function tripsCol(uid: string) {
+  return getFirestore().collection(`users/${uid}/trips`);
+}
+
+function publicTrip(id: string, x: FirebaseFirestore.DocumentData) {
+  return {
+    id,
+    city: x.city, country: x.country, country_code: x.country_code,
+    start_date: x.start_date, end_date: x.end_date ?? null, days: Number(x.days ?? 1),
+  };
+}
+
+/**
+ * One tracked stay from the agent's words, or the fields it wants to change
+ * on an existing one. Unlike planned stops these do not chain: every stay is
+ * its own thing with its own two dates, and both are required on a new one
+ * so an agent cannot open a stay that the tracker then has to close.
+ */
+function buildStay(raw: StayInput, existing: FirebaseFirestore.DocumentData | null) {
+  if (!raw || typeof raw !== 'object') throw new ApiError(400, 'invalid-argument', 'Send a JSON body.');
+  const out: Record<string, unknown> = {};
+
+  const wantsPlace = raw.city !== undefined || raw.country !== undefined || raw.country_code !== undefined;
+  if (wantsPlace || !existing) {
+    const city = typeof raw.city === 'string' ? raw.city.trim().slice(0, 80) : String(existing?.city ?? '');
+    if (!city) throw new ApiError(400, 'invalid-argument', '"city" is required.');
+    const { code, country } = resolveCountry(raw, String(existing?.country_code ?? ''));
+    const coords = findCityCoords(city, code);
+    out.city = coords?.name ?? city;
+    out.country = country;
+    out.country_code = code;
+    out.latitude = coords?.latitude ?? null;
+    out.longitude = coords?.longitude ?? null;
+  }
+
+  const start = typeof raw.start_date === 'string' ? raw.start_date : String(existing?.start_date ?? '');
+  const end = typeof raw.end_date === 'string' ? raw.end_date : (existing?.end_date ?? '');
+  if (!YMD.test(start)) throw new ApiError(400, 'invalid-argument', '"start_date" must be YYYY-MM-DD.');
+  if (!YMD.test(end)) throw new ApiError(400, 'invalid-argument', '"end_date" must be YYYY-MM-DD.');
+  if (end < start) throw new ApiError(400, 'invalid-argument', '"end_date" is before "start_date".');
+  if (start > toYmd(new Date())) throw new ApiError(400, 'invalid-argument', 'A stay cannot start in the future. Plan it as a journey instead.');
+  out.start_date = start;
+  out.end_date = end;
+  out.days = countDays(fromYmd(start), fromYmd(end));
+  return out;
+}
+
 // ── Routing ──
 
 function send(res: Response, status: number, body: unknown) {
@@ -299,7 +382,8 @@ async function handle(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const uid = await authenticate(req);
+  const caller = await authenticate(req);
+  const { uid } = caller;
   const [, v1, resource, id] = path.split('/');
   if (v1 !== 'v1') throw new ApiError(404, 'not-found', 'Unknown route.');
 
@@ -323,11 +407,53 @@ async function handle(req: Request, res: Response): Promise<void> {
     );
     send(res, 200, {
       trips: trips.map((t) => ({
+        id: t.sync_id,
         city: t.city, country: t.country, country_code: t.country_code,
         start_date: t.start_date, end_date: t.end_date, days: t.days,
       })),
     });
     return;
+  }
+
+  if (resource === 'trips') {
+    const col = tripsCol(uid);
+    if (req.method === 'POST' && !id) {
+      requireTimelineWrite(caller);
+      const docId = randomUUID();
+      await col.doc(docId).set({
+        ...buildStay(req.body ?? {}, null),
+        local_id: null,
+        updated_at: Timestamp.now(),
+        deleted: false,
+        created_by: 'agent',
+      });
+      send(res, 201, publicTrip(docId, (await col.doc(docId).get()).data()!));
+      return;
+    }
+    if (req.method === 'GET' && id) {
+      const snap = await col.doc(id).get();
+      if (!snap.exists || snap.get('deleted') === true) throw new ApiError(404, 'not-found', 'No such stay.');
+      send(res, 200, publicTrip(id, snap.data()!));
+      return;
+    }
+    if ((req.method === 'PATCH' || req.method === 'PUT') && id) {
+      requireTimelineWrite(caller);
+      const ref = col.doc(id);
+      const snap = await ref.get();
+      if (!snap.exists || snap.get('deleted') === true) throw new ApiError(404, 'not-found', 'No such stay.');
+      await ref.update({ ...buildStay(req.body ?? {}, snap.data()!), updated_at: Timestamp.now() });
+      send(res, 200, publicTrip(id, (await ref.get()).data()!));
+      return;
+    }
+    if (req.method === 'DELETE' && id) {
+      requireTimelineWrite(caller);
+      const ref = col.doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) throw new ApiError(404, 'not-found', 'No such stay.');
+      await ref.update({ deleted: true, updated_at: Timestamp.now() });
+      send(res, 200, { ok: true });
+      return;
+    }
   }
 
   if (req.method === 'GET' && resource === 'stats' && !id) {
@@ -441,6 +567,18 @@ function openapi() {
       notes: { type: 'string' },
     },
   };
+  const idParam = { name: 'id', in: 'path', required: true, schema: { type: 'string' } };
+  const stay = {
+    type: 'object',
+    required: ['city', 'country', 'start_date', 'end_date'],
+    properties: {
+      city: { type: 'string' },
+      country: { type: 'string', description: 'Country name; or give country_code' },
+      country_code: { type: 'string', description: 'ISO 3166-1 alpha-2' },
+      start_date: { type: 'string', format: 'date', description: 'Not in the future; future travel is a journey' },
+      end_date: { type: 'string', format: 'date' },
+    },
+  };
   return {
     openapi: '3.1.0',
     info: {
@@ -460,6 +598,21 @@ function openapi() {
             { name: 'to', in: 'query', schema: { type: 'string', format: 'date' }, description: 'Only stays starting on or before this day' },
           ],
         },
+        post: {
+          ...auth,
+          summary: 'Add a past stay the tracker missed. Needs a key that may edit the timeline (403 otherwise).',
+          requestBody: { required: true, content: { 'application/json': { schema: stay } } },
+        },
+      },
+      '/v1/trips/{id}': {
+        get: { ...auth, summary: 'One tracked stay', parameters: [idParam] },
+        patch: {
+          ...auth,
+          summary: 'Correct a stay: its dates or its place. Needs a key that may edit the timeline.',
+          parameters: [idParam],
+          requestBody: { content: { 'application/json': { schema: { ...stay, required: [] } } } },
+        },
+        delete: { ...auth, summary: 'Remove a stay that never happened. Needs a key that may edit the timeline.', parameters: [idParam] },
       },
       '/v1/stats': {
         get: {

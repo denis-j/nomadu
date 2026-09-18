@@ -27,6 +27,14 @@ export default function SettingsStack() {
         }}
       />
       <Stack.Screen
+        name="agent-connect"
+        options={{
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.72, 1.0],
+        }}
+      />
+      <Stack.Screen
         name="debug"
         options={{
           title: 'Debug',
