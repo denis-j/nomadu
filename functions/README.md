@@ -46,7 +46,19 @@ The phone is the source of truth for its own edits, the cloud is the meeting poi
 
 ## Cloud Functions
 
-All callables require a signed-in Firebase user and are called from the app through `httpsCallable`. Errors use the standard `HttpsError` codes (`unauthenticated`, `invalid-argument`, `resource-exhausted`, `not-found`, `internal`).
+Seven of the eight functions are Firebase **callables**, one (`agentApi`) is a plain HTTP function. The difference matters for the documentation: the OpenAPI spec below covers `agentApi` only. Callables are not HTTP routes in the ordinary sense; they are invoked through the Firebase SDK, which wraps the request, attaches the signed-in user's ID token and unwraps the `{data}` envelope. Documenting them as REST would describe an interface nobody uses, so they are documented here instead.
+
+All callables require a signed-in Firebase user and are called from the app like this:
+
+```ts
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../lib/firebase';
+
+const fn = httpsCallable<{ city: string; country: string }, { tips: string }>(functions, 'cityTips');
+const { data } = await fn({ city: 'Lisbon', country: 'Portugal' });
+```
+
+`lib/ai.ts` wraps the three AI ones with error mapping, `lib/auth.ts` calls `deleteAccount`, and `app/(tabs)/(settings)/agent-connect.tsx` and `agent.tsx` call the token ones. Errors use the standard `HttpsError` codes (`unauthenticated`, `invalid-argument`, `resource-exhausted`, `not-found`, `internal`).
 
 ### AI (Gemini proxies)
 
