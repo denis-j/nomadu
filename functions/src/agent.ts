@@ -26,13 +26,14 @@ import { chainDates, countDays, fromYmd, toYmd } from '../../lib/days';
 import type { Trip } from '../../lib/database';
 import type { UserVisa } from '../../lib/userVisas';
 import { findCityCoords, getCountryCode, getCountryName } from '../../utils/geography';
+import { TRANSPORTS, docsHtml, openapi } from './openapi';
 
 const REGION = 'us-central1';
 const TOKENS = 'agent_tokens';
 const TOKEN_PREFIX = 'nmd_';
 const MAX_TOKENS_PER_USER = 5;
 const MAX_STOPS = 60;
-const TRANSPORTS = new Set(['flight', 'train', 'car', 'bus', 'ferry', 'walk']);
+const TRANSPORT_SET = new Set<string>(TRANSPORTS);
 
 // ─── Tokens (callable, from the app) ──────────────────────────────────────────
 
@@ -266,7 +267,7 @@ function buildLegs(input: unknown, existing: any[] = []) {
     if (!raw || typeof raw.city !== 'string' || !raw.city.trim()) throw new ApiError(400, 'invalid-argument', `stops[${i}].city is required.`);
     const city = raw.city.trim().slice(0, 80);
     const { code, country } = resolveCountry(raw, '', `stops[${i}]: `);
-    const transport = typeof raw.transport === 'string' && TRANSPORTS.has(raw.transport) ? raw.transport : 'flight';
+    const transport = typeof raw.transport === 'string' && TRANSPORT_SET.has(raw.transport) ? raw.transport : 'flight';
     const notes = typeof raw.notes === 'string' ? raw.notes.trim().slice(0, 500) || null : null;
 
     let start = typeof raw.start_date === 'string' && YMD.test(raw.start_date) ? raw.start_date : '';
@@ -379,6 +380,10 @@ async function handle(req: Request, res: Response): Promise<void> {
   const path = req.path.replace(/\/+$/, '') || '/';
   if (req.method === 'GET' && path === '/v1/openapi.json') {
     send(res, 200, openapi());
+    return;
+  }
+  if (req.method === 'GET' && path === '/v1/docs') {
+    res.status(200).set('Content-Type', 'text/html; charset=utf-8').set('Cache-Control', 'public, max-age=300').send(docsHtml());
     return;
   }
 
@@ -548,102 +553,3 @@ export const agentApi = onRequest({ region: REGION, memory: '512MiB', timeoutSec
     send(res, 500, { error: { code: 'internal', message: 'Something went wrong on our side.' } });
   }
 });
-
-// ─── Tool description ─────────────────────────────────────────────────────────
-
-function openapi() {
-  const auth = { security: [{ bearer: [] }] };
-  const stop = {
-    type: 'object',
-    required: ['city', 'country'],
-    properties: {
-      city: { type: 'string' },
-      country: { type: 'string', description: 'Country name; or give country_code' },
-      country_code: { type: 'string', description: 'ISO 3166-1 alpha-2' },
-      start_date: { type: 'string', format: 'date', description: 'Only needed on the first stop; later stops start the day after the previous one ends' },
-      end_date: { type: 'string', format: 'date' },
-      days: { type: 'integer', minimum: 1, description: 'Length of the stay; alternative to end_date' },
-      transport: { type: 'string', enum: [...TRANSPORTS], description: 'How you get there' },
-      notes: { type: 'string' },
-    },
-  };
-  const idParam = { name: 'id', in: 'path', required: true, schema: { type: 'string' } };
-  const stay = {
-    type: 'object',
-    required: ['city', 'country', 'start_date', 'end_date'],
-    properties: {
-      city: { type: 'string' },
-      country: { type: 'string', description: 'Country name; or give country_code' },
-      country_code: { type: 'string', description: 'ISO 3166-1 alpha-2' },
-      start_date: { type: 'string', format: 'date', description: 'Not in the future; future travel is a journey' },
-      end_date: { type: 'string', format: 'date' },
-    },
-  };
-  return {
-    openapi: '3.1.0',
-    info: {
-      title: 'Nomadu agent API',
-      version: '1.0.0',
-      description: 'Where the user has been, how their visa and tax days stand, and the trips they are planning. Dates are YYYY-MM-DD calendar days.',
-    },
-    components: { securitySchemes: { bearer: { type: 'http', scheme: 'bearer' } } },
-    paths: {
-      '/v1/me': { get: { ...auth, summary: 'Profile: citizenship, residence, counts' } },
-      '/v1/trips': {
-        get: {
-          ...auth,
-          summary: 'Tracked stays: where the user was and when',
-          parameters: [
-            { name: 'from', in: 'query', schema: { type: 'string', format: 'date' }, description: 'Only stays ending on or after this day' },
-            { name: 'to', in: 'query', schema: { type: 'string', format: 'date' }, description: 'Only stays starting on or before this day' },
-          ],
-        },
-        post: {
-          ...auth,
-          summary: 'Add a past stay the tracker missed. Needs a key that may edit the timeline (403 otherwise).',
-          requestBody: { required: true, content: { 'application/json': { schema: stay } } },
-        },
-      },
-      '/v1/trips/{id}': {
-        get: { ...auth, summary: 'One tracked stay', parameters: [idParam] },
-        patch: {
-          ...auth,
-          summary: 'Correct a stay: its dates or its place. Needs a key that may edit the timeline.',
-          parameters: [idParam],
-          requestBody: { content: { 'application/json': { schema: { ...stay, required: [] } } } },
-        },
-        delete: { ...auth, summary: 'Remove a stay that never happened. Needs a key that may edit the timeline.', parameters: [idParam] },
-      },
-      '/v1/stats': {
-        get: {
-          ...auth,
-          summary: 'Days away from home, countries, cities, stops; for a year or all time',
-          parameters: [{ name: 'year', in: 'query', schema: { type: 'integer' } }],
-        },
-      },
-      '/v1/visa': { get: { ...auth, summary: 'Visa allowance per destination: days allowed, used and remaining, and a status' } },
-      '/v1/tax': { get: { ...auth, summary: 'Tax residency exposure per country for the current year' } },
-      '/v1/journeys': {
-        get: { ...auth, summary: 'Planned trips with their stops' },
-        post: {
-          ...auth,
-          summary: 'Create a planned trip. Stops chain: each starts the day after the previous one ends.',
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: { type: 'object', required: ['title', 'stops'], properties: { title: { type: 'string' }, stops: { type: 'array', items: stop } } } } },
-          },
-        },
-      },
-      '/v1/journeys/{id}': {
-        get: { ...auth, summary: 'One planned trip', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }] },
-        patch: {
-          ...auth,
-          summary: 'Rename a trip or replace its stops',
-          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-          requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { title: { type: 'string' }, stops: { type: 'array', items: stop } } } } } },
-        },
-        delete: { ...auth, summary: 'Delete a planned trip', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }] },
-      },
-    },
-  };
-}

@@ -37,9 +37,14 @@ export const deleteAccount = onCall(
       // Removes users/{uid} together with its trips and visas subcollections.
       await db.recursiveDelete(db.doc(`users/${uid}`));
 
-      // Usage counters live outside the user document.
-      const usage = await db.collection('ai_usage').where('uid', '==', uid).get();
-      await Promise.all(usage.docs.map((d) => d.ref.delete()));
+      // Usage counters and agent tokens live outside the user document. The
+      // tokens matter most: one left behind would keep authenticating an
+      // agent against a uid that no longer has an owner.
+      const [usage, tokens] = await Promise.all([
+        db.collection('ai_usage').where('uid', '==', uid).get(),
+        db.collection('agent_tokens').where('uid', '==', uid).get(),
+      ]);
+      await Promise.all([...usage.docs, ...tokens.docs].map((d) => d.ref.delete()));
     } catch (err) {
       logger.error('Account deletion failed while removing Firestore data', {
         uid,
