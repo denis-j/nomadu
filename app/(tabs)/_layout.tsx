@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
+import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNotificationCheck } from '../../hooks/useNotificationCheck';
 import { requestNotificationPermissions } from '../../lib/notifications';
 import { useExperimentals } from '../../hooks/useExperimentals';
+import { consumePendingInvite } from '../../lib/sharing';
 
 const { Trigger } = NativeTabs;
 
@@ -12,6 +14,15 @@ const NOTIF_ASKED_KEY = 'notif_permission_asked';
 export default function TabLayout() {
   useNotificationCheck();
   const experimentalsEnabled = useExperimentals();
+  const router = useRouter();
+
+  // An invite link opened while signed out was parked; now that the tabs
+  // are up, the user is signed in, so bring the invite back.
+  useEffect(() => {
+    consumePendingInvite().then((code) => {
+      if (code) router.push(`/join/${code}` as any);
+    });
+  }, [router]);
 
   useEffect(() => {
     const askOnce = async () => {

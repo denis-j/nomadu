@@ -26,6 +26,15 @@ import { chainDates, countDays, fromYmd, toYmd } from '../../lib/days';
 import type { Trip } from '../../lib/database';
 import type { UserVisa } from '../../lib/userVisas';
 import { findCityCoords, getCountryCode, getCountryName } from '../../utils/geography';
+import {
+  accommodationSummaries,
+  handleAccommodationRoute,
+  listAccommodations,
+  tombstonePlansForJourney,
+  tombstonePlansForStops,
+  type AccommodationSummary,
+} from './accommodation';
+import { ApiError, send, type Caller } from './api';
 import { TRANSPORTS, docsHtml, openapi } from './openapi';
 
 const REGION = 'us-central1';
@@ -106,17 +115,6 @@ export const listAgentTokens = onCall({ region: REGION }, async (request) => {
 });
 
 // ─── The API (bearer token, from the agent) ───────────────────────────────────
-
-class ApiError extends Error {
-  constructor(public status: number, public code: string, message: string) {
-    super(message);
-  }
-}
-
-interface Caller {
-  uid: string;
-  editTimeline: boolean;
-}
 
 async function authenticate(req: Request): Promise<Caller> {
   const header = req.get('authorization') ?? '';
@@ -202,7 +200,12 @@ function journeysCol(uid: string) {
   return getFirestore().collection(`users/${uid}/journeys`);
 }
 
-function publicJourney(id: string, x: FirebaseFirestore.DocumentData) {
+/**
+ * A journey as the agent sees it. Every stop carries a summary of its
+ * accommodation plan (or null), so one GET /journeys tells the agent which
+ * stops still need a place without a request per stop.
+ */
+function publicJourney(id: string, x: FirebaseFirestore.DocumentData, accommodations: Map<string, AccommodationSummary>) {
   const legs = (Array.isArray(x.legs) ? x.legs : []) as any[];
   return {
     id,
@@ -219,6 +222,7 @@ function publicJourney(id: string, x: FirebaseFirestore.DocumentData) {
       end_date: l.end_date,
       transport: l.transport,
       notes: l.notes ?? null,
+      accommodation: accommodations.get(l.sync_id) ?? null,
     })),
     travellers: (Array.isArray(x.travellers) ? x.travellers : []).map((t: any) => t.name),
   };
@@ -263,6 +267,10 @@ function buildLegs(input: unknown, existing: any[] = []) {
   if (input.length > MAX_STOPS) throw new ApiError(400, 'invalid-argument', `At most ${MAX_STOPS} stops.`);
 
   let cursor = '';
+  // Each existing stop can lend its id to one new stop only: two stops in
+  // the same city used to both get the first one's id, which the phone's
+  // unique index then dropped.
+  const unmatched = [...existing];
   const draft = input.map((raw: StopInput, i) => {
     if (!raw || typeof raw.city !== 'string' || !raw.city.trim()) throw new ApiError(400, 'invalid-argument', `stops[${i}].city is required.`);
     const city = raw.city.trim().slice(0, 80);
@@ -286,9 +294,13 @@ function buildLegs(input: unknown, existing: any[] = []) {
     cursor = toYmd(next);
 
     // Keep the id of a stop the agent is editing in place, so the phone
-    // updates it rather than replacing it.
-    const prior = existing.find((l) => l.city === city && l.country_code === code);
+    // updates it rather than replacing it, and so its accommodation plan
+    // (keyed by that id) stays attached. Matched by the name as given or
+    // as the dataset spells it, so an alias the dataset knows still finds
+    // the stop it was added under.
     const coords = findCityCoords(city, code);
+    const priorIndex = unmatched.findIndex((l) => l.country_code === code && (l.city === city || (coords && l.city === coords.name)));
+    const prior = priorIndex >= 0 ? unmatched.splice(priorIndex, 1)[0] : undefined;
     return {
       sync_id: prior?.sync_id ?? randomUUID(),
       city: coords?.name ?? city,
@@ -367,10 +379,6 @@ function buildStay(raw: StayInput, existing: FirebaseFirestore.DocumentData | nu
 
 // ── Routing ──
 
-function send(res: Response, status: number, body: unknown) {
-  res.status(status).set('Cache-Control', 'no-store').json(body);
-}
-
 function query(req: Request, name: string): string | null {
   const v = req.query[name];
   return typeof v === 'string' && v.length > 0 ? v : null;
@@ -389,8 +397,19 @@ async function handle(req: Request, res: Response): Promise<void> {
 
   const caller = await authenticate(req);
   const { uid } = caller;
-  const [, v1, resource, id] = path.split('/');
+  const [, v1, resource, id, ...deeper] = path.split('/');
   if (v1 !== 'v1') throw new ApiError(404, 'not-found', 'Unknown route.');
+
+  // Accommodation plans hang off a stop: /journeys/{id}/stops/{stopId}/accommodation…
+  if (resource === 'journeys' && id && deeper[0] === 'stops' && deeper[1] && deeper[2] === 'accommodation') {
+    await handleAccommodationRoute(caller, req, res, id, deeper[1], deeper.slice(3));
+    return;
+  }
+  if (req.method === 'GET' && resource === 'accommodations' && !id) {
+    await listAccommodations(caller, req, res);
+    return;
+  }
+  if (deeper.length > 0) throw new ApiError(404, 'not-found', 'Unknown route.');
 
   if (req.method === 'GET' && resource === 'me' && !id) {
     const [profile, trips, journeys] = await Promise.all([loadProfile(uid), loadTrips(uid), journeysCol(uid).get()]);
@@ -487,14 +506,14 @@ async function handle(req: Request, res: Response): Promise<void> {
   if (resource === 'journeys') {
     const col = journeysCol(uid);
     if (req.method === 'GET' && !id) {
-      const snap = await col.get();
-      send(res, 200, { journeys: snap.docs.filter((d) => d.get('deleted') !== true).map((d) => publicJourney(d.id, d.data())) });
+      const [snap, plans] = await Promise.all([col.get(), accommodationSummaries(uid)]);
+      send(res, 200, { journeys: snap.docs.filter((d) => d.get('deleted') !== true).map((d) => publicJourney(d.id, d.data(), plans)) });
       return;
     }
     if (req.method === 'GET' && id) {
-      const snap = await col.doc(id).get();
+      const [snap, plans] = await Promise.all([col.doc(id).get(), accommodationSummaries(uid)]);
       if (!snap.exists || snap.get('deleted') === true) throw new ApiError(404, 'not-found', 'No such journey.');
-      send(res, 200, publicJourney(snap.id, snap.data()!));
+      send(res, 200, publicJourney(snap.id, snap.data()!, plans));
       return;
     }
     if (req.method === 'POST' && !id) {
@@ -513,7 +532,7 @@ async function handle(req: Request, res: Response): Promise<void> {
         created_by: 'agent',
       });
       const snap = await col.doc(docId).get();
-      send(res, 201, publicJourney(docId, snap.data()!));
+      send(res, 201, publicJourney(docId, snap.data()!, new Map()));
       return;
     }
     if ((req.method === 'PATCH' || req.method === 'PUT') && id) {
@@ -523,9 +542,17 @@ async function handle(req: Request, res: Response): Promise<void> {
       const body = req.body ?? {};
       const patch: Record<string, unknown> = { updated_at: Timestamp.now() };
       if (typeof body.title === 'string' && body.title.trim()) patch.title = body.title.trim().slice(0, 80);
-      if (body.stops !== undefined) patch.legs = buildLegs(body.stops, snap.get('legs') ?? []);
+      const before = (snap.get('legs') ?? []) as any[];
+      if (body.stops !== undefined) patch.legs = buildLegs(body.stops, before);
       await ref.update(patch);
-      send(res, 200, publicJourney(id, (await ref.get()).data()!));
+      // Plans are keyed by stop id and live in their own collection, so a
+      // stop that kept its id (same city and country) keeps its plan and a
+      // stop that was dropped takes its plan with it.
+      if (body.stops !== undefined) {
+        const kept = new Set((patch.legs as any[]).map((l) => l.sync_id));
+        await tombstonePlansForStops(uid, before.map((l) => l.sync_id).filter((x) => x && !kept.has(x)));
+      }
+      send(res, 200, publicJourney(id, (await ref.get()).data()!, await accommodationSummaries(uid)));
       return;
     }
     if (req.method === 'DELETE' && id) {
@@ -533,6 +560,7 @@ async function handle(req: Request, res: Response): Promise<void> {
       const snap = await ref.get();
       if (!snap.exists) throw new ApiError(404, 'not-found', 'No such journey.');
       await ref.update({ deleted: true, updated_at: Timestamp.now() });
+      await tombstonePlansForJourney(uid, id);
       send(res, 200, { ok: true });
       return;
     }
@@ -541,7 +569,11 @@ async function handle(req: Request, res: Response): Promise<void> {
   throw new ApiError(404, 'not-found', 'Unknown route.');
 }
 
-export const agentApi = onRequest({ region: REGION, memory: '512MiB', timeoutSeconds: 60 }, async (req, res) => {
+/**
+ * One request, answered. Exported so the tests can drive the API with a
+ * fake request and response, outside the Functions runtime.
+ */
+export async function serve(req: Request, res: Response): Promise<void> {
   try {
     await handle(req, res);
   } catch (err) {
@@ -552,4 +584,6 @@ export const agentApi = onRequest({ region: REGION, memory: '512MiB', timeoutSec
     logger.error('agent api failed', { path: req.path, err: String(err) });
     send(res, 500, { error: { code: 'internal', message: 'Something went wrong on our side.' } });
   }
-});
+}
+
+export const agentApi = onRequest({ region: REGION, memory: '512MiB', timeoutSeconds: 60 }, serve);

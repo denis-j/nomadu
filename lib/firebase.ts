@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getReactNativePersistence, initializeAuth } from 'firebase/auth';
 import { initializeFirestore } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
+import { getStorage } from 'firebase/storage';
 import { secureAuthStorage } from './secureAuthStorage';
 
 
@@ -27,3 +28,7 @@ export const db = initializeFirestore(app, {
 
 // Region must match `options.region` in functions/src/index.ts.
 export const functions = getFunctions(app, 'us-central1');
+
+// Only for the documents of shared trips (lib/documentSync.ts); everything
+// else the app stores is small enough for Firestore.
+export const storage = getStorage(app);

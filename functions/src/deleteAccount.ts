@@ -22,6 +22,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
+import { forgetUser } from './share';
 
 export const deleteAccount = onCall(
   { region: 'us-central1', memory: '256MiB', timeoutSeconds: 300 },
@@ -34,7 +35,8 @@ export const deleteAccount = onCall(
     const db = getFirestore();
 
     try {
-      // Removes users/{uid} together with its trips and visas subcollections.
+      // Removes users/{uid} together with its trips, visas, journeys and
+      // accommodations subcollections.
       await db.recursiveDelete(db.doc(`users/${uid}`));
 
       // Usage counters and agent tokens live outside the user document. The
@@ -45,6 +47,10 @@ export const deleteAccount = onCall(
         db.collection('agent_tokens').where('uid', '==', uid).get(),
       ]);
       await Promise.all([...usage.docs, ...tokens.docs].map((d) => d.ref.delete()));
+
+      // Trips they shared stop being shared; trips they came along on go
+      // on without them.
+      await forgetUser(uid);
     } catch (err) {
       logger.error('Account deletion failed while removing Firestore data', {
         uid,

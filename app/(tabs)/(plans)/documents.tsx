@@ -16,6 +16,7 @@ import {
   JourneyDocument,
   JourneyTraveller,
   renameJourneyTraveller,
+  travellerLabel,
 } from '../../../lib/database';
 import { DocumentKind, documentUri, isImageMime, isPdfMime, kindMeta } from '../../../lib/documents';
 import { parseDate } from '../../../lib/database';
@@ -43,11 +44,15 @@ export default function DocumentsScreen() {
   const nav = useNavigation();
   const params = useLocalSearchParams<{ journeyId: string; travellerId?: string }>();
   const journeyId = Number(params.journeyId);
-  const { travellers, documents, loaded, refresh } = useJourneyDocuments(journeyId, { ensureSelf: true });
+  const { travellers, documents, owner, uid, loaded, refresh } = useJourneyDocuments(journeyId, { ensureSelf: true });
   const [filter, setFilter] = useState<Filter>(params.travellerId ? Number(params.travellerId) : 'all');
 
-  // The first traveller is the user; ensureSelf creates it at sort order 0.
-  const self = travellers[0];
+  // On one's own trip the first traveller is the user (ensureSelf creates it
+  // at sort order 0); on a friend's trip it is whoever carries our account.
+  const self = owner ? travellers.find((t) => t.uid === uid) : travellers[0];
+  const label = (t: JourneyTraveller) => travellerLabel(t, uid, owner);
+  // On a friend's trip the wallet has two tabs: mine, and everyone's.
+  const shown = owner ? travellers.filter((t) => t.uid === uid) : travellers;
   const current = filter === 'all' ? null : travellers.find((t) => t.id === filter) ?? null;
   useEffect(() => {
     if (filter !== 'all' && loaded && !current) setFilter('all');
@@ -126,8 +131,10 @@ export default function DocumentsScreen() {
   };
 
   // Long press on a pill, like on a trip card. "You" can be renamed to your
-  // actual name but never removed: it is your trip.
+  // actual name but never removed: it is your trip. On a friend's trip the
+  // list is theirs and stays as it is.
   const travellerMenu = (t: JourneyTraveller) => {
+    if (owner) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const removable = t.id !== self?.id;
     ActionSheetIOS.showActionSheetWithOptions(
@@ -157,9 +164,9 @@ export default function DocumentsScreen() {
     const docs = documents.filter((d) => d.traveller_id === current.id || isShared(d));
     if (docs.length) groups.push({ key: `t${current.id}`, title: null, docs });
   } else {
-    for (const t of travellers) {
+    for (const t of shown) {
       const docs = documents.filter((d) => d.traveller_id === t.id);
-      if (docs.length) groups.push({ key: `t${t.id}`, title: t.name, docs });
+      if (docs.length) groups.push({ key: `t${t.id}`, title: label(t), docs });
     }
     const shared = documents.filter(isShared);
     if (shared.length) groups.push({ key: 'shared', title: 'Everyone', docs: shared });
@@ -173,14 +180,14 @@ export default function DocumentsScreen() {
         <PillRow
           options={[
             { key: 'all', label: 'All', active: filter === 'all', onPress: () => setFilter('all') },
-            ...travellers.map((t) => ({
+            ...shown.map((t) => ({
               key: `t${t.id}`,
-              label: t.name,
+              label: label(t),
               active: filter === t.id,
               onPress: () => setFilter(t.id),
               onLongPress: () => travellerMenu(t),
             })),
-            { key: 'add', label: 'Add', icon: 'person-add-outline', onPress: addTraveller },
+            ...(owner ? [] : [{ key: 'add', label: 'Add', icon: 'person-add-outline' as const, onPress: addTraveller }]),
           ]}
         />
 

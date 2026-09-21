@@ -14,7 +14,11 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { deleteJourneyLeg, parseDate, type TransportType } from '../../../lib/database';
 import { Flag } from '../../../components/Flag';
+import { StatusBadge, planChipText } from '../../../components/accommodationForm';
 import { Colors } from '../../../constants/colors';
+import { useAccommodation } from '../../../hooks/useAccommodations';
+import { setPendingStay } from '../../../lib/accommodationBridge';
+import { formatMoney, nightsBetween, primaryOption } from '../../../lib/accommodationModel';
 import { getCityTips } from '../../../lib/ai';
 import { showToast } from '../../../lib/toast';
 
@@ -30,6 +34,11 @@ type Params = {
   notes?: string;
   /** '1' when the start is fixed by the previous stop and only the length is chosen. */
   lockStart?: string;
+  /** Sync ids: what the accommodation plan is keyed by. */
+  stopSyncId?: string;
+  journeySyncId?: string;
+  /** '1' on a friend's trip: look, do not touch. */
+  readOnly?: string;
 };
 
 const TRANSPORT_LABELS: Record<string, { icon: string; label: string }> = {
@@ -113,6 +122,18 @@ const mdStyles = StyleSheet.create({
   num: { fontSize: 14, lineHeight: 20, color: PlatformColor('tertiaryLabel'), fontVariant: ['tabular-nums'], width: 18 },
 });
 
+/** The second line of the stay card: nights, the pick, what it costs. */
+function staySummary(plan: NonNullable<ReturnType<typeof useAccommodation>['plan']>): string {
+  const nights = nightsBetween(plan.check_in, plan.check_out);
+  const parts = [`${nights} ${nights === 1 ? 'night' : 'nights'}`];
+  const primary = primaryOption(plan);
+  const price = plan.booking ? formatMoney(plan.booking.price, plan.booking.currency) : primary ? formatMoney(primary.total_price, primary.currency) : null;
+  if (price) parts.push(price);
+  else if (plan.requirements.budget_per_night && plan.requirements.currency) parts.push(`up to ${formatMoney(plan.requirements.budget_per_night, plan.requirements.currency)}/night`);
+  if (!primary && plan.options.length) parts.push(`${plan.options.length} to compare`);
+  return parts.join(' · ');
+}
+
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function StopInfoScreen() {
@@ -128,6 +149,8 @@ export default function StopInfoScreen() {
 
   const [tips, setTips] = useState<string | null>(null);
   const [tipsLoading, setTipsLoading] = useState(false);
+  const { plan: stay } = useAccommodation(params.stopSyncId);
+  const readOnly = params.readOnly === '1';
 
   useEffect(() => {
     if (!city || !country) return;
@@ -157,6 +180,24 @@ export default function StopInfoScreen() {
         ...(params.lockStart && { lockStart: params.lockStart }),
       },
     });
+  };
+
+  const openAccommodation = () => {
+    if (!params.stopSyncId || !params.journeySyncId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Not a replace: the journey screen pushes the page once this sheet is
+    // gone (see accommodationBridge for why).
+    setPendingStay({
+      stopSyncId: params.stopSyncId,
+      journeySyncId: params.journeySyncId,
+      city,
+      country,
+      countryCode,
+      start: params.start,
+      end: params.end,
+      readOnly,
+    });
+    nav.goBack();
   };
 
   const handleDelete = () => {
@@ -215,6 +256,35 @@ export default function StopInfoScreen() {
           </View>
         </View>
 
+        {/* Where to stay. On a friend's trip only once they planned something. */}
+        {params.stopSyncId && params.journeySyncId && (!readOnly || stay) ? (
+          <>
+            <Text style={styles.sectionTitle}>Where to stay</Text>
+            <Pressable onPress={openAccommodation} style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }]}>
+              <View style={styles.stayRow}>
+                <View style={styles.stayIcon}>
+                  <Ionicons name="bed-outline" size={20} color={PlatformColor('label') as any} />
+                </View>
+                <View style={styles.stayText}>
+                  {stay ? (
+                    <>
+                      <Text style={styles.stayTitle} numberOfLines={1}>{planChipText(stay)}</Text>
+                      <Text style={styles.staySub} numberOfLines={1}>{staySummary(stay)}</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.stayTitle}>Plan a place to stay</Text>
+                      <Text style={styles.staySub}>Requirements, options, the booking</Text>
+                    </>
+                  )}
+                </View>
+                {stay ? <StatusBadge status={stay.status} size="small" /> : null}
+                <Ionicons name="chevron-forward" size={16} color={PlatformColor('tertiaryLabel') as any} />
+              </View>
+            </Pressable>
+          </>
+        ) : null}
+
         {/* Notes */}
         {params.notes ? (
           <>
@@ -226,6 +296,7 @@ export default function StopInfoScreen() {
         ) : null}
 
         {/* Actions: above the tips, which can run long */}
+        {!readOnly && (
         <View style={styles.actions}>
           <Pressable style={styles.editButton} onPress={handleEdit}>
             <Ionicons name="pencil" size={16} color={PlatformColor('label') as any} />
@@ -236,6 +307,7 @@ export default function StopInfoScreen() {
             <Text style={styles.deleteButtonText}>Delete</Text>
           </Pressable>
         </View>
+        )}
 
         {/* Tips */}
         <Text style={styles.sectionTitle}>Tips for {city}</Text>
@@ -336,6 +408,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  stayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  stayIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    borderCurve: 'continuous',
+    backgroundColor: PlatformColor('systemGray5'),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stayText: { flex: 1, gap: 2 },
+  stayTitle: { fontSize: 16, fontWeight: '600', color: PlatformColor('label') },
+  staySub: { fontSize: 13, color: PlatformColor('secondaryLabel') },
   notesText: {
     padding: 16,
     fontSize: 15,

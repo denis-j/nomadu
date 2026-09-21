@@ -59,6 +59,10 @@ export function kindMeta(kind: string) {
 }
 
 /** Everything under one folder, so a future "export all" is one directory. */
+export function documentsDirectory(): Directory {
+  return documentsDir();
+}
+
 function documentsDir(): Directory {
   const dir = new Directory(Paths.document, 'documents');
   dir.create({ idempotent: true, intermediates: true });

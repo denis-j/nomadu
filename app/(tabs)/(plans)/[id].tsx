@@ -1,5 +1,6 @@
 import React, { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Animated, {
+  Easing, interpolate,
   useSharedValue, useAnimatedStyle,
   withTiming, withSpring,
   FadeIn, FadeOut,
@@ -17,16 +18,23 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useHeaderHeight } from '@react-navigation/elements';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import RNMapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Haptics from 'expo-haptics';
 import { useJourney } from '../../../hooks/useJourney';
 import { useJourneyDocuments } from '../../../hooks/useJourneyDocuments';
+import { useJourneyAccommodations } from '../../../hooks/useAccommodations';
+import { consumePendingStay } from '../../../lib/accommodationBridge';
+import { planChipText, statusColor } from '../../../components/accommodationForm';
+import type { LocalAccommodation } from '../../../lib/accommodations';
 import { DocumentsEntryCard } from '../../../components/JourneyDocuments';
+import { AvatarStack, avatarPeople, type AvatarPerson } from '../../../components/TravellerAvatars';
+import { TravellersContent } from '../../../components/TravellersContent';
 import { useAuth } from '../../../hooks/useAuth';
 import { EmptyState } from '../../../components/EmptyState';
 import { CloudyButton } from '../../../components/CloudyButton';
@@ -36,10 +44,12 @@ import {
   JourneyLeg, TransportType,
   parseDate,
   getAllTripsRaw,
+  getJourneyWithLegs,
   reorderJourneyLegs,
   updateJourneyTitle,
 } from '../../../lib/database';
 import { deleteJourneyWithDocuments } from '../../../lib/documents';
+import { inviteFriends, leaveTrip, stopSharing } from '../../../lib/shareActions';
 import { getCitizenship, getHasFixedResidence } from '../../../lib/onboarding';
 import { calculateAllVisaStatuses, VisaStatus } from '../../../lib/visaCalculations';
 import { getAllUserVisas } from '../../../lib/userVisas';
@@ -238,12 +248,26 @@ function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; h
     const t = setTimeout(async () => {
       try {
         const b = await map.getMapBoundaries();
+        // A view across the date line (Tokyo and New York on one trip) has
+        // its east edge west of its west edge; the raw difference is then
+        // negative and MapKit throws a native exception on it, which takes
+        // the whole app down. Measure the span the long way round instead.
+        let longitudeDelta = b.northEast.longitude - b.southWest.longitude;
+        let longitude = (b.northEast.longitude + b.southWest.longitude) / 2;
+        if (longitudeDelta < 0) {
+          longitudeDelta += 360;
+          longitude = b.southWest.longitude + longitudeDelta / 2;
+          if (longitude > 180) longitude -= 360;
+        }
         const region = {
           latitude: (b.northEast.latitude + b.southWest.latitude) / 2,
-          longitude: (b.northEast.longitude + b.southWest.longitude) / 2,
+          longitude,
           latitudeDelta: b.northEast.latitude - b.southWest.latitude,
-          longitudeDelta: b.northEast.longitude - b.southWest.longitude,
+          longitudeDelta,
         };
+        if (!(region.latitudeDelta > 0) || !(region.longitudeDelta > 0) || region.longitudeDelta > 360) {
+          throw new Error(`unusable map region ${JSON.stringify(region)}`);
+        }
         const path = await map.takeSnapshot({ region, format: 'png', quality: 1, result: 'file' });
         setSnapshot(storeMapSnapshot(cacheKey, path));
       } catch (err) {
@@ -311,41 +335,135 @@ function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; h
 }
 
 const ChipShell = hasGlass ? GlassView : View;
-const chipShellProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
+const chipGlassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
+/** The bar's height; the discs and the chip are as tall as this. */
+const BAR_H = 44;
+const MORPH_OPEN = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
+const MORPH_CLOSE = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
+
+/** A 44pt glass disc with one symbol: the back and add buttons of the bar. */
+function GlassDisc({ icon, size, onPress, label }: { icon: keyof typeof Ionicons.glyphMap; size: number; onPress: () => void; label: string }) {
+  return (
+    <Pressable onPress={onPress} hitSlop={6} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => pressed && { opacity: 0.7 }}>
+      <ChipShell {...chipGlassProps} {...(hasGlass ? { isInteractive: true } : {})} style={[styles.disc, !hasGlass && styles.titleChipFallback]}>
+        <Ionicons name={icon} size={size} color={Colors.text} />
+      </ChipShell>
+    </Pressable>
+  );
+}
 
 /**
- * The header title as the Map tab's glass chip: name on top, dates and length
- * underneath. Same height as the glass back and add buttons beside it.
+ * The header title as the Map tab's glass chip, and like the Map tab's chip
+ * it morphs: a tap and the capsule widens and grows downward into the
+ * travellers panel, the title row staying where it is at the top, the
+ * faces and the invite fading in underneath. Same 400ms curve as the map.
+ *
+ * Lives in the screen rather than the native header, because a header title
+ * cannot grow past the bar; the bar's back and add buttons are drawn here
+ * too, as glass discs, so the row reads as one header.
  *
  * Fixed height and a minimum width from the first frame, and no text until
  * the journey is loaded: the capsule must not grow from a one-line "Trip" to
  * two lines a moment later, that moved the whole header centre.
  */
-function TripTitleChip({
+function TripMorphChip({
+  journeyId,
   title,
   legs,
   ready,
+  owner,
+  people,
+  open,
+  onToggle,
   onLongPress,
+  onChanged,
+  maxWidth,
 }: {
+  journeyId: number;
   title: string;
   legs: JourneyLeg[];
   ready: boolean;
+  /** Whose trip this is, when it is a friend's. */
+  owner: string | null;
+  people: AvatarPerson[];
+  open: boolean;
+  onToggle: () => void;
   onLongPress: () => void;
+  onChanged: () => void;
+  /** Room between the two discs when closed; the screen's width minus 32 when open. */
+  maxWidth: { closed: number; open: number };
 }) {
   const span = tripSpan(legs);
+  const [chipWidth, setChipWidth] = useState(0);
+  const [panelHeight, setPanelHeight] = useState(0);
+  const progress = useSharedValue(0);
+  const [mounted, setMounted] = useState(false);
+
+  // The faces sit on the right edge; the text gets the same room on both
+  // sides, so it is centred in the capsule and not in what the faces leave.
+  const faces = Math.min(people.length, 3) + (people.length > 3 ? 1 : 0);
+  const facesWidth = faces > 0 ? 24 + (faces - 1) * 24 * 0.7 : 0;
+  const sidePad = 16 + (facesWidth > 0 ? facesWidth + 6 : 0);
+
+  useEffect(() => {
+    if (open) setMounted(true);
+    progress.value = withTiming(open ? 1 : 0, open ? MORPH_OPEN : MORPH_CLOSE);
+  }, [open, progress]);
+
+  const containerStyle = useAnimatedStyle(() => ({
+    width: chipWidth > 0 ? interpolate(progress.value, [0, 1], [chipWidth, maxWidth.open]) : undefined,
+    height: panelHeight > 0 ? interpolate(progress.value, [0, 1], [BAR_H, BAR_H + panelHeight]) : BAR_H,
+    borderRadius: interpolate(progress.value, [0, 1], [BAR_H / 2, 26]),
+  }));
+  const panelStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0.4, 1], [0, 1]),
+  }));
+  // The small faces hand over to the big ones below as the chip opens.
+  const miniFacesStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.3], [1, 0]),
+  }));
+
   return (
-    <Pressable onLongPress={onLongPress} delayLongPress={350} accessibilityRole="header">
-    <ChipShell {...chipShellProps} style={[styles.titleChip, !hasGlass && styles.titleChipFallback]}>
-      {ready && (
-        <>
-          <Text style={styles.titleChipTitle} numberOfLines={1}>{title}</Text>
-          <Text style={styles.titleChipSub} numberOfLines={1}>
-            {span ? span.status : 'No stops yet'}
-          </Text>
-        </>
+    <Animated.View
+      style={[styles.morph, !hasGlass && styles.titleChipFallback, containerStyle]}
+      onLayout={(e) => {
+        // The capsule's natural width, measured once with the text in it.
+        if (ready && chipWidth === 0) setChipWidth(Math.min(e.nativeEvent.layout.width, maxWidth.closed));
+      }}
+    >
+      {hasGlass && <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />}
+      <Pressable
+        onPress={onToggle}
+        onLongPress={onLongPress}
+        delayLongPress={350}
+        accessibilityRole="header"
+        accessibilityState={{ expanded: open }}
+        style={[styles.titleChip, { paddingHorizontal: sidePad }]}
+      >
+        {ready && (
+          <>
+            <View style={styles.titleChipText}>
+              <Text style={styles.titleChipTitle} numberOfLines={1}>{title}</Text>
+              <Text style={styles.titleChipSub} numberOfLines={1}>
+                {owner ? `with ${owner}` : span ? span.status : 'No stops yet'}
+              </Text>
+            </View>
+            {people.length > 0 && (
+              <Animated.View style={[styles.titleChipFaces, miniFacesStyle]}>
+                <AvatarStack people={people} size={24} max={3} />
+              </Animated.View>
+            )}
+          </>
+        )}
+      </Pressable>
+      {/* Mounted on the first opening and kept, measured in the flow below the
+          row; the container's animated height reveals it. */}
+      {mounted && (
+        <Animated.View style={[{ width: maxWidth.open }, panelStyle]} onLayout={(e) => setPanelHeight(e.nativeEvent.layout.height)} pointerEvents={open ? 'auto' : 'none'}>
+          <TravellersContent journeyId={journeyId} onChanged={onChanged} onClose={onToggle} />
+        </Animated.View>
       )}
-    </ChipShell>
-    </Pressable>
+    </Animated.View>
   );
 }
 
@@ -392,7 +510,11 @@ type LegCardProps = {
   leg: JourneyLeg;
   /** No earlier stop in the same country: the place to say how much visa is left. */
   firstInCountry: boolean;
+  /** The stop's accommodation plan, when one was started. */
+  stay: LocalAccommodation | null;
   onPress: (leg: JourneyLeg) => void;
+  /** Tap on the stay chip: straight to the accommodation page. */
+  onOpenStay: (leg: JourneyLeg) => void;
   onDrag?: () => void;
   visaStatuses: VisaStatus[];
   taxStatuses: TaxStatus[];
@@ -402,7 +524,9 @@ type LegCardProps = {
 const LegCard = React.memo(function LegCard({
   leg,
   firstInCountry,
+  stay,
   onPress,
+  onOpenStay,
   onDrag,
   visaStatuses,
   taxStatuses,
@@ -441,7 +565,7 @@ const LegCard = React.memo(function LegCard({
   const plannedTaxExceeds = plannedDays >= TAX_THRESHOLD;
 
   // ── Build chips ───────────────────────────────────────────────────────────────
-  interface Chip { label: string; color: string }
+  interface Chip { label: string; color: string; icon?: keyof typeof Ionicons.glyphMap; onPress?: () => void }
   const chips: Chip[] = [];
 
   // A green "180d left" under every Thai stop is noise: say it once per
@@ -466,6 +590,12 @@ const LegCard = React.memo(function LegCard({
   } else if (plannedTaxExceeds && !trackedVisa) {
     // Only show projected tax if not already covered by tracked data
     chips.push({ label: `⚠︎ ${plannedDays}d > ${TAX_THRESHOLD}d tax risk`, color: Colors.error });
+  }
+
+  // Where you sleep, once that is being planned. Grey until there is a
+  // place, black from then on; no third colour.
+  if (stay && stay.needed) {
+    chips.push({ label: planChipText(stay), color: statusColor(stay.status), icon: 'bed-outline', onPress: () => onOpenStay(leg) });
   }
 
   const CardWrap = hasGlass ? GlassView : View;
@@ -518,9 +648,16 @@ const LegCard = React.memo(function LegCard({
               {chips.length > 0 && (
                 <View style={styles.statusChipsRow}>
                   {chips.map((chip, i) => (
-                    <View key={i} style={[styles.statusChip, { backgroundColor: chip.color + '18' }]}>
+                    <Pressable
+                      key={i}
+                      onPress={chip.onPress}
+                      disabled={!chip.onPress}
+                      hitSlop={chip.onPress ? 6 : undefined}
+                      style={({ pressed }) => [styles.statusChip, { backgroundColor: chip.icon ? Colors.surfaceSecondary : chip.color + '14' }, pressed && { opacity: 0.6 }]}
+                    >
+                      {chip.icon && <Ionicons name={chip.icon} size={12} color={chip.color} style={styles.statusChipIcon} />}
                       <Text style={[styles.statusChipText, { color: chip.color }]}>{chip.label}</Text>
-                    </View>
+                    </Pressable>
                   ))}
                 </View>
               )}
@@ -545,7 +682,8 @@ const LegCard = React.memo(function LegCard({
   prev.leg.notes === next.leg.notes &&
   prev.leg.city === next.leg.city &&
   prev.leg.country === next.leg.country &&
-  prev.firstInCountry === next.firstInCountry
+  prev.firstInCountry === next.firstInCountry &&
+  prev.stay?.updated_at === next.stay?.updated_at
 );
 
 // ─── Suggestion Leg Card ──────────────────────────────────────────────────────
@@ -795,11 +933,17 @@ function AISuggestionsSection({
 
 export default function JourneyDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, travellers: openTravellersParam } = useLocalSearchParams<{ id: string; travellers?: string }>();
   const journeyId = Number(id);
   const { journey, loading, refresh, setJourney } = useJourney(journeyId);
-  const headerHeight = useHeaderHeight();
+  // The native header is off for this screen (see _layout.tsx); the bar is
+  // drawn below at the same place, so the map maths keep the same number.
+  const insets = useSafeAreaInsets();
+  const headerHeight = insets.top + BAR_H;
   const docs = useJourneyDocuments(journeyId);
+  // A friend's trip: shown as they planned it, nothing here changes it.
+  const readOnly = !!journey?.shared_owner_uid;
+  const { plans: stays } = useJourneyAccommodations(journey?.sync_id);
 
   // ─── Visa / Tax statuses ─────────────────────────────────────────────────────
 
@@ -960,6 +1104,24 @@ export default function JourneyDetailScreen() {
     });
   }, [router, journeyId, journey?.legs]);
 
+  const openStay = useCallback((leg: JourneyLeg) => {
+    if (!leg.sync_id || !journey?.sync_id) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({
+      pathname: '/(tabs)/(plans)/accommodation',
+      params: {
+        stopSyncId: leg.sync_id,
+        journeySyncId: journey.sync_id,
+        city: leg.city,
+        country: leg.country,
+        countryCode: leg.country_code,
+        start: leg.start_date,
+        end: leg.end_date,
+        ...(readOnly && { readOnly: '1' }),
+      },
+    });
+  }, [router, journey?.sync_id, readOnly]);
+
   const openStopInfo = useCallback((leg: JourneyLeg) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push({
@@ -975,9 +1137,24 @@ export default function JourneyDetailScreen() {
         transport: leg.transport,
         ...(leg.notes && { notes: leg.notes }),
         ...(journey?.legs[0]?.id !== leg.id && { lockStart: '1' }),
+        ...(leg.sync_id && journey?.sync_id && { stopSyncId: leg.sync_id, journeySyncId: journey.sync_id }),
+        ...(readOnly && { readOnly: '1' }),
       },
     });
-  }, [router, journeyId, journey?.legs]);
+  }, [router, journeyId, journey?.legs, journey?.sync_id, readOnly]);
+
+  // The stop sheet closes and leaves the stop behind; the page is pushed
+  // from here, after the sheet's dismissal has run, so it is laid out at
+  // full size (see accommodationBridge).
+  useFocusEffect(
+    useCallback(() => {
+      const stay = consumePendingStay();
+      if (!stay) return;
+      const { readOnly: ro, ...rest } = stay;
+      const t = setTimeout(() => router.push({ pathname: '/(tabs)/(plans)/accommodation', params: { ...rest, ...(ro && { readOnly: '1' }) } }), 350);
+      return () => clearTimeout(t);
+    }, [router]),
+  );
 
   const handleAddSuggestion = useCallback((s: StopSuggestion) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -994,17 +1171,6 @@ export default function JourneyDetailScreen() {
     });
   }, [router, journeyId]);
 
-  // ─── Header ───────────────────────────────────────────────────────────────────
-
-  const headerRight = useCallback(
-    () => (
-      <Pressable onPress={openAddSheet} hitSlop={8}>
-        <Ionicons name="add" size={28} color={Colors.primary} />
-      </Pressable>
-    ),
-    [openAddSheet],
-  );
-
   const legs = journey?.legs ?? [];
 
   const openMap = useCallback(() => {
@@ -1017,17 +1183,35 @@ export default function JourneyDetailScreen() {
   const tripActions = useCallback(() => {
     if (!journey) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (readOnly) {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { title: journey.title, options: ['Leave trip', 'Cancel'], destructiveButtonIndex: 0, cancelButtonIndex: 1 },
+        async (i) => {
+          if (i !== 0) return;
+          await leaveTrip(journey);
+          if (!(await getJourneyWithLegs(journeyId))) router.back();
+        },
+      );
+      return;
+    }
+    const shared = !!journey.share_code;
+    const options = ['Invite friends', ...(shared ? ['Stop sharing'] : []), 'Rename', 'Delete trip', 'Cancel'];
     ActionSheetIOS.showActionSheetWithOptions(
-      { title: journey.title, options: ['Rename', 'Delete trip', 'Cancel'], destructiveButtonIndex: 1, cancelButtonIndex: 2 },
+      { title: journey.title, options, destructiveButtonIndex: options.length - 2, cancelButtonIndex: options.length - 1 },
       (i) => {
+        const rename = shared ? 2 : 1;
         if (i === 0) {
+          inviteFriends(journey).then(refresh);
+        } else if (shared && i === 1) {
+          stopSharing(journey).then(refresh);
+        } else if (i === rename) {
           Alert.prompt('Rename trip', undefined, async (name) => {
             const next = (name ?? '').trim();
             if (!next || next === journey.title) return;
             await updateJourneyTitle(journeyId, next);
             refresh();
           }, 'plain-text', journey.title);
-        } else if (i === 1) {
+        } else if (i === rename + 1) {
           Alert.alert('Delete this trip?', 'Stops and documents go with it.', [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Delete', style: 'destructive', onPress: async () => { await deleteJourneyWithDocuments(journeyId); router.back(); } },
@@ -1035,12 +1219,32 @@ export default function JourneyDetailScreen() {
         }
       },
     );
-  }, [journey, journeyId, refresh, router]);
+  }, [journey, journeyId, readOnly, refresh, router]);
 
-  const headerTitle = useCallback(
-    () => <TripTitleChip title={journey?.title ?? ''} legs={legs} ready={!!journey} onLongPress={tripActions} />,
-    [journey?.title, legs, journey, tripActions],
+  // The travellers panel unfolds from the chip rather than sliding up as a
+  // sheet: the faces are in the chip, so that is where they open.
+  // Like the Map tab's chip: a firm tap opening, a soft one closing.
+  const [travellersOpen, setTravellersOpen] = useState(openTravellersParam === '1');
+  const toggleTravellers = useCallback(() => {
+    setTravellersOpen((v) => {
+      Haptics.impactAsync(v ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium);
+      return !v;
+    });
+  }, []);
+  const closeTravellers = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTravellersOpen(false);
+  }, []);
+  const travellersChanged = useCallback(() => {
+    refresh();
+    docs.refresh();
+  }, [refresh, docs.refresh]);
+
+  const people = useMemo(
+    () => avatarPeople(docs.travellers, docs.uid, journey?.shared_owner_uid ? { shared_owner_uid: journey.shared_owner_uid, shared_owner_name: journey.shared_owner_name } : null),
+    [docs.travellers, docs.uid, journey?.shared_owner_uid, journey?.shared_owner_name],
   );
+
 
   // ─── Timeline line offset ──────────────────────────────────────────────────
   const [timelineTop, setTimelineTop] = useState(0);
@@ -1073,15 +1277,17 @@ export default function JourneyDetailScreen() {
         <LegCard
           leg={item}
           firstInCountry={!legs.slice(0, index).some((l) => l.country_code === item.country_code)}
+          stay={item.sync_id ? stays.get(item.sync_id) ?? null : null}
           onPress={openStopInfo}
-          onDrag={drag}
+          onOpenStay={openStay}
+          onDrag={readOnly ? undefined : drag}
           visaStatuses={visaStatuses}
           taxStatuses={taxStatuses}
           citizenshipCode={citizenshipCode}
         />
       </ScaleDecorator>
     );
-  }, [legs, openStopInfo, visaStatuses, taxStatuses]);
+  }, [legs, stays, openStopInfo, openStay, readOnly, visaStatuses, taxStatuses, citizenshipCode]);
 
   const onHeaderLayout = useCallback((e: any) => {
     setTimelineTop(e.nativeEvent.layout.height);
@@ -1113,7 +1319,7 @@ export default function JourneyDetailScreen() {
 
   const listFooter = useMemo(() => (
     <>
-      {legs.length > 0 && (
+      {legs.length > 0 && !readOnly && (
         <AISuggestionsSection
           suggestions={chainedSuggestions}
           loading={suggestionsLoading}
@@ -1134,35 +1340,32 @@ export default function JourneyDetailScreen() {
         </View>
       )}
     </>
-  ), [legs.length, chainedSuggestions, suggestionsLoading, suggestionsError, suggestionsCollapsed, aiPreference, handleAddSuggestion, loadSuggestions, toggleSuggestions, refineSuggestions]);
+  ), [legs.length, readOnly, chainedSuggestions, suggestionsLoading, suggestionsError, suggestionsCollapsed, aiPreference, handleAddSuggestion, loadSuggestions, toggleSuggestions, refineSuggestions]);
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
-  const tripName = journey?.title ?? 'Trip';
+  const { width: screenWidth } = useWindowDimensions();
+  // Between the two discs (16 + 44 + 12 on each side) when closed.
+  const chipWidths = useMemo(() => ({ closed: screenWidth - 2 * (16 + BAR_H + 12), open: screenWidth - 32 }), [screenWidth]);
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: tripName,
-          headerTitle: headerTitle,
-          headerTintColor: Colors.text,
-          headerRight,
-        }}
-      />
+      <Stack.Screen options={{ headerShown: false }} />
 
       {!loading && legs.length === 0 ? (
         <View style={styles.emptyWrap}>
           <EmptyState
             icon="✈️"
             title="No stops yet"
-            subtitle="City, dates, and how you'll get there. The rest builds from that."
+            subtitle={readOnly ? `${journey?.shared_owner_name ?? 'Your friend'} has not planned any stops yet.` : "City, dates, and how you'll get there. The rest builds from that."}
           />
-          <View style={styles.emptyCta}>
-            <CloudyButton onPress={openAddSheet} style={{ width: '100%' }} innerStyle={{ justifyContent: 'center' }}>
-              <Text style={styles.emptyCtaText}>Add your first stop</Text>
-            </CloudyButton>
-          </View>
+          {!readOnly && (
+            <View style={styles.emptyCta}>
+              <CloudyButton onPress={openAddSheet} style={{ width: '100%' }} innerStyle={{ justifyContent: 'center' }}>
+                <Text style={styles.emptyCtaText}>Add your first stop</Text>
+              </CloudyButton>
+            </View>
+          )}
         </View>
       ) : (
         <GestureHandlerRootView style={{ flex: 1 }}>
@@ -1181,6 +1384,30 @@ export default function JourneyDetailScreen() {
           />
         </GestureHandlerRootView>
       )}
+      {/* Behind the open chip: a touch anywhere else folds it back. */}
+      {travellersOpen && <Pressable style={StyleSheet.absoluteFill} onPress={closeTravellers} accessibilityLabel="Close" />}
+
+      {/* The bar: two discs and the chip between them, over the map. */}
+      <View style={[styles.bar, { top: insets.top }]} pointerEvents="box-none">
+        <GlassDisc icon="chevron-back" size={24} onPress={() => router.back()} label="Back" />
+        <View style={styles.barSpacer} pointerEvents="none" />
+        {!readOnly && <GlassDisc icon="add" size={28} onPress={openAddSheet} label="Add a stop" />}
+      </View>
+      <View style={[styles.morphSlot, { top: insets.top }]} pointerEvents="box-none">
+        <TripMorphChip
+          journeyId={journeyId}
+          title={journey?.title ?? ''}
+          legs={legs}
+          ready={!!journey}
+          owner={journey?.shared_owner_name ?? null}
+          people={people}
+          open={travellersOpen}
+          onToggle={toggleTravellers}
+          onLongPress={tripActions}
+          onChanged={travellersChanged}
+          maxWidth={chipWidths}
+        />
+      </View>
     </>
   );
 }
@@ -1240,10 +1467,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 20,
+    borderRadius: 999,
+    borderCurve: 'continuous',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
   },
   connectorText: {
@@ -1286,7 +1514,7 @@ const styles = StyleSheet.create({
   },
   legCardFallback: {
     backgroundColor: Colors.surface,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
   },
   legFlagWrap: {
@@ -1324,10 +1552,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   statusChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 8,
+    borderCurve: 'continuous',
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
+  statusChipIcon: { marginRight: 4 },
   statusChipText: {
     ...Typography.caption,
     fontWeight: '600',
@@ -1339,6 +1571,7 @@ const styles = StyleSheet.create({
   daysBadge: {
     backgroundColor: Colors.primary + '14',
     borderRadius: 8,
+    borderCurve: 'continuous',
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
@@ -1522,17 +1755,45 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: Colors.surfaceSecondary,
   },
-  // ─── Title chip in the header (same material as the Map tab's chip) ───
+  // ─── The bar over the map: two discs and the morphing chip ───
+  bar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    height: BAR_H,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  barSpacer: { flex: 1 },
+  disc: {
+    width: BAR_H,
+    height: BAR_H,
+    borderRadius: BAR_H / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  morphSlot: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  morph: {
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+    alignItems: 'center',
+  },
+  // ─── Title chip (same material as the Map tab's chip) ───
   titleChip: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 999,
-    paddingHorizontal: 16,
     minWidth: 200,
-    maxWidth: 250,
-    height: 44,
-    overflow: 'hidden',
+    height: BAR_H,
   },
+  titleChipText: { alignItems: 'center', flexShrink: 1 },
+  titleChipFaces: { position: 'absolute', right: 12, top: (BAR_H - 24) / 2 },
   titleChipFallback: {
     backgroundColor: 'rgba(255,255,255,0.88)',
     shadowColor: '#000',

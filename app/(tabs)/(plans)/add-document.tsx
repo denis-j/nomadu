@@ -14,8 +14,11 @@ import {
   addJourneyDocument,
   addJourneyTraveller,
   ensureSelfTraveller,
+  getJourneyWithLegs,
   JourneyTraveller,
+  travellerLabel,
 } from '../../../lib/database';
+import { useAuth } from '../../../hooks/useAuth';
 import { DOCUMENT_KINDS, DocumentKind, importDocumentFile, isImageMime, kindMeta } from '../../../lib/documents';
 import { showToast } from '../../../lib/toast';
 
@@ -41,7 +44,9 @@ export default function AddDocumentScreen() {
   const presetKind = params.kind ? kindMeta(params.kind).kind : 'ticket';
   const presetTraveller = params.travellerId ? Number(params.travellerId) : null;
 
+  const { user } = useAuth();
   const [travellers, setTravellers] = useState<JourneyTraveller[]>([]);
+  const [owner, setOwner] = useState<{ shared_owner_uid: string | null; shared_owner_name: string | null } | null>(null);
   const [picked, setPicked] = useState<Picked | null>(null);
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<DocumentKind>(presetKind);
@@ -49,11 +54,15 @@ export default function AddDocumentScreen() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    ensureSelfTraveller(journeyId).then((t) => {
+    Promise.all([ensureSelfTraveller(journeyId, user?.uid ?? null), getJourneyWithLegs(journeyId)]).then(([t, j]) => {
       setTravellers(t);
-      if (presetTraveller === null || !t.some((x) => x.id === presetTraveller)) setTravellerId(t[0]?.id ?? null);
+      setOwner(j?.shared_owner_uid ? { shared_owner_uid: j.shared_owner_uid, shared_owner_name: j.shared_owner_name } : null);
+      // Default to oneself: the first traveller on an own trip, the one with
+      // our account on a friend's.
+      const mine = j?.shared_owner_uid ? t.find((x) => x.uid === user?.uid) : t[0];
+      if (presetTraveller === null || !t.some((x) => x.id === presetTraveller)) setTravellerId(mine?.id ?? null);
     });
-  }, [journeyId, presetTraveller]);
+  }, [journeyId, presetTraveller, user?.uid]);
 
   const addTraveller = () => {
     Alert.prompt(
@@ -63,7 +72,7 @@ export default function AddDocumentScreen() {
         const trimmed = (name ?? '').trim();
         if (!trimmed) return;
         const id = await addJourneyTraveller(journeyId, trimmed);
-        setTravellers((prev) => [...prev, { id, journey_id: journeyId, name: trimmed, sort_order: prev.length, sync_id: null }]);
+        setTravellers((prev) => [...prev, { id, journey_id: journeyId, name: trimmed, sort_order: prev.length, sync_id: null, uid: null }]);
         setTravellerId(id);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       },
@@ -129,6 +138,7 @@ export default function AddDocumentScreen() {
         title: title.trim(),
         file_name: fileName,
         mime: picked.mime,
+        uploader_uid: user?.uid ?? null,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       nav.goBack();
@@ -208,10 +218,12 @@ export default function AddDocumentScreen() {
 
         <SectionLabel>Whose is it</SectionLabel>
         <Card>
-          {travellers.map((t) => (
+          {/* On a friend's trip only oneself and everyone: what the owner's
+              wallet shows of one's documents is exactly that. */}
+          {(owner ? travellers.filter((t) => t.uid === user?.uid) : travellers).map((t) => (
             <ChoiceRow
               key={t.id}
-              title={t.name}
+              title={travellerLabel(t, user?.uid ?? null, owner)}
               selected={travellerId === t.id}
               onPress={() => setTravellerId(t.id)}
             />
@@ -221,14 +233,17 @@ export default function AddDocumentScreen() {
             subtitle="A booking that covers the whole group"
             selected={travellerId === null}
             onPress={() => setTravellerId(null)}
+            last={!!owner}
           />
-          <ChoiceRow
-            title="Someone else"
-            subtitle="Add a travel companion"
-            selected={false}
-            onPress={addTraveller}
-            last
-          />
+          {!owner && (
+            <ChoiceRow
+              title="Someone else"
+              subtitle="Add a travel companion"
+              selected={false}
+              onPress={addTraveller}
+              last
+            />
+          )}
         </Card>
 
         <View style={styles.footer}>

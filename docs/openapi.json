@@ -2,13 +2,13 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Nomadu agent API",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "contact": {
       "name": "Nomadu",
       "url": "https://nomadu.app"
     },
     "summary": "A traveller's timeline, visa and tax standing, and plans, for an AI agent acting on their behalf.",
-    "description": "Nomadu tracks where its user is, day by day, and works out visa allowances and tax residency from that. This API gives an agent the same data and numbers the app shows, plus the ability to plan trips and, when the user allows it, to correct the timeline.\n\n## Authentication\nEvery request except this spec and `/docs` needs `Authorization: Bearer nmd_…`. The user creates the token in the app (Settings, AI agent) and decides at that moment whether the token may edit the timeline. A token that may not gets `403 forbidden` on `POST /trips`, `PATCH /trips/{id}` and `DELETE /trips/{id}`; everything else works for every token. A revoked token answers `401`.\n\n## Conventions\nAll bodies are JSON. Dates are calendar days as `YYYY-MM-DD` in the user's local reckoning; there are no times. Days are counted inclusively: a stay from the 1st to the 3rd is 3 days. Countries can be given by English name or by ISO code; unknown countries are rejected, not guessed. Errors are `{\"error\": {\"code\", \"message\"}}`.\n\n## Two kinds of travel\n**Stays** (`/trips`) are the past: where the user actually was, recorded by the phone. **Journeys** (`/journeys`) are plans: a title and a chain of stops with dates. A stay cannot start in the future and a plan is never counted as presence. When the user says \"I am going to Hanoi next month\", that is a journey; \"I was in Hanoi last month and the app missed it\", that is a stay.\n\n## What the app does with your writes\nEverything you create or change syncs to the user's phone within seconds while the app is open, or on its next start. Tell the user when you have written something. Deleting is soft: the record is tombstoned and disappears from the app."
+    "description": "Nomadu tracks where its user is, day by day, and works out visa allowances and tax residency from that. This API gives an agent the same data and numbers the app shows, plus the ability to plan trips and, when the user allows it, to correct the timeline.\n\n## Authentication\nEvery request except this spec and `/docs` needs `Authorization: Bearer nmd_…`. The user creates the token in the app (Settings, AI agent) and decides at that moment whether the token may edit the timeline. A token that may not gets `403 forbidden` on `POST /trips`, `PATCH /trips/{id}` and `DELETE /trips/{id}`; everything else works for every token. A revoked token answers `401`.\n\n## Conventions\nAll bodies are JSON. Dates are calendar days as `YYYY-MM-DD` in the user's local reckoning; there are no times. Days are counted inclusively: a stay from the 1st to the 3rd is 3 days. Countries can be given by English name or by ISO code; unknown countries are rejected, not guessed. Errors are `{\"error\": {\"code\", \"message\"}}`.\n\n## Two kinds of travel\n**Stays** (`/trips`) are the past: where the user actually was, recorded by the phone. **Journeys** (`/journeys`) are plans: a title and a chain of stops with dates. A stay cannot start in the future and a plan is never counted as presence. When the user says \"I am going to Hanoi next month\", that is a journey; \"I was in Hanoi last month and the app missed it\", that is a stay.\n\n## Accommodation\nEvery planned stop can carry one accommodation plan (`/journeys/{id}/stops/{stopId}/accommodation`): whether a place is needed, what it should be like, the options that were found, the one that was picked and, once booked, the booking details. You research on the platforms yourself and save what you found here; Nomadu never searches or books anything. A plan is planning only: it never becomes a stay in the timeline and never changes visa or tax numbers. Check-in and check-out are stored on the plan and validated; when a stop is later moved, the plan keeps its dates and reports `dates_match_stop: false`, so ask the user before changing a booking. Every token may read and write plans, the same as journeys. `GET /accommodations?status=searching` lists the stops that still need a place; every stop in `/journeys` carries a one-line summary of its plan.\n\n## What the app does with your writes\nEverything you create or change syncs to the user's phone within seconds while the app is open, or on its next start. Tell the user when you have written something. Deleting is soft: the record is tombstoned and disappears from the app."
   },
   "servers": [
     {
@@ -31,6 +31,10 @@
     {
       "name": "Plans",
       "description": "Trips the user is planning"
+    },
+    {
+      "name": "Accommodation",
+      "description": "Where to stay at each planned stop: requirements, options found, the pick, the booking"
     },
     {
       "name": "Meta",
@@ -251,6 +255,17 @@
               "string",
               "null"
             ]
+          },
+          "accommodation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AccommodationSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The stop's accommodation plan in one line, null when none has been started"
           }
         }
       },
@@ -631,6 +646,872 @@
             "maxItems": 12,
             "description": "Twelve buckets for a year, null for all time"
           }
+        }
+      },
+      "AccommodationStatus": {
+        "type": "string",
+        "enum": [
+          "open",
+          "searching",
+          "options_available",
+          "deciding",
+          "selected",
+          "booked",
+          "checked_in",
+          "completed",
+          "cancelled"
+        ],
+        "description": "Where the plan stands. Moves forward on its own when something happens (an option is added: options_available; one is selected: selected; a booking is saved: booked) and can be set by hand any time with PUT …/status. open: nothing done yet. searching: looking for places. options_available: at least one option saved. deciding: the user is choosing. selected: one option picked, not booked. booked: booking details saved. checked_in, completed: the stay itself. cancelled: sticks until set to something else."
+      },
+      "AccommodationRequirements": {
+        "type": "object",
+        "description": "What the place should be like. Every field is optional; absent keeps the current value, null clears it.",
+        "properties": {
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "hotel",
+              "apartment",
+              "airbnb",
+              "condo",
+              "hostel",
+              "guesthouse",
+              "coliving",
+              "other",
+              null
+            ]
+          },
+          "budget_per_night": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Ceiling per night. Two decimals; needs a currency beside it."
+          },
+          "budget_total": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Ceiling for the whole stay. Two decimals; needs a currency beside it."
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z]{3}$",
+            "description": "ISO 4217 for both budgets. Required when either budget is given.",
+            "example": "THB"
+          },
+          "areas": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "maxItems": 10,
+            "description": "Neighbourhoods or areas to look in. Lower-cased and de-duplicated; may also be sent as one comma-separated string."
+          },
+          "min_requirements": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500,
+            "description": "Must-haves in words: \"private bathroom, no ground floor\""
+          },
+          "work_requirements": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500,
+            "description": "What working from there needs: \"stable wifi 50 Mbit, quiet, a desk\""
+          },
+          "amenities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "maxItems": 20,
+            "description": "Wanted amenities. The app knows wifi, desk, quiet, ac, kitchen, washer, gym, pool, balcony, parking, breakfast; other words are kept as given. Lower-cased and de-duplicated; may also be sent as one comma-separated string."
+          },
+          "dates_flexible": {
+            "type": "boolean",
+            "default": false,
+            "description": "true when a day either side is fine"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000
+          }
+        }
+      },
+      "AccommodationOption": {
+        "type": "object",
+        "description": "One place that was found. Prices are as seen on the platform; say when you looked (last_checked_at), they move.",
+        "required": [
+          "id",
+          "name",
+          "check_in",
+          "check_out",
+          "rating_scale",
+          "amenities",
+          "sort_order"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "example": "Loft in Tay Ho"
+          },
+          "platform": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40,
+            "description": "Where it was found"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "http(s) link to the listing"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200,
+            "description": "Address or area"
+          },
+          "check_in": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-12",
+            "description": "Defaults to the plan's check_in"
+          },
+          "check_out": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-12",
+            "description": "Defaults to the plan's check_out; must be after check_in"
+          },
+          "total_price": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "For the whole stay, fees included if the platform shows it that way. Two decimals; needs a currency beside it."
+          },
+          "price_per_night": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Per night. Two decimals; needs a currency beside it."
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z]{3}$",
+            "description": "ISO 4217 for every price on this option. Required when any price is given.",
+            "example": "THB"
+          },
+          "fees": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Cleaning and service fees on top, when shown separately. Two decimals; needs a currency beside it."
+          },
+          "rating": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "The platform's rating, on rating_scale"
+          },
+          "rating_scale": {
+            "type": "integer",
+            "enum": [
+              5,
+              10
+            ],
+            "default": 5,
+            "description": "5 for Airbnb and Google, 10 for Booking.com and Agoda. Send it with a rating above 5."
+          },
+          "review_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "cancellation_policy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 300,
+            "description": "In words: \"free until 3 days before\""
+          },
+          "amenities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "maxItems": 20,
+            "description": "What the listing has. Lower-cased and de-duplicated; may also be sent as one comma-separated string."
+          },
+          "score": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10,
+            "description": "Your own verdict, 0 to 10, one decimal"
+          },
+          "risks": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500,
+            "description": "What could go wrong: construction, far from transport, few reviews"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000
+          },
+          "last_checked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the listing was last looked at"
+          },
+          "sort_order": {
+            "type": "integer",
+            "description": "Position in the list, from 0"
+          }
+        }
+      },
+      "AccommodationOptionInput": {
+        "type": "object",
+        "description": "An option to save or the fields of one to change. Only name is required on a new one; absent fields keep their value on a PATCH, null clears them. Free text must not contain payment card numbers.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "example": "Loft in Tay Ho"
+          },
+          "platform": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40,
+            "description": "Where it was found"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "http(s) link to the listing"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200,
+            "description": "Address or area"
+          },
+          "check_in": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-12",
+            "description": "Defaults to the plan's check_in"
+          },
+          "check_out": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-12",
+            "description": "Defaults to the plan's check_out; must be after check_in"
+          },
+          "total_price": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "For the whole stay, fees included if the platform shows it that way. Two decimals; needs a currency beside it."
+          },
+          "price_per_night": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Per night. Two decimals; needs a currency beside it."
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z]{3}$",
+            "description": "ISO 4217 for every price on this option. Required when any price is given.",
+            "example": "THB"
+          },
+          "fees": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Cleaning and service fees on top, when shown separately. Two decimals; needs a currency beside it."
+          },
+          "rating": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "The platform's rating, on rating_scale"
+          },
+          "rating_scale": {
+            "type": "integer",
+            "enum": [
+              5,
+              10
+            ],
+            "default": 5,
+            "description": "5 for Airbnb and Google, 10 for Booking.com and Agoda. Send it with a rating above 5."
+          },
+          "review_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "cancellation_policy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 300,
+            "description": "In words: \"free until 3 days before\""
+          },
+          "amenities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "maxItems": 20,
+            "description": "What the listing has. Lower-cased and de-duplicated; may also be sent as one comma-separated string."
+          },
+          "score": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10,
+            "description": "Your own verdict, 0 to 10, one decimal"
+          },
+          "risks": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500,
+            "description": "What could go wrong: construction, far from transport, few reviews"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000
+          },
+          "last_checked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the listing was last looked at"
+          }
+        }
+      },
+      "AccommodationBooking": {
+        "type": "object",
+        "description": "What was booked, for the door and the desk. No payment details: card numbers are refused, and there is no field for a password or a login.",
+        "properties": {
+          "option_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The option that was booked. Defaults to the selected option when the booking is first saved."
+          },
+          "booking_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Link to the reservation on the platform"
+          },
+          "booking_reference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 80,
+            "description": "Confirmation number"
+          },
+          "price": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "What was actually paid or is due. Two decimals; needs a currency beside it."
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z]{3}$",
+            "description": "Required when price is given",
+            "example": "THB"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 300
+          },
+          "check_in_info": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000,
+            "description": "How to get in: times, codes, where the key is"
+          },
+          "check_out_info": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000
+          },
+          "deposit": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Security deposit. Two decimals; needs a currency beside it."
+          },
+          "deposit_currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z]{3}$",
+            "description": "Defaults to currency",
+            "example": "THB"
+          },
+          "provider_contact": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 300,
+            "description": "Host or reception: name, phone, messenger"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000
+          },
+          "review_rating": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 5,
+            "description": "Your rating after the stay, 0 to 5"
+          },
+          "review_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "description": "Your review after the stay"
+          }
+        }
+      },
+      "Accommodation": {
+        "type": "object",
+        "description": "The accommodation plan of one stop: whether a place is needed, what it should be like, the options found, the pick and the booking. Planning only: it is never a stay in the timeline.",
+        "required": [
+          "id",
+          "journey_id",
+          "journey_title",
+          "stop_id",
+          "stop",
+          "needed",
+          "status",
+          "check_in",
+          "check_out",
+          "nights",
+          "dates_match_stop",
+          "requirements",
+          "options",
+          "selected_option_id",
+          "booking",
+          "notes",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Same as stop_id: a stop has at most one plan"
+          },
+          "journey_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "journey_title": {
+            "type": "string"
+          },
+          "stop_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "stop": {
+            "type": "object",
+            "description": "The stop this plan belongs to, as it is now",
+            "required": [
+              "id",
+              "city",
+              "country",
+              "country_code",
+              "start_date",
+              "end_date"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "city": {
+                "type": "string"
+              },
+              "country": {
+                "type": "string"
+              },
+              "country_code": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 2,
+                "description": "ISO 3166-1 alpha-2, upper case",
+                "example": "TH"
+              },
+              "start_date": {
+                "type": "string",
+                "format": "date",
+                "example": "2026-09-12"
+              },
+              "end_date": {
+                "type": "string",
+                "format": "date",
+                "example": "2026-09-12"
+              }
+            }
+          },
+          "needed": {
+            "type": "boolean",
+            "description": "false when the user has a place already (friends, own flat) and wants no search"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AccommodationStatus"
+          },
+          "check_in": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-12",
+            "description": "First night. Defaults to the stop's start_date."
+          },
+          "check_out": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-12",
+            "description": "Morning of departure. Defaults to the day after the stop's end_date, so nights equal the stop's days."
+          },
+          "nights": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "dates_match_stop": {
+            "type": "boolean",
+            "description": "false when the stop was moved or resized after the plan was made. The plan keeps its own dates; tell the user rather than moving a booking."
+          },
+          "requirements": {
+            "$ref": "#/components/schemas/AccommodationRequirements"
+          },
+          "options": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {
+              "$ref": "#/components/schemas/AccommodationOption"
+            }
+          },
+          "selected_option_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "booking": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AccommodationBooking"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "description": "Notes on the plan as a whole"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "AccommodationInput": {
+        "type": "object",
+        "description": "Fields of the plan to set. All optional; absent keeps, null clears. Options and booking have their own routes.",
+        "properties": {
+          "needed": {
+            "type": "boolean",
+            "default": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/AccommodationStatus"
+          },
+          "check_in": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-12",
+            "description": "Must be a real day. Defaults to the stop's start_date on creation."
+          },
+          "check_out": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-12",
+            "description": "Must be after check_in. Defaults to the day after the stop's end_date on creation."
+          },
+          "requirements": {
+            "$ref": "#/components/schemas/AccommodationRequirements"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          }
+        }
+      },
+      "AccommodationSummary": {
+        "type": "object",
+        "description": "A plan in one line, attached to every stop of a journey",
+        "required": [
+          "status",
+          "needed",
+          "check_in",
+          "check_out",
+          "nights",
+          "options",
+          "selected",
+          "booked"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/AccommodationStatus"
+          },
+          "needed": {
+            "type": "boolean"
+          },
+          "check_in": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-12"
+          },
+          "check_out": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-12"
+          },
+          "nights": {
+            "type": "integer"
+          },
+          "options": {
+            "type": "integer",
+            "description": "How many options are saved"
+          },
+          "selected": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name of the selected or booked option"
+          },
+          "booked": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "examples": {
+      "Accommodation": {
+        "summary": "A plan with one option, selected, not yet booked",
+        "value": {
+          "id": "3c1f2a9e-7d4b-4e0a-9b6f-1e2d3c4b5a60",
+          "journey_id": "a1b2c3d4-0000-4000-8000-000000000001",
+          "journey_title": "Vietnam",
+          "stop_id": "3c1f2a9e-7d4b-4e0a-9b6f-1e2d3c4b5a60",
+          "stop": {
+            "id": "3c1f2a9e-7d4b-4e0a-9b6f-1e2d3c4b5a60",
+            "city": "Hanoi",
+            "country": "Vietnam",
+            "country_code": "VN",
+            "start_date": "2026-11-01",
+            "end_date": "2026-11-04"
+          },
+          "needed": true,
+          "status": "selected",
+          "check_in": "2026-11-01",
+          "check_out": "2026-11-05",
+          "nights": 4,
+          "dates_match_stop": true,
+          "requirements": {
+            "type": "apartment",
+            "budget_per_night": 40,
+            "budget_total": null,
+            "currency": "USD",
+            "areas": [
+              "tay ho",
+              "old quarter"
+            ],
+            "min_requirements": "private bathroom",
+            "work_requirements": "stable wifi, quiet, a desk",
+            "amenities": [
+              "wifi",
+              "desk",
+              "ac"
+            ],
+            "dates_flexible": false,
+            "notes": null
+          },
+          "options": [
+            {
+              "id": "9f8e7d6c-5b4a-4c3d-8e2f-1a0b9c8d7e6f",
+              "name": "Loft in Tay Ho",
+              "platform": "Airbnb",
+              "url": "https://www.airbnb.com/rooms/1",
+              "address": "Tay Ho, Hanoi",
+              "check_in": "2026-11-01",
+              "check_out": "2026-11-05",
+              "total_price": 152,
+              "price_per_night": 38,
+              "currency": "USD",
+              "fees": 18,
+              "rating": 4.9,
+              "rating_scale": 5,
+              "review_count": 88,
+              "cancellation_policy": "free until 3 days before",
+              "amenities": [
+                "wifi",
+                "desk",
+                "ac",
+                "kitchen"
+              ],
+              "score": 8.5,
+              "risks": "no reviews from the last 6 months",
+              "notes": "host replies within an hour",
+              "last_checked_at": "2026-09-18T10:00:00.000Z",
+              "sort_order": 0
+            }
+          ],
+          "selected_option_id": "9f8e7d6c-5b4a-4c3d-8e2f-1a0b9c8d7e6f",
+          "booking": null,
+          "notes": "ask about late check-in",
+          "updated_at": "2026-09-18T10:05:00.000Z"
         }
       }
     },
@@ -1410,7 +2291,7 @@
         ],
         "operationId": "updateJourney",
         "summary": "Rename a plan or replace its stops",
-        "description": "Send `title`, `stops`, or both. `stops` replaces the whole list; a stop with the same city and country as before keeps its id. Ask the user before replacing stops they arranged by hand.",
+        "description": "Send `title`, `stops`, or both. `stops` replaces the whole list; a stop with the same city and country as before keeps its id and, with it, its accommodation plan. A stop that is dropped takes its plan with it. Ask the user before replacing stops they arranged by hand.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1468,7 +2349,7 @@
         ],
         "operationId": "deleteJourney",
         "summary": "Delete a plan",
-        "description": "Ask the user first.",
+        "description": "Ask the user first. The accommodation plans of its stops go with it.",
         "responses": {
           "200": {
             "description": "Deleted",
@@ -1487,6 +2368,1126 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/accommodations": {
+      "get": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Accommodation"
+        ],
+        "operationId": "listAccommodations",
+        "summary": "Every accommodation plan, with its stop",
+        "description": "Across all journeys, in check-in order. Plans whose stop no longer exists are left out. Start here for \"which stops still need a place\": filter by status.",
+        "parameters": [
+          {
+            "name": "journey_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/AccommodationStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "accommodations"
+                  ],
+                  "properties": {
+                    "accommodations": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Accommodation"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/journeys/{id}/stops/{stopId}/accommodation": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "stopId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "The stop's id from the journey"
+        }
+      ],
+      "get": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Accommodation"
+        ],
+        "operationId": "getAccommodation",
+        "summary": "The plan of one stop",
+        "description": "404 when nothing has been planned for this stop yet; `PUT` creates it. Notes live here too: `notes` on the plan, `requirements.notes`, and `risks` and `notes` on every option.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accommodation"
+                },
+                "examples": {
+                  "plan": {
+                    "$ref": "#/components/examples/Accommodation"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Accommodation"
+        ],
+        "operationId": "putAccommodation",
+        "summary": "Create the plan or change its requirements",
+        "description": "Creates the plan when there is none (201) and updates it otherwise (200). Send only what you know; absent fields keep their value, null clears. Options and the booking are not touched here. Dates default from the stop; a budget needs a currency. PATCH does the same.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccommodationInput"
+              },
+              "example": {
+                "needed": true,
+                "requirements": {
+                  "type": "apartment",
+                  "budget_per_night": 40,
+                  "currency": "USD",
+                  "areas": [
+                    "Tay Ho",
+                    "Old Quarter"
+                  ],
+                  "work_requirements": "stable wifi, quiet, a desk",
+                  "amenities": [
+                    "wifi",
+                    "desk",
+                    "ac"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accommodation"
+                },
+                "examples": {
+                  "plan": {
+                    "$ref": "#/components/examples/Accommodation"
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accommodation"
+                },
+                "examples": {
+                  "plan": {
+                    "$ref": "#/components/examples/Accommodation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Accommodation"
+        ],
+        "operationId": "patchAccommodation",
+        "summary": "Same as PUT",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccommodationInput"
+              },
+              "example": {
+                "notes": "ask about late check-in"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accommodation"
+                },
+                "examples": {
+                  "plan": {
+                    "$ref": "#/components/examples/Accommodation"
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accommodation"
+                },
+                "examples": {
+                  "plan": {
+                    "$ref": "#/components/examples/Accommodation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Accommodation"
+        ],
+        "operationId": "deleteAccommodation",
+        "summary": "Drop the plan",
+        "description": "Removes the plan with its options and booking from the stop. Ask the user first. For \"no place needed\" set `needed: false` instead.",
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/journeys/{id}/stops/{stopId}/accommodation/options": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "stopId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "The stop's id from the journey"
+        }
+      ],
+      "post": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Accommodation"
+        ],
+        "operationId": "addAccommodationOption",
+        "summary": "Save a place you found",
+        "description": "Creates the plan too when there is none, so research can start before the requirements are written down. At most 30 options per stop. A plan that was open or searching becomes options_available. Prices need a currency; a rating above 5 needs rating_scale: 10. Say when you looked (last_checked_at).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccommodationOptionInput"
+              },
+              "example": {
+                "name": "Loft in Tay Ho",
+                "platform": "Airbnb",
+                "url": "https://www.airbnb.com/rooms/1",
+                "total_price": 152,
+                "price_per_night": 38,
+                "fees": 18,
+                "currency": "USD",
+                "rating": 4.9,
+                "review_count": 88,
+                "cancellation_policy": "free until 3 days before",
+                "amenities": [
+                  "wifi",
+                  "desk",
+                  "ac",
+                  "kitchen"
+                ],
+                "score": 8.5,
+                "risks": "no reviews from the last 6 months",
+                "last_checked_at": "2026-09-18T10:00:00Z"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Saved; the whole plan comes back with the new option in `options`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accommodation"
+                },
+                "examples": {
+                  "plan": {
+                    "$ref": "#/components/examples/Accommodation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/journeys/{id}/stops/{stopId}/accommodation/options/{optionId}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "stopId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "The stop's id from the journey"
+        },
+        {
+          "name": "optionId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "patch": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Accommodation"
+        ],
+        "operationId": "updateAccommodationOption",
+        "summary": "Change an option",
+        "description": "Send only what changed: a new price with last_checked_at, a score, a risk you noticed. PUT does the same.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "An option to save or the fields of one to change. Only name is required on a new one; absent fields keep their value on a PATCH, null clears them. Free text must not contain payment card numbers.",
+                "required": [],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "example": "Loft in Tay Ho"
+                  },
+                  "platform": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 40,
+                    "description": "Where it was found"
+                  },
+                  "url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uri",
+                    "description": "http(s) link to the listing"
+                  },
+                  "address": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 200,
+                    "description": "Address or area"
+                  },
+                  "check_in": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-09-12",
+                    "description": "Defaults to the plan's check_in"
+                  },
+                  "check_out": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-09-12",
+                    "description": "Defaults to the plan's check_out; must be after check_in"
+                  },
+                  "total_price": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "description": "For the whole stay, fees included if the platform shows it that way. Two decimals; needs a currency beside it."
+                  },
+                  "price_per_night": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "description": "Per night. Two decimals; needs a currency beside it."
+                  },
+                  "currency": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[A-Z]{3}$",
+                    "description": "ISO 4217 for every price on this option. Required when any price is given.",
+                    "example": "THB"
+                  },
+                  "fees": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "description": "Cleaning and service fees on top, when shown separately. Two decimals; needs a currency beside it."
+                  },
+                  "rating": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "description": "The platform's rating, on rating_scale"
+                  },
+                  "rating_scale": {
+                    "type": "integer",
+                    "enum": [
+                      5,
+                      10
+                    ],
+                    "default": 5,
+                    "description": "5 for Airbnb and Google, 10 for Booking.com and Agoda. Send it with a rating above 5."
+                  },
+                  "review_count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "cancellation_policy": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 300,
+                    "description": "In words: \"free until 3 days before\""
+                  },
+                  "amenities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 60
+                    },
+                    "maxItems": 20,
+                    "description": "What the listing has. Lower-cased and de-duplicated; may also be sent as one comma-separated string."
+                  },
+                  "score": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 10,
+                    "description": "Your own verdict, 0 to 10, one decimal"
+                  },
+                  "risks": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500,
+                    "description": "What could go wrong: construction, far from transport, few reviews"
+                  },
+                  "notes": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 1000
+                  },
+                  "last_checked_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time",
+                    "description": "When the listing was last looked at"
+                  }
+                }
+              },
+              "example": {
+                "total_price": 140,
+                "last_checked_at": "2026-09-19T08:00:00Z"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accommodation"
+                },
+                "examples": {
+                  "plan": {
+                    "$ref": "#/components/examples/Accommodation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Accommodation"
+        ],
+        "operationId": "removeAccommodationOption",
+        "summary": "Remove an option",
+        "description": "If it was the selected one, the plan goes back to options_available (or searching when none is left). A booking that pointed at it keeps its details.",
+        "responses": {
+          "200": {
+            "description": "Removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accommodation"
+                },
+                "examples": {
+                  "plan": {
+                    "$ref": "#/components/examples/Accommodation"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/journeys/{id}/stops/{stopId}/accommodation/options/{optionId}/select": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "stopId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "The stop's id from the journey"
+        },
+        {
+          "name": "optionId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Accommodation"
+        ],
+        "operationId": "selectAccommodationOption",
+        "summary": "Pick this option",
+        "description": "Marks it as the one to book and moves the plan to selected (a booked plan keeps its status). Only after the user has chosen; do not pick for them.",
+        "responses": {
+          "200": {
+            "description": "Selected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accommodation"
+                },
+                "examples": {
+                  "plan": {
+                    "$ref": "#/components/examples/Accommodation"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/journeys/{id}/stops/{stopId}/accommodation/booking": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "stopId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "The stop's id from the journey"
+        }
+      ],
+      "put": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Accommodation"
+        ],
+        "operationId": "putAccommodationBooking",
+        "summary": "Save the booking",
+        "description": "After the user has booked on the platform. Links to the selected option unless option_id says otherwise, and moves the plan to booked. Absent fields keep their value, so the check-in code can be added later. Never store payment details: card numbers are refused. PATCH does the same.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccommodationBooking"
+              },
+              "example": {
+                "booking_reference": "HMX4K2",
+                "booking_url": "https://www.airbnb.com/trips/1",
+                "price": 152,
+                "currency": "USD",
+                "check_in_info": "Self check-in from 15:00, lockbox code comes by message the day before",
+                "provider_contact": "Linh, +84 90 000 0000"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accommodation"
+                },
+                "examples": {
+                  "plan": {
+                    "$ref": "#/components/examples/Accommodation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Accommodation"
+        ],
+        "operationId": "clearAccommodationBooking",
+        "summary": "Forget the booking details",
+        "description": "For a booking that was cancelled on the platform. The plan goes back to selected or the options. To mark the stay as cancelled altogether, set the status instead.",
+        "responses": {
+          "200": {
+            "description": "Cleared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accommodation"
+                },
+                "examples": {
+                  "plan": {
+                    "$ref": "#/components/examples/Accommodation"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/journeys/{id}/stops/{stopId}/accommodation/status": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "stopId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "The stop's id from the journey"
+        }
+      ],
+      "put": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Accommodation"
+        ],
+        "operationId": "setAccommodationStatus",
+        "summary": "Set the status by hand",
+        "description": "Any status, including backwards. Use it for the steps nothing else implies: searching when you start, deciding when you have shown the user the options, checked_in, completed, cancelled.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "$ref": "#/components/schemas/AccommodationStatus"
+                  }
+                }
+              },
+              "example": {
+                "status": "searching"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accommodation"
+                },
+                "examples": {
+                  "plan": {
+                    "$ref": "#/components/examples/Accommodation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/journeys/{id}/stops/{stopId}/accommodation/notes": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "stopId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "The stop's id from the journey"
+        }
+      ],
+      "get": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Accommodation"
+        ],
+        "operationId": "getAccommodationNotes",
+        "summary": "Every note on the plan in one place",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "notes",
+                    "requirements_notes",
+                    "options",
+                    "booking_notes"
+                  ],
+                  "properties": {
+                    "notes": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "requirements_notes": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "options": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "risks": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "notes": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "booking_notes": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                },
+                "example": {
+                  "notes": "ask about late check-in",
+                  "requirements_notes": null,
+                  "options": [
+                    {
+                      "id": "9f8e7d6c-5b4a-4c3d-8e2f-1a0b9c8d7e6f",
+                      "name": "Loft in Tay Ho",
+                      "risks": "no reviews from the last 6 months",
+                      "notes": "host replies within an hour"
+                    }
+                  ],
+                  "booking_notes": null
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Accommodation"
+        ],
+        "operationId": "setAccommodationNotes",
+        "summary": "Replace the plan's notes",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "notes"
+                ],
+                "properties": {
+                  "notes": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 2000
+                  }
+                }
+              },
+              "example": {
+                "notes": "ask about late check-in"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accommodation"
+                },
+                "examples": {
+                  "plan": {
+                    "$ref": "#/components/examples/Accommodation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"

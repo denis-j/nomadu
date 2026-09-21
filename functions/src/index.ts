@@ -30,6 +30,7 @@ initializeApp();
 
 export { deleteAccount } from './deleteAccount';
 export { agentApi, createAgentToken, revokeAgentToken, listAgentTokens } from './agent';
+export { shareJourney, previewInvite, joinJourney, leaveJourney, removeJourneyMember, unshareJourney, sharePage } from './share';
 
 const geminiKey = defineSecret('GEMINI_API_KEY');
 

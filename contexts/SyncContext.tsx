@@ -4,11 +4,16 @@ import { reportError } from '../lib/monitoring';
 import {
   getCloudSyncEnabled,
   getLastSyncTime,
+  pushPlans,
   setCloudSyncEnabled as setCloudSyncEnabledStorage,
   startRealtimeSync,
   stopRealtimeSync,
   syncAll,
 } from '../lib/sync';
+import { onLocalChange } from '../lib/syncTrigger';
+
+/** How long after the last local edit the push goes out. */
+const PUSH_DELAY_MS = 2000;
 
 type SyncStatus = 'idle' | 'syncing' | 'error';
 
@@ -56,7 +61,21 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     doSync(user.uid);
     startRealtimeSync(user.uid);
 
+    // Local edits go out a couple of seconds after the last one, so a
+    // friend following the trip sees the change now, not at the next start.
+    const uid = user.uid;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const offChange = onLocalChange(() => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        pushPlans(uid).catch((err) => reportError(err, 'sync:push-plans'));
+      }, PUSH_DELAY_MS);
+    });
+
     return () => {
+      offChange();
+      if (timer) clearTimeout(timer);
       stopRealtimeSync();
     };
   }, [user, cloudSyncEnabled]);

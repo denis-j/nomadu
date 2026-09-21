@@ -7,6 +7,10 @@ import {
   doc,
   getDocs,
   onSnapshot,
+  query,
+  setDoc,
+  updateDoc,
+  where,
   writeBatch,
   type DocumentData,
   type Unsubscribe,
@@ -14,9 +18,13 @@ import {
 import { db } from './firebase';
 import {
   clearAllData,
+  clearJourneyShareCodeBySyncId,
+  forgetFollowedJourney,
   getAllJourneysForSync,
   getAllTripsForSync,
+  getFollowedJourneySyncIds,
   setSyncId,
+  syncJourneyMembers,
   upsertJourneyFromCloud,
   upsertTripFromCloud,
   type JourneySyncLeg,
@@ -29,6 +37,20 @@ import {
   upsertUserVisaFromCloud,
   type EntriesAllowed,
 } from './userVisas';
+import {
+  getAllAccommodationsForSync,
+  replaceFollowedPlans,
+  upsertAccommodationFromCloud,
+} from './accommodations';
+import {
+  ACCOMMODATION_STATUSES,
+  EMPTY_REQUIREMENTS,
+  type AccommodationBooking,
+  type AccommodationOption,
+  type AccommodationRequirements,
+  type AccommodationStatus,
+} from './accommodationModel';
+import { pullDocumentsFromCloud, pushDocumentsToCloud, watchDocuments } from './documentSync';
 import { parseSyncStamp } from './syncTime';
 import { clearBadgeProgress } from './badges';
 import { reportError } from './monitoring';
@@ -68,6 +90,15 @@ function journeysCollection(uid: string) {
 
 function visasCollection(uid: string) {
   return collection(db, 'users', uid, 'visas');
+}
+
+function accommodationsCollection(uid: string) {
+  return collection(db, 'users', uid, 'accommodations');
+}
+
+/** Trips shared with friends: one mirror per journey, see functions/src/share.ts. */
+function sharedJourneysCollection() {
+  return collection(db, 'shared_journeys');
 }
 
 /**
@@ -328,7 +359,10 @@ export async function pushJourneysToCloud(uid: string): Promise<void> {
     ops = 0;
   };
 
+  const mirrors: { syncId: string; data: DocumentData }[] = [];
   for (const journey of journeys) {
+    // A friend's trip is theirs: followed here, never pushed as ours.
+    if (journey.shared_owner_uid) continue;
     const localUpdatedAt = journey.updated_at ? parseSyncStamp(journey.updated_at) : new Date();
     const cloudData = cloud.get(journey.sync_id);
     if (cloudData) {
@@ -336,18 +370,31 @@ export async function pushJourneysToCloud(uid: string): Promise<void> {
       if (cloudUpdatedAt >= localUpdatedAt) continue;
     }
     // No merge: a stop removed locally must disappear from the array too.
-    batch.set(doc(journeys_, journey.sync_id), {
+    const data = {
       title: journey.title,
       legs: journey.legs,
       travellers: journey.travellers,
-      local_id: journey.id,
       updated_at: Timestamp.fromDate(localUpdatedAt),
       deleted: journey.deleted,
-    });
+    };
+    batch.set(doc(journeys_, journey.sync_id), { ...data, local_id: journey.id });
     ops++;
+    if (journey.share_code) mirrors.push({ syncId: journey.sync_id, data: { ...data, owner_uid: uid } });
     if (ops >= BATCH_LIMIT) await commit();
   }
   await commit();
+
+  // The mirror the friends follow. Written one by one, outside the batch:
+  // a mirror whose sharing was stopped meanwhile is refused by the rules,
+  // and that must not take the journey itself down with it.
+  for (const { syncId, data } of mirrors) {
+    try {
+      await setDoc(doc(sharedJourneysCollection(), syncId), data, { merge: true });
+    } catch (err) {
+      await clearJourneyShareCodeBySyncId(syncId);
+      reportError(err, 'sync:journey-mirror');
+    }
+  }
 }
 
 function journeyFromDoc(id: string, data: DocumentData) {
@@ -371,6 +418,173 @@ export async function pullJourneysFromCloud(uid: string): Promise<void> {
   }
 }
 
+// ─── Trips shared with friends ───
+// Two views of `shared_journeys`: the trips this account follows (a member
+// of), which land in the local journeys table read-only; and the trips this
+// account shares, whose members become travellers so the owner sees who is
+// coming and the friends see their own name in the wallet.
+
+function sharedOwnerOf(data: DocumentData) {
+  return { uid: String(data.owner_uid ?? ''), name: String(data.owner_name ?? 'A friend') };
+}
+
+function membersOf(data: DocumentData): { uid: string; name: string }[] {
+  const members = (data.members ?? {}) as Record<string, { name?: unknown }>;
+  return Object.entries(members).map(([uid, m]) => ({ uid, name: typeof m?.name === 'string' && m.name.trim() ? m.name.trim() : 'Friend' }));
+}
+
+async function takeFollowedJourney(id: string, data: DocumentData): Promise<void> {
+  await upsertJourneyFromCloud(journeyFromDoc(id, data), sharedOwnerOf(data));
+  if (data.deleted !== true) await replaceFollowedPlans(id, followedPlansOf(data));
+}
+
+export async function pullSharedJourneysFromCloud(uid: string): Promise<void> {
+  const snapshot = await getDocs(query(sharedJourneysCollection(), where('member_uids', 'array-contains', uid)));
+  const seen = new Set<string>();
+  for (const docSnap of snapshot.docs) {
+    seen.add(docSnap.id);
+    await takeFollowedJourney(docSnap.id, docSnap.data());
+  }
+  // Followed here but no longer shared with us: the owner stopped, or we left.
+  for (const syncId of await getFollowedJourneySyncIds()) {
+    if (!seen.has(syncId)) await forgetFollowedJourney(syncId);
+  }
+}
+
+/** Owner side: friends who joined become travellers on the trip. */
+export async function pullMembersFromCloud(uid: string): Promise<void> {
+  const snapshot = await getDocs(query(sharedJourneysCollection(), where('owner_uid', '==', uid)));
+  for (const docSnap of snapshot.docs) {
+    await syncJourneyMembers(docSnap.id, membersOf(docSnap.data()), uid);
+  }
+}
+
+// ─── Accommodation plans ───
+// One document per stop with the options embedded, compared as a whole by
+// updated_at; the document id is the stop's sync id. This is what the agent
+// API reads and writes when it researches places, so it is pulled after the
+// journeys it belongs to.
+
+export async function pushAccommodationsToCloud(uid: string): Promise<void> {
+  const plans = await getAllAccommodationsForSync();
+  if (plans.length === 0) return;
+
+  const plans_ = accommodationsCollection(uid);
+  const snapshot = await getDocs(plans_);
+  const cloud = new Map<string, DocumentData>();
+  snapshot.forEach((docSnap) => cloud.set(docSnap.id, docSnap.data()));
+
+  let batch = writeBatch(db);
+  let ops = 0;
+  const commit = async () => {
+    if (ops === 0) return;
+    await batch.commit();
+    batch = writeBatch(db);
+    ops = 0;
+  };
+
+  for (const plan of plans) {
+    const localUpdatedAt = parseSyncStamp(plan.updated_at);
+    const cloudData = cloud.get(plan.id);
+    if (cloudData) {
+      const cloudUpdatedAt = cloudData.updated_at instanceof Timestamp ? cloudData.updated_at.toDate() : new Date(0);
+      if (cloudUpdatedAt >= localUpdatedAt) continue;
+    }
+    // No merge: an option removed here must disappear from the array too.
+    batch.set(doc(plans_, plan.id), {
+      journey_id: plan.journey_id,
+      stop_id: plan.stop_id,
+      needed: plan.needed,
+      status: plan.status,
+      check_in: plan.check_in,
+      check_out: plan.check_out,
+      requirements: plan.requirements,
+      options: plan.options,
+      selected_option_id: plan.selected_option_id,
+      booking: plan.booking,
+      notes: plan.notes,
+      local_id: plan.local_id,
+      updated_at: Timestamp.fromDate(localUpdatedAt),
+      deleted: plan.deleted,
+    });
+    ops++;
+    if (ops >= BATCH_LIMIT) await commit();
+  }
+  await commit();
+  await mirrorAccommodations(plans.filter((p) => !p.deleted));
+}
+
+/** What the mirror last got per shared trip, so an unchanged set is not written again. */
+const mirroredPlans = new Map<string, string>();
+
+/**
+ * The plans of a shared trip, into its mirror, so the friends see where
+ * everyone sleeps. The whole set every time (`updateDoc` replaces the map,
+ * a removed plan disappears), skipped when nothing about it changed.
+ */
+async function mirrorAccommodations(plans: { id: string; journey_id: string; updated_at: string }[]): Promise<void> {
+  const shared = (await getAllJourneysForSync()).filter((j) => j.share_code && !j.shared_owner_uid && !j.deleted);
+  for (const journey of shared) {
+    const mine = plans.filter((p) => p.journey_id === journey.sync_id);
+    const stamp = mine.map((p) => `${p.id}@${p.updated_at}`).sort().join('|');
+    if (mirroredPlans.get(journey.sync_id) === stamp) continue;
+    const map: Record<string, unknown> = {};
+    for (const p of mine) {
+      const { id, journey_id, updated_at, ...rest } = p as any;
+      map[id] = { ...rest, id, journey_id, updated_at };
+    }
+    try {
+      await updateDoc(doc(sharedJourneysCollection(), journey.sync_id), { accommodations: map });
+      mirroredPlans.set(journey.sync_id, stamp);
+    } catch (err) {
+      reportError(err, 'sync:accommodation-mirror');
+    }
+  }
+}
+
+/** The plans in a shared trip's mirror, as the friend's phone stores them. */
+function followedPlansOf(data: DocumentData) {
+  const map = (data.accommodations ?? {}) as Record<string, DocumentData>;
+  return Object.entries(map).map(([id, x]) => {
+    const updatedAt = x.updated_at instanceof Timestamp ? x.updated_at.toDate().toISOString() : typeof x.updated_at === 'string' ? x.updated_at : new Date().toISOString();
+    const plan = accommodationFromDoc(id, { ...x, updated_at: null });
+    return { ...plan, updated_at: updatedAt };
+  }).filter((p) => p.check_in && p.check_out && p.journey_id);
+}
+
+function accommodationFromDoc(id: string, data: DocumentData) {
+  const updatedAt = data.updated_at instanceof Timestamp
+    ? data.updated_at.toDate().toISOString()
+    : new Date().toISOString();
+  return {
+    id,
+    journey_id: String(data.journey_id ?? ''),
+    stop_id: String(data.stop_id ?? id),
+    needed: data.needed !== false,
+    status: (ACCOMMODATION_STATUSES as readonly string[]).includes(data.status) ? (data.status as AccommodationStatus) : 'open',
+    check_in: String(data.check_in ?? ''),
+    check_out: String(data.check_out ?? ''),
+    requirements: { ...EMPTY_REQUIREMENTS, ...(data.requirements ?? {}) } as AccommodationRequirements,
+    options: (Array.isArray(data.options) ? data.options : []) as AccommodationOption[],
+    selected_option_id: typeof data.selected_option_id === 'string' ? data.selected_option_id : null,
+    booking: (data.booking ?? null) as AccommodationBooking | null,
+    notes: typeof data.notes === 'string' ? data.notes : null,
+    updated_at: updatedAt,
+    deleted: data.deleted === true,
+  };
+}
+
+export async function pullAccommodationsFromCloud(uid: string): Promise<void> {
+  const snapshot = await getDocs(accommodationsCollection(uid));
+  for (const docSnap of snapshot.docs) {
+    const plan = accommodationFromDoc(docSnap.id, docSnap.data());
+    // A document without dates cannot be stored (NOT NULL); nothing writes
+    // one, but a hand-edited document must not break the whole pull.
+    if (!plan.deleted && (!plan.check_in || !plan.check_out || !plan.journey_id)) continue;
+    await upsertAccommodationFromCloud(plan);
+  }
+}
+
 // ─── Bidirectional Sync ───
 
 /**
@@ -384,14 +598,42 @@ export async function syncAll(uid: string): Promise<void> {
   await pullVisasFromCloud(uid);
   await pushVisasToCloud(uid);
   await pullJourneysFromCloud(uid);
+  await pullMembersFromCloud(uid);
   await pushJourneysToCloud(uid);
+  await pullSharedJourneysFromCloud(uid);
+  await pullAccommodationsFromCloud(uid);
+  await pushAccommodationsToCloud(uid);
+  await pullDocumentsFromCloud(uid);
+  await pushDocumentsToCloud(uid);
   await pushProfileToCloud(uid);
   await setLastSyncTime(uid);
+}
+
+/**
+ * Only what this phone changed, pushed. Run a moment after a local edit
+ * (see `syncTrigger`), so a stop moved here reaches the friends following
+ * the trip, and the agent, without waiting for the next app start. Plans
+ * and accommodation only: the timeline has its own rhythm.
+ */
+export async function pushPlans(uid: string): Promise<void> {
+  await pushJourneysToCloud(uid);
+  await pushAccommodationsToCloud(uid);
+  await pushDocumentsToCloud(uid);
 }
 
 // ─── Realtime Listener ───
 
 let activeUnsubscribe: Unsubscribe | null = null;
+
+/** Screens showing a wallet register here to re-read when a shared document lands. */
+const documentListeners = new Set<() => void>();
+export function onDocumentsChanged(fn: () => void): () => void {
+  documentListeners.add(fn);
+  return () => { documentListeners.delete(fn); };
+}
+function notifyDocumentsChanged(): void {
+  documentListeners.forEach((fn) => fn());
+}
 
 export function startRealtimeSync(uid: string): Unsubscribe {
   stopRealtimeSync();
@@ -407,6 +649,55 @@ export function startRealtimeSync(uid: string): Unsubscribe {
         } catch (err) {
           reportError(err, 'sync:journeys-realtime');
         }
+      }
+    }
+  });
+
+  // Accommodation plans: the agent's research lands on the phone while the
+  // trip is open, same as its stops.
+  const unsubscribeAccommodations = onSnapshot(accommodationsCollection(uid), async (snapshot) => {
+    for (const change of snapshot.docChanges()) {
+      if (change.type === 'added' || change.type === 'modified') {
+        try {
+          const plan = accommodationFromDoc(change.doc.id, change.doc.data());
+          if (!plan.deleted && (!plan.check_in || !plan.check_out || !plan.journey_id)) continue;
+          await upsertAccommodationFromCloud(plan);
+        } catch (err) {
+          reportError(err, 'sync:accommodations-realtime');
+        }
+      }
+    }
+  });
+
+  // Trips followed: a friend's edit shows up here; a trip no longer shared
+  // with us leaves the query and is tombstoned.
+  const unsubscribeFollowed = onSnapshot(query(sharedJourneysCollection(), where('member_uids', 'array-contains', uid)), async (snapshot) => {
+    for (const change of snapshot.docChanges()) {
+      try {
+        if (change.type === 'removed') {
+          await forgetFollowedJourney(change.doc.id);
+        } else {
+          await takeFollowedJourney(change.doc.id, change.doc.data());
+        }
+      } catch (err) {
+        reportError(err, 'sync:followed-realtime');
+      }
+    }
+  });
+
+  // Trips shared: a friend joining becomes a traveller within seconds. A
+  // mirror that disappeared means sharing was stopped, from here or through
+  // account deletion.
+  const unsubscribeShared = onSnapshot(query(sharedJourneysCollection(), where('owner_uid', '==', uid)), async (snapshot) => {
+    for (const change of snapshot.docChanges()) {
+      try {
+        if (change.type === 'removed') {
+          await clearJourneyShareCodeBySyncId(change.doc.id);
+        } else {
+          await syncJourneyMembers(change.doc.id, membersOf(change.doc.data()), uid);
+        }
+      } catch (err) {
+        reportError(err, 'sync:shared-realtime');
       }
     }
   });
@@ -437,9 +728,23 @@ export function startRealtimeSync(uid: string): Unsubscribe {
     }
   });
 
+  // Documents of shared trips: one listener per trip, set up once the
+  // trips are known. `notifyDocumentsChanged` wakes the open wallet.
+  let unsubscribeDocuments: Unsubscribe | null = null;
+  let stopped = false;
+  watchDocuments(uid, notifyDocumentsChanged).then((u) => {
+    if (stopped) u();
+    else unsubscribeDocuments = u;
+  }).catch((err) => reportError(err, 'sync:documents-watch'));
+
   const unsubscribe: Unsubscribe = () => {
+    stopped = true;
     unsubscribeTrips();
     unsubscribeJourneys();
+    unsubscribeAccommodations();
+    unsubscribeFollowed();
+    unsubscribeShared();
+    unsubscribeDocuments?.();
   };
   activeUnsubscribe = unsubscribe;
   return unsubscribe;

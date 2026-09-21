@@ -20,8 +20,9 @@ import * as Haptics from 'expo-haptics';
 import { useJourneys } from '../../../hooks/useJourneys';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
-import { insertJourney, insertJourneyLeg, parseDate, TransportType } from '../../../lib/database';
+import { insertJourney, insertJourneyLeg, parseDate, TransportType, type Journey } from '../../../lib/database';
 import { deleteJourneyWithDocuments } from '../../../lib/documents';
+import { inviteFriends, leaveTrip, stopSharing } from '../../../lib/shareActions';
 import { Flag } from '../../../components/Flag';
 
 const hasGlass = isLiquidGlassAvailable();
@@ -238,21 +239,22 @@ function computeTotalDays(firstStart: string, lastEnd: string): number {
 
 // ─── Journey Card ────────────────────────────────────────────────────────────
 
-interface JourneyCardData {
-  id: number;
-  title: string;
+type JourneyCardData = Omit<Journey, 'countries'> & {
   leg_count: number;
   first_start: string | null;
   last_end: string | null;
   countries: string | null; // JSON array of country codes
-}
+};
 
 function JourneyCard({
   journey,
   onDelete,
+  onChanged,
 }: {
   journey: JourneyCardData;
   onDelete: (id: number) => void;
+  /** Sharing started, stopped or left: the list re-reads. */
+  onChanged: () => void;
 }) {
   const router = useRouter();
 
@@ -279,23 +281,29 @@ function JourneyCard({
       : null;
 
   const stopLabel = journey.leg_count === 1 ? 'stop' : 'stops';
-  const meta =
-    totalDays !== null
-      ? `${journey.leg_count} ${stopLabel} · ${totalDays} days`
-      : `${journey.leg_count} ${stopLabel}`;
+  const followed = !!journey.shared_owner_uid;
+  const meta = [
+    totalDays !== null ? `${journey.leg_count} ${stopLabel} · ${totalDays} days` : `${journey.leg_count} ${stopLabel}`,
+    followed ? `with ${journey.shared_owner_name ?? 'a friend'}` : journey.share_code ? 'shared' : null,
+  ].filter(Boolean).join(' · ');
 
+  // A friend's trip can only be left; one's own can be shared, unshared, deleted.
   const handleLongPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (followed) {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['Leave trip', 'Cancel'], destructiveButtonIndex: 0, cancelButtonIndex: 1, title: journey.title },
+        (i) => { if (i === 0) leaveTrip(journey).then(onChanged); },
+      );
+      return;
+    }
+    const options = ['Invite friends', ...(journey.share_code ? ['Stop sharing'] : []), 'Delete trip', 'Cancel'];
     ActionSheetIOS.showActionSheetWithOptions(
-      {
-        options: ['Delete trip', 'Cancel'],
-        destructiveButtonIndex: 0,
-        cancelButtonIndex: 1,
-        title: journey.title,
-      },
+      { options, destructiveButtonIndex: options.length - 2, cancelButtonIndex: options.length - 1, title: journey.title },
       (i) => {
-        if (i === 0) onDelete(journey.id);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        if (i === 0) inviteFriends(journey).then(onChanged);
+        else if (journey.share_code && i === 1) stopSharing(journey).then(onChanged);
+        else if (i === options.length - 2) onDelete(journey.id);
       },
     );
   };
@@ -437,14 +445,14 @@ export default function JourneysScreen() {
             <JourneyCard
               key={j.id}
               journey={{
-                id: j.id,
-                title: j.title,
+                ...j,
                 leg_count: (j.leg_count as number) ?? 0,
                 first_start: j.first_start ?? null,
                 last_end: j.last_end ?? null,
                 countries: j.countries ?? null,
               }}
               onDelete={handleDelete}
+              onChanged={refresh}
             />
           ))
         )}

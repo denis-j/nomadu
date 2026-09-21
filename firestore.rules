@@ -36,6 +36,16 @@ service cloud.firestore {
         allow update: if request.auth != null && request.auth.uid == userId;
         allow delete: if request.auth != null && request.auth.uid == userId;
       }
+
+      // Accommodation plans, one document per journey stop (the document id
+      // is the stop's id) with the researched options embedded. Same auth
+      // pattern; an agent reaches them through the Functions, with a token.
+      match /accommodations/{stopId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     // AI call budget, written only by the Cloud Functions via the Admin SDK
@@ -49,6 +59,52 @@ service cloud.firestore {
     // Agent tokens: hashes only, written and read by the Functions through
     // the Admin SDK. A client never touches them.
     match /agent_tokens/{tokenId} {
+      allow read, write: if false;
+    }
+
+    // A trip shared with friends: the owner's journey mirrored, plus who is
+    // along. Members read it, the owner's phone updates the mirror on every
+    // push, and the membership itself only changes through the Functions
+    // (shareJourney, joinJourney), so nobody joins without the invite code.
+    match /shared_journeys/{journeyId} {
+      allow read: if request.auth != null
+        && (resource.data.owner_uid == request.auth.uid
+          || request.auth.uid in resource.data.member_uids);
+      allow update: if request.auth != null
+        && resource.data.owner_uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['title', 'legs', 'travellers', 'accommodations', 'updated_at', 'deleted', 'owner_uid', 'owner_name']);
+      allow create, delete: if false;
+
+      // Documents shared on the trip: the file is in Storage under the same
+      // ids (storage.rules mirrors these checks). The owner reads them all;
+      // a member reads what is for everyone or for them, and may only add
+      // for everyone or for themselves. Records are the uploader's to
+      // change, and the owner's.
+      match /documents/{docId} {
+        function trip() {
+          return get(/databases/$(database)/documents/shared_journeys/$(journeyId)).data;
+        }
+        function isOwner() {
+          return request.auth != null && trip().owner_uid == request.auth.uid;
+        }
+        function isMember() {
+          return request.auth != null && request.auth.uid in trip().member_uids;
+        }
+        allow read: if isOwner()
+          || (isMember() && (resource.data.traveller_uid == null || resource.data.traveller_uid == request.auth.uid));
+        allow create: if (isOwner() || isMember())
+          && request.resource.data.uploader_uid == request.auth.uid
+          && (isOwner() || request.resource.data.traveller_uid == null || request.resource.data.traveller_uid == request.auth.uid);
+        allow update: if (isOwner() || resource.data.uploader_uid == request.auth.uid)
+          && request.resource.data.uploader_uid == resource.data.uploader_uid;
+        allow delete: if isOwner() || resource.data.uploader_uid == request.auth.uid;
+      }
+    }
+
+    // Invite codes: read by the Functions only. A client that could list
+    // them could join any trip.
+    match /invites/{code} {
       allow read, write: if false;
     }
 

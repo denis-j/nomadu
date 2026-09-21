@@ -1,0 +1,32 @@
+rules_version = '2';
+
+// Files of documents shared on a trip, and nothing else. Each file sits
+// under the trip's id and the document's id, and the checks are the ones
+// from firestore.rules for the matching record: the owner reads everything
+// on the trip, a member what is for everyone or for them; owner and members
+// upload (20 MB at most), the uploader or the owner deletes.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /shared/{journeyId}/{file} {
+      function trip() {
+        return firestore.get(/databases/(default)/documents/shared_journeys/$(journeyId)).data;
+      }
+      function record() {
+        return firestore.get(/databases/(default)/documents/shared_journeys/$(journeyId)/documents/$(file.split('\\.')[0])).data;
+      }
+      function isOwner() {
+        return request.auth != null && trip().owner_uid == request.auth.uid;
+      }
+      function isMember() {
+        return request.auth != null && request.auth.uid in trip().member_uids;
+      }
+      allow read: if isOwner()
+        || (isMember() && (record().traveller_uid == null || record().traveller_uid == request.auth.uid));
+      allow create: if (isOwner() || isMember()) && request.resource.size < 20 * 1024 * 1024;
+      allow delete: if isOwner() || record().uploader_uid == request.auth.uid;
+    }
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -8,8 +8,9 @@ import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
-import { deleteJourneyDocument, getJourneyDocument, getJourneyTravellers, JourneyDocument, parseDate } from '../../../lib/database';
-import { documentExists, documentUri, isImageMime, kindMeta, removeDocumentFile } from '../../../lib/documents';
+import { getJourneyDocument, getJourneyTravellers, getJourneyWithLegs, JourneyDocument, parseDate } from '../../../lib/database';
+import { documentExists, documentUri, isImageMime, kindMeta } from '../../../lib/documents';
+import { deleteDocumentEverywhere } from '../../../lib/documentSync';
 import { showToast } from '../../../lib/toast';
 
 /**
@@ -55,8 +56,9 @@ export default function DocumentScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await deleteJourneyDocument(doc.id);
-          removeDocumentFile(doc.file_name);
+          // A shared document goes from the cloud too, so the others lose it as well.
+          const journey = await getJourneyWithLegs(doc.journey_id);
+          await deleteDocumentEverywhere(doc, journey?.sync_id ?? null);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           router.back();
           showToast('Document deleted');

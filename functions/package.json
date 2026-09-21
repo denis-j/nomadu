@@ -1,6 +1,6 @@
 {
   "name": "nomadu-functions",
-  "description": "Server-side Gemini proxy for Nomadu",
+  "description": "Nomadu backend: Gemini proxies, account deletion and the agent API",
   "private": true,
   "main": "lib/index.js",
   "engines": {
@@ -13,7 +13,8 @@
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/test.mjs"
   },
   "dependencies": {
     "firebase-admin": "^13.0.2",

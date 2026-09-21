@@ -13,13 +13,11 @@ export default function PlansStack() {
       <Stack.Screen
         name="[id]"
         options={{
-          // Static header setup lives here so the first frame already has it;
-          // set from inside the screen it arrived a frame late and flickered.
+          // The trip draws its own bar over the map (back disc, morphing
+          // title chip, add disc): a native header title cannot grow into
+          // the travellers panel. Set here so the first frame is right.
+          headerShown: false,
           headerBackTitle: 'Journeys',
-          headerLargeTitle: false,
-          headerTransparent: true,
-          headerShadowVisible: false,
-          headerBackButtonDisplayMode: 'minimal',
           title: '',
         }}
       />
@@ -71,6 +69,13 @@ export default function PlansStack() {
         name="document"
         options={{
           headerBackButtonDisplayMode: 'minimal',
+        }}
+      />
+      <Stack.Screen
+        name="accommodation"
+        options={{
+          headerBackButtonDisplayMode: 'minimal',
+          headerLargeTitle: false,
         }}
       />
       <Stack.Screen

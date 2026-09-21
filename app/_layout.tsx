@@ -124,6 +124,15 @@ function RootNavigator() {
         }}
       />
       <Stack.Screen
+        name="join/[code]"
+        options={{
+          headerShown: false,
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.75, 1.0],
+        }}
+      />
+      <Stack.Screen
         name="debug/badges"
         options={{
           title: 'Badges (Debug)',

@@ -58,11 +58,13 @@ export function DocumentsEntryCard({
 }
 
 const styles = StyleSheet.create({
+  // Same radius as a stop card, the two entry cards stack 12 apart and
+  // leave 16 before the timeline like the map does.
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 16,
+    borderRadius: 18,
     borderCurve: 'continuous',
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -71,7 +73,7 @@ const styles = StyleSheet.create({
   },
   cardFallback: {
     backgroundColor: Colors.surface,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
   },
   icon: {
