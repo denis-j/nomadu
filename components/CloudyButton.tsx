@@ -58,7 +58,10 @@ export function CloudyButton({
 const styles = StyleSheet.create({
   shadow: {
     width: '100%',
+    // Capped for wide screens; without this the button would hang on the
+    // left of any parent wider than the cap instead of sitting in the middle.
     maxWidth: 360,
+    alignSelf: 'center',
   },
   outer: {
     borderRadius: 999,

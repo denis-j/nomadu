@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router/stack';
+import { Colors } from '../../../constants/colors';
 
 export default function PlansStack() {
   return (
@@ -79,6 +80,22 @@ export default function PlansStack() {
         options={{
           headerBackButtonDisplayMode: 'minimal',
           headerLargeTitle: false,
+        }}
+      />
+      <Stack.Screen
+        name="guide"
+        options={{
+          headerBackButtonDisplayMode: 'minimal',
+          headerLargeTitle: false,
+        }}
+      />
+      <Stack.Screen
+        name="guide-start"
+        options={{
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.85],
+          contentStyle: { backgroundColor: Colors.background },
         }}
       />
       <Stack.Screen
