@@ -25,6 +25,7 @@ import {
   type Leg,
 } from './prompts';
 import { consumeQuota } from './rateLimit';
+import { cachedCityTips } from './cityTips';
 
 initializeApp();
 
@@ -115,13 +116,17 @@ export const cityTips = onCall(options, async (request) => {
   const city = requireString(data.city, 'city', 80);
   const country = requireString(data.country, 'country', 80);
 
-  await consumeQuota(uid, 'cityTips');
-
-  const text = await generateText(geminiKey.value(), buildCityTipsPrompt(city, country), 512, 0.8);
-  if (!text) {
-    throw new HttpsError('internal', 'The AI returned an empty response. Please try again.');
-  }
-  return { tips: text };
+  // Shared across users: the model runs once per city, then everyone reads
+  // the same answer back. The quota is only spent when it does run.
+  const { tips } = await cachedCityTips(city, country, async () => {
+    await consumeQuota(uid, 'cityTips');
+    const text = await generateText(geminiKey.value(), buildCityTipsPrompt(city, country), 512, 0.8);
+    if (!text) {
+      throw new HttpsError('internal', 'The AI returned an empty response. Please try again.');
+    }
+    return text;
+  });
+  return { tips };
 });
 
 // ─── Trip extraction from a screenshot ───────────────────────────────────────

@@ -6,6 +6,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import { deleteTrip, getTripById, Trip } from '../../lib/database';
 import { Flag } from '../../components/Flag';
+import { SectionLabel } from '../../components/visaForm';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 
@@ -111,25 +112,26 @@ export default function TripDetailScreen() {
           <StatCard label={isActive ? 'Status' : 'Departed'} value={isActive ? 'Active' : formatDate(trip.end_date!)} />
         </View>
 
-        {/* Details Card */}
-        <GlassCard
-          {...glassProps}
-          style={[styles.detailsCard, !hasGlass && styles.detailsCardFallback]}
-        >
-          <Text style={styles.detailsTitle}>Trip Details</Text>
-
-          <DetailRow icon="log-in-outline" label="Arrival" value={formatDateLong(trip.start_date)} />
-          <View style={styles.separator} />
-          <DetailRow icon="log-out-outline" label="Departure" value={trip.end_date ? formatDateLong(trip.end_date) : 'Ongoing'} />
-          <View style={styles.separator} />
-          <DetailRow icon="time-outline" label="Total Days" value={`${trip.days} day${trip.days !== 1 ? 's' : ''}`} />
-          {trip.latitude && trip.longitude && (
-            <>
-              <View style={styles.separator} />
-              <DetailRow icon="navigate-outline" label="Coordinates" value={`${trip.latitude.toFixed(4)}, ${trip.longitude.toFixed(4)}`} />
-            </>
-          )}
-        </GlassCard>
+        {/* Details Card, its label above it as on the stop sheet */}
+        <View style={styles.section}>
+          <SectionLabel>Trip details</SectionLabel>
+          <GlassCard
+            {...glassProps}
+            style={[styles.detailsCard, !hasGlass && styles.detailsCardFallback]}
+          >
+            <DetailRow icon="log-in-outline" label="Arrival" value={formatDateLong(trip.start_date)} />
+            <View style={styles.separator} />
+            <DetailRow icon="log-out-outline" label="Departure" value={trip.end_date ? formatDateLong(trip.end_date) : 'Ongoing'} />
+            <View style={styles.separator} />
+            <DetailRow icon="time-outline" label="Total Days" value={`${trip.days} day${trip.days !== 1 ? 's' : ''}`} />
+            {trip.latitude && trip.longitude && (
+              <>
+                <View style={styles.separator} />
+                <DetailRow icon="navigate-outline" label="Coordinates" value={`${trip.latitude.toFixed(4)}, ${trip.longitude.toFixed(4)}`} />
+              </>
+            )}
+          </GlassCard>
+        </View>
 
         {/* Delete */}
         <TouchableOpacity
@@ -316,10 +318,13 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   // ─── Details Card ───
-  detailsCard: {
-    borderRadius: 16,
+  section: {
     marginHorizontal: 16,
     marginTop: 16,
+    gap: 10,
+  },
+  detailsCard: {
+    borderRadius: 16,
     padding: 18,
     overflow: 'hidden',
   },
@@ -327,13 +332,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
-  },
-  detailsTitle: {
-    ...Typography.button,
-    fontWeight: '700',
-    marginBottom: 16,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   separator: {
     height: 1,

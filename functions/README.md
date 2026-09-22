@@ -27,6 +27,7 @@ shared_journeys/{journeySyncId}     a trip shared with friends: mirror plus memb
   documents/{docSyncId}             records of the documents shared on it
 invites/{code}                      invite code -> journey         (functions only)
 ai_usage/{uid}_{YYYY-MM-DD}         per-day AI call counters       (functions only)
+city_tips/{country__city}           cached tips, one per city      (functions only)
 agent_tokens/{sha256}               hashed agent tokens            (functions only)
 ```
 
@@ -85,6 +86,8 @@ Model `gemini-3.1-flash-lite`, key from Secret Manager. Prompts are built server
 | `extractTrips` | `imageBase64` (max 7 MB), `mimeType` (jpeg, png, webp, heic) | `{trips: [{city, country, startDate, endDate or null}]}`, empty when nothing is readable | 30 |
 
 Used by the Plan screen (suggestions under a trip, tips on a stop) and the screenshot import.
+
+`cityTips` answers from `city_tips/{country__city}` when it can (`cityTips.ts`): the model runs once per city, the answer is kept for 90 days and served to every later caller without a model call and without counting against their budget. The key is the country and city lower-cased with accents and punctuation stripped, so "Viet Nam, Hà Nội" and "vietnam hanoi" share one entry. The app additionally caches what it received per device (`lib/ai.ts`).
 
 ### Account
 
@@ -185,4 +188,4 @@ npm run logs
 
 `GEMINI_API_KEY` is set once with `npx firebase functions:secrets:set GEMINI_API_KEY`. The app's own configuration (`EXPO_PUBLIC_FIREBASE_*`, `EXPO_PUBLIC_GOOGLE_*`, `EXPO_PUBLIC_SENTRY_DSN`) is public by design and inlined at build time; `scripts/check-env.mjs` refuses a build without it.
 
-Housekeeping still to do by hand: a Firestore TTL policy on `ai_usage.expiresAt` so old counters delete themselves.
+Housekeeping still to do by hand: Firestore TTL policies on `ai_usage.expiresAt` and `city_tips.expiresAt` so old counters and stale tips delete themselves.

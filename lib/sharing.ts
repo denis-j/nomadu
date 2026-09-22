@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Share } from 'react-native';
 import { httpsCallable } from 'firebase/functions';
 import { auth, functions } from './firebase';
-import { getJourneyWithLegs, parseDate, setJourneyShareCode, type Journey } from './database';
+import { setJourneyShareCode, type Journey } from './database';
 import { localChanged } from './syncTrigger';
 
 /**
@@ -75,13 +75,9 @@ export async function unshareJourney(journey: ShareableJourney): Promise<void> {
   await setJourneyShareCode(journey.id, null);
 }
 
-/** "Come along to Vietnam, 1 to 14 Nov: <link>" in the system share sheet. */
-export async function presentInvite(journey: ShareableJourney, url: string): Promise<void> {
-  const full = await getJourneyWithLegs(journey.id);
-  const legs = full?.legs ?? [];
-  const fmt = (ymd: string) => parseDate(ymd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  const when = legs.length ? `, ${fmt(legs[0].start_date)} to ${fmt(legs[legs.length - 1].end_date)}` : '';
-  await Share.share({ message: `Come along to ${journey.title}${when}. Open the link in Nomadu to follow the trip: ${url}`, url });
+/** The link, and only the link, in the system share sheet; the page it opens says the rest. */
+export async function presentInvite(_journey: ShareableJourney, url: string): Promise<void> {
+  await Share.share({ url });
 }
 
 /** An invite opened before signing in is kept until the tabs are up. */

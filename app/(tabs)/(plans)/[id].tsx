@@ -33,7 +33,7 @@ import { consumePendingStay } from '../../../lib/accommodationBridge';
 import { planChipText, statusColor } from '../../../components/accommodationForm';
 import type { LocalAccommodation } from '../../../lib/accommodations';
 import { DocumentsEntryCard } from '../../../components/JourneyDocuments';
-import { AvatarStack, avatarPeople, type AvatarPerson } from '../../../components/TravellerAvatars';
+import { AvatarStack, avatarPeople, avatarStackWidth, type AvatarPerson } from '../../../components/TravellerAvatars';
 import { TravellersContent } from '../../../components/TravellersContent';
 import { useAuth } from '../../../hooks/useAuth';
 import { EmptyState } from '../../../components/EmptyState';
@@ -338,6 +338,8 @@ const ChipShell = hasGlass ? GlassView : View;
 const chipGlassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 /** The bar's height; the discs and the chip are as tall as this. */
 const BAR_H = 44;
+/** The faces inside the closed chip. */
+const FACE = 22;
 const MORPH_OPEN = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
 const MORPH_CLOSE = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
 
@@ -401,9 +403,10 @@ function TripMorphChip({
 
   // The faces sit on the right edge; the text gets the same room on both
   // sides, so it is centred in the capsule and not in what the faces leave.
-  const faces = Math.min(people.length, 3) + (people.length > 3 ? 1 : 0);
-  const facesWidth = faces > 0 ? 24 + (faces - 1) * 24 * 0.7 : 0;
-  const sidePad = 16 + (facesWidth > 0 ? facesWidth + 6 : 0);
+  // Two small faces and a "+N": more would push the status line out of
+  // the room between the discs.
+  const facesWidth = avatarStackWidth(people.length, FACE, 2, 0.35);
+  const sidePad = 8 + facesWidth;
 
   useEffect(() => {
     if (open) setMounted(true);
@@ -450,7 +453,7 @@ function TripMorphChip({
             </View>
             {people.length > 0 && (
               <Animated.View style={[styles.titleChipFaces, miniFacesStyle]}>
-                <AvatarStack people={people} size={24} max={3} />
+                <AvatarStack people={people} size={FACE} max={2} overlap={0.35} />
               </Animated.View>
             )}
           </>
@@ -1135,6 +1138,7 @@ export default function JourneyDetailScreen() {
         start: leg.start_date,
         end: leg.end_date,
         transport: leg.transport,
+        ...(leg.latitude != null && leg.longitude != null && { latitude: String(leg.latitude), longitude: String(leg.longitude) }),
         ...(leg.notes && { notes: leg.notes }),
         ...(journey?.legs[0]?.id !== leg.id && { lockStart: '1' }),
         ...(leg.sync_id && journey?.sync_id && { stopSyncId: leg.sync_id, journeySyncId: journey.sync_id }),
@@ -1345,8 +1349,8 @@ export default function JourneyDetailScreen() {
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   const { width: screenWidth } = useWindowDimensions();
-  // Between the two discs (16 + 44 + 12 on each side) when closed.
-  const chipWidths = useMemo(() => ({ closed: screenWidth - 2 * (16 + BAR_H + 12), open: screenWidth - 32 }), [screenWidth]);
+  // Between the two discs (16 + 44 + 8 on each side) when closed.
+  const chipWidths = useMemo(() => ({ closed: screenWidth - 2 * (16 + BAR_H + 8), open: screenWidth - 32 }), [screenWidth]);
 
   return (
     <>
@@ -1793,7 +1797,7 @@ const styles = StyleSheet.create({
     height: BAR_H,
   },
   titleChipText: { alignItems: 'center', flexShrink: 1 },
-  titleChipFaces: { position: 'absolute', right: 12, top: (BAR_H - 24) / 2 },
+  titleChipFaces: { position: 'absolute', right: 8, top: (BAR_H - FACE) / 2 },
   titleChipFallback: {
     backgroundColor: 'rgba(255,255,255,0.88)',
     shadowColor: '#000',

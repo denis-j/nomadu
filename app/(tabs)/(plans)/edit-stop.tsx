@@ -10,12 +10,12 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { Ionicons } from '@expo/vector-icons';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
+import { StopSummary } from '../../../components/StopSummary';
+import { TransportPicker } from '../../../components/TransportPicker';
 import { updateJourneyLeg, parseDate, type TransportType } from '../../../lib/database';
 import { forwardGeocode } from '../../../lib/geocoding';
-import { Colors } from '../../../constants/colors';
 import { getCountryCode } from '../../../utils/geography';
 import { showToast } from '../../../lib/toast';
 
@@ -31,15 +31,6 @@ type Params = {
   /** '1' when the start is fixed by the previous stop and only the length is chosen. */
   lockStart?: string;
 };
-
-const TRANSPORTS: { type: TransportType; icon: string; label: string }[] = [
-  { type: 'flight', icon: 'airplane', label: 'Flight' },
-  { type: 'train', icon: 'train-outline', label: 'Train' },
-  { type: 'car', icon: 'car-outline', label: 'Car' },
-  { type: 'bus', icon: 'bus-outline', label: 'Bus' },
-  { type: 'ferry', icon: 'boat-outline', label: 'Ferry' },
-  { type: 'walk', icon: 'walk-outline', label: 'Walk' },
-];
 
 const fmtDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -61,7 +52,6 @@ export default function EditStopScreen() {
   const [notes, setNotes] = useState(params.notes || '');
   const [saving, setSaving] = useState(false);
 
-  const days = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1);
 
   // ─── Calendar ───────────────────────────────────────────────────────────────
 
@@ -166,13 +156,7 @@ export default function EditStopScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Location summary */}
-        <View style={styles.locationRow}>
-          <Text style={styles.locationText}>{params.city}, {params.country}</Text>
-          <View style={styles.daysBubble}>
-            <Text style={styles.daysText}>{days}d</Text>
-          </View>
-        </View>
+        <StopSummary city={params.city} country={params.country} start={startDate} end={endDate} />
 
         {/* Calendar */}
         <Text style={styles.sectionTitle}>Dates</Text>
@@ -201,30 +185,7 @@ export default function EditStopScreen() {
 
         {/* Transport */}
         <Text style={styles.sectionTitle}>Transport</Text>
-        <View style={styles.transportGrid}>
-          {TRANSPORTS.map((t) => {
-            const active = transport === t.type;
-            return (
-              <Pressable
-                key={t.type}
-                style={[styles.transportPill, active && styles.transportPillActive]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setTransport(t.type);
-                }}
-              >
-                <Ionicons
-                  name={t.icon as any}
-                  size={18}
-                  color={active ? '#fff' : PlatformColor('label') as any}
-                />
-                <Text style={[styles.transportLabel, active && styles.transportLabelActive]}>
-                  {t.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <TransportPicker value={transport} onChange={setTransport} />
 
         {/* Notes */}
         <Text style={styles.sectionTitle}>Notes</Text>
@@ -250,30 +211,6 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingBottom: 60,
   },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  locationText: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: PlatformColor('label'),
-    flex: 1,
-  },
-  daysBubble: {
-    backgroundColor: PlatformColor('systemGray5'),
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  daysText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: PlatformColor('label'),
-    fontVariant: ['tabular-nums'],
-  },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '600',
@@ -292,31 +229,6 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     overflow: 'hidden',
     padding: 4,
-  },
-  transportGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  transportPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: PlatformColor('secondarySystemGroupedBackground'),
-  },
-  transportPillActive: {
-    backgroundColor: '#000',
-  },
-  transportLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: PlatformColor('label'),
-  },
-  transportLabelActive: {
-    color: Colors.white,
   },
   inputCard: {
     backgroundColor: PlatformColor('secondarySystemGroupedBackground'),

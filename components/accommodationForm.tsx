@@ -175,12 +175,15 @@ export function TextArea({
   label,
   value,
   onCommit,
+  live,
   placeholder,
   last,
 }: {
   label?: string;
   value: string;
   onCommit: (v: string) => void;
+  /** Commit every keystroke, for a form with its own button rather than autosave. */
+  live?: boolean;
   placeholder?: string;
   last?: boolean;
 }) {
@@ -194,7 +197,7 @@ export function TextArea({
           ref={ref}
           style={s.areaInput}
           value={draft}
-          onChangeText={setDraft}
+          onChangeText={(v) => { setDraft(v); if (live) onCommit(v); }}
           onFocus={() => { focused.current = true; }}
           onBlur={() => {
             focused.current = false;

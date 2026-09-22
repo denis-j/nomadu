@@ -27,16 +27,19 @@ export default function PlansStack() {
           presentation: 'formSheet',
           headerShown: false,
           sheetGrabberVisible: true,
-          sheetAllowedDetents: [0.85, 1.0],
+          sheetAllowedDetents: [1.0],
           contentStyle: { backgroundColor: 'transparent' },
         }}
       />
       <Stack.Screen
         name="stop-info"
         options={{
+          // Like a stay's sheet: the map is the header, and the sheet opens
+          // full so map, stats and details are all there at once.
+          headerShown: false,
           presentation: 'formSheet',
           sheetGrabberVisible: true,
-          sheetAllowedDetents: [0.7, 1.0],
+          sheetAllowedDetents: [1.0],
           contentStyle: { backgroundColor: 'transparent' },
         }}
       />

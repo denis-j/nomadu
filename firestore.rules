@@ -56,6 +56,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // City tips, one entry per city for everyone, written by the cityTips
+    // function. Clients get them through the function, never directly.
+    match /city_tips/{cityId} {
+      allow read, write: if false;
+    }
+
     // Agent tokens: hashes only, written and read by the Functions through
     // the Admin SDK. A client never touches them.
     match /agent_tokens/{tokenId} {

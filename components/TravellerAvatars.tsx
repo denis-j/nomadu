@@ -89,21 +89,27 @@ export function Avatar({
 }
 
 /** Up to `max` discs overlapping, then "+N". */
-export function AvatarStack({ people, size = 36, max = 4 }: { people: AvatarPerson[]; size?: number; max?: number }) {
+export function AvatarStack({ people, size = 36, max = 4, overlap = 0.3 }: { people: AvatarPerson[]; size?: number; max?: number; overlap?: number }) {
   const shown = people.slice(0, max);
   const rest = people.length - shown.length;
   return (
     <View style={styles.stack}>
       {shown.map((p, i) => (
-        <Avatar key={p.key} person={p} size={size} style={i > 0 ? { marginLeft: -size * 0.3 } : undefined} />
+        <Avatar key={p.key} person={p} size={size} style={i > 0 ? { marginLeft: -size * overlap } : undefined} />
       ))}
       {rest > 0 && (
-        <View style={[styles.more, { width: size, height: size, borderRadius: size / 2, marginLeft: -size * 0.3 }]}>
+        <View style={[styles.more, { width: size, height: size, borderRadius: size / 2, marginLeft: -size * overlap }]}>
           <Text style={styles.moreText}>+{rest}</Text>
         </View>
       )}
     </View>
   );
+}
+
+/** How wide a stack of `n` people comes out, for layouts that reserve room for it. */
+export function avatarStackWidth(n: number, size: number, max: number, overlap = 0.3): number {
+  const discs = Math.min(n, max) + (n > max ? 1 : 0);
+  return discs > 0 ? size + (discs - 1) * size * (1 - overlap) : 0;
 }
 
 const styles = StyleSheet.create({

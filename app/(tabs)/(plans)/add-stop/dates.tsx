@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { PlatformColor, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { PlatformColor, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
+import { StopSummary } from '../../../../components/StopSummary';
 import { parseDate } from '../../../../lib/database';
 
 type Params = {
@@ -21,9 +22,6 @@ type Params = {
 
 const fmt = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-const fmtDisplay = (d: Date) =>
-  d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 const RANGE_COLOR = '#000000';
 const RANGE_BG = 'rgba(0,0,0,0.08)';
@@ -49,7 +47,6 @@ export default function AddStopDatesScreen() {
   const [endDate, setEndDate] = useState(initialEnd);
   const [pickingEnd, setPickingEnd] = useState(lockStart);
 
-  const days = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1);
 
   const handleDayPress = (day: DateData) => {
     const d = parseDate(day.dateString);
@@ -147,25 +144,7 @@ export default function AddStopDatesScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
       >
-        {/* Location + days summary */}
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLocation}>{city}, {country}</Text>
-          <View style={styles.daysBubble}>
-            <Text style={styles.daysText}>{days}d</Text>
-          </View>
-        </View>
-
-        {/* Date range display */}
-        <Text style={styles.dateRange}>
-          {fmtDisplay(startDate)} – {fmtDisplay(endDate)}
-        </Text>
-
-        {/* Hint */}
-        <Text style={styles.hint}>
-          {lockStart
-            ? `Starts ${fmtDisplay(startDate)}, right after the previous stop. Tap the last day.`
-            : pickingEnd ? 'Tap a date for the end' : 'Tap a date for the start'}
-        </Text>
+        <StopSummary city={city} country={country} start={startDate} end={endDate} />
 
         {/* Calendar */}
         <Calendar
@@ -200,35 +179,6 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 12,
     paddingBottom: 60,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  summaryLocation: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: PlatformColor('label'),
-    flex: 1,
-  },
-  daysBubble: {
-    backgroundColor: PlatformColor('systemGray5'),
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  daysText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: PlatformColor('label'),
-    fontVariant: ['tabular-nums'],
-  },
-  dateRange: {
-    fontSize: 14,
-    color: PlatformColor('secondaryLabel'),
-    textAlign: 'center',
   },
   hint: {
     fontSize: 13,
