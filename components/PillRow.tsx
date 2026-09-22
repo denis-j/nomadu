@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +12,8 @@ export interface PillOption {
   key: string;
   label: string;
   icon?: keyof typeof Ionicons.glyphMap;
+  /** Drawn where the icon would be, for a pill that leads with a face. */
+  leading?: ReactNode;
   active?: boolean;
   onPress: () => void;
   /** Secondary actions on the pill (rename, remove). Fires on active pills too. */
@@ -33,6 +36,7 @@ export function PillRow({ options, tabular = false }: { options: PillOption[]; t
 
   const content = (opt: PillOption) => (
     <>
+      {opt.leading}
       {opt.icon && (
         <Ionicons name={opt.icon} size={15} color={opt.active ? Colors.white : Colors.text} />
       )}
@@ -60,7 +64,7 @@ export function PillRow({ options, tabular = false }: { options: PillOption[]; t
               isInteractive
               style={styles.pillGlass}
             >
-              <Pressable onPress={() => press(opt)} onLongPress={opt.onLongPress} style={styles.pillInner}>
+              <Pressable onPress={() => press(opt)} onLongPress={opt.onLongPress} style={[styles.pillInner, !!opt.leading && styles.pillWithFace]}>
                 {content(opt)}
               </Pressable>
             </GlassView>
@@ -75,6 +79,7 @@ export function PillRow({ options, tabular = false }: { options: PillOption[]; t
               onLongPress={opt.onLongPress}
               style={({ pressed }) => [
                 styles.pillFallback,
+                !!opt.leading && styles.pillWithFace,
                 opt.active && styles.pillFallbackActive,
                 pressed && !opt.active && styles.pillPressed,
               ]}
@@ -110,6 +115,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
   },
+  // A face is taller than the text it sits next to; keep the capsule from
+  // growing around it.
+  pillWithFace: { paddingLeft: 6, paddingVertical: 5 },
   fallbackRow: {
     flexDirection: 'row',
     gap: 8,

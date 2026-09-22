@@ -13,6 +13,7 @@ import { ToastContainer } from '../components/Toast';
 import { UpdateBanner } from '../components/UpdateBanner';
 import { useOTAUpdates } from '../hooks/useOTAUpdates';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { Colors } from '../constants/colors';
 import { initMonitoring, setMonitoringUser } from '../lib/monitoring';
 
 // First statement in the module, so a failure anywhere below is still
@@ -130,6 +131,9 @@ function RootNavigator() {
           presentation: 'formSheet',
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.75, 1.0],
+          // Its own ground: transparent let the map of the screen behind
+          // shine through the whole invite.
+          contentStyle: { backgroundColor: Colors.background },
         }}
       />
       <Stack.Screen

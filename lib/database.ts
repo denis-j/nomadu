@@ -642,6 +642,8 @@ export interface Journey {
   first_start?: string | null;
   last_end?: string | null;
   countries?: string; // JSON array of unique country_codes
+  /** JSON array of [name, uid, sync_id] per traveller, for the faces on the card. */
+  travellers?: string;
 }
 
 export interface JourneyLeg {
@@ -677,7 +679,13 @@ export async function getAllJourneys(): Promise<Journey[]> {
         SELECT json_group_array(DISTINCT l2.country_code)
         FROM journey_legs l2
         WHERE l2.journey_id = j.id
-      ) AS countries
+      ) AS countries,
+      (
+        SELECT json_group_array(json_array(t.name, t.uid, t.sync_id))
+        FROM journey_travellers t
+        WHERE t.journey_id = j.id
+        ORDER BY t.sort_order ASC, t.id ASC
+      ) AS travellers
     FROM journeys j
     LEFT JOIN journey_legs l ON l.journey_id = j.id
     WHERE j.deleted = 0

@@ -17,6 +17,8 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { AvatarStack, avatarPeopleFromJson } from '../../../components/TravellerAvatars';
+import { useAuth } from '../../../hooks/useAuth';
 import { useJourneys } from '../../../hooks/useJourneys';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
@@ -282,10 +284,14 @@ function JourneyCard({
 
   const stopLabel = journey.leg_count === 1 ? 'stop' : 'stops';
   const followed = !!journey.shared_owner_uid;
-  const meta = [
-    totalDays !== null ? `${journey.leg_count} ${stopLabel} · ${totalDays} days` : `${journey.leg_count} ${stopLabel}`,
-    followed ? `with ${journey.shared_owner_name ?? 'a friend'}` : journey.share_code ? 'shared' : null,
-  ].filter(Boolean).join(' · ');
+  const meta = totalDays !== null ? `${journey.leg_count} ${stopLabel} · ${totalDays} days` : `${journey.leg_count} ${stopLabel}`;
+
+  // Who is on it, as faces where the word "shared" used to be. Only on a
+  // trip that is actually shared: on one's own trip the single face would
+  // say nothing.
+  const { user } = useAuth();
+  const shared = followed || !!journey.share_code;
+  const people = shared ? avatarPeopleFromJson(journey.travellers, user?.uid ?? null, journey) : [];
 
   // A friend's trip can only be left; one's own can be shared, unshared, deleted.
   const handleLongPress = () => {
@@ -349,7 +355,11 @@ function JourneyCard({
             )}
             <Text style={styles.cardMetaText}>{meta}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+          {people.length > 0 ? (
+            <AvatarStack people={people} size={26} max={4} overlap={0.35} />
+          ) : (
+            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+          )}
         </View>
       </CardWrap>
     </TouchableOpacity>

@@ -24,6 +24,7 @@ import { randomInt } from 'node:crypto';
 import { Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
+import { avatarSeed } from '../../lib/avatarSeed';
 
 const REGION = 'us-central1';
 export const SHARED = 'shared_journeys';
@@ -152,9 +153,20 @@ export async function preview(uid: string, data: { code?: unknown }) {
     journey_id: journeyId,
     title: x.title,
     owner_name: x.owner_name,
+    // The invite screen draws the owner's face from this, the same seed the
+    // trip's own traveller row uses once you are on it.
+    // The invite screen draws the owner's face from this, the same seed the
+    // trip's own traveller row uses once you are on it. Hashed, so the
+    // invite never carries the owner's account id.
+    owner_avatar: avatarSeed(x.owner_uid),
     start_date: legs[0]?.start_date ?? null,
     end_date: legs.length ? legs[legs.length - 1].end_date : null,
-    stops: legs.map((l: any) => ({ city: String(l.city ?? ''), country_code: String(l.country_code ?? '') })),
+    stops: legs.map((l: any) => ({
+      city: String(l.city ?? ''),
+      country_code: String(l.country_code ?? ''),
+      start_date: String(l.start_date ?? ''),
+      end_date: String(l.end_date ?? ''),
+    })),
     members: (x.member_uids ?? []).length,
     is_owner: x.owner_uid === uid,
     is_member: (x.member_uids ?? []).includes(uid),
@@ -269,6 +281,14 @@ function humanDate(ymd: string): string {
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
+/**
+ * The same cartoon face the app draws for this account, from the same
+ * hashed seed (see lib/avatarSeed.ts). The account id itself never reaches
+ * this page or the avatar service.
+ */
+const AVATAR_URL = (uid: string) =>
+  `https://api.dicebear.com/9.x/avataaars/png?seed=${avatarSeed(uid)}&size=112`;
+
 /** The trip as a page: what the link shows to someone without the app. */
 export function sharePageHtml(code: string, x: SharedDoc): string {
   const legs = x.legs ?? [];
@@ -289,6 +309,9 @@ export function sharePageHtml(code: string, x: SharedDoc): string {
   body { margin: 0; background: #F8F9FA; color: #000; font: 17px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", Helvetica, Arial, sans-serif; }
   main { max-width: 440px; margin: 0 auto; padding: 48px 20px 64px; }
   .who { color: #6B7280; font-size: 15px; margin: 0 0 6px; }
+  .from { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+  .from img { width: 56px; height: 56px; border-radius: 28px; background: #F0F2F5; }
+  .from .who { margin: 0 0 2px; }
   h1 { font-size: 30px; letter-spacing: -0.5px; margin: 0 0 4px; }
   .span { color: #6B7280; margin: 0 0 28px; font-variant-numeric: tabular-nums; }
   ul { list-style: none; padding: 0; margin: 0 0 32px; background: #fff; border: 1px solid #E5E7EB; border-radius: 18px; overflow: hidden; }
@@ -305,8 +328,13 @@ export function sharePageHtml(code: string, x: SharedDoc): string {
 </head>
 <body>
 <main>
-  <p class="who">${escape(x.owner_name)} invites you along</p>
-  <h1>${escape(x.title)}</h1>
+  <div class="from">
+    <img src="${AVATAR_URL(x.owner_uid)}" alt="" width="56" height="56">
+    <div>
+      <p class="who">${escape(x.owner_name)} invites you along</p>
+      <h1>${escape(x.title)}</h1>
+    </div>
+  </div>
   <p class="span">${escape(span)}${legs.length ? ` · ${legs.length} ${legs.length === 1 ? 'stop' : 'stops'}` : ''}</p>
   <ul>${stops}</ul>
   <a class="button primary" href="${APP_SCHEME}://join/${escape(code)}">Open in Nomadu</a>

@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useAvatar } from '../lib/avatars';
+import { avatarSeed } from '../lib/avatarSeed';
 import { travellerLabel, type JourneyTraveller } from '../lib/database';
 import { myName } from '../lib/sharing';
 
@@ -34,8 +35,33 @@ export interface AvatarPerson {
   /** In the app, not just a name. */
   account: boolean;
   owner: boolean;
-  /** What the face is drawn from: the account, or the traveller row's id. */
+  /** What the face is drawn from: see lib/avatarSeed.ts. */
   seed: string | null;
+}
+
+/**
+ * The faces for a row read straight from the trip list's query, which
+ * carries its travellers as `[name, uid, sync_id]` triples rather than as
+ * rows (see getAllJourneys). Same shape as `avatarPeople`, without a
+ * second read per card.
+ */
+export function avatarPeopleFromJson(
+  json: string | null | undefined,
+  uid: string | null,
+  journey: { shared_owner_uid: string | null; shared_owner_name: string | null } | null,
+): AvatarPerson[] {
+  if (!json) return [];
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(raw)) return [];
+  const travellers: JourneyTraveller[] = raw
+    .filter((t): t is [string, string | null, string | null] => Array.isArray(t) && typeof t[0] === 'string')
+    .map((t, i) => ({ id: i, journey_id: 0, name: t[0], sort_order: i, uid: t[1] ?? null, sync_id: t[2] ?? null }));
+  return avatarPeople(travellers, uid, journey);
 }
 
 /** The travellers of a journey as the avatar row wants them, owner first. */
@@ -52,7 +78,7 @@ export function avatarPeople(
     const owner = journey?.shared_owner_uid
       ? t.uid === journey.shared_owner_uid || (!t.uid && t.name === 'You')
       : t.uid === ownerUid || (!t.uid && t.name === 'You');
-    return { key: String(t.id), label, account: !!t.uid || owner, owner, seed: t.uid ?? t.sync_id };
+    return { key: String(t.id), label, account: !!t.uid || owner, owner, seed: avatarSeed(t.uid ?? t.sync_id) };
   });
   return people.sort((a, b) => Number(b.owner) - Number(a.owner));
 }

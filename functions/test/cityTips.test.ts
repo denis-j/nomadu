@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { Timestamp, __get, __reset, __seed } from './fakeFirestore';
 import { TTL_DAYS, cachedCityTips, tipsKey } from '../src/cityTips';
+import { avatarSeed } from '../../lib/avatarSeed';
 
 beforeEach(() => __reset());
 
@@ -50,5 +51,15 @@ describe('city tips cache', () => {
   test('a failed generation leaves nothing behind', async () => {
     await assert.rejects(cachedCityTips('Lisbon', 'Portugal', async () => { throw new Error('quota'); }));
     assert.equal(__get('city_tips/portugal__lisbon'), undefined);
+  });
+});
+
+describe('avatar seeds', () => {
+  test('are stable, short and never the id itself', () => {
+    assert.equal(avatarSeed('owner'), avatarSeed('owner'));
+    assert.notEqual(avatarSeed('owner'), avatarSeed('anna'));
+    assert.match(avatarSeed('CV9MFlOPHldsqfNsHv52BLtzmCQ2'), /^[0-9a-f]{16}$/);
+    assert.equal(avatarSeed(null), 'unknown');
+    assert.equal(avatarSeed(''), 'unknown');
   });
 });

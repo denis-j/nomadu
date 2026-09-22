@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { CloudyButton } from '../../components/CloudyButton';
 import { Flag } from '../../components/Flag';
+import { StatRow, StatTile } from '../../components/StatTile';
+import { Avatar } from '../../components/TravellerAvatars';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { useAuth } from '../../hooks/useAuth';
@@ -20,6 +22,24 @@ const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 const fmt = (ymd: string) => parseDate(ymd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+/** "Nov 10 – 13" inside a month, "Nov 28 – Dec 2" across one, as on the itinerary. */
+function fmtRange(start: string, end: string): string {
+  const s = parseDate(start);
+  const e = parseDate(end);
+  if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) return `${fmt(start)} – ${e.getDate()}`;
+  return `${fmt(start)} – ${fmt(end)}`;
+}
+
+/** "in 49 days", "Tomorrow", "Under way": when the trip starts, from today. */
+function startsIn(start: string | null): { label: string; value: string; unit?: string } {
+  if (!start) return { label: 'Starts', value: 'No dates' };
+  const days = Math.round((parseDate(start).getTime() - parseDate(new Date().toISOString().slice(0, 10)).getTime()) / 86_400_000);
+  if (days < 0) return { label: 'Trip', value: 'Under way' };
+  if (days === 0) return { label: 'Starts', value: 'Today' };
+  if (days === 1) return { label: 'Starts', value: 'Tomorrow' };
+  return { label: 'Starts', value: `in ${days}`, unit: 'days' };
+}
 
 /**
  * The end of an invite link: `nomady://join/{code}`.
@@ -82,7 +102,7 @@ export default function JoinTripScreen() {
     }
   };
 
-  const countries = preview ? [...new Set(preview.stops.map((s) => s.country_code).filter(Boolean))] : [];
+  const starts = startsIn(preview?.start_date ?? null);
   const nights = preview?.start_date && preview.end_date
     ? Math.round((parseDate(preview.end_date).getTime() - parseDate(preview.start_date).getTime()) / 86_400_000) + 1
     : 0;
@@ -107,26 +127,40 @@ export default function JoinTripScreen() {
         )}
         {preview && (
           <>
-            <Text style={styles.who}>{preview.owner_name} invites you along</Text>
-            <Text style={styles.title}>{preview.title}</Text>
-            <Text style={styles.span}>
-              {preview.start_date && preview.end_date ? `${fmt(preview.start_date)} – ${fmt(preview.end_date)} · ${nights} days` : 'No dates yet'}
-              {preview.stops.length ? ` · ${preview.stops.length} ${preview.stops.length === 1 ? 'stop' : 'stops'}` : ''}
-            </Text>
-            {countries.length > 0 && (
-              <View style={styles.flags}>
-                {countries.slice(0, 8).map((c) => <Flag key={c} code={c} size={22} />)}
+            {/* The inviter, with the face they carry on the trip itself. */}
+            <View style={styles.whoRow}>
+              <Avatar person={{ label: preview.owner_name, account: true, owner: true, seed: preview.owner_avatar }} size={44} />
+              <View style={styles.whoText}>
+                <Text style={styles.who}>{preview.owner_name} invites you along</Text>
+                <Text style={styles.title}>{preview.title}</Text>
               </View>
-            )}
+            </View>
+            {/* The trip in three numbers, as on a stop's sheet */}
+            <StatRow style={styles.stats}>
+              <StatTile label="Duration" value={`${nights}`} unit={nights === 1 ? 'day' : 'days'} />
+              <StatTile label="Stops" value={`${preview.stops.length}`} />
+              <StatTile {...starts} />
+            </StatRow>
 
             <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
               {preview.stops.slice(0, 6).map((s, i) => (
-                <View key={i} style={styles.stopRow}>
-                  <Flag code={s.country_code} size={18} />
-                  <Text style={styles.stopCity} numberOfLines={1}>{s.city}</Text>
+                <View key={i}>
+                  {i > 0 && <View style={styles.separator} />}
+                  <View style={styles.stopRow}>
+                    <Flag code={s.country_code} size={20} />
+                    <Text style={styles.stopCity} numberOfLines={1}>{s.city}</Text>
+                    {s.start_date && s.end_date ? (
+                      <Text style={styles.stopDates}>{fmtRange(s.start_date, s.end_date)}</Text>
+                    ) : null}
+                  </View>
                 </View>
               ))}
-              {preview.stops.length > 6 && <Text style={styles.more}>and {preview.stops.length - 6} more</Text>}
+              {preview.stops.length > 6 && (
+                <>
+                  <View style={styles.separator} />
+                  <Text style={styles.more}>and {preview.stops.length - 6} more</Text>
+                </>
+              )}
             </Glass>
 
             {preview.is_owner || preview.is_member ? (
@@ -170,25 +204,27 @@ export default function JoinTripScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 24, paddingTop: 36, gap: 12, paddingBottom: 60 },
+  content: { padding: 20, paddingTop: 32, gap: 14, paddingBottom: 60 },
   center: { alignItems: 'center', gap: 10, paddingVertical: 40 },
   hint: { ...Typography.body, color: Colors.textSecondary, textAlign: 'center' },
+  whoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 32 },
+  whoText: { flex: 1, gap: 1 },
   who: { ...Typography.bodySmall, color: Colors.textSecondary },
-  title: { ...Typography.titleLarge, marginTop: -6 },
-  span: { ...Typography.body, color: Colors.textSecondary, fontVariant: ['tabular-nums'], marginTop: -8 },
-  flags: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  title: { ...Typography.titleLarge },
+  stats: { marginTop: 2 },
   card: {
     borderRadius: 18,
     borderCurve: 'continuous',
     paddingHorizontal: 16,
-    paddingVertical: 4,
     overflow: 'hidden',
-    marginTop: 6,
+    backgroundColor: Colors.surface,
   },
-  cardFallback: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
-  stopRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
+  cardFallback: { borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.border },
+  separator: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginLeft: 30 },
+  stopRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13 },
   stopCity: { ...Typography.titleSmall, fontWeight: '500', flex: 1 },
-  more: { ...Typography.bodySmall, color: Colors.textTertiary, paddingVertical: 10 },
+  stopDates: { ...Typography.bodySmall, color: Colors.textSecondary, fontVariant: ['tabular-nums'] },
+  more: { ...Typography.bodySmall, color: Colors.textTertiary, paddingVertical: 13 },
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 12 },
   nameLabel: { ...Typography.titleSmall, fontWeight: '500' },
   nameInput: { ...Typography.titleSmall, fontWeight: '400', flex: 1, textAlign: 'right' },

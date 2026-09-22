@@ -7,6 +7,7 @@ import { WebView } from 'react-native-webview';
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { PillRow } from '../../../components/PillRow';
+import { Avatar, avatarPeople, type AvatarPerson } from '../../../components/TravellerAvatars';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { useJourneyDocuments } from '../../../hooks/useJourneyDocuments';
@@ -159,17 +160,22 @@ export default function DocumentsScreen() {
   const isShared = (d: JourneyDocument) => !travellers.some((t) => t.id === d.traveller_id);
 
   // "All": one section per traveller, shared documents last.
-  const groups: { key: string; title: string | null; docs: JourneyDocument[] }[] = [];
+  // The same faces as the invite panel, keyed by traveller, for the filter
+  // pills, the group headings and the corner of every tile.
+  const faces = new Map(avatarPeople(travellers, uid, owner).map((p) => [p.key, p]));
+  const faceOf = (t: JourneyTraveller) => faces.get(String(t.id)) ?? null;
+
+  const groups: { key: string; title: string | null; docs: JourneyDocument[]; traveller: JourneyTraveller | null }[] = [];
   if (current) {
     const docs = documents.filter((d) => d.traveller_id === current.id || isShared(d));
-    if (docs.length) groups.push({ key: `t${current.id}`, title: null, docs });
+    if (docs.length) groups.push({ key: `t${current.id}`, title: null, docs, traveller: current });
   } else {
     for (const t of shown) {
       const docs = documents.filter((d) => d.traveller_id === t.id);
-      if (docs.length) groups.push({ key: `t${t.id}`, title: label(t), docs });
+      if (docs.length) groups.push({ key: `t${t.id}`, title: label(t), docs, traveller: t });
     }
     const shared = documents.filter(isShared);
-    if (shared.length) groups.push({ key: 'shared', title: 'Everyone', docs: shared });
+    if (shared.length) groups.push({ key: 'shared', title: 'Everyone', docs: shared, traveller: null });
   }
   const empty = loaded && groups.length === 0;
 
@@ -180,13 +186,17 @@ export default function DocumentsScreen() {
         <PillRow
           options={[
             { key: 'all', label: 'All', active: filter === 'all', onPress: () => setFilter('all') },
-            ...shown.map((t) => ({
-              key: `t${t.id}`,
-              label: label(t),
-              active: filter === t.id,
-              onPress: () => setFilter(t.id),
-              onLongPress: () => travellerMenu(t),
-            })),
+            ...shown.map((t) => {
+              const person = faceOf(t);
+              return {
+                key: `t${t.id}`,
+                label: label(t),
+                leading: person ? <Avatar person={person} size={22} /> : undefined,
+                active: filter === t.id,
+                onPress: () => setFilter(t.id),
+                onLongPress: () => travellerMenu(t),
+              };
+            }),
             ...(owner ? [] : [{ key: 'add', label: 'Add', icon: 'person-add-outline' as const, onPress: addTraveller }]),
           ]}
         />
@@ -198,11 +208,13 @@ export default function DocumentsScreen() {
             <View key={g.key} style={styles.group}>
               {g.title && (
                 <View style={styles.groupHead}>
-                  <View style={[styles.groupAvatar, g.key === 'shared' && styles.groupAvatarShared]}>
-                    {g.key === 'shared'
-                      ? <Ionicons name="people" size={11} color={Colors.text} />
-                      : <Text style={styles.groupAvatarText}>{g.title.trim().charAt(0).toUpperCase()}</Text>}
-                  </View>
+                  {g.traveller && faceOf(g.traveller) ? (
+                    <Avatar person={faceOf(g.traveller)!} size={22} />
+                  ) : (
+                    <View style={[styles.groupAvatar, styles.groupAvatarShared]}>
+                      <Ionicons name="people" size={11} color={Colors.text} />
+                    </View>
+                  )}
                   <Text style={styles.groupTitle}>{g.title}</Text>
                 </View>
               )}
@@ -211,6 +223,9 @@ export default function DocumentsScreen() {
                   <DocumentTile
                     key={d.id}
                     doc={d}
+                    // Whose it is, as a face on the thumbnail: in the All tab
+                    // the heading already says it, so only where it is mixed.
+                    face={current && !isShared(d) ? null : d.traveller_id === null ? null : faces.get(String(d.traveller_id)) ?? null}
                     // In a traveller's tab a group booking needs saying so.
                     note={current && isShared(d) ? 'Everyone' : null}
                     // Live PDF previews are web views; a handful is fine, a wall is not.
@@ -230,11 +245,13 @@ export default function DocumentsScreen() {
 
 function DocumentTile({
   doc,
+  face,
   note,
   preview,
   onPress,
 }: {
   doc: JourneyDocument;
+  face: AvatarPerson | null;
   note: string | null;
   preview: boolean;
   onPress: () => void;
@@ -269,6 +286,11 @@ function DocumentTile({
             <Ionicons name={meta.icon} size={11} color="#fff" />
             <Text style={styles.kindPillText}>{meta.short}</Text>
           </View>
+          {face && (
+            <View style={styles.tileFace}>
+              <Avatar person={face} size={24} />
+            </View>
+          )}
         </View>
         <View style={styles.tileText}>
           <Text style={styles.tileTitle} numberOfLines={1}>{doc.title}</Text>
@@ -348,6 +370,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   groupAvatarShared: { backgroundColor: Colors.surfaceSecondary },
+  tileFace: { position: 'absolute', top: 8, right: 8 },
   groupAvatarText: { fontSize: 11, fontWeight: '700', color: Colors.white },
   groupTitle: {
     ...Typography.eyebrow,

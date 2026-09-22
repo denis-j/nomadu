@@ -149,6 +149,16 @@ describe('joining', () => {
   });
 });
 
+describe('the invite preview', () => {
+  test('carries a face for the owner, never their account id', async () => {
+    const { code } = await share('owner', { journeyId: 'j1' });
+    const seen = await preview('anna', { code });
+    assert.match(seen.owner_avatar, /^[0-9a-f]{16}$/);
+    assert.notEqual(seen.owner_avatar, 'owner');
+    assert.equal(JSON.stringify(seen).includes('"owner"'), false);
+  });
+});
+
 describe('the page', () => {
   test('shows the trip, the app link and nothing else', async () => {
     const { code } = await share('owner', { journeyId: 'j1' });
@@ -158,6 +168,8 @@ describe('the page', () => {
     assert.match(html, /Hanoi/);
     assert.match(html, /🇻🇳/);
     assert.match(html, new RegExp(`href="nomady://join/${code}"`));
+    // The owner's face, drawn from the hashed seed and not from their account id.
+    assert.match(html, /api\.dicebear\.com\/9\.x\/avataaars\/png\?seed=[0-9a-f]{16}&size=112/);
     assert.doesNotMatch(html, /owner_uid|owner/);
   });
 

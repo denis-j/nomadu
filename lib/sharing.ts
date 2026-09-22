@@ -24,9 +24,11 @@ export interface InvitePreview {
   journey_id: string;
   title: string;
   owner_name: string;
+  /** The seed for the owner's face (lib/avatarSeed.ts), not their account id. */
+  owner_avatar: string;
   start_date: string | null;
   end_date: string | null;
-  stops: { city: string; country_code: string }[];
+  stops: { city: string; country_code: string; start_date: string; end_date: string }[];
   members: number;
   is_owner: boolean;
   is_member: boolean;
