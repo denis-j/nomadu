@@ -3,29 +3,35 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Flag } from './Flag';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-import type { DestinationGuide } from '../constants/guides';
+import { guideDays, type DestinationGuide } from '../constants/guides';
 
-export const GUIDE_CARD_WIDTH = 220;
+export const GUIDE_CARD_WIDTH = 140;
 
 /**
- * A destination guide in the horizontal row under the trips: a photo, the
- * flag, the country and the one line that says why it is here. Everything
- * else is in the guide itself, a tap away, which is what a card is for.
+ * A destination guide as a poster in the row under the trips: the place,
+ * its flag, and how long the route runs. What it is like to arrive there
+ * is the guide's job, one tap away; a card that tries to say it too ends
+ * up a wall of text on a photo.
  */
 export function GuideCard({ guide, onPress }: { guide: DestinationGuide; onPress: () => void }) {
+  const days = guideDays(guide);
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
       <ImageBackground source={{ uri: guide.image }} style={styles.image} imageStyle={styles.imageInner}>
-        {/* Only as dark as the two lines of text need. */}
+        {/* Only the lower half darkens, and only as far as the name needs. */}
         <LinearGradient
-          colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.35)', 'rgba(0,0,0,0.8)']}
-          locations={[0, 0.5, 1]}
+          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.75)']}
+          locations={[0.45, 1]}
           style={StyleSheet.absoluteFill}
         />
+        <View style={styles.flag}>
+          <Flag code={guide.countryCode} size={20} />
+        </View>
         <View style={styles.text}>
-          <Flag code={guide.countryCode} size={22} />
           <Text style={styles.country} numberOfLines={1}>{guide.country}</Text>
-          <Text style={styles.tagline} numberOfLines={1}>{guide.tagline}</Text>
+          <Text style={styles.meta}>
+            {guide.legs.length} {guide.legs.length === 1 ? 'stop' : 'stops'} · {days} days
+          </Text>
         </View>
       </ImageBackground>
     </TouchableOpacity>
@@ -35,7 +41,7 @@ export function GuideCard({ guide, onPress }: { guide: DestinationGuide; onPress
 const styles = StyleSheet.create({
   card: {
     width: GUIDE_CARD_WIDTH,
-    height: 150,
+    height: 200,
     borderRadius: 18,
     overflow: 'hidden',
     borderCurve: 'continuous',
@@ -43,7 +49,8 @@ const styles = StyleSheet.create({
   },
   image: { flex: 1, justifyContent: 'flex-end' },
   imageInner: { borderRadius: 18 },
-  text: { padding: 14, gap: 3 },
-  country: { ...Typography.titleMedium, color: Colors.white, letterSpacing: -0.3 },
-  tagline: { ...Typography.caption, color: Colors.whiteAlpha75, fontWeight: '600' },
+  flag: { position: 'absolute', top: 10, left: 10 },
+  text: { padding: 12, gap: 2 },
+  country: { ...Typography.titleSmall, fontSize: 17, fontWeight: '700', color: Colors.white },
+  meta: { ...Typography.caption, fontSize: 11, fontWeight: '600', color: Colors.whiteAlpha75 },
 });
