@@ -6,3 +6,4 @@ flows:
   - 02-onboarding-funnel.yaml
   - 03-sign-up.yaml
   - 04-returning-user.yaml
+  - 05-cloud-sync.yaml

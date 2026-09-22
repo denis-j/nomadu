@@ -31,7 +31,7 @@ export default function SettingsScreen() {
   const [trackingSheetVisible, setTrackingSheetVisible] = useState(false);
   const { isPro, expirationDate, productIdentifier, loading } = useSubscription();
   const { user, signOut: handleSignOut } = useAuth();
-  const { cloudSyncEnabled, setCloudSyncEnabled, syncStatus, lastSynced, triggerSync } = useSync();
+  const { syncStatus, lastSynced, triggerSync } = useSync();
   const { country: passportCountry, countryCode: passportCode } = usePassport();
   const { granted: notificationsGranted } = useNotificationPermission();
   const router = useRouter();
@@ -341,49 +341,41 @@ export default function SettingsScreen() {
         <Text style={styles.sectionTitle}>Cloud Sync</Text>
         <View style={styles.row}>
           <View style={styles.rowContent}>
-            <Text style={styles.rowLabel}>Sync to Cloud</Text>
+            <Text style={styles.rowLabel}>Backed up</Text>
             <Text style={styles.rowDescription}>
-              Back up trips and sync across devices
+              Your trips live on this phone and in your account, so nothing is lost with the phone. Offline edits go up when you are back online.
             </Text>
           </View>
-          <Switch
-            value={cloudSyncEnabled === true}
-            onValueChange={setCloudSyncEnabled}
-          />
         </View>
-        {cloudSyncEnabled && (
+        <View style={styles.separator} />
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Status</Text>
+          <Text style={styles.rowValue}>
+            {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'error' ? 'Waiting for a connection' : 'Up to date'}
+          </Text>
+        </View>
+        {lastSynced && (
           <>
             <View style={styles.separator} />
             <View style={styles.row}>
-              <Text style={styles.rowLabel}>Status</Text>
-              <Text style={styles.rowValue}>
-                {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'error' ? 'Error' : 'Up to date'}
-              </Text>
+              <Text style={styles.rowLabel}>Last synced</Text>
+              <Text style={styles.rowValue}>{formatDate(lastSynced)}</Text>
             </View>
-            {lastSynced && (
-              <>
-                <View style={styles.separator} />
-                <View style={styles.row}>
-                  <Text style={styles.rowLabel}>Last synced</Text>
-                  <Text style={styles.rowValue}>{formatDate(lastSynced)}</Text>
-                </View>
-              </>
-            )}
-            <View style={styles.separator} />
-            <Pressable
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                triggerSync();
-              }}
-              disabled={syncStatus === 'syncing'}
-            >
-              <Text style={[styles.rowLabel, { color: Colors.primary, opacity: syncStatus === 'syncing' ? 0.5 : 1 }]}>
-                Sync Now
-              </Text>
-            </Pressable>
           </>
         )}
+        <View style={styles.separator} />
+        <Pressable
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            triggerSync();
+          }}
+          disabled={syncStatus === 'syncing'}
+        >
+          <Text style={[styles.rowLabel, { color: Colors.primary, opacity: syncStatus === 'syncing' ? 0.5 : 1 }]}>
+            Sync Now
+          </Text>
+        </Pressable>
       </Glass>
 
       {/* Location Tracking */}
@@ -446,9 +438,7 @@ export default function SettingsScreen() {
                     setIsClearing(true);
                     try {
                       await clearAllTravelData(user?.uid ?? null);
-                      if (user && cloudSyncEnabled === true) {
-                        startRealtimeSync(user.uid);
-                      }
+                      if (user) startRealtimeSync(user.uid);
                       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                       showToast('Travel data cleared');
                     } catch (error: any) {
@@ -500,14 +490,12 @@ export default function SettingsScreen() {
         <View style={styles.separator} />
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Storage</Text>
-          <Text style={styles.rowValue}>{cloudSyncEnabled ? 'Local + Cloud' : 'Local only'}</Text>
+          <Text style={styles.rowValue}>Local + Cloud</Text>
         </View>
       </Glass>
 
       <Text style={styles.footer}>
-        {cloudSyncEnabled
-          ? 'Data is stored locally and synced to the cloud.'
-          : 'All data is stored locally on your device.\nNothing is uploaded to any server.'}
+        Data is stored on this device and synced to your account.
       </Text>
     </ScrollView>
 

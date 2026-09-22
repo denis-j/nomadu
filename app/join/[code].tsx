@@ -11,7 +11,6 @@ import { Avatar } from '../../components/TravellerAvatars';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { useAuth } from '../../hooks/useAuth';
-import { useSync } from '../../contexts/SyncContext';
 import { getJourneyBySyncId, parseDate } from '../../lib/database';
 import { joinJourney, myName, previewInvite, setPendingInvite, type InvitePreview } from '../../lib/sharing';
 import { pullSharedJourneysFromCloud } from '../../lib/sync';
@@ -53,7 +52,6 @@ export default function JoinTripScreen() {
   const router = useRouter();
   const { code } = useLocalSearchParams<{ code: string }>();
   const { user, loading: authLoading } = useAuth();
-  const { cloudSyncEnabled, setCloudSyncEnabled } = useSync();
 
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -89,8 +87,6 @@ export default function JoinTripScreen() {
     setBusy(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      // A followed trip lives in the cloud, so the phone has to be on it.
-      if (cloudSyncEnabled !== true) await setCloudSyncEnabled(true);
       await joinJourney(code!, name.trim());
       await pullSharedJourneysFromCloud(user.uid);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

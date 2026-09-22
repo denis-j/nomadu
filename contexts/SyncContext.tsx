@@ -2,10 +2,8 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { useAuth } from '../hooks/useAuth';
 import { reportError } from '../lib/monitoring';
 import {
-  getCloudSyncEnabled,
   getLastSyncTime,
   pushPlans,
-  setCloudSyncEnabled as setCloudSyncEnabledStorage,
   startRealtimeSync,
   stopRealtimeSync,
   syncAll,
@@ -18,41 +16,35 @@ const PUSH_DELAY_MS = 2000;
 type SyncStatus = 'idle' | 'syncing' | 'error';
 
 interface SyncContextValue {
-  cloudSyncEnabled: boolean | null;
-  setCloudSyncEnabled: (enabled: boolean) => Promise<void>;
   syncStatus: SyncStatus;
   lastSynced: string | null;
   triggerSync: () => Promise<void>;
 }
 
 const SyncContext = createContext<SyncContextValue>({
-  cloudSyncEnabled: null,
-  setCloudSyncEnabled: async () => {},
   syncStatus: 'idle',
   lastSynced: null,
   triggerSync: async () => {},
 });
 
+/**
+ * Sync runs for whoever is signed in. There is no preference to read and
+ * none to set: the phone keeps its SQLite copy and the cloud follows, so
+ * an offline phone simply catches up later (see lib/sync.ts).
+ */
 export function SyncProvider({ children }: { children: React.ReactNode }) {
-  const [cloudSyncEnabled, setEnabled] = useState<boolean | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const { user } = useAuth();
   const syncingRef = useRef(false);
 
-  // Load preference on mount
   useEffect(() => {
-    if (!user) {
-      setEnabled(null);
-      return;
-    }
-    getCloudSyncEnabled(user.uid).then(setEnabled);
+    if (!user) return;
     getLastSyncTime(user.uid).then(setLastSynced);
   }, [user]);
 
-  // Start/stop realtime sync based on preference
   useEffect(() => {
-    if (!user || cloudSyncEnabled !== true) {
+    if (!user) {
       stopRealtimeSync();
       return;
     }
@@ -78,7 +70,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       if (timer) clearTimeout(timer);
       stopRealtimeSync();
     };
-  }, [user, cloudSyncEnabled]);
+  }, [user]);
 
   const doSync = useCallback(async (uid: string) => {
     if (syncingRef.current) return;
@@ -99,25 +91,14 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const setCloudSyncEnabled = useCallback(async (enabled: boolean) => {
-    if (!user) return;
-    await setCloudSyncEnabledStorage(user.uid, enabled);
-    setEnabled(enabled);
-    if (enabled) {
-      await doSync(user.uid);
-    } else {
-      stopRealtimeSync();
-    }
-  }, [user, doSync]);
-
   const triggerSync = useCallback(async () => {
-    if (!user || !cloudSyncEnabled) return;
+    if (!user) return;
     await doSync(user.uid);
-  }, [user, cloudSyncEnabled, doSync]);
+  }, [user, doSync]);
 
   return (
     <SyncContext.Provider
-      value={{ cloudSyncEnabled, setCloudSyncEnabled, syncStatus, lastSynced, triggerSync }}
+      value={{ syncStatus, lastSynced, triggerSync }}
     >
       {children}
     </SyncContext.Provider>

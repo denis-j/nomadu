@@ -1,0 +1,36 @@
+appId: com.nomady.app
+name: Cloud sync is forced and the timeline asks nothing
+tags:
+  - sync
+  - regression
+---
+# Runs against an app that is already signed in. Deep links pick the tab
+# (the iOS 26 tab bar only answers to a point tap), every step after that
+# is a real tap. Selectors are regexes: iOS hands Maestro one combined
+# accessibility label per row, so substrings need .* on both sides.
+- openLink: "nomady:///(tabs)/(timeline)"
+- extendedWaitUntil:
+    visible: ".*Timeline.*"
+    timeout: 20000
+
+# The cleanup offer is a row in the list, never a dialog on launch.
+- assertNotVisible: ".*Tidy up your timeline\\?.*"
+- assertNotVisible: "Not now"
+
+- openLink: "nomady:///(tabs)/(settings)"
+- scrollUntilVisible:
+    element: ".*Sync Now.*"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: ".*Backed up.*"
+# The switch is gone: sync is not a choice any more.
+- assertNotVisible: ".*Sync to Cloud.*"
+- tapOn: ".*Sync Now.*"
+- extendedWaitUntil:
+    visible: ".*Up to date.*"
+    timeout: 40000
+- scrollUntilVisible:
+    element: ".*Local . Cloud.*"
+    direction: DOWN
+    timeout: 15000
+- assertVisible: ".*Data is stored on this device and synced to your account.*"

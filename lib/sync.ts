@@ -56,19 +56,22 @@ import { clearBadgeProgress } from './badges';
 import { reportError } from './monitoring';
 import { pushProfileToCloud } from './onboarding';
 
-const CLOUD_SYNC_KEY = (uid: string) => `@cloud_sync_enabled_${uid}`;
 const LAST_SYNC_KEY = (uid: string) => `@last_sync_${uid}`;
 
+/**
+ * There is no switch any more: a signed-in account is a synced account.
+ *
+ * The phone still writes to SQLite first and reads from it, so everything
+ * works with no connection at all; what changes is that the cloud copy is
+ * no longer optional, it catches up whenever the phone is back online.
+ * Sharing a trip, following a friend's and having the same data on a second
+ * phone all depended on a setting most people never found.
+ *
+ * Old installs may still carry `@cloud_sync_enabled_{uid}`; nothing reads
+ * it, and the first sync after the update pushes whatever was local-only.
+ */
+
 // ─── Preferences ───
-
-export async function getCloudSyncEnabled(uid: string): Promise<boolean> {
-  const value = await AsyncStorage.getItem(CLOUD_SYNC_KEY(uid));
-  return value === 'true';
-}
-
-export async function setCloudSyncEnabled(uid: string, enabled: boolean): Promise<void> {
-  await AsyncStorage.setItem(CLOUD_SYNC_KEY(uid), enabled ? 'true' : 'false');
-}
 
 export async function getLastSyncTime(uid: string): Promise<string | null> {
   return AsyncStorage.getItem(LAST_SYNC_KEY(uid));

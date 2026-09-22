@@ -28,9 +28,9 @@ import { BadgeUnlockOverlay } from '../../../components/BadgeUnlockOverlay';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { Trip, applyTripRepair, getAllTripsRaw, markTripDeleted, parseDate } from '../../../lib/database';
-import { planRepair } from '../../../lib/tracking';
+import { planRepair, type RepairPlan } from '../../../lib/tracking';
+import { showToast } from '../../../lib/toast';
 import { toYmd } from '../../../lib/days';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { Flag } from '../../../components/Flag';
 
@@ -578,7 +578,6 @@ interface Section {
 const fmt = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-const REPAIR_DECLINED_KEY = '@timeline_repair_declined';
 
 // ─── Component ───
 
@@ -606,11 +605,19 @@ export default function TimelineScreen() {
     }, []),
   );
 
-  // Trips the old tracking rules left behind (duplicates, fragments of one
-  // stay, one-day blips from a cached fix) are offered for cleanup once per
-  // state of the mess: the plan is fingerprinted, and a declined fingerprint
-  // is not asked about again. Only while this screen is actually in front;
-  // the tab is mounted under the paywall too.
+  /**
+   * Trips the tracking rules left behind (duplicates, fragments of one
+   * stay, one-day blips from a stale fix) are offered for cleanup as a row
+   * in the list, never as a dialog.
+   *
+   * It used to be an alert on focus, which meant the app opened with a
+   * question every time tracking had produced one more fragment overnight,
+   * and the "not now" it remembered was keyed by local row ids, so a sync
+   * that rewrote a row asked again anyway. A row in the timeline can be
+   * read, acted on, or ignored, and ignoring it costs nothing.
+   */
+  const [repair, setRepair] = useState<RepairPlan | null>(null);
+  const [repairHidden, setRepairHidden] = useState(false);
   useFocusEffect(
     useCallback(() => {
       if (loading) return;
@@ -618,30 +625,20 @@ export default function TimelineScreen() {
       (async () => {
         const raw = await getAllTripsRaw();
         const plan = planRepair(raw, toYmd(new Date()));
-        const removed = plan.remove.length;
-        if (cancelled || removed === 0) return;
-        const fingerprint = [...plan.remove].sort((a, b) => a - b).join(',');
-        const declined = await AsyncStorage.getItem(REPAIR_DECLINED_KEY);
-        if (cancelled || declined === fingerprint) return;
-        Alert.alert(
-          'Tidy up your timeline?',
-          `${removed} ${removed === 1 ? 'stop is' : 'stops are'} duplicates, fragments of the same stay, or one-day blips from a stale location fix. Merging them leaves your history as it is, just without the noise.`,
-          [
-            { text: 'Not now', style: 'cancel', onPress: () => { AsyncStorage.setItem(REPAIR_DECLINED_KEY, fingerprint).catch(() => {}); } },
-            {
-              text: 'Tidy up',
-              onPress: async () => {
-                await applyTripRepair(plan);
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                refresh();
-              },
-            },
-          ],
-        );
+        if (!cancelled) setRepair(plan.remove.length > 0 ? plan : null);
       })();
       return () => { cancelled = true; };
-    }, [loading, refresh]),
+    }, [loading]),
   );
+
+  const applyRepair = useCallback(async () => {
+    if (!repair) return;
+    await applyTripRepair(repair);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setRepair(null);
+    showToast('Timeline tidied up');
+    refresh();
+  }, [repair, refresh]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -910,6 +907,15 @@ export default function TimelineScreen() {
         <SectionList
           sections={sections}
           keyExtractor={(item) => item.key}
+          ListHeaderComponent={
+            repair && !repairHidden ? (
+              <RepairRow
+                count={repair.remove.length}
+                onApply={applyRepair}
+                onDismiss={() => setRepairHidden(true)}
+              />
+            ) : null
+          }
           contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={styles.content}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
@@ -1008,6 +1014,57 @@ export default function TimelineScreen() {
 }
 
 // ─── Styles ───
+
+/** The cleanup offer as a row: what it found, one tap to do it, one to hide it. */
+function RepairRow({ count, onApply, onDismiss }: { count: number; onApply: () => void; onDismiss: () => void }) {
+  const Shell = hasGlass ? GlassView : View;
+  return (
+    <Shell
+      {...(hasGlass ? { glassEffectStyle: 'regular' as const } : {})}
+      style={[repairStyles.row, !hasGlass && repairStyles.rowFallback]}
+    >
+      <Ionicons name="sparkles-outline" size={18} color={Colors.textSecondary} />
+      <View style={repairStyles.text}>
+        <Text style={repairStyles.title}>
+          {count} {count === 1 ? 'stop looks' : 'stops look'} like duplicates
+        </Text>
+        <Text style={repairStyles.sub}>Fragments of the same stay, or a one-day blip from a stale location fix.</Text>
+      </View>
+      <Pressable onPress={onApply} hitSlop={6} style={({ pressed }) => [repairStyles.action, pressed && { opacity: 0.6 }]}>
+        <Text style={repairStyles.actionText}>Tidy up</Text>
+      </Pressable>
+      <Pressable onPress={onDismiss} hitSlop={8} accessibilityLabel="Hide" style={({ pressed }) => pressed && { opacity: 0.6 }}>
+        <Ionicons name="close" size={16} color={Colors.textTertiary} />
+      </Pressable>
+    </Shell>
+  );
+}
+
+const repairStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+  },
+  rowFallback: { backgroundColor: Colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.border },
+  text: { flex: 1, gap: 2 },
+  title: { ...Typography.bodySmall, fontWeight: '600' },
+  sub: { ...Typography.caption, color: Colors.textSecondary, lineHeight: 15 },
+  action: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderCurve: 'continuous',
+    backgroundColor: Colors.surfaceSecondary,
+  },
+  actionText: { ...Typography.caption, fontWeight: '700' },
+});
 
 const styles = StyleSheet.create({
   listWrap: {
