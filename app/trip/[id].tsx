@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { deleteTrip, getTripById, Trip } from '../../lib/database';
 import { Flag } from '../../components/Flag';
 import { SectionLabel } from '../../components/visaForm';
+import { StatRow, StatTile } from '../../components/StatTile';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 
@@ -106,11 +107,11 @@ export default function TripDetailScreen() {
         </View>
 
         {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <StatCard label="Duration" value={`${trip.days}`} unit={trip.days === 1 ? 'day' : 'days'} />
-          <StatCard label="Arrived" value={formatDate(trip.start_date)} />
-          <StatCard label={isActive ? 'Status' : 'Departed'} value={isActive ? 'Active' : formatDate(trip.end_date!)} />
-        </View>
+        <StatRow style={styles.statsRow}>
+          <StatTile label="Duration" value={`${trip.days}`} unit={trip.days === 1 ? 'day' : 'days'} />
+          <StatTile label="Arrived" value={formatDate(trip.start_date)} />
+          <StatTile label={isActive ? 'Status' : 'Departed'} value={isActive ? 'Active' : formatDate(trip.end_date!)} />
+        </StatRow>
 
         {/* Details Card, its label above it as on the stop sheet */}
         <View style={styles.section}>
@@ -155,33 +156,6 @@ export default function TripDetailScreen() {
         </TouchableOpacity>
       </View>
     </>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  unit,
-}: {
-  label: string;
-  value: string;
-  unit?: string;
-}) {
-  const glassProps = hasGlass
-    ? { glassEffectStyle: 'regular' as const }
-    : {};
-
-  return (
-    <GlassCard
-      {...glassProps}
-      style={[styles.statCard, !hasGlass && styles.statCardFallback]}
-    >
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>
-        {value}
-        {unit && <Text style={styles.statUnit}> {unit}</Text>}
-      </Text>
-    </GlassCard>
   );
 }
 
@@ -286,36 +260,8 @@ const styles = StyleSheet.create({
   },
   // ─── Stats Row ───
   statsRow: {
-    flexDirection: 'row',
     marginHorizontal: 16,
     marginTop: 20,
-    gap: 10,
-  },
-  statCard: {
-    flex: 1,
-    borderRadius: 14,
-    padding: 14,
-    gap: 4,
-    overflow: 'hidden',
-  },
-  statCardFallback: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  statValue: {
-    ...Typography.bodyLarge,
-    fontWeight: '700',
-  },
-  statUnit: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-  },
-  statLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.textTertiary,
-    marginBottom: 2,
   },
   // ─── Details Card ───
   section: {

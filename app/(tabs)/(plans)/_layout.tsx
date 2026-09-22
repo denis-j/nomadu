@@ -96,7 +96,8 @@ export default function PlansStack() {
           presentation: 'formSheet',
           title: 'New Trip',
           sheetGrabberVisible: true,
-          sheetAllowedDetents: [0.3],
+          sheetAllowedDetents: [0.34],
+          contentStyle: { backgroundColor: 'transparent' },
         }}
       />
     </Stack>

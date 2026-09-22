@@ -132,6 +132,9 @@ function fmtShort(dateStr: string): string {
 }
 
 /** "Sep 12 – 18" inside one month, "Sep 28 – Oct 3" across. */
+/** The visa and tax statuses as last computed, per account (see the effect in the screen). */
+const lastVisaTax = new Map<string, { visa: VisaStatus[]; tax: TaxStatus[]; citizenship: string | null }>();
+
 function fmtRange(start: string, end: string): string {
   const s = parseDate(start);
   const e = parseDate(end);
@@ -686,7 +689,12 @@ const LegCard = React.memo(function LegCard({
   prev.leg.city === next.leg.city &&
   prev.leg.country === next.leg.country &&
   prev.firstInCountry === next.firstInCountry &&
-  prev.stay?.updated_at === next.stay?.updated_at
+  prev.stay?.updated_at === next.stay?.updated_at &&
+  // The visa and tax chips arrive a moment after the first render; the
+  // card must not sit on its first, chipless frame when they do.
+  prev.visaStatuses === next.visaStatuses &&
+  prev.taxStatuses === next.taxStatuses &&
+  prev.citizenshipCode === next.citizenshipCode
 );
 
 // ─── Suggestion Leg Card ──────────────────────────────────────────────────────
@@ -946,19 +954,30 @@ export default function JourneyDetailScreen() {
   const docs = useJourneyDocuments(journeyId);
   // A friend's trip: shown as they planned it, nothing here changes it.
   const readOnly = !!journey?.shared_owner_uid;
-  const { plans: stays } = useJourneyAccommodations(journey?.sync_id);
+  // The list waits for the plans (and, below, the visa and tax statuses)
+  // too: a stop card that grows a chip a frame after it appeared reads as
+  // a flicker.
+  const { plans: stays, loaded: staysLoaded } = useJourneyAccommodations(journeyId);
 
   // ─── Visa / Tax statuses ─────────────────────────────────────────────────────
 
   const { user } = useAuth();
-  const [visaStatuses, setVisaStatuses] = useState<VisaStatus[]>([]);
-  const [taxStatuses, setTaxStatuses] = useState<TaxStatus[]>([]);
-  const [citizenshipCode, setCitizenshipCode] = useState<string | null>(null);
+  // What the last visit computed, so the chips are on the cards in their
+  // first frame when the screen comes back; the fresh computation below
+  // replaces them once it is in.
+  const known = user?.uid ? lastVisaTax.get(user.uid) : undefined;
+  const [visaStatuses, setVisaStatuses] = useState<VisaStatus[]>(known?.visa ?? []);
+  const [taxStatuses, setTaxStatuses] = useState<TaxStatus[]>(known?.tax ?? []);
+  const [citizenshipCode, setCitizenshipCode] = useState<string | null>(known?.citizenship ?? null);
+  const [visaLoaded, setVisaLoaded] = useState(!user?.uid || !!known);
   const visaTaxRef = useRef<{ visaTaxContext: string } | null>(null);
 
   useEffect(() => {
     const uid = user?.uid;
-    if (!uid) return;
+    if (!uid) {
+      setVisaLoaded(true);
+      return;
+    }
     Promise.all([
       getCitizenship(uid),
       getAllTripsRaw(),
@@ -974,6 +993,7 @@ export default function JourneyDetailScreen() {
         setCitizenshipCode(citizenship.countryCode);
         const tax = calculateAllTaxStatuses(trips, citizenship.countryCode, hasFixedResidence ?? true);
         console.log('[JourneyDetail] visa:', visa.length, 'tax:', tax.length, 'trips:', trips.length);
+        lastVisaTax.set(uid, { visa, tax, citizenship: citizenship.countryCode });
         setVisaStatuses(visa);
         setTaxStatuses(tax);
 
@@ -990,7 +1010,8 @@ export default function JourneyDetailScreen() {
         if (taxLines.length) lines.push('Tax warnings:\n' + taxLines.join('\n'));
         visaTaxRef.current = { visaTaxContext: lines.join('\n') };
       })
-      .catch((e) => console.error('[JourneyDetail] visa/tax load failed:', e));
+      .catch((e) => console.error('[JourneyDetail] visa/tax load failed:', e))
+      .finally(() => setVisaLoaded(true));
   }, [user?.uid]);
 
   // ─── AI ──────────────────────────────────────────────────────────────────────
@@ -1374,7 +1395,7 @@ export default function JourneyDetailScreen() {
       ) : (
         <GestureHandlerRootView style={{ flex: 1 }}>
           <DraggableFlatList
-            data={legs}
+            data={staysLoaded && visaLoaded ? legs : []}
             keyExtractor={(item) => String(item.id)}
             renderItem={renderItem}
             onDragEnd={handleReorder}

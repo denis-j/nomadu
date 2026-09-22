@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { Dropdown } from './Dropdown';
+import { currencyChoices, promptCurrency } from '../lib/currencies';
 import {
   STATUS_LABELS,
   TYPE_LABELS,
@@ -58,6 +60,27 @@ export function StatusBadge({ status, size = 'regular', onPress }: { status: Acc
       <Text style={[s.badgeText, { color }, size === 'small' && s.badgeTextSmall]}>{STATUS_LABELS[status]}</Text>
       {onPress && <Ionicons name="chevron-down" size={11} color={Colors.textTertiary} />}
     </Pressable>
+  );
+}
+
+/** A row that adds something below it: a plus, a title, no chevron. */
+export function AddRow({ title, open, onPress, last }: { title: string; open: boolean; onPress: () => void; last?: boolean }) {
+  return (
+    <>
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync();
+          onPress();
+        }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]}
+      >
+        <Ionicons name={open ? 'remove-circle-outline' : 'add-circle'} size={22} color={open ? Colors.textTertiary : Colors.cloudyBlue} />
+        <Text style={[s.rowLabel, s.addTitle]}>{open ? 'Cancel' : title}</Text>
+      </Pressable>
+      {!last && <View style={s.separator} />}
+    </>
   );
 }
 
@@ -216,14 +239,17 @@ export function TextArea({
 
 /**
  * An amount and its currency in one row, because a price without a
- * currency is not stored. Commits when either field is left, with both
- * values; the caller decides what to do with an amount that has no
- * currency yet.
+ * currency is not stored. The amount is typed and commits when the field
+ * is left; the currency is picked from a list and commits at once. An
+ * amount typed with no currency chosen takes `suggested` (the stop's
+ * country, or what the plan already uses), so nobody has to say "EUR"
+ * for every price.
  */
 export function MoneyRow({
   label,
   amount,
   currency,
+  suggested,
   onCommit,
   live,
   last,
@@ -231,6 +257,8 @@ export function MoneyRow({
   label: string;
   amount: string;
   currency: string;
+  /** The currency to assume when none was picked. */
+  suggested?: string | null;
   onCommit: (amount: string, currency: string) => void;
   /** Commit every keystroke, for a form with its own button rather than autosave. */
   live?: boolean;
@@ -239,10 +267,17 @@ export function MoneyRow({
   const ref = useRef<TextInput>(null);
   const a = useDraft(amount);
   const c = useDraft(currency);
+  const shown = c.draft || (a.draft.trim() ? suggested ?? '' : '');
+  const effective = (code: string, amt: string) => code || (amt.trim() ? suggested ?? '' : '');
   const commit = () => {
-    if (a.draft !== amount || c.draft !== currency) onCommit(a.draft, c.draft);
+    const code = effective(c.draft, a.draft);
+    if (a.draft !== amount || code !== currency) onCommit(a.draft, code);
   };
-  const missingCurrency = a.draft.trim() !== '' && c.draft.trim() === '';
+  const pick = (code: string) => {
+    c.setDraft(code);
+    onCommit(a.draft, code);
+  };
+  const choices = [...currencyChoices(c.draft, suggested).map((code) => ({ id: code, label: code })), { id: 'other', label: 'Other', icon: 'ellipsis.circle' }];
   return (
     <>
       <Pressable onPress={() => ref.current?.focus()} style={s.row}>
@@ -252,7 +287,7 @@ export function MoneyRow({
             ref={ref}
             style={[s.rowInput, s.moneyInput]}
             value={a.draft}
-            onChangeText={(v) => { a.setDraft(v); if (live) onCommit(v, c.draft); }}
+            onChangeText={(v) => { a.setDraft(v); if (live) onCommit(v, effective(c.draft, v)); }}
             onFocus={() => { a.focused.current = true; }}
             onBlur={() => { a.focused.current = false; commit(); }}
             placeholder="0"
@@ -260,62 +295,19 @@ export function MoneyRow({
             keyboardType="decimal-pad"
             returnKeyType="done"
           />
-          <TextInput
-            style={[s.rowInput, s.currencyInput, missingCurrency && s.currencyMissing]}
-            value={c.draft}
-            onChangeText={(v) => {
-              const code = v.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
-              c.setDraft(code);
-              if (live) onCommit(a.draft, code);
-            }}
-            onFocus={() => { c.focused.current = true; }}
-            onBlur={() => { c.focused.current = false; commit(); }}
-            placeholder="EUR"
-            placeholderTextColor={missingCurrency ? Colors.warning : Colors.textTertiary}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={3}
-            returnKeyType="done"
-          />
+          <Dropdown
+            title="Currency"
+            options={choices}
+            value={shown || suggested || null}
+            right
+            onPick={(id) => (id === 'other' ? promptCurrency(pick) : pick(id))}
+          >
+            <View style={s.currencyPick}>
+              <Text style={[s.currencyText, !shown && s.currencyEmpty]}>{shown || suggested || 'EUR'}</Text>
+              <Ionicons name="chevron-down" size={12} color={Colors.textTertiary} />
+            </View>
+          </Dropdown>
         </View>
-      </Pressable>
-      {!last && <View style={s.separator} />}
-    </>
-  );
-}
-
-/** A row that opens or closes something underneath: title, optional summary, chevron. */
-export function DisclosureRow({
-  title,
-  lines,
-  open,
-  onPress,
-  last,
-}: {
-  title: string;
-  lines?: string[];
-  open: boolean;
-  onPress: () => void;
-  last?: boolean;
-}) {
-  return (
-    <>
-      <Pressable
-        onPress={() => {
-          Haptics.selectionAsync();
-          onPress();
-        }}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]}
-      >
-        <View style={s.rowText}>
-          <Text style={s.rowLabel}>{title}</Text>
-          {lines?.map((line, i) => (
-            <Text key={i} style={s.rowSub} numberOfLines={2}>{line}</Text>
-          ))}
-        </View>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textTertiary} />
       </Pressable>
       {!last && <View style={s.separator} />}
     </>
@@ -393,8 +385,9 @@ const s = StyleSheet.create({
   },
   moneyRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'flex-end' },
   moneyInput: { fontVariant: ['tabular-nums'], flex: 0, minWidth: 90 },
-  currencyInput: { flex: 0, minWidth: 48, textAlign: 'left', color: Colors.textSecondary },
-  currencyMissing: { color: Colors.warning },
+  currencyPick: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4 },
+  currencyText: { ...Typography.titleSmall, fontWeight: '500', color: Colors.textSecondary, fontVariant: ['tabular-nums'] },
+  currencyEmpty: { color: Colors.textTertiary },
 
   areaRow: { paddingVertical: 14, gap: 6 },
   areaLabel: { ...Typography.bodySmall, color: Colors.textSecondary },
@@ -405,5 +398,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.08)',
     marginHorizontal: -20,
   },
+
+  addTitle: { flex: 1 },
 
 });

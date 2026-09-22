@@ -165,15 +165,38 @@ export async function getAccommodationForStop(stopSyncId: string): Promise<Local
   return planFromRows(row, await loadOptions(row.id));
 }
 
-/** Every live plan of a journey, by stop sync id. */
-export async function getAccommodationsForJourney(journeySyncId: string): Promise<Map<string, LocalAccommodation>> {
+/**
+ * Every live plan of a journey, by stop sync id. Keyed by the journey's
+ * local id so the itinerary can ask for its plans in the same breath as
+ * for the journey itself, before it knows the sync id.
+ */
+export async function getAccommodationsForJourney(journeyId: number): Promise<Map<string, LocalAccommodation>> {
   const db = await getDatabase();
   const rows = await db.getAllAsync<PlanRow>(
-    'SELECT * FROM accommodations WHERE journey_sync_id = ? AND deleted = 0',
-    [journeySyncId],
+    `SELECT a.* FROM accommodations a
+       JOIN journeys j ON j.sync_id = a.journey_sync_id
+      WHERE j.id = ? AND a.deleted = 0`,
+    [journeyId],
   );
+  if (rows.length === 0) return new Map();
+  // One read for every option of the journey, not one per plan: this runs
+  // each time the itinerary comes into view.
+  const options = await db.getAllAsync<OptionRow>(
+    `SELECT o.* FROM accommodation_options o
+       JOIN accommodations a ON a.id = o.accommodation_id
+       JOIN journeys j ON j.sync_id = a.journey_sync_id
+      WHERE j.id = ? AND a.deleted = 0
+      ORDER BY o.sort_order ASC, o.id ASC`,
+    [journeyId],
+  );
+  const byPlan = new Map<number, OptionRow[]>();
+  for (const o of options) {
+    const list = byPlan.get(o.accommodation_id) ?? [];
+    list.push(o);
+    byPlan.set(o.accommodation_id, list);
+  }
   const out = new Map<string, LocalAccommodation>();
-  for (const row of rows) out.set(row.sync_id, planFromRows(row, await loadOptions(row.id)));
+  for (const row of rows) out.set(row.sync_id, planFromRows(row, byPlan.get(row.id) ?? []));
   return out;
 }
 

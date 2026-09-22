@@ -17,6 +17,7 @@ import { deleteJourneyLeg, parseDate } from '../../../lib/database';
 import { Flag } from '../../../components/Flag';
 import { StatusBadge, planChipText } from '../../../components/accommodationForm';
 import { SectionLabel } from '../../../components/visaForm';
+import { StatRow, StatTile } from '../../../components/StatTile';
 import { CityTips } from '../../../components/MarkdownTips';
 import { transportInfo } from '../../../components/TransportPicker';
 import { Colors } from '../../../constants/colors';
@@ -210,11 +211,11 @@ export default function StopInfoScreen() {
         </View>
 
         {/* Stats: each fact once; the dates themselves are in the card below */}
-        <View style={styles.statsRow}>
-          <StatCard label="Duration" value={`${days}`} unit={days === 1 ? 'day' : 'days'} />
-          <StatCard label={when.label} value={when.value} unit={when.unit} />
-          <StatCard label="Transport" value={transport.label} icon={transport.icon} />
-        </View>
+        <StatRow style={styles.statsRow}>
+          <StatTile label="Duration" value={`${days}`} unit={days === 1 ? 'day' : 'days'} />
+          <StatTile label={when.label} value={when.value} unit={when.unit} />
+          <StatTile label="Transport" value={transport.label} icon={transport.icon} />
+        </StatRow>
 
         {/* Details */}
         <View style={styles.section}>
@@ -294,21 +295,6 @@ export default function StopInfoScreen() {
   );
 }
 
-function StatCard({ label, value, unit, icon }: { label: string; value: string; unit?: string; icon?: keyof typeof Ionicons.glyphMap }) {
-  return (
-    <GlassCard {...glassProps} style={[styles.statCard, !hasGlass && styles.statCardFallback]}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <View style={styles.statValueRow}>
-        {icon && <Ionicons name={icon} size={16} color={Colors.text} />}
-        <Text style={styles.statValue} numberOfLines={1}>
-          {value}
-          {unit && <Text style={styles.statUnit}> {unit}</Text>}
-        </Text>
-      </View>
-    </GlassCard>
-  );
-}
-
 function DetailRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
   return (
     <View style={styles.detailRow}>
@@ -349,13 +335,7 @@ const styles = StyleSheet.create({
   city: { ...Typography.displayMedium, fontSize: 26, fontWeight: '700' },
   country: { ...Typography.titleSmall, fontWeight: '400', color: Colors.textSecondary, marginTop: 2 },
   // ─── Stats ───
-  statsRow: { flexDirection: 'row', marginHorizontal: 16, marginTop: 20, gap: 10 },
-  statCard: { flex: 1, borderRadius: 14, padding: 14, gap: 4, overflow: 'hidden' },
-  statCardFallback: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
-  statValueRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  statValue: { ...Typography.bodyLarge, fontWeight: '700', flexShrink: 1 },
-  statUnit: { ...Typography.label, color: Colors.textSecondary },
-  statLabel: { fontSize: 11, fontWeight: '600', color: Colors.textTertiary, marginBottom: 2 },
+  statsRow: { marginHorizontal: 16, marginTop: 20 },
   // ─── Cards: a grey label above each, as on the add-stop form ───
   section: { marginHorizontal: 16, marginTop: 16, gap: 10 },
   card: { borderRadius: 16, padding: 18, overflow: 'hidden' },
