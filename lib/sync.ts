@@ -52,6 +52,7 @@ import {
 } from './accommodationModel';
 import { pullDocumentsFromCloud, pushDocumentsToCloud, watchDocuments } from './documentSync';
 import { parseSyncStamp } from './syncTime';
+import { cloudChanged } from './syncTrigger';
 import { clearBadgeProgress } from './badges';
 import { reportError } from './monitoring';
 import { pushProfileToCloud } from './onboarding';
@@ -521,6 +522,12 @@ export async function pushAccommodationsToCloud(uid: string): Promise<void> {
 /** What the mirror last got per shared trip, so an unchanged set is not written again. */
 const mirroredPlans = new Map<string, string>();
 
+/** Drop what this module remembers about the previous account's trips. */
+export function resetSyncState(): void {
+  stopRealtimeSync();
+  mirroredPlans.clear();
+}
+
 /**
  * The plans of a shared trip, into its mirror, so the friends see where
  * everyone sleeps. The whole set every time (`updateDoc` replaces the map,
@@ -628,6 +635,8 @@ export async function syncAll(uid: string): Promise<void> {
       reportError(err, `sync:${name}`);
     }
   }
+  // Open screens re-read what the pulls wrote, even when a later step failed.
+  cloudChanged();
   if (first !== null) throw first;
 
   await setLastSyncTime(uid);
@@ -675,6 +684,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
         }
       }
     }
+    if (snapshot.docChanges().length > 0) cloudChanged();
   });
 
   // Accommodation plans: the agent's research lands on the phone while the
@@ -691,6 +701,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
         }
       }
     }
+    if (snapshot.docChanges().length > 0) cloudChanged();
   });
 
   // Trips followed: a friend's edit shows up here; a trip no longer shared
@@ -707,6 +718,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
         reportError(err, 'sync:followed-realtime');
       }
     }
+    if (snapshot.docChanges().length > 0) cloudChanged();
   });
 
   // Trips shared: a friend joining becomes a traveller within seconds. A
@@ -724,6 +736,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
         reportError(err, 'sync:shared-realtime');
       }
     }
+    if (snapshot.docChanges().length > 0) cloudChanged();
   });
 
   const unsubscribeTrips = onSnapshot(tripsCollection(uid), async (snapshot) => {
@@ -750,6 +763,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
         });
       }
     }
+    if (snapshot.docChanges().length > 0) cloudChanged();
   });
 
   // Documents of shared trips: one listener per trip, set up once the

@@ -9,6 +9,7 @@ import {
   syncAll,
 } from '../lib/sync';
 import { onLocalChange } from '../lib/syncTrigger';
+import { ensureLocalDataOwner } from '../lib/localOwner';
 
 /** How long after the last local edit the push goes out. */
 const PUSH_DELAY_MS = 2000;
@@ -49,23 +50,40 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    const uid = user.uid;
+    let active = true;
+    // Nothing leaves the phone until the local data is known to be this
+    // account's: on a switch, the previous account's rows would otherwise
+    // be pushed into this one before they are wiped.
+    const owned = ensureLocalDataOwner(uid);
+
     // Initial sync + start listener
-    doSync(user.uid);
-    startRealtimeSync(user.uid);
+    owned
+      .then(() => {
+        if (!active) return;
+        doSync(uid);
+        startRealtimeSync(uid);
+      })
+      .catch((err) => {
+        reportError(err, 'local-owner');
+        if (active) setSyncStatus('error');
+      });
 
     // Local edits go out a couple of seconds after the last one, so a
     // friend following the trip sees the change now, not at the next start.
-    const uid = user.uid;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const offChange = onLocalChange(() => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        pushPlans(uid).catch((err) => reportError(err, 'sync:push-plans'));
+        owned
+          .then(() => pushPlans(uid))
+          .catch((err) => reportError(err, 'sync:push-plans'));
       }, PUSH_DELAY_MS);
     });
 
     return () => {
+      active = false;
       offChange();
       if (timer) clearTimeout(timer);
       stopRealtimeSync();
@@ -77,6 +95,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     syncingRef.current = true;
     setSyncStatus('syncing');
     try {
+      await ensureLocalDataOwner(uid);
       await syncAll(uid);
       const time = await getLastSyncTime(uid);
       setLastSynced(time);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useCloudRefresh } from './useCloudRefresh';
 import { getJourneyWithLegs, JourneyWithLegs } from '../lib/database';
 
 /**
@@ -30,6 +31,8 @@ export function useJourney(id: number) {
       setLoading(false);
     }
   }, [id]);
+
+  useCloudRefresh(refresh);
 
   useFocusEffect(
     useCallback(() => {

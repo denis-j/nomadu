@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useCloudRefresh } from './useCloudRefresh';
 import { useAuth } from './useAuth';
 import { getCitizenship } from '../lib/onboarding';
 import { getAllTripsRaw } from '../lib/database';
@@ -46,6 +47,8 @@ export function useVisaTracker() {
       if (!initialised.current) { initialised.current = true; setReady(true); }
     }
   }, [user]);
+
+  useCloudRefresh(refresh);
 
   useFocusEffect(
     useCallback(() => {

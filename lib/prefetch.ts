@@ -17,6 +17,16 @@ export function getVisaStatusesCache(): VisaStatus[] | null { return visaStatuse
 export function getTaxStatusesCache(): TaxStatus[] | null { return taxStatusesCache; }
 export function getCitizenshipCache(): { country: string; countryCode: string } | null { return citizenshipCache; }
 
+/** Forget everything read so far, for when the data it came from is gone. */
+export function resetPrefetchCaches(): void {
+  tripsCache = null;
+  statsCache = null;
+  journeysCache = null;
+  visaStatusesCache = null;
+  taxStatusesCache = null;
+  citizenshipCache = null;
+}
+
 export async function prefetchAll(): Promise<void> {
   try {
     [tripsCache, statsCache, journeysCache] = await Promise.all([

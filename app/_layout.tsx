@@ -14,7 +14,8 @@ import { UpdateBanner } from '../components/UpdateBanner';
 import { useOTAUpdates } from '../hooks/useOTAUpdates';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { Colors } from '../constants/colors';
-import { initMonitoring, setMonitoringUser } from '../lib/monitoring';
+import { initMonitoring, reportError, setMonitoringUser } from '../lib/monitoring';
+import { ensureLocalDataOwner } from '../lib/localOwner';
 
 // First statement in the module, so a failure anywhere below is still
 // reported. Imports are hoisted above this either way, which is why nothing
@@ -175,7 +176,15 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!user) return;
-    prefetchUserData(user.uid).then(() => setUserDataReady(true));
+    const uid = user.uid;
+    // The local data has to be this account's before anything reads it; a
+    // different account's rows are wiped here, and the caches filled before
+    // sign-in are refilled from what is left.
+    ensureLocalDataOwner(uid)
+      .then((wiped) => (wiped ? prefetchAll() : undefined))
+      .catch((err) => reportError(err, 'local-owner'))
+      .then(() => prefetchUserData(uid))
+      .then(() => setUserDataReady(true));
   }, [user?.uid]);
 
   // Tag reports with the signed-in user (uid only, never the email address).

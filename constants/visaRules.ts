@@ -23,7 +23,7 @@ import {
   SCHENGEN_AREA_POLICY,
   DESTINATION_POLICIES,
 } from './visaPolicies';
-import { lookupFromDataset, VISA_DATA_REFRESHED_AT } from './visaDataLookup';
+import { datasetStatedDays, lookupFromDataset, VISA_DATA_REFRESHED_AT } from './visaDataLookup';
 
 export { SCHENGEN_COUNTRIES, EU_EEA_CH_CITIZENS };
 
@@ -75,28 +75,67 @@ export interface ApplicableRule {
  */
 export const VISA_DATA_LAST_VERIFIED = VISA_DATA_REFRESHED_AT;
 
+/** Differences up to this many days between the two sources are rounding. */
+const ROUNDING_TOLERANCE_DAYS = 7;
+
+function withVerified(rule: VisaRule | null): VisaRule | null {
+  if (!rule) return null;
+  // Fill in the dataset-wide audit timestamp so the UI always has something
+  // to surface, without forcing every policy entry to repeat the same date.
+  return rule.lastVerified ? rule : { ...rule, lastVerified: VISA_DATA_LAST_VERIFIED };
+}
+
 /**
  * Resolve which rule applies to a given citizen for a destination policy.
  * Returns null when no rule applies (freedom of movement, home country, etc.).
+ *
+ * `datasetCode` is the country whose dataset cell stands for this
+ * destination: the destination itself, or a visited member state for the
+ * Schengen aggregate.
+ *
+ * The curated `default` was written with the passports that travel there
+ * visa-free in mind, and used to apply to every passport: India to France
+ * came out as 90/180 visa-free, Nigeria to the UK as 180 days. So:
+ *
+ *   1. An override naming this citizenship wins outright (ESTA, freedom of
+ *      movement, the Common Travel Area).
+ *   2. Otherwise the dataset decides whether this passport needs a visa
+ *      before travelling. If it does, that is the answer.
+ *   3. If both agree that entry needs no visa in advance, the curated rule
+ *      describes the allowance, since it knows rolling windows the dataset
+ *      cannot express. A per-stay rule that grants more days than the
+ *      dataset states for this passport gives way to the dataset's number.
+ *   4. If the curated default says "visa required" but the dataset lists
+ *      this passport as visa-free, the dataset is the more specific source.
  */
 export function resolvePolicy(
   citizenshipCode: string,
   policy: DestinationPolicy,
+  datasetCode?: string,
 ): VisaRule | null {
-  const raw = (() => {
-    if (policy.overrides) {
-      for (const override of policy.overrides) {
-        if (override.citizens.includes(citizenshipCode)) {
-          return override.rule;
-        }
-      }
-    }
-    return policy.default;
-  })();
-  if (!raw) return null;
-  // Fill in the dataset-wide audit timestamp so the UI always has something
-  // to surface, without forcing every policy entry to repeat the same date.
-  return raw.lastVerified ? raw : { ...raw, lastVerified: VISA_DATA_LAST_VERIFIED };
+  const override = policy.overrides?.find((o) => o.citizens.includes(citizenshipCode));
+  if (override) return withVerified(override.rule);
+
+  const curated = policy.default;
+  if (!curated || !datasetCode) return withVerified(curated);
+
+  const dataset = lookupFromDataset(citizenshipCode, datasetCode);
+  // The dataset does not know this pair: the curated default is all there is.
+  if (!dataset) return withVerified(curated);
+  if (dataset.ruleType === 'visa_required') return dataset;
+  if (curated.ruleType === 'visa_required') return dataset;
+
+  // The dataset writes a year as 360: a gap that small is rounding, not a
+  // shorter allowance for this passport.
+  const statedDays = datasetStatedDays(citizenshipCode, datasetCode);
+  if (
+    curated.windowDays === 0 &&
+    statedDays !== null &&
+    statedDays < curated.allowedDays - ROUNDING_TOLERANCE_DAYS
+  ) {
+    return dataset;
+  }
+  return withVerified(curated);
 }
 
 /**
@@ -117,12 +156,12 @@ export function getRuleForCitizen(
   if (!destinationCode || destinationCode === citizenshipCode) return null;
 
   if ((SCHENGEN_COUNTRIES as readonly string[]).includes(destinationCode)) {
-    return resolvePolicy(citizenshipCode, SCHENGEN_AREA_POLICY);
+    return resolvePolicy(citizenshipCode, SCHENGEN_AREA_POLICY, destinationCode);
   }
 
   const policy = DESTINATION_POLICIES[destinationCode];
   return policy
-    ? resolvePolicy(citizenshipCode, policy)
+    ? resolvePolicy(citizenshipCode, policy, destinationCode)
     : lookupFromDataset(citizenshipCode, destinationCode);
 }
 
@@ -145,7 +184,9 @@ export function getApplicableRules(
     (c) => visited.has(c) && c !== citizenshipCode,
   );
   if (visitedSchengen.length > 0) {
-    const schengenRule = resolvePolicy(citizenshipCode, SCHENGEN_AREA_POLICY);
+    // Schengen visa policy is common to all member states, so any visited
+    // one stands for the area in the dataset.
+    const schengenRule = resolvePolicy(citizenshipCode, SCHENGEN_AREA_POLICY, visitedSchengen[0]);
     if (schengenRule) {
       rules.push({
         destinationCode: 'SCHENGEN',
@@ -166,7 +207,7 @@ export function getApplicableRules(
 
     const policy = DESTINATION_POLICIES[code];
     const rule = policy
-      ? resolvePolicy(citizenshipCode, policy)
+      ? resolvePolicy(citizenshipCode, policy, code)
       : lookupFromDataset(citizenshipCode, code);
     if (!rule) continue;
 

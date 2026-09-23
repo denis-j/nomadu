@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useCloudRefresh } from './useCloudRefresh';
 import { getStats, Stats } from '../lib/database';
 import { getStatsCache } from '../lib/prefetch';
 import { getCitizenship } from '../lib/onboarding';
@@ -62,6 +63,8 @@ export function useStats(year: YearFilter = null) {
   }, [refresh]);
 
   // Also refresh whenever the screen regains focus (existing behaviour)
+  useCloudRefresh(refresh);
+
   useFocusEffect(
     useCallback(() => {
       refresh();

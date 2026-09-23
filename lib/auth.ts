@@ -15,7 +15,8 @@ import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { httpsCallable, type FunctionsError } from 'firebase/functions';
 import { auth, db, functions } from './firebase';
 import { identifyUser, logOutUser } from './revenueCat';
-import { clearAllData } from './database';
+import { wipeLocalData } from './localOwner';
+import { stopRealtimeSync, syncAll } from './sync';
 
 async function ensureUserDocument(user: User) {
   const ref = doc(db, 'users', user.uid);
@@ -95,7 +96,22 @@ export async function resetPassword(email: string) {
   await sendPasswordResetEmail(auth, email);
 }
 
+/** How long sign-out waits for the last push before giving up on it. */
+const FINAL_SYNC_TIMEOUT_MS = 6000;
+
 export async function signOut() {
+  // The local data stays on the phone for this account, but if a different
+  // account signs in next it is wiped (see lib/localOwner.ts). One last
+  // sync first, so an edit made offline is not lost with it. Bounded: a
+  // phone with no connection still signs out.
+  const uid = auth.currentUser?.uid;
+  if (uid) {
+    await Promise.race([
+      syncAll(uid).catch(() => {}),
+      new Promise((resolve) => setTimeout(resolve, FINAL_SYNC_TIMEOUT_MS)),
+    ]);
+  }
+  stopRealtimeSync();
   await firebaseSignOut(auth);
   await logOutUser();
 }
@@ -128,7 +144,9 @@ export async function deleteAccount(): Promise<void> {
 
   // Past this point the account is gone server-side. Local cleanup must not
   // throw, or the user is left signed into an account that no longer exists.
-  await clearAllData().catch(() => {});
+  // All of it: journeys, visas, stays and document files too, which would
+  // otherwise be pushed into whichever account signs in next.
+  await wipeLocalData().catch(() => {});
 
   // Everything this app writes is either uid-scoped or "@"-prefixed. The user
   // is leaving, so both go: preferences, badge progress, notification dedup

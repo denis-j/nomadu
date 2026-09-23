@@ -55,6 +55,19 @@ const DEFAULT_DAYS = {
 } as const;
 
 /**
+ * The number of days the dataset itself states for a visa-free pair, or null
+ * when the cell carries no number (a category like "visa free" or "eta", for
+ * which `lookupFromDataset` fills in a typical default).
+ */
+export function datasetStatedDays(
+  citizenshipCode: string,
+  destinationCode: string,
+): number | null {
+  const cell = VISA_DATA.matrix[citizenshipCode]?.[destinationCode];
+  return typeof cell === 'number' && cell > 0 ? cell : null;
+}
+
+/**
  * Look up the citizenship × destination cell and build a VisaRule from it.
  * Returns null when:
  *   - the dataset doesn't know this pair (rare — only edge codes)

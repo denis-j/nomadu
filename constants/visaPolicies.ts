@@ -43,10 +43,10 @@ export const EU_EEA_CH_CITIZENS = [
  * Source: https://travel.state.gov/content/travel/en/us-visas/tourism-visit/visa-waiver-program.html
  */
 export const US_VWP_CITIZENS = [
-  // EU + EEA + Switzerland (all covered except CY, RO, BG)
+  // EU + EEA + Switzerland (all covered except CY and BG; RO joined in 2025)
   'AT', 'BE', 'HR', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR',
   'HU', 'IS', 'IE', 'IT', 'LV', 'LI', 'LT', 'LU', 'MT', 'NL',
-  'NO', 'PL', 'PT', 'SK', 'SI', 'ES', 'SE', 'CH',
+  'NO', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH',
   // Plus
   'AD', 'AU', 'BN', 'CL', 'IL', 'JP', 'KR', 'MC', 'NZ', 'QA',
   'SM', 'SG', 'TW', 'GB',

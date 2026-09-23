@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useCloudRefresh } from './useCloudRefresh';
 import { getAllTrips, Trip } from '../lib/database';
 import { getTripsCache } from '../lib/prefetch';
 
@@ -22,6 +23,8 @@ export function useTrips() {
       }
     }
   }, []);
+
+  useCloudRefresh(refresh);
 
   useFocusEffect(
     useCallback(() => {

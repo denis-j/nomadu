@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useCloudRefresh } from './useCloudRefresh';
 import { useAuth } from './useAuth';
 import { getCitizenship, getHasFixedResidence } from '../lib/onboarding';
 import { getAllTripsRaw } from '../lib/database';
@@ -60,6 +61,8 @@ export function useTaxTracker(year: number = new Date().getFullYear()) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useCloudRefresh(refresh);
 
   useFocusEffect(
     useCallback(() => {

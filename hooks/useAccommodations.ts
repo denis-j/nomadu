@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useCloudRefresh } from './useCloudRefresh';
 import {
   getAccommodationForStop,
   getAccommodationsForJourney,
@@ -12,6 +13,11 @@ import {
  * a frame later; the read that follows only changes what changed.
  */
 const lastPlans = new Map<number, Map<string, LocalAccommodation>>();
+
+/** For when the journeys these ids point to are gone (another account signed in). */
+export function forgetAccommodationPlans(): void {
+  lastPlans.clear();
+}
 
 /**
  * The accommodation plans of one journey (its local id), by stop sync id,
@@ -37,6 +43,8 @@ export function useJourneyAccommodations(journeyId: number) {
       setLoaded(true);
     }
   }, [journeyId]);
+
+  useCloudRefresh(refresh);
 
   useFocusEffect(
     useCallback(() => {
@@ -80,6 +88,8 @@ export function useAccommodation(stopSyncId: string | null | undefined) {
       setLoaded(true);
     }
   }, [stopSyncId]);
+
+  useCloudRefresh(refresh);
 
   useFocusEffect(
     useCallback(() => {

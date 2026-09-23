@@ -204,6 +204,11 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
       sort_order          INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_accommodation_options_plan ON accommodation_options(accommodation_id);
+
+    CREATE TABLE IF NOT EXISTS app_meta (
+      key   TEXT PRIMARY KEY,
+      value TEXT
+    );
   `);
 
   // Migration: add sync columns
@@ -1466,6 +1471,49 @@ export async function clearAllData(): Promise<void> {
     DELETE FROM visits;
     DELETE FROM trips;
   `);
+}
+
+/**
+ * Every row of every user table, for when the data on this phone belongs to
+ * someone else (a different account signed in) or to nobody (the account was
+ * deleted). Children first, so no foreign key is left pointing at a deleted
+ * parent. The autoincrement counters stay where they are, so a new row never
+ * reuses the id of one that a cloud document or a cache still remembers.
+ */
+export async function wipeLocalDatabase(): Promise<void> {
+  const database = await getDatabase();
+  await database.withExclusiveTransactionAsync(async (tx) => {
+    await tx.execAsync(`
+      DELETE FROM accommodation_options;
+      DELETE FROM accommodations;
+      DELETE FROM journey_documents;
+      DELETE FROM journey_travellers;
+      DELETE FROM journey_legs;
+      DELETE FROM journeys;
+      DELETE FROM plans;
+      DELETE FROM user_visas;
+      DELETE FROM trips;
+      DELETE FROM visits;
+      DELETE FROM app_meta;
+    `);
+  });
+}
+
+export async function getMeta(key: string): Promise<string | null> {
+  const database = await getDatabase();
+  const row = await database.getFirstAsync<{ value: string | null }>(
+    'SELECT value FROM app_meta WHERE key = ?',
+    [key],
+  );
+  return row?.value ?? null;
+}
+
+export async function setMeta(key: string, value: string): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    'INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    [key, value],
+  );
 }
 
 export async function exportTrips(): Promise<Trip[]> {
