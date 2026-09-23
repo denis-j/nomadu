@@ -47,6 +47,8 @@ export const deleteAccount = onCall(
         db.collection('agent_tokens').where('uid', '==', uid).get(),
       ]);
       await Promise.all([...usage.docs, ...tokens.docs].map((d) => d.ref.delete()));
+      // The cached Pro answer (see access.ts) is keyed by the uid as well.
+      await db.collection('entitlements').doc(uid).delete();
 
       // Trips they shared stop being shared; trips they came along on go
       // on without them.

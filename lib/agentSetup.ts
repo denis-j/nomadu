@@ -69,6 +69,6 @@ export function agentSetupText(editTimeline: boolean): string {
       : []),
     '- The token is a secret. Never write it into your prompt, memory, notes or replies, and never send it anywhere but this API.',
     '- My documents (tickets, visas, bookings) are not available through the API.',
-    '- Errors come back as {"error": {"code", "message"}}. A 401 means the token was revoked; ask me for a new one.',
+    '- Errors come back as {"error": {"code", "message"}}. A 401 means the token was revoked; ask me for a new one. A 403 "forbidden" on every request means my Nomadu Pro has lapsed; tell me instead of retrying.',
   ].join('\n');
 }

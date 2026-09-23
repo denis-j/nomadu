@@ -189,3 +189,40 @@ npm run logs
 `GEMINI_API_KEY` is set once with `npx firebase functions:secrets:set GEMINI_API_KEY`. The app's own configuration (`EXPO_PUBLIC_FIREBASE_*`, `EXPO_PUBLIC_GOOGLE_*`, `EXPO_PUBLIC_SENTRY_DSN`) is public by design and inlined at build time; `scripts/check-env.mjs` refuses a build without it.
 
 Housekeeping still to do by hand: Firestore TTL policies on `ai_usage.expiresAt` and `city_tips.expiresAt` so old counters and stale tips delete themselves.
+
+## Pro and App Check (functions/src/access.ts)
+
+The Gemini callables (`suggestStops`, `extractTrips`, and `cityTips` when it
+has to generate), `createAgentToken` and every agent API request check that
+the account holds the RevenueCat entitlement `MMM 0 LLC Pro`. The callables
+can also require an App Check token. Both are switched in `functions/.env`:
+`off`, `log` (log who would be refused, refuse nobody) or `enforce`.
+
+A check that cannot run never refuses: with no secret set, or RevenueCat
+unreachable, the call goes through and an error is logged. A Pro answer is
+cached in `entitlements/{uid}` for 6 hours (or until the subscription ends),
+a "no" for 60 seconds.
+
+Rollout, Pro:
+
+1. Create the secret before the first deploy that contains this code (the
+   deploy needs it to exist). RevenueCat → Project settings → API keys →
+   Secret key (`sk_…`):
+   `npx firebase functions:secrets:set REVENUECAT_SECRET_KEY`
+2. Deploy with `ENTITLEMENT_MODE=log`. Watch the logs for a few days:
+   `npx firebase functions:log | grep "would refuse"`. Every line there is an
+   account that would have been refused. Sandbox and TestFlight purchases
+   must not show up.
+3. Set `ENTITLEMENT_MODE=enforce` and deploy again.
+
+Rollout, App Check (needs a new native build):
+
+1. Firebase console → App Check → register the iOS app with App Attest.
+2. Client: an App Check provider that hands its token to the JS SDK
+   (`initializeAppCheck` with a `CustomProvider` backed by
+   `@react-native-firebase/app-check`, or equivalent). Simulator and Maestro
+   runs need a debug token registered in the console.
+3. Ship that build, then `APP_CHECK_MODE=log`: "would refuse: no App Check
+   token" lines are old builds and scripts.
+4. `APP_CHECK_MODE=enforce` once old builds are gone. Refused calls get
+   "Please update Nomadu to the latest version."

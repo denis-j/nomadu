@@ -5,6 +5,10 @@ import { createHash } from 'node:crypto';
 import { Timestamp, __get, __reset, __seed } from './fakeFirestore';
 import { serve } from '../src/agent';
 
+// Pro and App Check have their own tests (access.test.ts); here every key's
+// account counts as paying.
+process.env.ENTITLEMENT_MODE = 'off';
+
 // ─── Harness ─────────────────────────────────────────────────────────────────
 
 const RW = 'nmd_readwrite';

@@ -16,6 +16,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall, onRequest, type Request } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
+import { requireAppAccess, requirePro, revenueCatKey } from './access';
 import type { Response } from 'express';
 
 import { calculateAllVisaStatuses } from '../../lib/visaCalculations';
@@ -55,8 +56,10 @@ function requireUid(uid: string | undefined): string {
   return uid;
 }
 
-export const createAgentToken = onCall({ region: REGION }, async (request) => {
+export const createAgentToken = onCall({ region: REGION, secrets: [revenueCatKey] }, async (request) => {
   const uid = requireUid(request.auth?.uid);
+  // An agent key is a Pro feature, and it outlives the app session.
+  await requireAppAccess(request, uid, 'createAgentToken');
   const label = typeof request.data?.label === 'string' ? request.data.label.trim().slice(0, 40) : '';
   // Chosen when the token is made and fixed for its life: whether the agent
   // may write to the tracked timeline, or only read it.
@@ -126,7 +129,15 @@ async function authenticate(req: Request): Promise<Caller> {
   const snap = await ref.get();
   if (!snap.exists) throw new ApiError(401, 'unauthenticated', 'Unknown or revoked token.');
   ref.update({ last_used_at: FieldValue.serverTimestamp() }).catch(() => {});
-  return { uid: snap.get('uid') as string, editTimeline: snap.get('edit_timeline') === true };
+  const uid = snap.get('uid') as string;
+  // Keys outlive the subscription they were made under: checked on use, not
+  // only on creation. Cached, so this is one document read per request.
+  try {
+    await requirePro(uid, 'agentApi');
+  } catch {
+    throw new ApiError(403, 'forbidden', 'This key belongs to an account without Nomadu Pro.');
+  }
+  return { uid, editTimeline: snap.get('edit_timeline') === true };
 }
 
 function requireTimelineWrite(caller: Caller): void {
@@ -586,4 +597,4 @@ export async function serve(req: Request, res: Response): Promise<void> {
   }
 }
 
-export const agentApi = onRequest({ region: REGION, memory: '512MiB', timeoutSeconds: 60 }, serve);
+export const agentApi = onRequest({ region: REGION, memory: '512MiB', timeoutSeconds: 60, secrets: [revenueCatKey] }, serve);

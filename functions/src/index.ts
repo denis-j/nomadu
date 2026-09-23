@@ -26,6 +26,7 @@ import {
 } from './prompts';
 import { consumeQuota } from './rateLimit';
 import { cachedCityTips } from './cityTips';
+import { requireAppAccess, revenueCatKey } from './access';
 
 initializeApp();
 
@@ -38,7 +39,7 @@ const geminiKey = defineSecret('GEMINI_API_KEY');
 /** Shared deployment options. Adjust `region` if your Firestore lives elsewhere. */
 const options = {
   region: 'us-central1',
-  secrets: [geminiKey],
+  secrets: [geminiKey, revenueCatKey],
   // Vision requests carry a base64 screenshot, so they need more headroom than
   // the default 256 MiB and longer than the default 60 s.
   memory: '512MiB' as const,
@@ -93,6 +94,7 @@ export const suggestStops = onCall(options, async (request) => {
       ? sanitize(data.userPreference, 300)
       : undefined;
 
+  await requireAppAccess(request, uid, 'suggestStops');
   await consumeQuota(uid, 'suggestStops');
 
   const prompt = buildStopSuggestionPrompt(journeyTitle, legs, visaTaxContext, userPreference);
@@ -118,7 +120,10 @@ export const cityTips = onCall(options, async (request) => {
 
   // Shared across users: the model runs once per city, then everyone reads
   // the same answer back. The quota is only spent when it does run.
+  // Reading tips someone else already paid for costs nothing; only a new
+  // generation has to come from a paying account in the real app.
   const { tips } = await cachedCityTips(city, country, async () => {
+    await requireAppAccess(request, uid, 'cityTips');
     await consumeQuota(uid, 'cityTips');
     const text = await generateText(geminiKey.value(), buildCityTipsPrompt(city, country), 512, 0.8);
     if (!text) {
@@ -156,6 +161,7 @@ export const extractTrips = onCall(options, async (request) => {
       ? data.mimeType
       : 'image/jpeg';
 
+  await requireAppAccess(request, uid, 'extractTrips');
   await consumeQuota(uid, 'extractTrips');
 
   const raw = await generateFromImage(

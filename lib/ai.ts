@@ -26,6 +26,12 @@ function toUserFacingError(err: unknown): Error {
   const message = (err as FunctionsError)?.message;
 
   if (code === 'functions/resource-exhausted' && message) return new Error(message);
+  // The server checks Pro and App Check itself (functions/src/access.ts);
+  // both messages are written for the user.
+  if (code === 'functions/permission-denied') {
+    return new Error('This feature is part of Nomadu Pro.');
+  }
+  if (code === 'functions/failed-precondition' && message) return new Error(message);
   if (code === 'functions/unauthenticated') {
     return new Error('Please sign in to use this feature.');
   }
