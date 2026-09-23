@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 import * as Crypto from 'expo-crypto';
 import { localIsNewer } from './syncTime';
-import { chainDates } from './days';
+import { chainDates, countDays, toYmd } from './days';
 import { localChanged } from './syncTrigger';
 
 let db: SQLite.SQLiteDatabase | null = null;
@@ -370,6 +370,12 @@ export interface Trip {
   sync_id: string | null;
   updated_at: string | null;
   deleted: number;
+  /**
+   * On entries from `getAllTrips`: every row folded into this one, oldest
+   * first. The timeline shows one "Berlin" for three consecutive rows, so
+   * deleting or editing it has to reach all three.
+   */
+  member_ids?: number[];
 }
 
 export async function insertTripManual(
@@ -517,8 +523,10 @@ export async function getAllTrips(): Promise<Trip[]> {
   const raw = await getAllTripsRaw();
   if (raw.length === 0) return [];
 
-  // Merge consecutive trips in the same city+country
-  const merged: Trip[] = [{ ...raw[0] }];
+  // Merge consecutive trips in the same city+country. Compared by country
+  // code: older rows carry the country name in the phone's language, and
+  // "Deutschland" next to "Germany" is still one stay.
+  const merged: Trip[] = [{ ...raw[0], member_ids: [raw[0].id] }];
 
   for (let i = 1; i < raw.length; i++) {
     const prev = merged[merged.length - 1];
@@ -526,29 +534,35 @@ export async function getAllTrips(): Promise<Trip[]> {
 
     const samePlace =
       prev.city.toLowerCase() === curr.city.toLowerCase() &&
-      prev.country.toLowerCase() === curr.country.toLowerCase();
+      (prev.country_code && curr.country_code
+        ? prev.country_code === curr.country_code
+        : prev.country.toLowerCase() === curr.country.toLowerCase());
 
-    // Check if dates are adjacent (prev end_date + 1 day >= curr start_date)
+    // Adjacent: the next row starts at most one calendar day after this one
+    // ends. Counted in days, not milliseconds, so the 25-hour day of a clock
+    // change does not split a stay in two.
     const adjacent = (() => {
       const prevEnd = prev.end_date ? parseDate(prev.end_date) : new Date();
       const currStart = parseDate(curr.start_date);
-      const diffMs = currStart.getTime() - prevEnd.getTime();
-      return diffMs <= 24 * 60 * 60 * 1000; // 1 day gap tolerance
+      return currStart <= prevEnd || countDays(prevEnd, currStart) <= 2;
     })();
 
     if (samePlace && adjacent) {
-      // Merge: extend prev trip
-      prev.end_date = curr.end_date;
-      const start = parseDate(prev.start_date);
+      // Merge: extend prev trip. A row that ends earlier than the stay so
+      // far (an overlap) must not cut it short.
+      if (prev.end_date !== null) {
+        prev.end_date = curr.end_date === null || curr.end_date > prev.end_date ? curr.end_date : prev.end_date;
+      }
       const end = prev.end_date ? parseDate(prev.end_date) : new Date();
-      prev.days = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+      prev.days = Math.max(1, countDays(parseDate(prev.start_date), end));
+      prev.member_ids!.push(curr.id);
       // Keep coords from whichever has them
       if (!prev.latitude && curr.latitude) {
         prev.latitude = curr.latitude;
         prev.longitude = curr.longitude;
       }
     } else {
-      merged.push({ ...curr });
+      merged.push({ ...curr, member_ids: [curr.id] });
     }
   }
 
@@ -558,7 +572,9 @@ export async function getAllTrips(): Promise<Trip[]> {
   // If the first (most recent) trip has end_date === today or no end_date, mark as present
   if (merged.length > 0) {
     const latest = merged[0];
-    const today = new Date().toISOString().split('T')[0];
+    // The local calendar day: toISOString is UTC, which in Bangkok is still
+    // yesterday until 7 in the morning.
+    const today = toYmd(new Date());
     if (latest.end_date === today) {
       latest.end_date = null;
     }
@@ -580,6 +596,61 @@ export async function markTripDeleted(id: number): Promise<void> {
   );
 }
 
+/** The timeline entry a row belongs to: the row itself plus any it was merged with. */
+export async function getMergedTripContaining(id: number): Promise<Trip | null> {
+  const entry = (await getAllTrips()).find((t) => t.member_ids?.includes(id));
+  return entry ?? null;
+}
+
+/**
+ * Delete a timeline entry: every row merged into it, as tombstones so the
+ * sync removes them everywhere instead of pulling them back. Deleting only
+ * the row that was tapped left the rest to merge into a shorter stay.
+ */
+export async function markTripGroupDeleted(id: number): Promise<void> {
+  const entry = await getMergedTripContaining(id);
+  const ids = entry?.member_ids ?? [id];
+  const database = await getDatabase();
+  await database.withExclusiveTransactionAsync(async (tx) => {
+    for (const rowId of ids) {
+      await tx.runAsync(
+        `UPDATE trips SET deleted = 1, updated_at = datetime('now') WHERE id = ?`,
+        [rowId],
+      );
+    }
+  });
+}
+
+/**
+ * Edit a timeline entry. The first row takes the new values and the other
+ * merged rows go, so the edited range is not overlapped by the old pieces.
+ */
+export async function updateTripGroup(
+  id: number,
+  city: string,
+  country: string,
+  countryCode: string,
+  startDate: string,
+  endDate: string | null,
+  latitude?: number | null,
+  longitude?: number | null,
+): Promise<void> {
+  const entry = await getMergedTripContaining(id);
+  const ids = entry?.member_ids ?? [id];
+  const [keep, ...rest] = ids;
+  await updateTrip(keep, city, country, countryCode, startDate, endDate, latitude, longitude);
+  if (rest.length === 0) return;
+  const database = await getDatabase();
+  await database.withExclusiveTransactionAsync(async (tx) => {
+    for (const rowId of rest) {
+      await tx.runAsync(
+        `UPDATE trips SET deleted = 1, updated_at = datetime('now') WHERE id = ?`,
+        [rowId],
+      );
+    }
+  });
+}
+
 export async function getTripById(id: number): Promise<Trip | null> {
   const database = await getDatabase();
   return database.getFirstAsync<Trip>('SELECT * FROM trips WHERE id = ?', [id]);
@@ -589,7 +660,7 @@ export async function getTripsByCity(city: string, countryCode: string): Promise
   const database = await getDatabase();
   const raw = await database.getAllAsync<Trip>(
     `SELECT * FROM trips
-     WHERE LOWER(city) = LOWER(?) AND country_code = ?
+     WHERE LOWER(city) = LOWER(?) AND country_code = ? AND deleted = 0
      ORDER BY start_date ASC`,
     [city, countryCode],
   );
@@ -932,6 +1003,19 @@ export async function upsertJourneyFromCloud(
 export async function setJourneyShareCode(journeyId: number, code: string | null): Promise<void> {
   const database = await getDatabase();
   await database.runAsync('UPDATE journeys SET share_code = ? WHERE id = ?', [code, journeyId]);
+}
+
+/**
+ * The invite code as the mirror has it, for a trip this phone still shares.
+ * Removing a friend replaces the code (their old link must stop working),
+ * and every phone of the owner has to hand out the new one.
+ */
+export async function updateJourneyShareCodeBySyncId(syncId: string, code: string): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    'UPDATE journeys SET share_code = ? WHERE sync_id = ? AND share_code IS NOT NULL AND share_code != ?',
+    [code, syncId, code],
+  );
 }
 
 export async function clearJourneyShareCodeBySyncId(syncId: string): Promise<void> {
@@ -1464,6 +1548,20 @@ export async function getStats(
 }
 
 // ─── Data Management ───
+
+/**
+ * "Clear Travel Data": every trip becomes a tombstone rather than vanishing,
+ * so the sync deletes it on every device. Rows deleted outright were pushed
+ * straight back by a second phone that still held them. Visits are
+ * device-local and simply go.
+ */
+export async function markAllTripsDeleted(): Promise<void> {
+  const database = await getDatabase();
+  await database.execAsync(`
+    UPDATE trips SET deleted = 1, updated_at = datetime('now') WHERE deleted = 0;
+    DELETE FROM visits;
+  `);
+}
 
 export async function clearAllData(): Promise<void> {
   const database = await getDatabase();

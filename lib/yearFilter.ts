@@ -1,11 +1,10 @@
 import { Trip, parseDate } from './database';
+import { countDays } from './days';
 
 /**
  * `null` means "All Time" (no filter). A number is a 4-digit calendar year.
  */
 export type YearFilter = number | null;
-
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -28,7 +27,9 @@ export function tripDaysInYear(trip: Trip, year: number): number {
 
   if (overlapStart > overlapEnd) return 0;
 
-  return Math.floor((overlapEnd.getTime() - overlapStart.getTime()) / MS_PER_DAY) + 1;
+  // Calendar days, not elapsed milliseconds: a range across the spring clock
+  // change is an hour short of whole days, and flooring dropped one.
+  return countDays(overlapStart, overlapEnd);
 }
 
 /**

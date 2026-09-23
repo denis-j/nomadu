@@ -5,7 +5,8 @@ import RNMapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { getTripsByCity, Trip } from '../../lib/database';
+import { getTripsByCity, parseDate, Trip } from '../../lib/database';
+import { MissingRoute } from '../../components/MissingRoute';
 import { Flag } from '../../components/Flag';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
@@ -24,12 +25,16 @@ export default function CityDetailScreen() {
   const [city, countryCode] = (key ?? '').split('::');
 
   useEffect(() => {
-    if (city && countryCode) {
-      getTripsByCity(city, countryCode).then((result) => {
-        setTrips(result);
-        setLoading(false);
-      });
+    // A key without "::" (a malformed link) has nothing to look up, and used
+    // to leave "Loading..." up for good.
+    if (!city || !countryCode) {
+      setLoading(false);
+      return;
     }
+    getTripsByCity(city, countryCode)
+      .then(setTrips)
+      .catch(() => setTrips([]))
+      .finally(() => setLoading(false));
   }, [city, countryCode]);
 
   // Deselect map pin when sheet is dismissed
@@ -45,13 +50,17 @@ export default function CityDetailScreen() {
     );
   }
 
+  if (trips.length === 0) {
+    return <MissingRoute title="City" message="No trips to this city." />;
+  }
+
   const country = trips[0]?.country ?? '';
   const totalDays = trips.reduce((sum, t) => sum + t.days, 0);
   const totalVisits = trips.length;
   const coordTrip = trips.find((t) => t.latitude && t.longitude);
 
   const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-US', {
+    parseDate(dateStr).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',

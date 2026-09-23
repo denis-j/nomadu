@@ -11,7 +11,7 @@ import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { CloudyButton } from '../../../components/CloudyButton';
 import { Flag } from '../../../components/Flag';
-import { todayStr, VisaStatus } from '../../../lib/visaCalculations';
+import { todayStr, visaGroup, VisaStatus } from '../../../lib/visaCalculations';
 import { hasNoExpiry } from '../../../lib/userVisas';
 import { getCountryName } from '../../../utils/geography';
 
@@ -205,23 +205,7 @@ function SourceFooter({ visa }: { visa: VisaStatus }) {
   );
 }
 
-/**
- * Which of the three groups a card belongs to.
- *
- * The flat, urgency-sorted list put expired visas at the very top and kept a
- * card for every country ever visited, so after a few years of travel the
- * screen was mostly history. Splitting it means the first thing you see is
- * what is actually running.
- */
-type Group = 'active' | 'expiredVisa' | 'pastCountry';
-
-function groupOf(visa: VisaStatus): Group {
-  if (visa.isUserVisa) {
-    return visa.status === 'expired' ? 'expiredVisa' : 'active';
-  }
-  // An auto rule whose stay is over: you were there, you are not now.
-  return visa.leftOn && visa.daysUsed === 0 ? 'pastCountry' : 'active';
-}
+const groupOf = visaGroup;
 
 function SectionHeader({
   title,

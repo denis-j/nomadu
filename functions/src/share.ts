@@ -22,6 +22,7 @@
 
 import { randomInt } from 'node:crypto';
 import { Timestamp, getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import { avatarSeed } from '../../lib/avatarSeed';
@@ -209,7 +210,51 @@ export async function leave(uid: string, data: { journeyId?: unknown }) {
   return { ok: true };
 }
 
-/** Owner: one friend off the trip. Their phone drops it the moment the document changes. */
+/**
+ * A shared trip, gone for good: the mirror, its document records and every
+ * file uploaded to it. Deleting only the mirror left the `documents`
+ * subcollection and the files (passports, tickets) behind, still readable
+ * by anyone who had been on the trip.
+ */
+async function purgeShared(journeyId: string, ownerUid: string): Promise<void> {
+  const db = getFirestore();
+  await db.recursiveDelete(db.collection(SHARED).doc(journeyId));
+  try {
+    await getStorage().bucket().deleteFiles({ prefix: `shared/${journeyId}/${ownerUid}/` });
+  } catch (err) {
+    // The records are gone, so the app no longer points at the files; they
+    // are orphans now, which is worth a loud log but not a failed unshare.
+    logger.error('shared files not deleted', { journeyId, err: String(err) });
+  }
+}
+
+/**
+ * What a member put on someone else's trip, for when they leave it for good
+ * (account deletion): their document records and the files behind them.
+ */
+async function purgeUploads(journeyId: string, uid: string): Promise<void> {
+  const db = getFirestore();
+  const mine = await db.collection(`${SHARED}/${journeyId}/documents`).where('uploader_uid', '==', uid).get();
+  for (const d of mine.docs) {
+    const path = d.get('path');
+    // Only files of this trip: the path is written by a client.
+    if (typeof path === 'string' && path.startsWith(`shared/${journeyId}/`) && !path.includes('..')) {
+      try {
+        await getStorage().bucket().file(path).delete();
+      } catch (err) {
+        logger.error('uploaded file not deleted', { journeyId, err: String(err) });
+      }
+    }
+    await d.ref.delete();
+  }
+}
+
+/**
+ * Owner: one friend off the trip. Their phone drops it the moment the
+ * document changes. The invite code is replaced as well: the old one is in
+ * their app and in their link, and with it they could simply join again.
+ * The owner's phones pick the new code up from the mirror.
+ */
 export async function removeMember(uid: string, data: { journeyId?: unknown; memberUid?: unknown }) {
   const journeyId = cleanId(data.journeyId);
   const memberUid = typeof data.memberUid === 'string' && data.memberUid.trim() ? data.memberUid.trim() : '';
@@ -222,9 +267,13 @@ export async function removeMember(uid: string, data: { journeyId?: unknown; mem
   if (memberUid === uid) throw new HttpsError('failed-precondition', 'You cannot remove yourself; stop sharing instead.');
   const members = { ...(x.members ?? {}) };
   delete members[memberUid];
-  await ref.update({ member_uids: (x.member_uids ?? []).filter((m) => m !== memberUid), members });
+  const db = getFirestore();
+  const code = newCode();
+  await db.collection(INVITES).doc(code).set({ journey_id: journeyId, owner_uid: uid, created_at: Timestamp.now() });
+  await ref.update({ member_uids: (x.member_uids ?? []).filter((m) => m !== memberUid), members, invite_code: code });
+  if (typeof x.invite_code === 'string') await db.collection(INVITES).doc(x.invite_code).delete();
   logger.info('member removed', { uid, journeyId });
-  return { ok: true };
+  return { ok: true, code, url: inviteUrl(code) };
 }
 
 /** Owner: the trip is private again. Members' phones tombstone their copy. */
@@ -237,7 +286,7 @@ export async function unshare(uid: string, data: { journeyId?: unknown }) {
   if (shared.get('owner_uid') !== uid) throw new HttpsError('permission-denied', 'Not your trip.');
   const code = shared.get('invite_code');
   if (typeof code === 'string') await db.collection(INVITES).doc(code).delete();
-  await ref.delete();
+  await purgeShared(journeyId, uid);
   logger.info('journey unshared', { uid, journeyId });
   return { ok: true };
 }
@@ -249,10 +298,11 @@ export async function forgetUser(uid: string): Promise<void> {
   for (const d of owned.docs) {
     const code = d.get('invite_code');
     if (typeof code === 'string') await db.collection(INVITES).doc(code).delete();
-    await d.ref.delete();
+    await purgeShared(d.id, uid);
   }
   const memberOf = await db.collection(SHARED).where('member_uids', 'array-contains', uid).get();
   for (const d of memberOf.docs) {
+    await purgeUploads(d.id, uid);
     const members = { ...(d.get('members') ?? {}) };
     delete members[uid];
     await d.ref.update({ member_uids: (d.get('member_uids') as string[]).filter((m) => m !== uid), members });

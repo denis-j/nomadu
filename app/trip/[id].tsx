@@ -4,7 +4,10 @@ import { useEffect, useState } from 'react';
 import RNMapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
-import { deleteTrip, getTripById, Trip } from '../../lib/database';
+import { getMergedTripContaining, markTripGroupDeleted, parseDate, Trip } from '../../lib/database';
+import { MissingRoute } from '../../components/MissingRoute';
+import { reportError } from '../../lib/monitoring';
+import { showToast } from '../../lib/toast';
 import { Flag } from '../../components/Flag';
 import { SectionLabel } from '../../components/visaForm';
 import { StatRow, StatTile } from '../../components/StatTile';
@@ -16,13 +19,23 @@ const GlassCard = hasGlass ? GlassView : View;
 
 export default function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [trip, setTrip] = useState<Trip | null>(null);
+  // undefined while loading, null when there is no such trip (deleted, or a
+  // link with a made-up id), which used to leave "Loading..." up for good.
+  const [trip, setTrip] = useState<Trip | null | undefined>(undefined);
 
   useEffect(() => {
-    if (id) {
-      getTripById(Number(id)).then(setTrip);
+    const rowId = Number(id);
+    if (!id || !Number.isFinite(rowId)) {
+      setTrip(null);
+      return;
     }
+    // The whole stay the timeline showed, not just its first row.
+    getMergedTripContaining(rowId).then(setTrip).catch(() => setTrip(null));
   }, [id]);
+
+  if (trip === null) {
+    return <MissingRoute title="Trip" message="This trip is no longer here." />;
+  }
 
   if (!trip) {
     return (
@@ -38,13 +51,13 @@ export default function TripDetailScreen() {
   // cut it to "Aug 26,…". The year is on the Arrival and Departure rows
   // right below, spelled out in full.
   const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-US', {
+    parseDate(dateStr).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
     });
 
   const formatDateLong = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-US', {
+    parseDate(dateStr).toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
@@ -146,8 +159,15 @@ export default function TripDetailScreen() {
                 text: 'Delete',
                 style: 'destructive',
                 onPress: async () => {
-                  await deleteTrip(trip.id);
-                  router.back();
+                  // A tombstone for every merged row: removing the row outright
+                  // let the next sync pull it straight back from the cloud.
+                  try {
+                    await markTripGroupDeleted(trip.id);
+                    router.back();
+                  } catch (err) {
+                    reportError(err, 'trip:delete');
+                    showToast('Could not delete this trip. Please try again.', 'error');
+                  }
                 },
               },
             ])

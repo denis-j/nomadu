@@ -2,6 +2,7 @@ import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Timestamp, __get, __reset, __seed } from './fakeFirestore';
+import { __storageDeleted, __storageReset } from './fakeStorage';
 import { forgetUser, join, leave, mirrorOf, newCode, preview, removeMember, share, sharePageHtml, unshare } from '../src/share';
 
 const LEGS = [
@@ -15,6 +16,7 @@ const rejects = async (work: Promise<unknown>, code: string) => {
 
 beforeEach(() => {
   __reset();
+  __storageReset();
   __seed('users/owner', { displayName: 'Denis' });
   __seed('users/anna', { displayName: 'Anna' });
   __seed('users/bob', {});
@@ -121,12 +123,29 @@ describe('joining', () => {
     await join('bob', { code });
     await rejects(removeMember('anna', { journeyId: 'j1', memberUid: 'bob' }), 'permission-denied');
     await rejects(removeMember('owner', { journeyId: 'j1', memberUid: 'owner' }), 'failed-precondition');
-    await removeMember('owner', { journeyId: 'j1', memberUid: 'anna' });
+    const removed = await removeMember('owner', { journeyId: 'j1', memberUid: 'anna' });
     assert.deepEqual(__get('shared_journeys/j1')!.member_uids, ['bob']);
     assert.equal('anna' in (__get('shared_journeys/j1')!.members as any), false);
-    // Removed, but the link still works: she can come back.
-    await join('anna', { code });
+    // Removed means removed: the link she has is dead, a new one replaces it.
+    assert.notEqual(removed.code, code);
+    assert.equal(__get('shared_journeys/j1')!.invite_code, removed.code);
+    assert.equal(__get(`invites/${code}`), undefined);
+    await rejects(join('anna', { code }), 'not-found');
+    // The owner can still invite, with the new code.
+    await join('anna', { code: removed.code });
     assert.deepEqual(__get('shared_journeys/j1')!.member_uids, ['bob', 'anna']);
+  });
+
+  test('unsharing removes the documents and their files too', async () => {
+    const { code } = await share('owner', { journeyId: 'j1' });
+    await join('anna', { code });
+    __seed('shared_journeys/j1/documents/d1', { title: 'Passport', path: 'shared/j1/owner/all/d1.jpg', uploader_uid: 'owner' });
+    __seed('shared_journeys/j1/documents/d2', { title: 'Ticket', path: 'shared/j1/owner/u/anna/d2.pdf', uploader_uid: 'anna' });
+    await unshare('owner', { journeyId: 'j1' });
+    assert.equal(__get('shared_journeys/j1'), undefined);
+    assert.equal(__get('shared_journeys/j1/documents/d1'), undefined);
+    assert.equal(__get('shared_journeys/j1/documents/d2'), undefined);
+    assert.deepEqual(__storageDeleted(), ['shared/j1/owner/*']);
   });
 
   test('unsharing is the owner\'s alone', async () => {
@@ -142,10 +161,23 @@ describe('joining', () => {
     const mine = await share('anna', { journeyId: 'a1' });
     await join('owner', { code: mine.code });
 
+    __seed('shared_journeys/a1/documents/x1', { title: 'Visa', path: 'shared/a1/anna/all/x1.jpg', uploader_uid: 'anna' });
+    __seed('shared_journeys/j1/documents/d1', { title: 'Her passport', path: 'shared/j1/owner/all/d1.jpg', uploader_uid: 'anna' });
+    __seed('shared_journeys/j1/documents/d2', { title: 'Owner ticket', path: 'shared/j1/owner/all/d2.jpg', uploader_uid: 'owner' });
+    __seed('shared_journeys/j1/documents/d3', { title: 'Bad path', path: 'shared/other/x/all/../../z.jpg', uploader_uid: 'anna' });
+
     await forgetUser('anna');
     assert.equal(__get('shared_journeys/a1'), undefined);
+    assert.equal(__get('shared_journeys/a1/documents/x1'), undefined);
     assert.equal(__get(`invites/${mine.code}`), undefined);
     assert.deepEqual(__get('shared_journeys/j1')!.member_uids, []);
+    // What she put on the owner's trip goes with her; the owner's stays.
+    assert.equal(__get('shared_journeys/j1/documents/d1'), undefined);
+    assert.equal(__get('shared_journeys/j1/documents/d3'), undefined);
+    assert.ok(__get('shared_journeys/j1/documents/d2'));
+    // Files: her own trip wholesale, her upload on the owner's trip, and
+    // nothing outside that trip even when a record points there.
+    assert.deepEqual(__storageDeleted().sort(), ['shared/a1/anna/*', 'shared/j1/owner/all/d1.jpg']);
   });
 });
 

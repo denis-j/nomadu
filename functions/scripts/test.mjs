@@ -16,11 +16,13 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const testDir = resolve(root, 'test');
 const outDir = resolve(root, 'lib/test');
 const fake = resolve(testDir, 'fakeFirestore.ts');
+const fakeStorage = resolve(testDir, 'fakeStorage.ts');
 
 const fakeFirestorePlugin = {
   name: 'fake-firestore',
   setup(build) {
     build.onResolve({ filter: /^firebase-admin\/firestore$/ }, () => ({ path: fake }));
+    build.onResolve({ filter: /^firebase-admin\/storage$/ }, () => ({ path: fakeStorage }));
   },
 };
 

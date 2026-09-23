@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Share } from 'react-native';
 import { httpsCallable } from 'firebase/functions';
 import { auth, functions } from './firebase';
-import { setJourneyShareCode, type Journey } from './database';
+import { setJourneyShareCode, updateJourneyShareCodeBySyncId, type Journey } from './database';
 import { localChanged } from './syncTrigger';
 
 /**
@@ -64,7 +64,9 @@ export async function joinJourney(code: string, name: string): Promise<{ journey
 
 /** Owner: a friend off the trip. The link stays valid; they can come back. */
 export async function removeMember(journeySyncId: string, memberUid: string): Promise<void> {
-  await call<{ journeyId: string; memberUid: string }, { ok: boolean }>('removeJourneyMember')({ journeyId: journeySyncId, memberUid });
+  const res = await call<{ journeyId: string; memberUid: string }, { ok: boolean; code?: string }>('removeJourneyMember')({ journeyId: journeySyncId, memberUid });
+  // The old invite code died with the removal; the one shown here must be the new one.
+  if (res.data.code) await updateJourneyShareCodeBySyncId(journeySyncId, res.data.code);
 }
 
 export async function leaveJourney(journeySyncId: string): Promise<void> {

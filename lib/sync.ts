@@ -3,7 +3,6 @@ import * as Crypto from 'expo-crypto';
 import {
   Timestamp,
   collection,
-  deleteDoc,
   doc,
   getDocs,
   onSnapshot,
@@ -17,7 +16,8 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import {
-  clearAllData,
+  markAllTripsDeleted,
+  updateJourneyShareCodeBySyncId,
   clearJourneyShareCodeBySyncId,
   forgetFollowedJourney,
   getAllJourneysForSync,
@@ -731,6 +731,8 @@ export function startRealtimeSync(uid: string): Unsubscribe {
           await clearJourneyShareCodeBySyncId(change.doc.id);
         } else {
           await syncJourneyMembers(change.doc.id, membersOf(change.doc.data()), uid);
+          const code = change.doc.get('invite_code');
+          if (typeof code === 'string') await updateJourneyShareCodeBySyncId(change.doc.id, code);
         }
       } catch (err) {
         reportError(err, 'sync:shared-realtime');
@@ -797,16 +799,33 @@ export function stopRealtimeSync(): void {
 
 // ─── Wipe travel data (trips + visits), local + cloud. Plans are preserved. ───
 
+/**
+ * Clear every trip, here and on every device of the account.
+ *
+ * Trips become tombstones that the push carries to the cloud and the other
+ * devices pull. Deleting the cloud documents instead left a second phone
+ * holding the rows with nothing to tell it they were gone, so its next push
+ * put all of them back.
+ *
+ * The pull comes first so a trip another device added in the meantime is
+ * cleared too; without a connection nothing is cleared and the caller shows
+ * the error. A push that fails later is not an error: the tombstones are
+ * local and go out with the next sync.
+ */
 export async function clearAllTravelData(uid: string | null): Promise<void> {
-  // Stop realtime sync so cloud deletions don't race with re-inserts
   stopRealtimeSync();
 
+  if (uid) await pullTripsFromCloud(uid);
+  await markAllTripsDeleted();
+
   if (uid) {
-    const tripsSnap = await getDocs(tripsCollection(uid));
-    await Promise.all(tripsSnap.docs.map((d) => deleteDoc(d.ref)));
-    await AsyncStorage.removeItem(LAST_SYNC_KEY(uid));
+    try {
+      await pushTripsToCloud(uid);
+    } catch (err) {
+      reportError(err, 'sync:clear-travel-data');
+    }
   }
 
-  await clearAllData();
   await clearBadgeProgress();
+  cloudChanged();
 }

@@ -4,7 +4,7 @@ import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-rout
 import { SymbolView } from 'expo-symbols';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
-import { insertTripManual, updateTrip, parseDate } from '../../../../lib/database';
+import { insertTripManual, updateTripGroup, parseDate } from '../../../../lib/database';
 import { forwardGeocode } from '../../../../lib/geocoding';
 import { getCountryCode } from '../../../../utils/geography';
 import { showToast } from '../../../../lib/toast';
@@ -112,7 +112,7 @@ export default function CreateDatesScreen() {
       const e = noEndDate ? null : fmt(endDate);
       const coords = await forwardGeocode(`${city}, ${country}`);
       if (isEditing && params.id) {
-        await updateTrip(
+        await updateTripGroup(
           Number(params.id), city, country, code, s, e,
           coords?.latitude, coords?.longitude,
         );

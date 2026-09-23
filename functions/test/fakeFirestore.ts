@@ -139,6 +139,12 @@ class Firestore {
   doc(path: string): DocumentReference {
     return new DocumentReference(path.replace(/^\/+|\/+$/g, ''));
   }
+  /** The document and everything under it, like the Admin SDK's. */
+  async recursiveDelete(ref: DocumentReference): Promise<void> {
+    for (const key of [...store.keys()]) {
+      if (key === ref.path || key.startsWith(`${ref.path}/`)) store.delete(key);
+    }
+  }
 }
 
 const instance = new Firestore();

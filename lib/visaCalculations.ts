@@ -5,6 +5,22 @@ import { getCountryName } from '../utils/geography';
 import { eachDay, toYmd } from './days';
 import type { EntriesAllowed, UserVisa } from './userVisas';
 
+/**
+ * Which of the Visa tab's three groups a status belongs to: running now, an
+ * expired visa of your own, or a country you have since left. Shared with
+ * the Tracking tab, whose card used to show the most urgent status of all,
+ * and "most urgent" sorts an expired visa first.
+ */
+export type VisaGroup = 'active' | 'expiredVisa' | 'pastCountry';
+
+export function visaGroup(visa: VisaStatus): VisaGroup {
+  if (visa.isUserVisa) {
+    return visa.status === 'expired' ? 'expiredVisa' : 'active';
+  }
+  // An auto rule whose stay is over: you were there, you are not now.
+  return visa.leftOn && visa.daysUsed === 0 ? 'pastCountry' : 'active';
+}
+
 export interface VisaStatus {
   destination: string;
   destinationCode: string;

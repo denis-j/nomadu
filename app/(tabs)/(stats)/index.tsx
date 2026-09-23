@@ -21,6 +21,7 @@ import { Typography } from '../../../constants/typography';
 import { StatsBars } from '../../../components/StatsBars';
 import { BADGE_LIBRARY } from '../../../lib/badges';
 import { CountryBadge3DPreview } from '../../../components/CountryBadge3D';
+import { visaGroup } from '../../../lib/visaCalculations';
 import { Flag } from '../../../components/Flag';
 import { YearPicker } from '../../../components/YearPicker';
 import type { YearFilter } from '../../../lib/yearFilter';
@@ -47,7 +48,13 @@ export default function StatsScreen() {
     setRefreshing(false);
   }, [refreshStats, refreshVisa, refreshTax]);
 
-  const mostCritical = visaStatuses.length > 0 ? visaStatuses[0] : null;
+  // Only what is running now, as on the Visa tab. The list is sorted by
+  // urgency, which puts an expired visa first, so the card showed a visa
+  // that ended weeks ago as the one being tracked. "Visa needed" entries
+  // have no allowance to count down and stay on the Visa tab.
+  const activeVisas = visaStatuses.filter((v) => visaGroup(v) === 'active');
+  const countedVisas = activeVisas.filter((v) => v.status !== 'visa_needed');
+  const mostCritical = countedVisas[0] ?? null;
   const mostCriticalTax = taxStatuses.length > 0 ? taxStatuses[0] : null;
 
   // Re-trigger bubble animations whenever the Stats tab gains focus
@@ -141,7 +148,7 @@ export default function StatsScreen() {
             <TrackerCard
               accentColor={Colors.cloudyBlue}
               title="Visa"
-              count={visaStatuses.length}
+              count={activeVisas.length}
               code={mostCritical.destinationCode}
               country={mostCritical.destination}
               daysLeft={mostCritical.daysRemaining}
@@ -530,7 +537,8 @@ function TrackerCard({
             <Text style={[trackerStyles.value, isUrgent && { color: Colors.error }]}>
               {daysLeft}
             </Text>
-            <Text style={trackerStyles.unit}>/ {total} days</Text>
+            {/* Days left, so say so: "109 / 183 days" read as 109 used. */}
+            <Text style={trackerStyles.unit}>of {total} left</Text>
           </View>
           <View style={trackerStyles.progressTrack}>
             <View

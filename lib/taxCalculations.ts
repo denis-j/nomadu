@@ -1,7 +1,7 @@
 import { Trip } from './database';
 import { getApplicableTaxRules } from '../constants/taxRules';
 import { countryCodeToFlag } from './geocoding';
-import { tripDaysInYear } from './yearFilter';
+import { eachDay, fromYmd } from './days';
 
 export interface TaxStatus {
   country: string;
@@ -32,34 +32,27 @@ function getCountryName(trips: Trip[], countryCode: string): string {
 /**
  * Total days a user spent in a country within a given calendar year.
  * Deduplicates overlapping/adjacent trips so we never double-count a day.
+ *
+ * Counted as a set of calendar dates. The previous loop stepped from local
+ * midnight in fixed 24-hour jumps and keyed on a UTC day number, so across a
+ * clock change it lost a day: 183 days in Thailand came out as 182 in
+ * Berlin, London or New York, "warning" instead of "resident". Days after
+ * today are not presence yet and are left out.
  */
 function countDaysInYear(trips: Trip[], countryCode: string, year: number): number {
-  const yearStart = new Date(year, 0, 1).getTime();
-  const yearEnd = new Date(year, 11, 31).getTime();
-
-  const uniqueDays = new Set<number>(); // store day-index since epoch
-  const msPerDay = 1000 * 60 * 60 * 24;
+  const today = new Date();
+  const yearStart = new Date(year, 0, 1, 12);
+  const yearEnd = new Date(year, 11, 31, 12);
+  const uniqueDays = new Set<string>();
 
   for (const t of trips) {
     if (t.country_code !== countryCode) continue;
-    const days = tripDaysInYear(t, year);
-    if (days <= 0) continue;
-
-    // Walk each day in this trip's clipped range and add to set
-    const [ys, ms, ds] = t.start_date.split('-').map(Number);
-    const tripStart = new Date(ys, ms - 1, ds).getTime();
-    const tripEnd = t.end_date
-      ? (() => {
-          const [ye, me, de] = t.end_date!.split('-').map(Number);
-          return new Date(ye, me - 1, de).getTime();
-        })()
-      : Date.now();
-
-    const fromMs = Math.max(tripStart, yearStart);
-    const toMs = Math.min(tripEnd, yearEnd);
-    for (let ms2 = fromMs; ms2 <= toMs; ms2 += msPerDay) {
-      uniqueDays.add(Math.floor(ms2 / msPerDay));
-    }
+    const tripStart = fromYmd(t.start_date);
+    const tripEnd = t.end_date ? fromYmd(t.end_date) : today;
+    const from = tripStart > yearStart ? tripStart : yearStart;
+    const endCap = tripEnd < yearEnd ? tripEnd : yearEnd;
+    const to = endCap < today ? endCap : today;
+    eachDay(from, to, (ymd) => uniqueDays.add(ymd));
   }
 
   return uniqueDays.size;

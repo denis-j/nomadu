@@ -27,7 +27,7 @@ import { takePendingUnlock } from '../../../lib/badges';
 import { BadgeUnlockOverlay } from '../../../components/BadgeUnlockOverlay';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
-import { Trip, applyTripRepair, getAllTripsRaw, markTripDeleted, parseDate } from '../../../lib/database';
+import { Trip, applyTripRepair, getAllTripsRaw, markTripGroupDeleted, parseDate } from '../../../lib/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { planRepair, type RepairPlan } from '../../../lib/tracking';
 import { showToast } from '../../../lib/toast';
@@ -880,7 +880,7 @@ export default function TimelineScreen() {
   }, [router]);
 
   const handleDelete = useCallback(async (id: number) => {
-    await markTripDeleted(id);
+    await markTripGroupDeleted(id);
     refresh();
   }, [refresh]);
 
