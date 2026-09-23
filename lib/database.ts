@@ -1169,6 +1169,25 @@ export async function upsertTripFromCloud(trip: {
       );
     }
   } else if (!trip.deleted) {
+    // The document may be this phone's own row coming back: the push writes
+    // the document first and stores the new id on the row afterwards, and
+    // the realtime listener can arrive in between. Adopting the row it
+    // belongs to (`local_id`) keeps one trip one row; inserting instead
+    // produced a second row, and the push's own write then died on the
+    // unique index, which aborted the whole sync and left the row without
+    // an id, so the next start made another copy. Thirty-six copies of one
+    // stay in Berlin is what that looks like after a week.
+    const adopted = trip.local_id
+      ? await database.runAsync(
+          `UPDATE trips SET sync_id = ?, city = ?, country = ?, country_code = ?, latitude = ?, longitude = ?,
+             start_date = ?, end_date = ?, days = ?, updated_at = ?, deleted = 0
+           WHERE id = ? AND sync_id IS NULL`,
+          [trip.sync_id, trip.city, trip.country, trip.country_code, trip.latitude, trip.longitude,
+           trip.start_date, trip.end_date, trip.days, trip.updated_at, trip.local_id],
+        )
+      : null;
+    if (adopted && adopted.changes > 0) return;
+
     // OR IGNORE, not plain INSERT: the unique index above turns a concurrent
     // second insert of the same document into a no-op instead of a crash.
     await database.runAsync(
@@ -1180,8 +1199,25 @@ export async function upsertTripFromCloud(trip: {
   }
 }
 
+/**
+ * Remember which cloud document a trip is, after the push created it.
+ *
+ * The id can already be taken: the realtime listener may have inserted a row
+ * for the very document that was just written. Claiming it anyway threw
+ * `UNIQUE constraint failed: trips.sync_id` and took the whole sync down
+ * with it, so the row is given up instead: the copy that already carries
+ * the id is the same trip, and this one is folded into it.
+ */
 export async function setSyncId(tripId: number, syncId: string): Promise<void> {
   const database = await getDatabase();
+  const taken = await database.getFirstAsync<{ id: number }>(
+    'SELECT id FROM trips WHERE sync_id = ? AND id != ?',
+    [syncId, tripId],
+  );
+  if (taken) {
+    await database.runAsync('DELETE FROM trips WHERE id = ? AND sync_id IS NULL', [tripId]);
+    return;
+  }
   await database.runAsync('UPDATE trips SET sync_id = ? WHERE id = ?', [syncId, tripId]);
 }
 

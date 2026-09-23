@@ -158,8 +158,22 @@ export async function getAllUserVisasForSync(): Promise<UserVisa[]> {
   return db.getAllAsync<UserVisa>(`SELECT * FROM user_visas ORDER BY id ASC`);
 }
 
+/**
+ * Remember which cloud document a visa is, after the push created it. Same
+ * hazard as trips (see setSyncId in database.ts): the pull can already have
+ * inserted a row for that very document, and claiming the id anyway threw
+ * on the unique index and took the sync down with it.
+ */
 export async function setUserVisaSyncId(id: number, syncId: string): Promise<void> {
   const db = await getDatabase();
+  const taken = await db.getFirstAsync<{ id: number }>(
+    'SELECT id FROM user_visas WHERE sync_id = ? AND id != ?',
+    [syncId, id],
+  );
+  if (taken) {
+    await db.runAsync('DELETE FROM user_visas WHERE id = ? AND sync_id IS NULL', [id]);
+    return;
+  }
   await db.runAsync(`UPDATE user_visas SET sync_id = ? WHERE id = ?`, [syncId, id]);
 }
 
@@ -177,6 +191,7 @@ export async function upsertUserVisaFromCloud(visa: {
   notes: string | null;
   updated_at: string;
   deleted: boolean;
+  local_id?: number | null;
 }): Promise<void> {
   const db = await getDatabase();
 
@@ -204,6 +219,22 @@ export async function upsertUserVisaFromCloud(visa: {
       );
     }
   } else if (!visa.deleted) {
+    // This phone's own row coming back before the push stored the id on it.
+    const adopted = visa.local_id
+      ? await db.runAsync(
+          `UPDATE user_visas SET sync_id = ?, country_code = ?, label = ?, valid_from = ?, valid_to = ?,
+             max_days_per_stay = ?, max_days_per_window = ?, window_days = ?, entries_allowed = ?,
+             notes = ?, updated_at = ?, deleted = 0
+           WHERE id = ? AND sync_id IS NULL`,
+          [
+            visa.sync_id, visa.country_code, visa.label, visa.valid_from, visa.valid_to,
+            visa.max_days_per_stay, visa.max_days_per_window, visa.window_days,
+            visa.entries_allowed, visa.notes, visa.updated_at, visa.local_id,
+          ],
+        )
+      : null;
+    if (adopted && adopted.changes > 0) return;
+
     await db.runAsync(
       // OR IGNORE for the same reason as trips: the unique index on sync_id
       // makes a concurrent second insert of one document a no-op.

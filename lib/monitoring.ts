@@ -97,6 +97,27 @@ export function setMonitoringUser(uid: string | null): void {
  * Use this for failures the app recovers from but that should not pass
  * silently, such as a sync round that threw.
  */
+/**
+ * Something that is not an Error, as a line worth reading. `String({})` is
+ * "[object Object]", and a Sentry issue by that name says nothing at all:
+ * the background location task hands over a plain object, and for a week it
+ * reported 26 times without once naming the failure.
+ */
+function describe(error: unknown): string {
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object') {
+    const e = error as { message?: unknown; code?: unknown };
+    const parts = [e.code, e.message].filter((v) => typeof v === 'string' && v);
+    if (parts.length) return parts.join(': ');
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return Object.prototype.toString.call(error);
+    }
+  }
+  return String(error);
+}
+
 export function reportError(error: unknown, context: string): void {
   if (!monitoringEnabled) {
     if (__DEV__) console.error(`[${context}]`, error);
@@ -104,6 +125,6 @@ export function reportError(error: unknown, context: string): void {
   }
   Sentry.withScope((scope) => {
     scope.setTag('context', context);
-    Sentry.captureException(error instanceof Error ? error : new Error(String(error)));
+    Sentry.captureException(error instanceof Error ? error : new Error(describe(error)));
   });
 }

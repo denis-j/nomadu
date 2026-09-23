@@ -41,10 +41,23 @@ function recordsOf(journeySyncId: string) {
   return collection(db, 'shared_journeys', journeySyncId, 'documents');
 }
 
-function cloudPathFor(journeySyncId: string, docSyncId: string, fileName: string): string {
+/**
+ * Where a document's file lives: under the trip, under the trip owner, and
+ * then either in `all` or in the folder of the one person it is for. The
+ * storage rules read the audience straight off the path (see storage.rules),
+ * because they cannot ask Firestore about it.
+ */
+function cloudPathFor(
+  journeySyncId: string,
+  ownerUid: string,
+  audience: string | null,
+  docSyncId: string,
+  fileName: string,
+): string {
   const dot = fileName.lastIndexOf('.');
   const ext = dot >= 0 ? fileName.slice(dot) : '';
-  return `shared/${journeySyncId}/${docSyncId}${ext}`;
+  const where = audience === null ? 'all' : `u/${audience}`;
+  return `shared/${journeySyncId}/${ownerUid}/${where}/${docSyncId}${ext}`;
 }
 
 interface Party {
@@ -90,6 +103,9 @@ export async function pushDocumentsToCloud(uid: string): Promise<void> {
       reportError(err, 'documents:push-list');
       continue;
     }
+    // The owner of the trip: this phone on its own trip, the friend on a
+    // followed one. It is part of every path the rules check.
+    const ownerUid = party.journey.shared_owner_uid ?? uid;
     for (const d of await getJourneyDocuments(party.journey.id)) {
       if (!d.sync_id) continue;
       const audience = audienceOf(d, party, uid);
@@ -100,12 +116,20 @@ export async function pushDocumentsToCloud(uid: string): Promise<void> {
       const localStamp = d.updated_at ? parseSyncStamp(d.updated_at) : new Date(0);
       if (record && record.updated_at instanceof Timestamp && record.updated_at.toDate() >= localStamp) continue;
       try {
+        // The file may already be up there: a record with a path means the
+        // upload happened, on this phone or another. Uploading again is an
+        // overwrite, which the storage rules refuse, and the attempt was
+        // repeated on every sync.
         let cloudPath = d.cloud_path;
+        if (!cloudPath && typeof record?.path === 'string' && record.path) {
+          cloudPath = record.path;
+          await setJourneyDocumentCloudPath(d.id, cloudPath);
+        }
         if (!cloudPath) {
           const file = new File(documentUri(d.file_name));
           if (!file.exists) continue;
           if ((file.size ?? 0) > MAX_BYTES) continue;
-          cloudPath = cloudPathFor(party.journey.sync_id, d.sync_id, d.file_name);
+          cloudPath = cloudPathFor(party.journey.sync_id, ownerUid, audience, d.sync_id, d.file_name);
           const blob = await (await fetch(file.uri)).blob();
           await uploadBytes(ref(storage, cloudPath), blob, { contentType: d.mime ?? undefined });
           await setJourneyDocumentCloudPath(d.id, cloudPath);

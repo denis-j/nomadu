@@ -335,6 +335,7 @@ export async function pullVisasFromCloud(uid: string): Promise<void> {
       notes: data.notes ?? null,
       updated_at: updatedAt,
       deleted: data.deleted === true,
+      local_id: data.local_id ?? null,
     });
   }
 }
@@ -596,19 +597,39 @@ export async function pullAccommodationsFromCloud(uid: string): Promise<void> {
  * the state right after a reinstall.
  */
 export async function syncAll(uid: string): Promise<void> {
-  await pullTripsFromCloud(uid);
-  await pushTripsToCloud(uid);
-  await pullVisasFromCloud(uid);
-  await pushVisasToCloud(uid);
-  await pullJourneysFromCloud(uid);
-  await pullMembersFromCloud(uid);
-  await pushJourneysToCloud(uid);
-  await pullSharedJourneysFromCloud(uid);
-  await pullAccommodationsFromCloud(uid);
-  await pushAccommodationsToCloud(uid);
-  await pullDocumentsFromCloud(uid);
-  await pushDocumentsToCloud(uid);
-  await pushProfileToCloud(uid);
+  // Each collection stands on its own: one that fails used to abort the
+  // rest, so a single bad write meant journeys, documents and the profile
+  // never went anywhere and the phone kept saying it had never synced.
+  // Failures are still failures (the caller shows the error and the
+  // last-synced stamp does not move), but the other collections get their
+  // turn, and the report names the step that broke.
+  const steps: [string, () => Promise<void>][] = [
+    ['trips:pull', () => pullTripsFromCloud(uid)],
+    ['trips:push', () => pushTripsToCloud(uid)],
+    ['visas:pull', () => pullVisasFromCloud(uid)],
+    ['visas:push', () => pushVisasToCloud(uid)],
+    ['journeys:pull', () => pullJourneysFromCloud(uid)],
+    ['members:pull', () => pullMembersFromCloud(uid)],
+    ['journeys:push', () => pushJourneysToCloud(uid)],
+    ['shared:pull', () => pullSharedJourneysFromCloud(uid)],
+    ['accommodations:pull', () => pullAccommodationsFromCloud(uid)],
+    ['accommodations:push', () => pushAccommodationsToCloud(uid)],
+    ['documents:pull', () => pullDocumentsFromCloud(uid)],
+    ['documents:push', () => pushDocumentsToCloud(uid)],
+    ['profile:push', () => pushProfileToCloud(uid)],
+  ];
+
+  let first: unknown = null;
+  for (const [name, run] of steps) {
+    try {
+      await run();
+    } catch (err) {
+      if (first === null) first = err;
+      reportError(err, `sync:${name}`);
+    }
+  }
+  if (first !== null) throw first;
+
   await setLastSyncTime(uid);
 }
 

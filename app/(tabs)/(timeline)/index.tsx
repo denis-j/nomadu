@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
   Alert,
@@ -28,6 +28,7 @@ import { BadgeUnlockOverlay } from '../../../components/BadgeUnlockOverlay';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { Trip, applyTripRepair, getAllTripsRaw, markTripDeleted, parseDate } from '../../../lib/database';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { planRepair, type RepairPlan } from '../../../lib/tracking';
 import { showToast } from '../../../lib/toast';
 import { toYmd } from '../../../lib/days';
@@ -36,6 +37,18 @@ import { Flag } from '../../../components/Flag';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const REPAIR_HIDDEN_KEY = '@timeline_repair_hidden';
+
+/**
+ * What a cleanup offer is about, as a string: the trips it would remove,
+ * by sync id where there is one. Local row ids change when the sync
+ * rewrites a row, which is why the old version asked again and again.
+ */
+function repairFingerprint(plan: RepairPlan, trips: { id: number; sync_id?: string | null }[]): string {
+  const byId = new Map(trips.map((t) => [t.id, t.sync_id ?? null]));
+  return [...plan.remove].map((id) => byId.get(id) ?? `#${id}`).sort().join(',');
 }
 
 const hasGlass = isLiquidGlassAvailable();
@@ -607,38 +620,53 @@ export default function TimelineScreen() {
 
   /**
    * Trips the tracking rules left behind (duplicates, fragments of one
-   * stay, one-day blips from a stale fix) are offered for cleanup as a row
-   * in the list, never as a dialog.
+   * stay, one-day blips from a stale fix) are offered for cleanup once.
    *
-   * It used to be an alert on focus, which meant the app opened with a
-   * question every time tracking had produced one more fragment overnight,
-   * and the "not now" it remembered was keyed by local row ids, so a sync
-   * that rewrote a row asked again anyway. A row in the timeline can be
-   * read, acted on, or ignored, and ignoring it costs nothing.
+   * "Not now" is remembered by what the offer is about: the sync ids of the
+   * trips it would merge. The first version keyed that on local row ids,
+   * which a sync rewrites, so the same question came back at every launch.
+   * A fresh fragment changes the fingerprint and is worth asking about
+   * again; the same old mess is not.
    */
-  const [repair, setRepair] = useState<RepairPlan | null>(null);
-  const [repairHidden, setRepairHidden] = useState(false);
+  const askedRef = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      if (loading) return;
+      if (loading || askedRef.current) return;
       let cancelled = false;
       (async () => {
         const raw = await getAllTripsRaw();
         const plan = planRepair(raw, toYmd(new Date()));
-        if (!cancelled) setRepair(plan.remove.length > 0 ? plan : null);
+        const removed = plan.remove.length;
+        if (cancelled || removed === 0) return;
+        const print = repairFingerprint(plan, raw);
+        const declined = await AsyncStorage.getItem(REPAIR_HIDDEN_KEY);
+        if (cancelled || declined === print) return;
+        askedRef.current = true;
+        Alert.alert(
+          'Tidy up your timeline?',
+          `${removed} ${removed === 1 ? 'stop is a duplicate' : 'stops are duplicates'}, fragments of the same stay, or one-day blips from a stale location fix. Merging them leaves your history as it is, just without the noise.`,
+          [
+            {
+              text: 'Not now',
+              style: 'cancel',
+              onPress: () => { AsyncStorage.setItem(REPAIR_HIDDEN_KEY, print).catch(() => {}); },
+            },
+            {
+              text: 'Tidy up',
+              onPress: async () => {
+                await applyTripRepair(plan);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                AsyncStorage.removeItem(REPAIR_HIDDEN_KEY).catch(() => {});
+                showToast('Timeline tidied up');
+                refresh();
+              },
+            },
+          ],
+        );
       })();
       return () => { cancelled = true; };
-    }, [loading]),
+    }, [loading, refresh]),
   );
-
-  const applyRepair = useCallback(async () => {
-    if (!repair) return;
-    await applyTripRepair(repair);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setRepair(null);
-    showToast('Timeline tidied up');
-    refresh();
-  }, [repair, refresh]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -907,15 +935,6 @@ export default function TimelineScreen() {
         <SectionList
           sections={sections}
           keyExtractor={(item) => item.key}
-          ListHeaderComponent={
-            repair && !repairHidden ? (
-              <RepairRow
-                count={repair.remove.length}
-                onApply={applyRepair}
-                onDismiss={() => setRepairHidden(true)}
-              />
-            ) : null
-          }
           contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={styles.content}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
@@ -1014,57 +1033,6 @@ export default function TimelineScreen() {
 }
 
 // ─── Styles ───
-
-/** The cleanup offer as a row: what it found, one tap to do it, one to hide it. */
-function RepairRow({ count, onApply, onDismiss }: { count: number; onApply: () => void; onDismiss: () => void }) {
-  const Shell = hasGlass ? GlassView : View;
-  return (
-    <Shell
-      {...(hasGlass ? { glassEffectStyle: 'regular' as const } : {})}
-      style={[repairStyles.row, !hasGlass && repairStyles.rowFallback]}
-    >
-      <Ionicons name="sparkles-outline" size={18} color={Colors.textSecondary} />
-      <View style={repairStyles.text}>
-        <Text style={repairStyles.title}>
-          {count} {count === 1 ? 'stop looks' : 'stops look'} like duplicates
-        </Text>
-        <Text style={repairStyles.sub}>Fragments of the same stay, or a one-day blip from a stale location fix.</Text>
-      </View>
-      <Pressable onPress={onApply} hitSlop={6} style={({ pressed }) => [repairStyles.action, pressed && { opacity: 0.6 }]}>
-        <Text style={repairStyles.actionText}>Tidy up</Text>
-      </Pressable>
-      <Pressable onPress={onDismiss} hitSlop={8} accessibilityLabel="Hide" style={({ pressed }) => pressed && { opacity: 0.6 }}>
-        <Ionicons name="close" size={16} color={Colors.textTertiary} />
-      </Pressable>
-    </Shell>
-  );
-}
-
-const repairStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 12,
-    borderRadius: 16,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-  },
-  rowFallback: { backgroundColor: Colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.border },
-  text: { flex: 1, gap: 2 },
-  title: { ...Typography.bodySmall, fontWeight: '600' },
-  sub: { ...Typography.caption, color: Colors.textSecondary, lineHeight: 15 },
-  action: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderCurve: 'continuous',
-    backgroundColor: Colors.surfaceSecondary,
-  },
-  actionText: { ...Typography.caption, fontWeight: '700' },
-});
 
 const styles = StyleSheet.create({
   listWrap: {
