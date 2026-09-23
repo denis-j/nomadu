@@ -116,9 +116,23 @@ async function processFix(fix: Fix, source: 'background' | 'foreground'): Promis
 
 // ─── Background task ───────────────────────────────────────────────────────────
 
+/**
+ * iOS raises `kCLErrorDomain` code 0 ("location unknown") whenever it cannot
+ * get a fix for a moment: indoors, in a tunnel, right after a cold start. It
+ * is not a failure, it is the weather, and it accounted for over a hundred
+ * reported errors in a week. The next update arrives on its own.
+ */
+function isTransientLocationError(error: { message?: string; code?: string | number } | null): boolean {
+  if (!error) return false;
+  const text = `${error.code ?? ''} ${error.message ?? ''}`;
+  return text.includes('kCLErrorDomain') && /\bCode=0\b/.test(text);
+}
+
 TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
   if (error) {
-    reportError(error, 'location:background-task');
+    if (!isTransientLocationError(error as { message?: string; code?: string | number })) {
+      reportError(error, 'location:background-task');
+    }
     return;
   }
 

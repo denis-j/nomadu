@@ -34,11 +34,13 @@ export default function TripDetailScreen() {
 
   const isActive = !trip.end_date;
 
+  // Day and month only: a third of the width cannot hold "Aug 26, 2026" and
+  // cut it to "Aug 26,…". The year is on the Arrival and Departure rows
+  // right below, spelled out in full.
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric',
     });
 
   const formatDateLong = (dateStr: string) =>

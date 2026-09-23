@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Ionicons } from '@expo/vector-icons';
 import { SymbolView } from 'expo-symbols';
+import { useIsFocused } from '@react-navigation/native';
 import { useTaxTracker } from '../../../hooks/useTaxTracker';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
@@ -98,6 +99,7 @@ export default function TaxScreen() {
     useTaxTracker(year);
   const [refreshing, setRefreshing] = useState(false);
   const [showFirstRunDisclaimer, setShowFirstRunDisclaimer] = useState(false);
+  const focused = useIsFocused();
 
   useEffect(() => {
     AsyncStorage.getItem(TAX_DISCLAIMER_SEEN_KEY).then((seen) => {
@@ -192,7 +194,10 @@ export default function TaxScreen() {
       </Glass>
 
       <FirstRunDisclaimerModal
-        visible={showFirstRunDisclaimer}
+        // Only while this screen is in front: a React Native modal renders
+        // above the whole app, so leaving the tab with it open left it
+        // hanging over the timeline and the plans.
+        visible={showFirstRunDisclaimer && focused}
         onDismiss={dismissFirstRunDisclaimer}
       />
     </ScrollView>

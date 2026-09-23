@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { Card } from '../../../components/visaForm';
 import { Dropdown } from '../../../components/Dropdown';
 import { Flag } from '../../../components/Flag';
+import { MissingRoute } from '../../../components/MissingRoute';
 import {
   MoneyRow,
   StatusBadge,
@@ -50,6 +51,7 @@ import {
 } from '../../../lib/accommodationModel';
 import { currencyForCountry } from '../../../lib/currencies';
 import { parseDate } from '../../../lib/database';
+import { toYmd } from '../../../lib/days';
 import { showToast } from '../../../lib/toast';
 
 type Params = {
@@ -116,13 +118,24 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 export default function AccommodationScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<Params>();
+  // A link from outside can be missing any of these; the hooks below run
+  // before the guard further down can bail out, so they get a harmless
+  // stand-in rather than `undefined`, which used to take the screen down
+  // inside fromYmd.
+  const complete = !!params.stopSyncId && !!params.journeySyncId && !!params.start && !!params.end;
+  const today = toYmd(new Date());
+  const stopSyncId = params.stopSyncId ?? '';
+  const journeySyncId = params.journeySyncId ?? '';
   const { plan, loaded, setPlan } = useAccommodation(params.stopSyncId);
   const readOnly = params.readOnly === '1';
 
-  const stop = useMemo(() => ({ start_date: params.start, end_date: params.end }), [params.start, params.end]);
+  const stop = useMemo(
+    () => ({ start_date: params.start ?? today, end_date: params.end ?? today }),
+    [params.start, params.end, today],
+  );
   const draft = useMemo(
-    () => createPlan(params.journeySyncId, { id: params.stopSyncId, ...stop }),
-    [params.journeySyncId, params.stopSyncId, stop],
+    () => createPlan(journeySyncId, { id: stopSyncId, ...stop }),
+    [journeySyncId, stopSyncId, stop],
   );
   const view: AccommodationPlan = plan ?? draft;
 
@@ -169,6 +182,8 @@ export default function AccommodationScreen() {
   const datesDiffer = !staysMatchStop(view, stop);
   const stopStay = defaultStay(stop);
   const stopNights = nightsBetween(stopStay.check_in, stopStay.check_out);
+
+  if (!complete) return <MissingRoute title="Stay" message="This stay is no longer here." />;
 
   if (!loaded) return <Stack.Screen options={{ title: `Stay in ${params.city}` }} />;
 

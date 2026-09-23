@@ -12,6 +12,7 @@ import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
+import { MissingRoute } from '../../../components/MissingRoute';
 import { StopSummary } from '../../../components/StopSummary';
 import { TransportPicker } from '../../../components/TransportPicker';
 import { updateJourneyLeg, parseDate, type TransportType } from '../../../lib/database';
@@ -41,9 +42,11 @@ const RANGE_BG = 'rgba(0,0,0,0.08)';
 export default function EditStopScreen() {
   const nav = useNavigation();
   const params = useLocalSearchParams<Params>();
+  const complete = !!params.start && !!params.end && !!params.legId;
 
-  const initialStart = parseDate(params.start);
-  const initialEnd = parseDate(params.end);
+  const today = fmtDate(new Date());
+  const initialStart = parseDate(params.start ?? today);
+  const initialEnd = parseDate(params.end ?? today);
 
   const [startDate, setStartDate] = useState(initialStart);
   const [endDate, setEndDate] = useState(initialEnd);
@@ -138,6 +141,8 @@ export default function EditStopScreen() {
       setSaving(false);
     }
   }, [params, startDate, endDate, transport, notes, nav]);
+
+  if (!complete) return <MissingRoute title="Edit Stop" message="This stop is no longer here." />;
 
   return (
     <>

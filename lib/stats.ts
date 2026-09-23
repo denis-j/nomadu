@@ -66,7 +66,6 @@ export function statsFromTrips(
   const trackedDays = new Set<string>();
   const awayDays = new Set<string>();
   const perCountry = new Map<string, { country: string; days: Set<string> }>();
-  const countryNames = new Set<string>();
   const cities = new Set<string>();
   const codesInWindow = new Set<string>();
   const codesBefore = new Set<string>();
@@ -87,8 +86,11 @@ export function statsFromTrips(
     const to = end > windowEnd ? windowEnd : end;
     if (from > to) continue;
 
-    countryNames.add(trip.country);
-    cities.add(`${trip.city}|${trip.country}`);
+    // By country code, never by the country's name: the geocoder used to
+    // store whatever the phone's language was, so the same place sits in the
+    // table as both "Germany" and "Deutschland". Counting names turned 13
+    // countries into 22 and 41 cities into 50.
+    cities.add(`${trip.city.trim().toLowerCase()}|${code}`);
     codesInWindow.add(code);
 
     // Exact duplicates are one stay, not two.
@@ -122,7 +124,7 @@ export function statsFromTrips(
   const rangeStart = windowStart ?? earliestStart;
 
   return {
-    totalCountries: countryNames.size,
+    totalCountries: codesInWindow.size,
     totalCities: cities.size,
     daysAway: awayDays.size,
     daysTracked: trackedDays.size,

@@ -19,6 +19,7 @@ import { StatusBadge, planChipText } from '../../../components/accommodationForm
 import { SectionLabel } from '../../../components/visaForm';
 import { StatRow, StatTile } from '../../../components/StatTile';
 import { CityTips } from '../../../components/MarkdownTips';
+import { MissingRoute } from '../../../components/MissingRoute';
 import { transportInfo } from '../../../components/TransportPicker';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
@@ -99,9 +100,10 @@ export default function StopInfoScreen() {
   const nav = useNavigation();
   const params = useLocalSearchParams<Params>();
   const { city, country, countryCode } = params;
+  const complete = !!params.start && !!params.end && !!city;
 
-  const startDate = parseDate(params.start);
-  const endDate = parseDate(params.end);
+  const startDate = parseDate(params.start ?? toYmd(new Date()));
+  const endDate = parseDate(params.end ?? toYmd(new Date()));
   const days = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1);
   const transport = transportInfo(params.transport);
 
@@ -175,6 +177,8 @@ export default function StopInfoScreen() {
       },
     ]);
   };
+
+  if (!complete) return <MissingRoute title="Stop" message="This stop is no longer here." />;
 
   const latitude = params.latitude ? Number(params.latitude) : null;
   const longitude = params.longitude ? Number(params.longitude) : null;
