@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import * as Crypto from 'expo-crypto';
 import { localIsNewer } from './syncTime';
 import { chainDates, countDays, toYmd } from './days';
-import { localChanged } from './syncTrigger';
+import { localChanged, timelineChanged } from './syncTrigger';
 
 let db: SQLite.SQLiteDatabase | null = null;
 let opening: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -396,6 +396,7 @@ export async function insertTripManual(
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     [city, country, countryCode, latitude ?? null, longitude ?? null, startDate, endDate ?? null, days],
   );
+  timelineChanged();
   return result.lastInsertRowId;
 }
 
@@ -417,6 +418,7 @@ export async function updateTrip(
     `UPDATE trips SET city=?, country=?, country_code=?, latitude=?, longitude=?, start_date=?, end_date=?, days=?, updated_at=datetime('now') WHERE id=?`,
     [city, country, countryCode, latitude ?? null, longitude ?? null, startDate, endDate ?? null, days, id],
   );
+  timelineChanged();
 }
 
 /**
@@ -438,6 +440,7 @@ export async function insertTrip(
      VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'))`,
     [city, country, countryCode, latitude, longitude, startDate],
   );
+  timelineChanged();
   return result.lastInsertRowId;
 }
 
@@ -452,6 +455,7 @@ export async function updateTripEndDate(tripId: number, endDate: string): Promis
      WHERE id = ?`,
     [endDate, endDate, endDate, endDate, tripId],
   );
+  timelineChanged();
 }
 
 /**
@@ -476,6 +480,7 @@ export async function applyTripRepair(plan: { extend: { id: number; end_date: st
       [id],
     );
   }
+  timelineChanged();
 }
 
 /**
@@ -586,6 +591,7 @@ export async function getAllTrips(): Promise<Trip[]> {
 export async function deleteTrip(id: number): Promise<void> {
   const database = await getDatabase();
   await database.runAsync('DELETE FROM trips WHERE id = ?', [id]);
+  timelineChanged();
 }
 
 export async function markTripDeleted(id: number): Promise<void> {
@@ -594,6 +600,7 @@ export async function markTripDeleted(id: number): Promise<void> {
     `UPDATE trips SET deleted = 1, updated_at = datetime('now') WHERE id = ?`,
     [id],
   );
+  timelineChanged();
 }
 
 /** The timeline entry a row belongs to: the row itself plus any it was merged with. */
@@ -619,6 +626,7 @@ export async function markTripGroupDeleted(id: number): Promise<void> {
       );
     }
   });
+  timelineChanged();
 }
 
 /**
@@ -649,6 +657,7 @@ export async function updateTripGroup(
       );
     }
   });
+  timelineChanged();
 }
 
 export async function getTripById(id: number): Promise<Trip | null> {
@@ -1231,6 +1240,7 @@ export async function upsertTripFromCloud(trip: {
   updated_at: string;
   deleted: boolean;
   local_id?: number | null;
+  install_id?: string | null;
 }): Promise<void> {
   const database = await getDatabase();
 
@@ -1266,7 +1276,7 @@ export async function upsertTripFromCloud(trip: {
     // unique index, which aborted the whole sync and left the row without
     // an id, so the next start made another copy. Thirty-six copies of one
     // stay in Berlin is what that looks like after a week.
-    const adopted = trip.local_id
+    const adopted = trip.local_id && (await isFromThisInstall(trip.install_id))
       ? await database.runAsync(
           `UPDATE trips SET sync_id = ?, city = ?, country = ?, country_code = ?, latitude = ?, longitude = ?,
              start_date = ?, end_date = ?, days = ?, updated_at = ?, deleted = 0
@@ -1595,6 +1605,34 @@ export async function wipeLocalDatabase(): Promise<void> {
       DELETE FROM app_meta;
     `);
   });
+  installIdCache = null;
+}
+
+let installIdCache: string | null = null;
+
+/**
+ * This install's id, sent with every pushed row next to its `local_id`.
+ *
+ * `local_id` is a row number, and row numbers are only unique on one
+ * install: after a reinstall they start again at 1, and a second device has
+ * its own 1. The pull adopts a local row for a cloud document only when the
+ * document came from this very install; matching on the row number alone
+ * let a trip from another device overwrite an unrelated one here.
+ */
+export async function getInstallId(): Promise<string> {
+  if (installIdCache) return installIdCache;
+  let id = await getMeta('install_id');
+  if (!id) {
+    id = Crypto.randomUUID();
+    await setMeta('install_id', id);
+  }
+  installIdCache = id;
+  return id;
+}
+
+/** True when a pulled document was pushed by this install, so its `local_id` means a row here. */
+export async function isFromThisInstall(installId: string | null | undefined): Promise<boolean> {
+  return !!installId && installId === (await getInstallId());
 }
 
 export async function getMeta(key: string): Promise<string | null> {

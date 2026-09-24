@@ -170,6 +170,7 @@ export default function SignInScreen() {
 
               <CloudyButton
                 onPress={handleSignIn}
+                disabled={loading}
                 style={[styles.continueButton, loading && styles.continueButtonDisabled]}
                 innerStyle={styles.continueInner}
               >

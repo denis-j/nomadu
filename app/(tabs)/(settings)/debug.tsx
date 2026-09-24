@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { fireArrivalIfNew, runUsageThresholdCheck, resetArrivalState, resetUsageThresholdState, rescheduleVisaExpiryReminders, requestNotificationPermissions } from '../../../lib/notifications';
 import { Colors } from '../../../constants/colors';
+import { MissingRoute } from '../../../components/MissingRoute';
 import { Typography } from '../../../constants/typography';
 
 const hasGlass = isLiquidGlassAvailable();
@@ -59,14 +60,23 @@ function DebugButton({
   );
 }
 
+/**
+ * Development builds only. It fires fake arrival and visa notifications, and
+ * the route is reachable by link in every build, so a release shows nothing.
+ */
 export default function DebugScreen() {
+  if (!__DEV__) return <MissingRoute title="Settings" message="This page is not available." />;
+  return <DebugScreenContent />;
+}
+
+function DebugScreenContent() {
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.content}
     >
       <Text style={styles.warning}>
-        🛠 Debug Mode — Internal use only
+        🛠 Debug Mode, internal use only
       </Text>
 
       {/* Permissions */}

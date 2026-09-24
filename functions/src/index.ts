@@ -25,7 +25,7 @@ import {
   type Leg,
 } from './prompts';
 import { consumeQuota } from './rateLimit';
-import { cachedCityTips } from './cityTips';
+import { cachedCityTips, isPlainPlaceName } from './cityTips';
 import { requireAppAccess, revenueCatKey } from './access';
 
 initializeApp();
@@ -117,6 +117,9 @@ export const cityTips = onCall(options, async (request) => {
 
   const city = requireString(data.city, 'city', 80);
   const country = requireString(data.country, 'country', 80);
+  if (!isPlainPlaceName(city) || !isPlainPlaceName(country)) {
+    throw new HttpsError('invalid-argument', 'No tips for this place.');
+  }
 
   // Shared across users: the model runs once per city, then everyone reads
   // the same answer back. The quota is only spent when it does run.

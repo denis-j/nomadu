@@ -1,6 +1,6 @@
 import { File } from 'expo-file-system';
 import { Timestamp, collection, deleteDoc, doc, getDocs, onSnapshot, query, setDoc, where, type DocumentData, type Unsubscribe } from 'firebase/firestore';
-import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { deleteObject, getDownloadURL, getMetadata, ref, uploadBytes } from 'firebase/storage';
 import { db, storage } from './firebase';
 import {
   deleteJourneyDocument,
@@ -130,9 +130,14 @@ export async function pushDocumentsToCloud(uid: string): Promise<void> {
           if (!file.exists) continue;
           if ((file.size ?? 0) > MAX_BYTES) continue;
           cloudPath = cloudPathFor(party.journey.sync_id, ownerUid, audience, d.sync_id, d.file_name);
-          const blob = await (await fetch(file.uri)).blob();
-          await uploadBytes(ref(storage, cloudPath), blob, { contentType: d.mime ?? undefined });
-          await setJourneyDocumentCloudPath(d.id, cloudPath);
+          // An earlier attempt may have uploaded the file and then failed on
+          // the record: the file is there, only the record is missing.
+          const target = ref(storage, cloudPath);
+          const uploaded = await getMetadata(target).then(() => true, () => false);
+          if (!uploaded) {
+            const blob = await (await fetch(file.uri)).blob();
+            await uploadBytes(target, blob, { contentType: d.mime ?? undefined });
+          }
         }
         await setDoc(doc(recordsOf(party.journey.sync_id), d.sync_id), {
           title: d.title,
@@ -144,6 +149,12 @@ export async function pushDocumentsToCloud(uid: string): Promise<void> {
           path: cloudPath,
           updated_at: Timestamp.fromDate(localStamp.getTime() > 0 ? localStamp : new Date()),
         });
+        // Only now, with the record written. The pull reads "a cloud path
+        // but no record" as "deleted on another phone" and drops the row and
+        // its file; set right after the upload, a record write that failed
+        // (no signal, the app closed during a large scan) cost the owner the
+        // document on the next sync.
+        if (d.cloud_path !== cloudPath) await setJourneyDocumentCloudPath(d.id, cloudPath);
       } catch (err) {
         reportError(err, 'documents:push');
       }

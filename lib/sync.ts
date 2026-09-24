@@ -17,6 +17,7 @@ import {
 import { db } from './firebase';
 import {
   markAllTripsDeleted,
+  getInstallId,
   updateJourneyShareCodeBySyncId,
   clearJourneyShareCodeBySyncId,
   forgetFollowedJourney,
@@ -124,6 +125,7 @@ function isLegacySyncId(syncId: string | null | undefined): syncId is string {
 export async function pushTripsToCloud(uid: string): Promise<void> {
   const trips = await getAllTripsForSync();
   if (trips.length === 0) return;
+  const installId = await getInstallId();
 
   const trips_ = tripsCollection(uid);
 
@@ -179,6 +181,7 @@ export async function pushTripsToCloud(uid: string): Promise<void> {
         end_date: trip.end_date,
         days: trip.days,
         local_id: trip.id,
+        install_id: installId,
         updated_at: Timestamp.fromDate(localUpdatedAt),
         deleted: trip.deleted === 1,
       },
@@ -229,6 +232,7 @@ export async function pullTripsFromCloud(uid: string): Promise<void> {
       updated_at: updatedAt,
       deleted: data.deleted === true,
       local_id: data.local_id ?? null,
+      install_id: typeof data.install_id === 'string' ? data.install_id : null,
     });
   }
 }
@@ -248,6 +252,7 @@ export async function pullTripsFromCloud(uid: string): Promise<void> {
 export async function pushVisasToCloud(uid: string): Promise<void> {
   const visas = await getAllUserVisasForSync();
   if (visas.length === 0) return;
+  const installId = await getInstallId();
 
   const visas_ = visasCollection(uid);
 
@@ -295,6 +300,7 @@ export async function pushVisasToCloud(uid: string): Promise<void> {
         entries_allowed: visa.entries_allowed,
         notes: visa.notes,
         local_id: visa.id,
+        install_id: installId,
         updated_at: Timestamp.fromDate(localUpdatedAt),
         deleted: visa.deleted === 1,
       },
@@ -337,6 +343,7 @@ export async function pullVisasFromCloud(uid: string): Promise<void> {
       updated_at: updatedAt,
       deleted: data.deleted === true,
       local_id: data.local_id ?? null,
+      install_id: typeof data.install_id === 'string' ? data.install_id : null,
     });
   }
 }
@@ -762,6 +769,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
           updated_at: updatedAt,
           deleted: data.deleted === true,
           local_id: data.local_id ?? null,
+          install_id: typeof data.install_id === 'string' ? data.install_id : null,
         });
       }
     }

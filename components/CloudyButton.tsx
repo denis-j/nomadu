@@ -1,10 +1,16 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useRef, useState } from 'react';
 import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { CloudBackdrop } from './CloudBackdrop';
 
 interface CloudyButtonProps {
-  onPress: () => void;
+  /**
+   * May return a promise. Until it settles, further taps are ignored, so a
+   * quick double tap cannot create an account or send a reset mail twice.
+   */
+  onPress: () => void | Promise<unknown>;
+  /** No taps at all, e.g. while the form is incomplete. */
+  disabled?: boolean;
   children: ReactNode;
   compact?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -20,6 +26,7 @@ interface CloudyButtonProps {
  */
 export function CloudyButton({
   onPress,
+  disabled,
   children,
   compact,
   style,
@@ -28,15 +35,24 @@ export function CloudyButton({
 }: CloudyButtonProps) {
   const [size, setSize] = useState({ w: 0, h: 0 });
 
+  const busy = useRef(false);
+
   const handlePress = () => {
+    if (disabled || busy.current) return;
     if (haptic !== null) Haptics.impactAsync(haptic);
-    onPress();
+    const result = onPress();
+    if (result && typeof (result as Promise<unknown>).finally === 'function') {
+      busy.current = true;
+      (result as Promise<unknown>).catch(() => {}).finally(() => { busy.current = false; });
+    }
   };
 
   return (
     <View style={styles.shadow}>
       <Pressable
         onPress={handlePress}
+        disabled={disabled}
+        accessibilityState={{ disabled: !!disabled }}
         onLayout={(e) => {
           const { width, height } = e.nativeEvent.layout;
           if (width !== size.w || height !== size.h) setSize({ w: width, h: height });

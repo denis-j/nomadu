@@ -22,6 +22,25 @@ export function localChanged(): void {
 }
 
 /**
+ * "A trip or a visa changed here": tracking, a manual entry, an edit, a
+ * delete. Separate from `localChanged` because trips and visas go out with
+ * the full sync, not the plans push, and used to wait for the next cold
+ * start, which iOS can put off for days. One listener, like `localChanged`.
+ */
+let timelineListener: (() => void) | null = null;
+
+export function onTimelineChange(fn: () => void): () => void {
+  timelineListener = fn;
+  return () => {
+    if (timelineListener === fn) timelineListener = null;
+  };
+}
+
+export function timelineChanged(): void {
+  timelineListener?.();
+}
+
+/**
  * "The cloud changed what is on this phone": a sync finished, the realtime
  * listener applied a document, or another account's data was wiped. Screens
  * used to re-read only when they came into focus, so a timeline that was

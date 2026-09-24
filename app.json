@@ -26,14 +26,15 @@
         "tinted": "./assets/app-icons/Icon-iOS-TintedDark-1024x1024@1x.png"
       },
       "infoPlist": {
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Nomad uses your location to automatically track the cities and countries you visit.",
-        "NSLocationWhenInUseUsageDescription": "Nomad uses your location to show your current city and country.",
-        "NSLocationAlwaysUsageDescription": "Nomad tracks your location in the background to log visited cities automatically.",
-        "NSPhotoLibraryUsageDescription": "Nomad reads screenshots you pick to automatically extract trips into your timeline.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Nomadu uses your location to automatically track the cities and countries you visit.",
+        "NSLocationWhenInUseUsageDescription": "Nomadu uses your location to show your current city and country.",
+        "NSLocationAlwaysUsageDescription": "Nomadu tracks your location in the background to log visited cities automatically.",
+        "NSPhotoLibraryUsageDescription": "Nomadu reads the screenshots and documents you pick, to add trips to your timeline and keep tickets with your trip.",
         "UIBackgroundModes": [
           "location"
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Nomadu uses the camera when you photograph a ticket, visa or booking to keep it with your trip."
       },
       "appleTeamId": "Y6KMGQ9398",
       "buildNumber": "5"
@@ -67,9 +68,9 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Nomad uses your location to automatically track the cities and countries you visit.",
-          "locationAlwaysPermission": "Nomad tracks your location in the background to log visited cities automatically.",
-          "locationWhenInUsePermission": "Nomad uses your location to show your current city and country.",
+          "locationAlwaysAndWhenInUsePermission": "Nomadu uses your location to automatically track the cities and countries you visit.",
+          "locationAlwaysPermission": "Nomadu tracks your location in the background to log visited cities automatically.",
+          "locationWhenInUsePermission": "Nomadu uses your location to show your current city and country.",
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true
         }
@@ -86,7 +87,14 @@
       ],
       "expo-video",
       "expo-font",
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
       [
         "@sentry/react-native/expo",
         {
@@ -96,7 +104,15 @@
         }
       ],
       "expo-sharing",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Nomadu reads the screenshots and documents you pick, to add trips to your timeline and keep tickets with your trip.",
+          "cameraPermission": "Nomadu uses the camera when you photograph a ticket, visa or booking to keep it with your trip.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "extra": {
       "router": {},

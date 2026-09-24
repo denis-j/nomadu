@@ -209,7 +209,7 @@ export default function SettingsScreen() {
         <Text style={styles.sectionTitle}>Account</Text>
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Email</Text>
-          <Text style={styles.rowValue}>{user?.email ?? '—'}</Text>
+          <Text style={styles.rowValue}>{user?.email ?? 'Not set'}</Text>
         </View>
         <View style={styles.separator} />
         <Pressable
@@ -428,7 +428,7 @@ export default function SettingsScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             Alert.alert(
               'Clear Travel Data',
-              'This will delete all trips and visits — both on this device and in the cloud. Your planned trips will be preserved. This cannot be undone.',
+              'This deletes all trips and visits, on this device, in the cloud and on your other devices. Your planned trips stay. This cannot be undone.',
               [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -473,6 +473,8 @@ export default function SettingsScreen() {
         <Pressable
           style={styles.row}
           onPress={() => {
+            // The debug screen only exists in development builds.
+            if (!__DEV__) return;
             const next = versionTaps + 1;
             setVersionTaps(next);
             if (next >= 5) {
@@ -512,7 +514,7 @@ export default function SettingsScreen() {
             <View style={styles.sheetItemText}>
               <Text style={styles.sheetItemTitle}>Battery efficient</Text>
               <Text style={styles.sheetItemDesc}>
-                Uses iOS Significant Location Changes — only wakes when you move to a new area.
+                Uses iOS Significant Location Changes, so it only wakes when you move to a new area.
               </Text>
             </View>
           </View>
@@ -539,7 +541,7 @@ export default function SettingsScreen() {
             <View style={styles.sheetItemText}>
               <Text style={styles.sheetItemTitle}>City-level only</Text>
               <Text style={styles.sheetItemDesc}>
-                We only need to know which city and country you're in — no precise GPS tracking.
+                We only need to know which city and country you're in, not your exact position.
               </Text>
             </View>
           </View>
@@ -548,7 +550,7 @@ export default function SettingsScreen() {
             <View style={styles.sheetItemText}>
               <Text style={styles.sheetItemTitle}>Private by design</Text>
               <Text style={styles.sheetItemDesc}>
-                All location data stays on your device. Nothing is sent to external servers.
+                Your trips are stored on this device and in your Nomadu account. Place names come from Apple Maps or OpenStreetMap, and screenshots you import are read by our AI service. Nothing is sold or used for advertising.
               </Text>
             </View>
           </View>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { PlatformColor, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -104,7 +104,12 @@ export default function CreateDatesScreen() {
     return marks;
   }, [startDate, endDate, noEndDate]);
 
+  // A ref, not the state: two taps in the same frame both still see
+  // `saving` as false, and each would add the trip.
+  const savingRef = useRef(false);
   const handleSave = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       const code = getCountryCode(country);
@@ -134,6 +139,7 @@ export default function CreateDatesScreen() {
       showToast(isEditing ? 'Trip updated' : 'Trip added');
     } catch (err) {
       console.error('Failed to save trip:', err);
+      savingRef.current = false;
       setSaving(false);
     }
   };

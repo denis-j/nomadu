@@ -29,7 +29,10 @@ export default function BadgeFullscreenScreen() {
   const { countryCode, unlock } = useLocalSearchParams<{ countryCode: string; unlock?: string }>();
   const code = (countryCode ?? '').toUpperCase();
   const info = getBadgeInfo(code);
-  const isUnlock = unlock === '1' || unlock === 'true';
+  // The unlock mode marks the badge as earned. The app itself never links
+  // here with it, and the scheme is public, so any link could hand out
+  // badges; only development builds honour it.
+  const isUnlock = __DEV__ && (unlock === '1' || unlock === 'true');
 
   useEffect(() => {
     if (isUnlock && code) {

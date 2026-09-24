@@ -13,6 +13,15 @@ const ENDPOINT =
 /** Upstream call budget. Gemini occasionally takes a while on vision requests. */
 const TIMEOUT_MS = 60_000;
 
+/**
+ * "This model is currently experiencing high demand" (503) and rate limits
+ * (429) are usually over within a second or two. One quiet retry turns most
+ * of them into an answer instead of an error on the user's screen.
+ */
+const RETRY_STATUSES = [429, 503];
+const RETRY_DELAY_MS = 1500;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 interface Part {
   text?: string;
   inline_data?: { mime_type: string; data: string };
@@ -23,6 +32,7 @@ async function generate(
   parts: Part[],
   maxOutputTokens: number,
   temperature: number,
+  attempt = 1,
 ): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -44,6 +54,12 @@ async function generate(
     throw new HttpsError('unavailable', 'The AI service did not respond. Please try again.');
   } finally {
     clearTimeout(timer);
+  }
+
+  if (!res.ok && attempt === 1 && RETRY_STATUSES.includes(res.status)) {
+    logger.warn('Gemini busy, retrying once', { status: res.status });
+    await sleep(RETRY_DELAY_MS);
+    return generate(apiKey, parts, maxOutputTokens, temperature, 2);
   }
 
   if (!res.ok) {

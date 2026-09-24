@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import {
   ActionSheetIOS,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -120,7 +121,14 @@ function JourneyCard({
       (i) => {
         if (i === 0) inviteFriends(journey).then(onChanged);
         else if (journey.share_code && i === 1) stopSharing(journey).then(onChanged);
-        else if (i === options.length - 2) onDelete(journey.id);
+        // Same question as on the trip screen: stops and documents go with
+        // it, and there is no undo.
+        else if (i === options.length - 2) {
+          Alert.alert('Delete this trip?', 'Stops and documents go with it.', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete', style: 'destructive', onPress: () => onDelete(journey.id) },
+          ]);
+        }
       },
     );
   };

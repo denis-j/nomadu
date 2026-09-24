@@ -1,6 +1,7 @@
 import * as Crypto from 'expo-crypto';
-import { getDatabase } from './database';
+import { getDatabase, isFromThisInstall } from './database';
 import { localIsNewer } from './syncTime';
+import { timelineChanged } from './syncTrigger';
 import { rescheduleVisaExpiryReminders } from './notifications';
 
 export type EntriesAllowed = 'single' | 'multiple';
@@ -98,6 +99,7 @@ export async function insertUserVisa(input: UserVisaInput): Promise<number> {
   // Re-schedule expiry reminders so the newly-added visa gets its 30/7/1-day
   // countdowns set up. Fire-and-forget: the insert succeeded either way.
   syncExpiryReminders();
+  timelineChanged();
   return result.lastInsertRowId;
 }
 
@@ -124,6 +126,7 @@ export async function updateUserVisa(id: number, input: UserVisaInput): Promise<
     ],
   );
   syncExpiryReminders();
+  timelineChanged();
 }
 
 export async function getAllUserVisas(): Promise<UserVisa[]> {
@@ -148,6 +151,7 @@ export async function markUserVisaDeleted(id: number): Promise<void> {
     [nowIso(), id],
   );
   syncExpiryReminders();
+  timelineChanged();
 }
 
 // ─── Cloud sync support ─────────────────────────────────────────────────────
@@ -192,6 +196,7 @@ export async function upsertUserVisaFromCloud(visa: {
   updated_at: string;
   deleted: boolean;
   local_id?: number | null;
+  install_id?: string | null;
 }): Promise<void> {
   const db = await getDatabase();
 
@@ -220,7 +225,8 @@ export async function upsertUserVisaFromCloud(visa: {
     }
   } else if (!visa.deleted) {
     // This phone's own row coming back before the push stored the id on it.
-    const adopted = visa.local_id
+    // Only from this install: another device's row numbers mean nothing here.
+    const adopted = visa.local_id && (await isFromThisInstall(visa.install_id))
       ? await db.runAsync(
           `UPDATE user_visas SET sync_id = ?, country_code = ?, label = ?, valid_from = ?, valid_to = ?,
              max_days_per_stay = ?, max_days_per_window = ?, window_days = ?, entries_allowed = ?,

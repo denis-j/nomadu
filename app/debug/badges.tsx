@@ -16,6 +16,7 @@ import {
   useSkybox,
 } from 'react-native-filament';
 import { Colors } from '../../constants/colors';
+import { MissingRoute } from '../../components/MissingRoute';
 import { Typography } from '../../constants/typography';
 
 const THAILAND_GLB = require('../../assets/glb/thailand.glb');
@@ -24,7 +25,13 @@ const VIETNAM_GLB = require('../../assets/glb/vietnam.glb');
 // Match the app's page background exactly so the canvas blends in.
 const PAGE_BG = Colors.background; // '#F8F9FA'
 
+/** Development builds only; the route is reachable by link in every build. */
 export default function BadgesDebugScreen() {
+  if (!__DEV__) return <MissingRoute title="Badges" message="This page is not available." />;
+  return <BadgesDebugContent />;
+}
+
+function BadgesDebugContent() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack.Screen options={{ title: 'Badges (Debug)', headerBackTitle: 'Back' }} />

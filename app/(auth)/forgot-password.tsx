@@ -141,6 +141,7 @@ export default function ForgotPasswordScreen() {
             ) : (
               <CloudyButton
                 onPress={handleReset}
+                disabled={loading}
                 style={[styles.continueButton, loading && styles.continueButtonDisabled]}
                 innerStyle={styles.continueInner}
               >

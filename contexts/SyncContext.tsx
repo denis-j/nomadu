@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
 import { reportError } from '../lib/monitoring';
 import {
@@ -8,11 +9,19 @@ import {
   stopRealtimeSync,
   syncAll,
 } from '../lib/sync';
-import { onLocalChange } from '../lib/syncTrigger';
+import { onLocalChange, onTimelineChange } from '../lib/syncTrigger';
 import { ensureLocalDataOwner } from '../lib/localOwner';
 
 /** How long after the last local edit the push goes out. */
 const PUSH_DELAY_MS = 2000;
+/**
+ * A trip or visa edit goes out with a full sync, which reads whole
+ * collections, so edits are gathered for a while first: adding a trip and
+ * fixing its dates a moment later is one sync, not two.
+ */
+const TIMELINE_DELAY_MS = 15_000;
+/** Back in the foreground with nothing changed here: sync if the last one is older than this. */
+const FOREGROUND_RESYNC_MS = 30 * 60 * 1000;
 
 type SyncStatus = 'idle' | 'syncing' | 'error';
 
@@ -38,6 +47,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const { user } = useAuth();
   const syncingRef = useRef(false);
+  // A trip or visa changed here since the last successful sync (tracking in
+  // the background, an edit), or the last sync failed: both mean the next
+  // foreground has something to send.
+  const dirtyRef = useRef(false);
+  const lastOkRef = useRef(0);
 
   useEffect(() => {
     if (!user) return;
@@ -82,10 +96,35 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       }, PUSH_DELAY_MS);
     });
 
+    // Trips and visas used to go out only at a cold start, which iOS can
+    // put off for days, and a sync that failed offline was never retried.
+    // Now: a while after an edit made in the open app, and whenever the app
+    // comes back with something unsent, a failure behind it, or a stale sync.
+    let timelineTimer: ReturnType<typeof setTimeout> | null = null;
+    const offTimeline = onTimelineChange(() => {
+      dirtyRef.current = true;
+      // Tracking writes while the app is in the background; that waits for
+      // the foreground instead of syncing from a background wake.
+      if (AppState.currentState !== 'active') return;
+      if (timelineTimer) clearTimeout(timelineTimer);
+      timelineTimer = setTimeout(() => {
+        timelineTimer = null;
+        owned.then(() => doSync(uid)).catch(() => {});
+      }, TIMELINE_DELAY_MS);
+    });
+    const appState = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      const stale = Date.now() - lastOkRef.current > FOREGROUND_RESYNC_MS;
+      if (dirtyRef.current || stale) owned.then(() => doSync(uid)).catch(() => {});
+    });
+
     return () => {
       active = false;
       offChange();
+      offTimeline();
+      appState.remove();
       if (timer) clearTimeout(timer);
+      if (timelineTimer) clearTimeout(timelineTimer);
       stopRealtimeSync();
     };
   }, [user]);
@@ -94,13 +133,18 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     if (syncingRef.current) return;
     syncingRef.current = true;
     setSyncStatus('syncing');
+    // Cleared up front: an edit made while this sync runs sets it again and
+    // is picked up by the next one.
+    dirtyRef.current = false;
     try {
       await ensureLocalDataOwner(uid);
       await syncAll(uid);
+      lastOkRef.current = Date.now();
       const time = await getLastSyncTime(uid);
       setLastSynced(time);
       setSyncStatus('idle');
     } catch (err) {
+      dirtyRef.current = true;
       // The UI only shows an error pill, so without this the failure is
       // invisible to us: nobody reports "the little dot was orange".
       reportError(err, 'sync');

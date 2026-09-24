@@ -170,6 +170,7 @@ export default function SignUpScreen() {
 
               <CloudyButton
                 onPress={handleSignUp}
+                disabled={loading}
                 style={[styles.continueButton, loading && styles.continueButtonDisabled]}
                 innerStyle={styles.continueInner}
               >

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { PlatformColor, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
+import { MissingRoute } from '../../../../components/MissingRoute';
 import { Card, SectionLabel } from '../../../../components/visaForm';
 import { TextArea } from '../../../../components/accommodationForm';
 import { CityTips } from '../../../../components/MarkdownTips';
@@ -35,14 +36,22 @@ export default function AddStopDetailsScreen() {
   const { country, city } = params;
   const isEditing = !!params.legId;
 
-  const startDate = parseDate(params.start);
-  const endDate = parseDate(params.end);
+  // Reachable by link, so the place and dates may be missing; reading a date
+  // out of undefined took the whole screen down.
+  const complete = !!(country && city && params.start && params.end && (params.legId || params.journeyId));
+  const startDate = complete ? parseDate(params.start) : new Date();
+  const endDate = complete ? parseDate(params.end) : new Date();
 
   const [transport, setTransport] = useState<TransportType>((params.transport as TransportType) || 'flight');
   const [notes, setNotes] = useState(params.notes || '');
   const [saving, setSaving] = useState(false);
 
+  // A ref, not the state: two taps in the same frame both still see
+  // `saving` as false, and each would add the stop.
+  const savingRef = useRef(false);
   const handleSave = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       const code = getCountryCode(country);
@@ -58,9 +67,12 @@ export default function AddStopDetailsScreen() {
       showToast(isEditing ? 'Stop updated' : 'Stop added');
     } catch (err) {
       console.error('Failed to save leg:', err);
+      savingRef.current = false;
       setSaving(false);
     }
   };
+
+  if (!complete) return <MissingRoute title="Stop" message="This stop is no longer here." />;
 
   return (
     <>
