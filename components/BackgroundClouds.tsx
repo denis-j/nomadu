@@ -29,7 +29,7 @@ interface CloudDef {
 // these are background texture only. Top edge gets the heaviest dusting so
 // the sky feels populated; mid + bottom keep just enough to balance.
 const CLOUDS: CloudDef[] = [
-  // Top band — more dense to make the sky feel alive
+  // Top band, more dense to make the sky feel alive
   { size: 50, color: 'rgba(255, 255, 255, 0.45)', top: 50,  left: -14, drift: 22, duration: 19000, phase: 0    },
   { size: 32, color: 'rgba(255, 255, 255, 0.35)', top: 70,  right: 30, drift: 16, duration: 22000, phase: 0.3  },
   { size: 26, color: 'rgba(255, 255, 255, 0.30)', top: 110, left: 60,  drift: 14, duration: 24000, phase: 0.55 },

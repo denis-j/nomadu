@@ -18,7 +18,7 @@ interface OnboardingProgressProps {
 
 /**
  * Thin floating progress bar pinned to the top of every onboarding screen.
- * Drives the Zeigarnik effect — users see how close they are to the finish.
+ * Drives the Zeigarnik effect, users see how close they are to the finish.
  */
 export function OnboardingProgress({ step, total }: OnboardingProgressProps) {
   const insets = useSafeAreaInsets();

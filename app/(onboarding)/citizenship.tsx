@@ -216,7 +216,7 @@ export default function CitizenshipScreen() {
         })}
       </MapView>
 
-      {/* Gradient overlay at top — pointerEvents none so map stays tappable */}
+      {/* Gradient overlay at top, pointerEvents none so map stays tappable */}
       <View style={styles.topGradient} pointerEvents="none">
         <AnimatedGradientBackground
           colorSets={[{
@@ -272,7 +272,7 @@ export default function CitizenshipScreen() {
           )}
         </View>
 
-        {/* Bottom card — confirm OR success (First-Win-Moment) */}
+        {/* Bottom card, confirm OR success (First-Win-Moment) */}
         {(hoveredCountry || selected) && !isSearching && (
           <Animated.View
             key={selected ?? hoveredCountry}

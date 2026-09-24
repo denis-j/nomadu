@@ -2,28 +2,40 @@ rules_version = '2';
 
 // Files of documents shared on a trip, and nothing else.
 //
-// The audience is in the path rather than in a Firestore lookup: storage
-// rules in this project cannot read Firestore (a `firestore.get` here is
-// refused even for a document that exists and matches), so everything a
-// rule needs has to be visible in the path itself.
-//
 //   shared/{journeyId}/{ownerUid}/all/{file}       for everyone on the trip
 //   shared/{journeyId}/{ownerUid}/u/{uid}/{file}   for that person, and the owner
 //
-// What the path cannot tell is whether someone is still on the trip, so:
+// Who is on a trip is read from its Firestore mirror,
+// `shared_journeys/{journeyId}` (owner_uid, member_uids). That needs the
+// Storage service agent to be allowed to read Firestore; `firebase deploy`
+// asks to grant it the first time. Without the lookup, anyone signed in
+// could store files under made-up trip ids, and a removed member who knew
+// a file's path could still fetch it.
 //
-//   - No listing. A file is reachable only through its full path, which
-//     ends in the document's random id; the ids are in the Firestore
-//     records, and those only current members can read. Someone removed
-//     from a trip does not learn the files added after they left.
-//   - No overwriting and no deleting from a client. Otherwise anyone who
-//     had once been on the trip could wipe or swap a boarding pass. When a
-//     record is deleted, or moves to another audience, the
-//     `sharedDocumentFiles` function removes its old file; who may do that
-//     is decided on the record, where the rules do check membership.
+// Beyond membership:
+//
+//   - No listing. A file is reached through its full path, which ends in
+//     the document's random id from the Firestore record.
+//   - No overwriting and no deleting from a client. When a record is
+//     deleted, or moves to another audience, the `sharedDocumentFiles`
+//     function removes its old file; who may do that is decided on the
+//     record.
 //   - Only images and PDFs, at most 20 MB: what the app itself uploads.
 service firebase.storage {
   match /b/{bucket}/o {
+    function trip(journeyId) {
+      return firestore.get(/databases/(default)/documents/shared_journeys/$(journeyId)).data;
+    }
+
+    // Signed in, and the owner or a member of this trip, which must belong
+    // to the owner named in the path.
+    function onTrip(journeyId, ownerUid) {
+      let t = trip(journeyId);
+      return request.auth != null
+        && t.owner_uid == ownerUid
+        && (request.auth.uid == ownerUid || request.auth.uid in t.member_uids);
+    }
+
     function isDocumentFile() {
       return request.resource.size < 20 * 1024 * 1024
         && (request.resource.contentType.matches('image/.*')
@@ -31,18 +43,20 @@ service firebase.storage {
     }
 
     match /shared/{journeyId}/{ownerUid}/all/{file} {
-      allow get: if request.auth != null;
+      allow get: if onTrip(journeyId, ownerUid);
       allow list: if false;
-      allow create: if request.auth != null && resource == null && isDocumentFile();
+      // resource == null: Storage treats overwriting an object as a create.
+      allow create: if resource == null && onTrip(journeyId, ownerUid) && isDocumentFile();
       allow update, delete: if false;
     }
     match /shared/{journeyId}/{ownerUid}/u/{uid}/{file} {
       function mine() {
-        return request.auth != null && (request.auth.uid == uid || request.auth.uid == ownerUid);
+        return onTrip(journeyId, ownerUid)
+          && (request.auth.uid == uid || request.auth.uid == ownerUid);
       }
       allow get: if mine();
       allow list: if false;
-      allow create: if mine() && resource == null && isDocumentFile();
+      allow create: if resource == null && mine() && isDocumentFile();
       allow update, delete: if false;
     }
     match /{allPaths=**} {

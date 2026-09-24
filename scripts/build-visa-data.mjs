@@ -5,7 +5,7 @@
  * Source: https://github.com/ilyankou/passport-index-dataset (MIT-licensed)
  * Coverage: ~199 passports x ~199 destinations.
  *
- * Cell values from the CSV are kept verbatim — the lookup logic in
+ * Cell values from the CSV are kept verbatim, the lookup logic in
  * `constants/visaRules.ts` is responsible for turning them into VisaRule
  * objects. Keeping the raw cells means the JSON refresh is just a re-download.
  *

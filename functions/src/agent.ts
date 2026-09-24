@@ -66,21 +66,23 @@ export const createAgentToken = onCall({ region: REGION, secrets: [revenueCatKey
   const editTimeline = request.data?.editTimeline === true;
   const db = getFirestore();
 
-  const existing = await db.collection(TOKENS).where('uid', '==', uid).get();
-  if (existing.size >= MAX_TOKENS_PER_USER) {
-    throw new HttpsError('resource-exhausted', `You can have at most ${MAX_TOKENS_PER_USER} tokens. Revoke one first.`);
-  }
-
   const token = TOKEN_PREFIX + randomBytes(32).toString('base64url');
   const id = hashToken(token);
-  await db.collection(TOKENS).doc(id).set({
-    uid,
-    label: label || 'Agent',
-    // Enough to recognise a token in a config file, useless for guessing it.
-    prefix: token.slice(0, TOKEN_PREFIX.length + 6),
-    edit_timeline: editTimeline,
-    created_at: FieldValue.serverTimestamp(),
-    last_used_at: null,
+  // Count and create together: parallel calls each saw room for one more.
+  await db.runTransaction(async (tx) => {
+    const existing = (await tx.get(db.collection(TOKENS).where('uid', '==', uid))) as FirebaseFirestore.QuerySnapshot;
+    if (existing.size >= MAX_TOKENS_PER_USER) {
+      throw new HttpsError('resource-exhausted', `You can have at most ${MAX_TOKENS_PER_USER} tokens. Revoke one first.`);
+    }
+    tx.set(db.collection(TOKENS).doc(id), {
+      uid,
+      label: label || 'Agent',
+      // Enough to recognise a token in a config file, useless for guessing it.
+      prefix: token.slice(0, TOKEN_PREFIX.length + 6),
+      edit_timeline: editTimeline,
+      created_at: FieldValue.serverTimestamp(),
+      last_used_at: null,
+    });
   });
   logger.info('agent token created', { uid, id: id.slice(0, 8), editTimeline });
   // The only time the token itself leaves the server.
@@ -119,6 +121,31 @@ export const listAgentTokens = onCall({ region: REGION }, async (request) => {
 
 // ─── The API (bearer token, from the agent) ───────────────────────────────────
 
+/** Requests per token and minute. An agent working through a trip needs a few dozen. */
+export const AGENT_REQUESTS_PER_MINUTE = 60;
+
+/**
+ * Every request reads whole collections, so a leaked or looping token could
+ * run up Firestore reads without end. Counted per token and minute in
+ * `agent_usage` (closed to clients by the catch-all rule).
+ */
+async function consumeTokenBudget(tokenId: string): Promise<void> {
+  const db = getFirestore();
+  const minute = new Date().toISOString().slice(0, 16);
+  const ref = db.collection('agent_usage').doc(`${tokenId.slice(0, 32)}_${minute}`);
+  const used = await db.runTransaction(async (tx) => {
+    const count = Number(((await tx.get(ref)) as FirebaseFirestore.DocumentSnapshot).get('count') ?? 0);
+    if (count < AGENT_REQUESTS_PER_MINUTE) {
+      // expires_at: set a Firestore TTL policy on this field to drop old counters.
+      tx.set(ref, { count: FieldValue.increment(1), expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000) }, { merge: true });
+    }
+    return count;
+  });
+  if (used >= AGENT_REQUESTS_PER_MINUTE) {
+    throw new ApiError(429, 'rate-limited', `At most ${AGENT_REQUESTS_PER_MINUTE} requests per minute. Wait a moment and try again.`);
+  }
+}
+
 async function authenticate(req: Request): Promise<Caller> {
   const header = req.get('authorization') ?? '';
   const match = /^Bearer\s+(\S+)$/i.exec(header);
@@ -128,6 +155,7 @@ async function authenticate(req: Request): Promise<Caller> {
   const ref = getFirestore().collection(TOKENS).doc(hashToken(match[1]));
   const snap = await ref.get();
   if (!snap.exists) throw new ApiError(401, 'unauthenticated', 'Unknown or revoked token.');
+  await consumeTokenBudget(ref.id);
   ref.update({ last_used_at: FieldValue.serverTimestamp() }).catch(() => {});
   const uid = snap.get('uid') as string;
   // Keys outlive the subscription they were made under: checked on use, not
@@ -204,7 +232,31 @@ async function loadProfile(uid: string) {
   const citizenship = x.citizenship && typeof x.citizenship.countryCode === 'string'
     ? { country: String(x.citizenship.country), countryCode: String(x.citizenship.countryCode).toUpperCase() }
     : null;
-  return { citizenship, hasFixedResidence: typeof x.hasFixedResidence === 'boolean' ? x.hasFixedResidence : null };
+  return {
+    citizenship,
+    hasFixedResidence: typeof x.hasFixedResidence === 'boolean' ? x.hasFixedResidence : null,
+    timezone: typeof x.timezone === 'string' ? x.timezone : null,
+  };
+}
+
+/**
+ * The user's today, as a local date on this server. The day counts all work
+ * on calendar days, and the server runs in UTC: for someone in Bangkok before
+ * 07:00, "today" was yesterday, so an ongoing stay was a day short and a stay
+ * starting today counted as the future. Falls back to UTC for profiles that
+ * have not sent a timezone yet.
+ */
+export function userToday(timezone: string | null, now: Date = new Date()): Date {
+  try {
+    if (timezone) {
+      const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+      const [y, m, d] = ymd.split('-').map(Number);
+      if (y && m && d) return new Date(y, m - 1, d);
+    }
+  } catch {
+    // Unknown zone name: fall through.
+  }
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 function journeysCol(uid: string) {
@@ -381,7 +433,11 @@ function buildStay(raw: StayInput, existing: FirebaseFirestore.DocumentData | nu
   if (!YMD.test(start)) throw new ApiError(400, 'invalid-argument', '"start_date" must be YYYY-MM-DD.');
   if (!YMD.test(end)) throw new ApiError(400, 'invalid-argument', '"end_date" must be YYYY-MM-DD.');
   if (end < start) throw new ApiError(400, 'invalid-argument', '"end_date" is before "start_date".');
-  if (start > toYmd(new Date())) throw new ApiError(400, 'invalid-argument', 'A stay cannot start in the future. Plan it as a journey instead.');
+  // Against the latest "today" anywhere (UTC+14): the server runs in UTC,
+  // and a stay that begins today in Bangkok is already tomorrow's date there
+  // for part of the day.
+  const latestToday = toYmd(new Date(Date.now() + 14 * 60 * 60 * 1000));
+  if (start > latestToday) throw new ApiError(400, 'invalid-argument', 'A stay cannot start in the future. Plan it as a journey instead.');
   out.start_date = start;
   out.end_date = end;
   out.days = countDays(fromYmd(start), fromYmd(end));
@@ -496,7 +552,7 @@ async function handle(req: Request, res: Response): Promise<void> {
     const year = y ? Number(y) : null;
     if (y && !Number.isInteger(year)) throw new ApiError(400, 'invalid-argument', '"year" must be a number.');
     const [trips, profile] = await Promise.all([loadTrips(uid), loadProfile(uid)]);
-    send(res, 200, statsFromTrips(trips, year, profile.citizenship?.countryCode ?? null, availableYearsFromTrips(trips)));
+    send(res, 200, statsFromTrips(trips, year, profile.citizenship?.countryCode ?? null, availableYearsFromTrips(trips), userToday(profile.timezone)));
     return;
   }
 
@@ -504,11 +560,11 @@ async function handle(req: Request, res: Response): Promise<void> {
     const [trips, profile, visas] = await Promise.all([loadTrips(uid), loadProfile(uid), loadVisas(uid)]);
     if (!profile.citizenship) throw new ApiError(409, 'no-citizenship', 'Set your citizenship in the app first.');
     if (resource === 'visa') {
-      send(res, 200, { citizenship: profile.citizenship, statuses: calculateAllVisaStatuses(trips, profile.citizenship.countryCode, visas) });
+      send(res, 200, { citizenship: profile.citizenship, statuses: calculateAllVisaStatuses(trips, profile.citizenship.countryCode, visas, userToday(profile.timezone)) });
     } else {
       send(res, 200, {
         citizenship: profile.citizenship,
-        statuses: calculateAllTaxStatuses(trips, profile.citizenship.countryCode, profile.hasFixedResidence ?? true),
+        statuses: calculateAllTaxStatuses(trips, profile.citizenship.countryCode, profile.hasFixedResidence ?? true, userToday(profile.timezone).getFullYear(), userToday(profile.timezone)),
       });
     }
     return;

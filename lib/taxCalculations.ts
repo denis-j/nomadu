@@ -39,8 +39,7 @@ function getCountryName(trips: Trip[], countryCode: string): string {
  * Berlin, London or New York, "warning" instead of "resident". Days after
  * today are not presence yet and are left out.
  */
-function countDaysInYear(trips: Trip[], countryCode: string, year: number): number {
-  const today = new Date();
+function countDaysInYear(trips: Trip[], countryCode: string, year: number, today: Date): number {
   const yearStart = new Date(year, 0, 1, 12);
   const yearEnd = new Date(year, 11, 31, 12);
   const uniqueDays = new Set<string>();
@@ -68,13 +67,15 @@ export function calculateAllTaxStatuses(
   citizenshipCode: string,
   hasFixedResidence: boolean,
   year: number = new Date().getFullYear(),
+  /** "Today" as a local calendar day; the server passes the user's own. */
+  today: Date = new Date(),
 ): TaxStatus[] {
   const visitedCodes = [...new Set(trips.map((t) => t.country_code))];
   const applicableRules = getApplicableTaxRules(citizenshipCode, visitedCodes, hasFixedResidence);
 
   const statuses: TaxStatus[] = applicableRules
     .map(({ countryCode, rule }) => {
-      const daysPresent = countDaysInYear(trips, countryCode, year);
+      const daysPresent = countDaysInYear(trips, countryCode, year, today);
       const daysRemaining = Math.max(0, rule.thresholdDays - daysPresent);
       const percentUsed = rule.thresholdDays > 0 ? (daysPresent / rule.thresholdDays) * 100 : 0;
 
@@ -91,7 +92,7 @@ export function calculateAllTaxStatuses(
         status: getStatusFromPercent(percentUsed),
       };
     })
-    // Drop countries with zero days in the selected year — keeps the list clean
+    // Drop countries with zero days in the selected year, keeps the list clean
     .filter((s) => s.daysPresent > 0);
 
   // Sort by urgency: resident → warning → caution → safe, then by percent desc

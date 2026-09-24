@@ -11,7 +11,7 @@
  *
  * Deliberately emits plain glTF with no compression extensions:
  * react-native-filament ships the Draco *glue* (DracoCache.cpp.o) but not the
- * decoder itself — `nm libgltfio_core.a | grep _ZN5draco` finds nothing — so
+ * decoder itself, `nm libgltfio_core.a | grep _ZN5draco` finds nothing, so
  * Draco-compressed models come out empty in release builds. EXT_meshopt_compression
  * is linked and would work, but plain float32 is small enough already and keeps
  * the assets loadable by any glTF viewer.
@@ -95,7 +95,7 @@ for (const file of files) {
   const tris = countTriangles(doc);
   const texSize = largestTexture(doc);
 
-  // Both targets already met — skip, so repeated runs don't decimate a model
+  // Both targets already met, skip, so repeated runs don't decimate a model
   // that was optimised on an earlier pass (or re-encode its JPEGs again).
   if (tris <= budget * 1.1 && texSize <= texTarget) {
     after += sizeBefore;

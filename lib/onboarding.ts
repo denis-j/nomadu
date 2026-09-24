@@ -154,6 +154,9 @@ export async function pushProfileToCloud(uid: string): Promise<void> {
     {
       ...(citizenship && { citizenship }),
       ...(hasFixedResidence !== null && { hasFixedResidence }),
+      // So the agent API counts days up to the user's today, not the
+      // server's: in UTC+7 before 07:00 the server is still on yesterday.
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     },
     { merge: true },
   );

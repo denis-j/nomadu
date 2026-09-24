@@ -223,7 +223,7 @@ export default function MapScreen() {
         if (!active) await startBackgroundTracking();
       }
 
-      // Always do a foreground check — only needs foreground permission
+      // Always do a foreground check, only needs foreground permission
       setDetecting(true);
       await foregroundLocationCheck();
       await refresh();

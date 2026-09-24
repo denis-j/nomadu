@@ -3,7 +3,7 @@
  *
  * Translates raw cells from `passport-index-dataset` (constants/visa-data.json)
  * into our internal `VisaRule` shape. Used as the FALLBACK when a destination
- * doesn't have a hand-curated entry in `constants/visaPolicies.ts` — manual
+ * doesn't have a hand-curated entry in `constants/visaPolicies.ts`, manual
  * policies always win because they encode special arrangements (US VWP, the
  * IE Common Travel Area, Schengen aggregation) that the matrix can't express.
  *
@@ -40,7 +40,7 @@ const VISA_DATA = data as VisaDataPayload;
 /** Date the bundled matrix was last refreshed from the upstream dataset. */
 export const VISA_DATA_REFRESHED_AT = VISA_DATA._meta.refreshedAt;
 
-/** Source URL — surfaced to users as the "official source" link fallback. */
+/** Source URL, surfaced to users as the "official source" link fallback. */
 export const VISA_DATA_SOURCE = VISA_DATA._meta.source;
 
 /**
@@ -70,7 +70,7 @@ export function datasetStatedDays(
 /**
  * Look up the citizenship × destination cell and build a VisaRule from it.
  * Returns null when:
- *   - the dataset doesn't know this pair (rare — only edge codes)
+ *   - the dataset doesn't know this pair (rare, only edge codes)
  *   - the destination IS the user's home country (cell value -1)
  */
 export function lookupFromDataset(

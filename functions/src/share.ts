@@ -197,18 +197,25 @@ export async function join(uid: string, data: { code?: unknown; name?: unknown }
   const { journeyId, shared } = await loadInvite(code);
   const x = shared.data() as SharedDoc;
   if (x.owner_uid === uid) throw new HttpsError('failed-precondition', 'This is your own trip.');
-  const uids = x.member_uids ?? [];
-  const members = { ...(x.members ?? {}) };
-  if (!uids.includes(uid)) {
-    if (uids.length >= MAX_MEMBERS) throw new HttpsError('resource-exhausted', 'This trip is full.');
-    uids.push(uid);
-  }
   const profile = await getFirestore().doc(`users/${uid}`).get();
-  members[uid] = {
-    name: cleanName(data.name, cleanName(profile.get('displayName'), 'Friend')),
-    joined_at: members[uid]?.joined_at ?? Timestamp.now(),
-  };
-  await shared.ref.update({ member_uids: uids, members });
+  // Read and write in one transaction: two people joining at the same moment
+  // each wrote the member list they had read, and one of them vanished from
+  // it; parallel joins could also go past MAX_MEMBERS.
+  await getFirestore().runTransaction(async (tx) => {
+    const fresh = (await tx.get(shared.ref)).data() as SharedDoc | undefined;
+    if (!fresh) throw new HttpsError('not-found', 'This trip is no longer shared.');
+    const uids = [...(fresh.member_uids ?? [])];
+    const members = { ...(fresh.members ?? {}) };
+    if (!uids.includes(uid)) {
+      if (uids.length >= MAX_MEMBERS) throw new HttpsError('resource-exhausted', 'This trip is full.');
+      uids.push(uid);
+    }
+    members[uid] = {
+      name: cleanName(data.name, cleanName(profile.get('displayName'), 'Friend')),
+      joined_at: members[uid]?.joined_at ?? Timestamp.now(),
+    };
+    tx.update(shared.ref, { member_uids: uids, members });
+  });
   logger.info('journey joined', { uid, journeyId });
   return { journey_id: journeyId, title: x.title, owner_name: x.owner_name };
 }

@@ -21,7 +21,7 @@ export async function reverseGeocode(
   latitude: number,
   longitude: number,
 ): Promise<GeocodedLocation> {
-  // 1) Try native geocoder first (Apple/Google Maps) — best at resolving
+  // 1) Try native geocoder first (Apple/Google Maps), best at resolving
   //    local admin structures to recognisable city names (e.g. "Phuket"
   //    instead of the sub-district "Ratsada").
   try {
@@ -53,7 +53,7 @@ export async function reverseGeocode(
     // continue to Nominatim
   }
 
-  // 2) Nominatim fallback — English names for when native geocoder fails
+  // 2) Nominatim fallback, English names for when native geocoder fails
   try {
     const resp = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en&zoom=10`,

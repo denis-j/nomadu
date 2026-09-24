@@ -12,6 +12,7 @@ import { getJourneyDocument, getJourneyTravellers, getJourneyWithLegs, JourneyDo
 import { documentExists, documentUri, isImageMime, kindMeta } from '../../../lib/documents';
 import { deleteDocumentEverywhere } from '../../../lib/documentSync';
 import { showToast } from '../../../lib/toast';
+import { MissingRoute } from '../../../components/MissingRoute';
 
 /**
  * One document, full screen.
@@ -26,11 +27,18 @@ export default function DocumentScreen() {
   const [doc, setDoc] = useState<JourneyDocument | null>(null);
   const [owner, setOwner] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
+  // No such document (a made-up id, or deleted meanwhile): the screen showed
+  // an empty page with working share and delete buttons.
+  const [gone, setGone] = useState(!Number.isFinite(Number(params.id)));
 
   useEffect(() => {
+    if (!Number.isFinite(Number(params.id))) return;
     getJourneyDocument(Number(params.id)).then(async (d) => {
       setDoc(d);
-      if (!d) return;
+      if (!d) {
+        setGone(true);
+        return;
+      }
       if (!documentExists(d.file_name)) setMissing(true);
       const travellers = await getJourneyTravellers(d.journey_id);
       setOwner(travellers.find((t) => t.id === d.traveller_id)?.name ?? (travellers.length > 1 ? 'Everyone' : null));
@@ -69,6 +77,8 @@ export default function DocumentScreen() {
 
   const uri = doc ? documentUri(doc.file_name) : null;
   const meta = doc ? kindMeta(doc.kind) : null;
+
+  if (gone) return <MissingRoute title="Document" message="This document is no longer here." />;
 
   return (
     <>

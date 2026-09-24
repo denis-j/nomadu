@@ -66,6 +66,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { MissingRoute } from '../../../components/MissingRoute';
 
 const hasGlass = isLiquidGlassAvailable();
 
@@ -1372,6 +1373,12 @@ export default function JourneyDetailScreen() {
   const { width: screenWidth } = useWindowDimensions();
   // Between the two discs (16 + 44 + 8 on each side) when closed.
   const chipWidths = useMemo(() => ({ closed: screenWidth - 2 * (16 + BAR_H + 8), open: screenWidth - 32 }), [screenWidth]);
+
+  // A made-up or deleted trip id showed an empty trip with "Add your first
+  // stop", which added stops to a trip that does not exist.
+  if (!loading && (!journey || journey.deleted)) {
+    return <MissingRoute title="Trip" message="This trip is no longer here." />;
+  }
 
   return (
     <>

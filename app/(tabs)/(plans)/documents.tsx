@@ -21,6 +21,8 @@ import {
 } from '../../../lib/database';
 import { DocumentKind, documentUri, isImageMime, isPdfMime, kindMeta } from '../../../lib/documents';
 import { parseDate } from '../../../lib/database';
+import { MissingRoute } from '../../../components/MissingRoute';
+import { useJourneyExists } from '../../../hooks/useJourneyExists';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -40,7 +42,15 @@ type Filter = 'all' | number;
  * of text. The pills at the top filter by traveller because that is the
  * question being asked at the desk: "and yours?"
  */
+/** Reachable by link: without a real trip there is nothing to show or add to. */
 export default function DocumentsScreen() {
+  const { journeyId } = useLocalSearchParams<{ journeyId: string }>();
+  const exists = useJourneyExists(Number(journeyId));
+  if (exists === false) return <MissingRoute title="Documents" message="This trip is no longer here." />;
+  return <DocumentsScreenContent />;
+}
+
+function DocumentsScreenContent() {
   const router = useRouter();
   const nav = useNavigation();
   const params = useLocalSearchParams<{ journeyId: string; travellerId?: string }>();

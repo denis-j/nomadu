@@ -247,7 +247,7 @@ function HexBadgeFace({
   const band1End = cy - innerR * 0.4;
   const band2End = cy + innerR * 0.25;
 
-  // Band fill rects (full width — they'll be clipped to the hex)
+  // Band fill rects (full width, they'll be clipped to the hex)
   const bandLeft = cx - innerR * SQRT3 / 2 - 2;
   const bandFullWidth = innerR * SQRT3 + 4;
 
@@ -295,7 +295,7 @@ function HexBadgeFace({
         {/* Outer metallic hex frame */}
         <Path d={hexPath(outerR)} fill={`url(#${id}-rim)`} />
 
-        {/* Inner backdrop (gold/silver divider color) — gaps between bands will show this */}
+        {/* Inner backdrop (gold/silver divider color), gaps between bands will show this */}
         <Path d={hexPath(innerR)} fill={metal.divider} />
 
         {/* Enamel bands, all clipped to the inner hex */}
@@ -305,7 +305,7 @@ function HexBadgeFace({
           <Rect x={bandLeft} y={band2End + 1.5} width={bandFullWidth} height={innerBottom - band2End + 2} fill={`url(#${id}-e2)`} />
         </G>
 
-        {/* Inner border between rim and enamel — adds depth */}
+        {/* Inner border between rim and enamel, adds depth */}
         <Path d={hexPath(innerR)} stroke={metal.rimDark} strokeOpacity={0.5} strokeWidth={1} fill="none" />
         {/* Outer dark line at the rim edge */}
         <Path d={hexPath(outerR)} stroke={metal.rimDark} strokeOpacity={0.75} strokeWidth={1} fill="none" />

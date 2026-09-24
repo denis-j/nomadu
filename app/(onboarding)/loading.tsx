@@ -34,7 +34,7 @@ interface Stage {
 
 // Static loading stages. Onboarding preferences are still collected for
 // future use, but personalisation (per-goal, per-citizenship, per-residence
-// copy) is deliberately turned off here for now — the screen reads the same
+// copy) is deliberately turned off here for now, the screen reads the same
 // for every user.
 const STAGES: Stage[] = [
   { text: 'Setting up your tracking engine…', duration: 1100 },

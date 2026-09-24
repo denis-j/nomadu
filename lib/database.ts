@@ -698,13 +698,16 @@ export async function getTripsByCity(city: string, countryCode: string): Promise
     const curr = raw[i];
     const prevEnd = prev.end_date ? parseDate(prev.end_date) : new Date();
     const currStart = parseDate(curr.start_date);
-    const adjacent = currStart.getTime() - prevEnd.getTime() <= 24 * 60 * 60 * 1000;
+    // Calendar days, like getAllTrips: the 25-hour day of a clock change is
+    // not a gap.
+    const adjacent = currStart <= prevEnd || countDays(prevEnd, currStart) <= 2;
 
     if (adjacent) {
-      prev.end_date = curr.end_date;
-      const start = parseDate(prev.start_date);
+      if (prev.end_date !== null) {
+        prev.end_date = curr.end_date === null || curr.end_date > prev.end_date ? curr.end_date : prev.end_date;
+      }
       const end = prev.end_date ? parseDate(prev.end_date) : new Date();
-      prev.days = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+      prev.days = Math.max(1, countDays(parseDate(prev.start_date), end));
       if (!prev.latitude && curr.latitude) {
         prev.latitude = curr.latitude;
         prev.longitude = curr.longitude;
@@ -714,9 +717,9 @@ export async function getTripsByCity(city: string, countryCode: string): Promise
     }
   }
 
-  // Mark latest as present if end_date is today
+  // Mark latest as present if end_date is today (the local day, not UTC's)
   const latest = merged[merged.length - 1];
-  const today = new Date().toISOString().split('T')[0];
+  const today = toYmd(new Date());
   if (latest.end_date === today) latest.end_date = null;
 
   return merged;

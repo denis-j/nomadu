@@ -3,7 +3,7 @@
  * (goal, residence, permissions). Single source of truth so the rhythm
  * is identical screen-to-screen.
  *
- * KEPT INTENTIONALLY SIMPLE — pure FadeIn (opacity only, no Y transform,
+ * KEPT INTENTIONALLY SIMPLE, pure FadeIn (opacity only, no Y transform,
  * no custom easing chain). Reanimated layout animations with chained
  * .easing() can stutter; pure fade is the smoothest reliable primitive.
  *

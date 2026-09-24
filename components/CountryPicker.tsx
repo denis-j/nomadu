@@ -23,7 +23,7 @@ interface CountryPickerProps {
 /**
  * Reusable iOS-native country picker body. Render inside a Stack screen that
  * wires the search bar via `headerSearchBarOptions` and forwards onChangeText
- * to this component's `query` prop. The picker itself is pure presentation —
+ * to this component's `query` prop. The picker itself is pure presentation,
  * the host owns search state and the selection callback.
  *
  * Visual style: white sheet background, hairline-separated rows, native
@@ -41,7 +41,7 @@ export function CountryPicker({
 
   // Idle view shows a curated Popular block on top + the full A-Z list below
   // so the user can browse the entire ~250-country catalogue without having
-  // to type. Cheap memo — getCountryNames is itself cached.
+  // to type. Cheap memo, getCountryNames is itself cached.
   const allCountriesSorted = useMemo(() => {
     const popularSet = new Set(popularCountries);
     return getCountryNames()

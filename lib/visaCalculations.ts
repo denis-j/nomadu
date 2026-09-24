@@ -330,10 +330,13 @@ export function getCurrentStay(
 /** Period marker for rolling windows; see `runUsageThresholdCheck`. */
 export const ROLLING_PERIOD = 'rolling';
 
+// The card changes colour at the same marks the warnings fire at (75 %
+// "heads-up", 90 % "warning", see notifications.ts). At 67 and 85 the card
+// turned amber and red days before the phone said anything.
 function getStatusFromPercent(percent: number): VisaStatus['status'] {
   if (percent > 100) return 'exceeded';
-  if (percent > 85) return 'critical';
-  if (percent > 67) return 'warning';
+  if (percent >= 90) return 'critical';
+  if (percent >= 75) return 'warning';
   return 'ok';
 }
 
@@ -459,8 +462,9 @@ export function calculateAllVisaStatuses(
   trips: Trip[],
   citizenshipCode: string,
   userVisas: UserVisa[] = [],
+  /** "Today" as a local calendar day; the server passes the user's own. */
+  refDate: Date = today(),
 ): VisaStatus[] {
-  const refDate = today();
   const ymdToday = toYmd(refDate);
   const year = refDate.getFullYear();
   const travelSpans = buildTravelSpans(trips, refDate);

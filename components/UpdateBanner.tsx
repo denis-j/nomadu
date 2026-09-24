@@ -21,7 +21,7 @@ interface UpdateBannerProps {
  * Non-blocking floating pill that surfaces a staged OTA update. Sits above the
  * tab bar so it doesn't cover the active screen's primary content. "Now"
  * triggers an immediate reload via the host's `onApply`; "Later" just hides
- * the pill — the staged update still applies on the next cold start.
+ * the pill, the staged update still applies on the next cold start.
  */
 export function UpdateBanner({ visible, onApply }: UpdateBannerProps) {
   const insets = useSafeAreaInsets();

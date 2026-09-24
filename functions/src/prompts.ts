@@ -44,11 +44,11 @@ export function buildStopSuggestionPrompt(
   const lastEnd = legs[legs.length - 1]?.endDate ?? new Date().toISOString().slice(0, 10);
 
   const contextBlock = visaTaxContext
-    ? `\nTraveler visa & tax constraints — factor these into your suggestions:\n${visaTaxContext}\n`
+    ? `\nTraveler visa & tax constraints. Factor these into your suggestions:\n${visaTaxContext}\n`
     : '';
 
   const preferenceBlock = userPreference
-    ? `\nUSER PREFERENCE (high priority — shape your suggestions around this):\n"${userPreference}"\n`
+    ? `\nUSER PREFERENCE (high priority, shape your suggestions around this):\n"${userPreference}"\n`
     : '';
 
   return `You are a travel planning assistant specialized in digital nomads.
@@ -87,7 +87,7 @@ DATES
 - ALL 3 suggestions are independent alternatives, NOT a sequence
 - Each suggestion starts exactly 1 day after the last existing stop ends: ${lastEnd}
 - Duration per stop: 5 to 14 days
-- Do NOT chain dates across suggestions — each one starts from the same date
+- Do NOT chain dates across suggestions; each one starts from the same date
 
 TRANSPORT SELECTION
 Choose the most realistic option:
@@ -188,4 +188,4 @@ RULES
 - Skip duplicates within the same screenshot
 - Skip entries labelled "Transit", "Layover", "Connection"
 - Dates must be valid calendar dates
-- Do not invent dates or places that aren't on screen — lower confidence rather than guess`;
+- Do not invent dates or places that aren't on screen; lower confidence rather than guess`;

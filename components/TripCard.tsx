@@ -21,7 +21,7 @@ interface TripCardProps {
 }
 
 export function TripCard({ trip, daysOverride, hasOverlap, compact, onDelete, onEdit }: TripCardProps) {
-  // ActionSheet title still uses the emoji string — native iOS handles it well there.
+  // ActionSheet title still uses the emoji string, native iOS handles it well there.
   const emojiFlag = countryCodeToFlag(trip.country_code);
   const startDate = parseDate(trip.start_date);
   const endDate = trip.end_date ? parseDate(trip.end_date) : null;

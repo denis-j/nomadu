@@ -57,7 +57,7 @@ export default function BadgeLibraryScreen() {
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
       >
-        {/* Hero — collection progress */}
+        {/* Hero, collection progress */}
         <Glass
           {...glassProps}
           style={[styles.hero, !hasGlass && styles.heroFallback]}

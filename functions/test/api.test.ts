@@ -374,3 +374,15 @@ describe('journeys and the list', () => {
     assert.equal((await call('GET', '/trips')).body.trips.length, 0);
   });
 });
+
+describe('the user\'s today', () => {
+  test('follows the profile timezone, not the server clock', async () => {
+    const { userToday } = await import('../src/agent');
+    // 23:30 UTC on 1 March: already 2 March in Bangkok, still 1 March in New York.
+    const now = new Date(Date.UTC(2026, 2, 1, 23, 30));
+    const ymd = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    assert.equal(ymd(userToday('Asia/Bangkok', now)), '2026-3-2');
+    assert.equal(ymd(userToday('America/New_York', now)), '2026-3-1');
+    assert.equal(ymd(userToday('Not/AZone', now)), ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate())));
+  });
+});

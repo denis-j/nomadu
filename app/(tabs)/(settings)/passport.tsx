@@ -179,7 +179,7 @@ export default function PassportScreen() {
         )}
       </ScrollView>
 
-      {/* Floating morph chip — sits above the tab bar when idle, snaps to
+      {/* Floating morph chip, sits above the tab bar when idle, snaps to
           just above the keyboard when typing (no doubled-up cushion). */}
       <View
         style={[

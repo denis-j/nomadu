@@ -29,13 +29,29 @@ export class Timestamp {
   }
 }
 
+const INCREMENT = Symbol('increment');
+
 export const FieldValue = {
   serverTimestamp: () => Timestamp.now(),
+  increment: (n: number) => ({ [INCREMENT]: n }),
 };
+
+/** Resolve FieldValue.increment against what is stored. */
+function applyIncrements(prev: Data, next: Data): Data {
+  const out: Data = { ...next };
+  for (const [k, v] of Object.entries(next)) {
+    if (v && typeof v === 'object' && INCREMENT in (v as object)) {
+      const base = typeof prev[k] === 'number' ? (prev[k] as number) : 0;
+      out[k] = base + (v as Record<symbol, number>)[INCREMENT];
+    }
+  }
+  return out;
+}
 
 /** Deep copy that keeps Timestamps as Timestamps. */
 function clone<T>(value: T): T {
   if (value instanceof Timestamp) return value as T;
+  if (value && typeof value === 'object' && INCREMENT in (value as object)) return value;
   if (Array.isArray(value)) return value.map(clone) as T;
   if (value && typeof value === 'object') {
     const out: Data = {};
@@ -89,7 +105,7 @@ class DocumentReference {
   }
   async set(data: Data, options?: { merge?: boolean }): Promise<void> {
     const prev = options?.merge ? store.get(this.path) ?? {} : {};
-    store.set(this.path, { ...prev, ...clone(data) });
+    store.set(this.path, { ...prev, ...applyIncrements(store.get(this.path) ?? {}, clone(data)) });
   }
   async update(data: Data): Promise<void> {
     const prev = store.get(this.path);
@@ -138,6 +154,24 @@ class Firestore {
   }
   doc(path: string): DocumentReference {
     return new DocumentReference(path.replace(/^\/+|\/+$/g, ''));
+  }
+  /**
+   * Transactions run their function once against the map: the fake is
+   * single-threaded, so there is nothing to retry against.
+   */
+  async runTransaction<T>(fn: (tx: {
+    get: (target: DocumentReference | Query) => Promise<unknown>;
+    set: (ref: DocumentReference, data: Data, options?: { merge?: boolean }) => void;
+    update: (ref: DocumentReference, data: Data) => void;
+  }) => Promise<T>): Promise<T> {
+    const writes: (() => Promise<void>)[] = [];
+    const result = await fn({
+      get: (target) => target.get(),
+      set: (ref, data, options) => { writes.push(() => ref.set(data, options)); },
+      update: (ref, data) => { writes.push(() => ref.update(data)); },
+    });
+    for (const w of writes) await w();
+    return result;
   }
   /** The document and everything under it, like the Admin SDK's. */
   async recursiveDelete(ref: DocumentReference): Promise<void> {

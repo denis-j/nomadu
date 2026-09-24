@@ -21,6 +21,8 @@ import {
 import { useAuth } from '../../../hooks/useAuth';
 import { DOCUMENT_KINDS, DocumentKind, importDocumentFile, isImageMime, kindMeta } from '../../../lib/documents';
 import { showToast } from '../../../lib/toast';
+import { MissingRoute } from '../../../components/MissingRoute';
+import { useJourneyExists } from '../../../hooks/useJourneyExists';
 
 interface Picked {
   uri: string;
@@ -35,7 +37,15 @@ interface Picked {
  * before: pickers hand out temporary URIs and a cancelled sheet should leave
  * nothing behind.
  */
+/** Reachable by link: without a real trip there is nothing to show or add to. */
 export default function AddDocumentScreen() {
+  const { journeyId } = useLocalSearchParams<{ journeyId: string }>();
+  const exists = useJourneyExists(Number(journeyId));
+  if (exists === false) return <MissingRoute title="Add document" message="This trip is no longer here." />;
+  return <AddDocumentScreenContent />;
+}
+
+function AddDocumentScreenContent() {
   const nav = useNavigation();
   // The wallet passes what it already knows: the slot that was tapped and
   // whose tab was open. Both are just defaults, still changeable here.

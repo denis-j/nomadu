@@ -21,7 +21,7 @@ import { Colors } from '../constants/colors';
  * Resolves a `require(...)`'d GLB module to a concrete local `file://` URI.
  *
  * In dev, react-native-filament can load the metro http URL directly, but in a
- * production build there is no metro server — the bundled asset has to be
+ * production build there is no metro server, the bundled asset has to be
  * resolved to its on-device file path. expo-asset's downloadAsync() unpacks the
  * embedded asset and gives us `localUri`, which Filament's loader accepts via
  * its `file://` branch.
@@ -74,7 +74,7 @@ interface CountryBadge3DProps {
   countryCode: string;
   /** Fixed height in px. Omit (or pass undefined) to fill the parent (flex: 1). */
   height?: number;
-  /** Background color of the canvas — defaults to the app background so it blends seamlessly */
+  /** Background color of the canvas, defaults to the app background so it blends seamlessly */
   backgroundColor?: string;
 }
 

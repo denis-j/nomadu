@@ -11,7 +11,7 @@ export function ToastContainer() {
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    // registerToast returns its unregister fn — invoke on unmount so a
+    // registerToast returns its unregister fn, invoke on unmount so a
     // mounted sheet-level container can pop and let the root take over again.
     return registerToast((data) => setToast(data));
   }, []);

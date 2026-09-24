@@ -146,7 +146,7 @@ export default function ImportScreen() {
   useEffect(() => {
     const pending = takePendingImportImages();
     if (!pending || pending.length === 0) {
-      // No images — shouldn't normally happen. Just close the sheet.
+      // No images, shouldn't normally happen. Just close the sheet.
       router.back();
       return;
     }

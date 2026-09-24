@@ -43,7 +43,7 @@ export const Typography = {
     color: Colors.text,
   }),
 
-  // ─── Display — hero numerals ─────────────────────────────────────────────
+  // ─── Display, hero numerals ─────────────────────────────────────────────
   displayLarge: T({
     fontSize: 36,
     fontWeight: '800',
@@ -57,7 +57,7 @@ export const Typography = {
     letterSpacing: -0.4,
   }),
 
-  // ─── Title — section headings, card titles ──────────────────────────────
+  // ─── Title, section headings, card titles ──────────────────────────────
   titleLarge: T({
     fontSize: 22,
     fontWeight: '700',
@@ -75,7 +75,7 @@ export const Typography = {
     color: Colors.text,
   }),
 
-  // ─── Body — content ─────────────────────────────────────────────────────
+  // ─── Body, content ─────────────────────────────────────────────────────
   bodyLarge: T({
     fontSize: 17,
     fontWeight: '400',
@@ -97,7 +97,7 @@ export const Typography = {
     color: Colors.text,
   }),
 
-  // ─── Label — inline labels, metadata (sits next to a value) ─────────────
+  // ─── Label, inline labels, metadata (sits next to a value) ─────────────
   label: T({
     fontSize: 13,
     fontWeight: '500',
@@ -109,7 +109,7 @@ export const Typography = {
     color: Colors.text,
   }),
 
-  // ─── Eyebrow — small uppercase tags above titles ────────────────────────
+  // ─── Eyebrow, small uppercase tags above titles ────────────────────────
   eyebrow: T({
     fontSize: 11,
     fontWeight: '600',
@@ -118,7 +118,7 @@ export const Typography = {
     textTransform: 'uppercase',
   }),
 
-  // ─── Caption — hints, helper text, fine print ───────────────────────────
+  // ─── Caption, hints, helper text, fine print ───────────────────────────
   caption: T({
     fontSize: 12,
     fontWeight: '400',
@@ -137,7 +137,7 @@ export const Typography = {
     color: Colors.text,
   }),
 
-  // ─── Numeric — tabular nums for stat values ─────────────────────────────
+  // ─── Numeric, tabular nums for stat values ─────────────────────────────
   numericLarge: T({
     fontSize: 36,
     fontWeight: '800',

@@ -12,6 +12,7 @@ import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { useAuth } from '../../hooks/useAuth';
 import { getJourneyBySyncId, parseDate } from '../../lib/database';
+import { toYmd } from '../../lib/days';
 import { joinJourney, myName, previewInvite, setPendingInvite, type InvitePreview } from '../../lib/sharing';
 import { pullSharedJourneysFromCloud } from '../../lib/sync';
 import { showToast } from '../../lib/toast';
@@ -33,7 +34,7 @@ function fmtRange(start: string, end: string): string {
 /** "in 49 days", "Tomorrow", "Under way": when the trip starts, from today. */
 function startsIn(start: string | null): { label: string; value: string; unit?: string } {
   if (!start) return { label: 'Starts', value: 'No dates' };
-  const days = Math.round((parseDate(start).getTime() - parseDate(new Date().toISOString().slice(0, 10)).getTime()) / 86_400_000);
+  const days = Math.round((parseDate(start).getTime() - parseDate(toYmd(new Date())).getTime()) / 86_400_000);
   if (days < 0) return { label: 'Trip', value: 'Under way' };
   if (days === 0) return { label: 'Starts', value: 'Today' };
   if (days === 1) return { label: 'Starts', value: 'Tomorrow' };

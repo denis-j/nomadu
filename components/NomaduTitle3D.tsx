@@ -25,7 +25,7 @@ interface NomaduTitle3DProps {
 /**
  * 3D wordmark for the brand name "Nomadu". Renders the bundled nomadu.glb
  * with a transparent skybox so the welcome-screen gradient shows through.
- * Static by design — wordmarks shouldn't dance.
+ * Static by design, wordmarks shouldn't dance.
  */
 export function NomaduTitle3D({
   width = 340,

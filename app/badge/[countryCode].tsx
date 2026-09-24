@@ -72,7 +72,7 @@ export default function BadgeFullscreenScreen() {
         <CountryBadge3D countryCode={code} backgroundColor={BLACK_BG} />
 
         <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-          {/* Close button — top right, liquid glass on black */}
+          {/* Close button, top right, liquid glass on black */}
           <View style={styles.closeWrap}>
             {hasGlass ? (
               <GlassView style={styles.closeBtnGlass} isInteractive>
@@ -95,7 +95,7 @@ export default function BadgeFullscreenScreen() {
             )}
           </View>
 
-          {/* Title block — same trio as unlock overlay */}
+          {/* Title block, same trio as unlock overlay */}
           <View pointerEvents="none" style={styles.topBlock}>
             <Text style={styles.eyebrow}>Reward</Text>
             <Text style={styles.title}>{info.name}</Text>

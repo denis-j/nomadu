@@ -54,9 +54,14 @@ await check('removed member can no longer delete her record', deleteDoc(doc(fsOf
 await check('removed member can no longer read records', getDoc(doc(fsOf('anna'), `${J}/documents/d1`)), false);
 await check('owner deletes any record', deleteDoc(doc(fsOf('owner'), `${J}/documents/d1`)), true);
 
-// ── Storage
+// ── Storage (Anna has been removed above; Bob is still on the trip)
 const jpg = { contentType: 'image/jpeg' };
-await check('signed-in user can fetch a file whose full path they know', getBytes(ref(stOf('bob'), 'shared/j1/owner/u/bob/d9.pdf')), true);
+await check('member fetches a file of the trip', getBytes(ref(stOf('bob'), 'shared/j1/owner/u/bob/d9.pdf')), true);
+await check('stranger cannot fetch a file even with its full path', getBytes(ref(stOf('eve'), 'shared/j1/owner/all/d1.jpg')), false);
+await check('removed member cannot fetch a file even with its full path', getBytes(ref(stOf('anna'), 'shared/j1/owner/all/d1.jpg')), false);
+await check('stranger cannot upload under a made-up trip', uploadBytes(ref(stOf('eve'), 'shared/nope/eve/all/x.jpg'), new Uint8Array([1]), jpg), false);
+await check('stranger cannot upload to a real trip', uploadBytes(ref(stOf('eve'), 'shared/j1/owner/all/x.jpg'), new Uint8Array([1]), jpg), false);
+await check('path naming the wrong owner is refused', uploadBytes(ref(stOf('bob'), 'shared/j1/bob/all/x.jpg'), new Uint8Array([1]), jpg), false);
 await check('nobody can list a trip folder', listAll(ref(stOf('bob'), 'shared/j1/owner/all')), false);
 await check('member uploads a new image for everyone', uploadBytes(ref(stOf('bob'), 'shared/j1/owner/all/n1.jpg'), new Uint8Array([1]), jpg), true);
 await check('uploading a non-document type is refused', uploadBytes(ref(stOf('bob'), 'shared/j1/owner/all/n2.html'), new Uint8Array([1]), { contentType: 'text/html' }), false);

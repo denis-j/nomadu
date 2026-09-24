@@ -78,7 +78,7 @@ export function TimelineBubbles({ size = 80, variant = 'none', icons = DEFAULT_I
   );
 }
 
-// ─── Animated wrapper around each Bubble — switches animation based on variant ───
+// ─── Animated wrapper around each Bubble, switches animation based on variant ───
 
 interface AnimatedBubbleProps {
   index: 0 | 1 | 2;

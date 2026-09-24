@@ -36,7 +36,7 @@ export function useOTAUpdates() {
           await Updates.fetchUpdateAsync();
         }
       } catch {
-        // Network errors, throttled CDN, dev environment — all non-fatal.
+        // Network errors, throttled CDN, dev environment, all non-fatal.
       }
     };
 

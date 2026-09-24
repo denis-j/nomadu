@@ -12,7 +12,7 @@ const DEFAULT_TAX_RULE: TaxRule = {
 /**
  * Returns a TaxRule for each visited country.
  * When hasFixedResidence is true, the home country is excluded (user is already
- * tax resident there). When false, the home country is included — spending
+ * tax resident there). When false, the home country is included, spending
  * 183+ days could trigger residency.
  */
 export function getApplicableTaxRules(

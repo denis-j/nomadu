@@ -15,7 +15,7 @@ interface FlagProps {
 }
 
 /**
- * Centralised flag renderer. Replaces emoji flag strings — gives us crisp
+ * Centralised flag renderer. Replaces emoji flag strings, gives us crisp
  * SVG-quality on every device, and the same look in dev simulator and prod.
  *
  *   <Flag code="US" size={24} />

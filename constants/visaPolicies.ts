@@ -8,7 +8,7 @@
  *   - Schengen Area aggregate (90/180 rolling window across all member states)
  *   - US Visa Waiver Program (citizenship-group ESTA override)
  *   - Ireland Common Travel Area (UK + EU citizens skip the rule entirely)
- *   - Rolling-window rules (UK 180/365, AE 90/180, …) — the dataset only
+ *   - Rolling-window rules (UK 180/365, AE 90/180, …), the dataset only
  *     stores per-stay numbers, so multi-window logic needs a manual entry
  *
  * When in doubt, the dataset's per-citizenship number is probably more
@@ -23,14 +23,14 @@ import type { DestinationPolicy, VisaRule } from './visaRules';
 
 // ─── Country groups ────────────────────────────────────────────────────────
 
-/** Schengen Area member states (29 — incl. Croatia, Bulgaria, Romania). */
+/** Schengen Area member states (29, incl. Croatia, Bulgaria, Romania). */
 export const SCHENGEN_COUNTRIES = [
   'AT', 'BE', 'BG', 'HR', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE',
   'GR', 'HU', 'IS', 'IT', 'LV', 'LI', 'LT', 'LU', 'MT', 'NL',
   'NO', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'CH',
 ] as const;
 
-/** EU + EEA + Switzerland citizens — freedom of movement inside Schengen. */
+/** EU + EEA + Switzerland citizens, freedom of movement inside Schengen. */
 export const EU_EEA_CH_CITIZENS = [
   'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR',
   'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL',
@@ -73,7 +73,7 @@ const visaRequired = (source?: string): VisaRule => ({
 // ─── Destination policies ──────────────────────────────────────────────────
 
 /**
- * Schengen as a single aggregated rule — the 90/180 limit applies across the
+ * Schengen as a single aggregated rule, the 90/180 limit applies across the
  * whole area, not per country. EU/EEA/CH citizens have freedom of movement.
  */
 export const SCHENGEN_AREA_POLICY: DestinationPolicy = {

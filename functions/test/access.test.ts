@@ -164,3 +164,21 @@ describe('the agent API', () => {
     assert.equal(refused.status, 403);
   });
 });
+
+describe('agent rate limit', () => {
+  test('a token gets a fixed number of requests per minute', async () => {
+    const { AGENT_REQUESTS_PER_MINUTE } = await import('../src/agent');
+    process.env.ENTITLEMENT_MODE = 'off';
+    const sha = (s: string) => createHash('sha256').update(s).digest('hex');
+    __seed(`agent_tokens/${sha('nmd_busy')}`, { uid: 'busy', edit_timeline: false, label: 'x' });
+    const statuses: number[] = [];
+    for (let i = 0; i < AGENT_REQUESTS_PER_MINUTE + 1; i++) {
+      const reply = { status: 0 } as any;
+      const res: any = { status(s: number) { reply.status = s; return res; }, set() { return res; }, json() {}, send() {} };
+      await serve({ method: 'GET', path: '/v1/journeys', query: {}, get: (n: string) => (n.toLowerCase() === 'authorization' ? 'Bearer nmd_busy' : undefined) } as any, res);
+      statuses.push(reply.status);
+    }
+    assert.equal(statuses.filter((s) => s === 200).length, AGENT_REQUESTS_PER_MINUTE);
+    assert.equal(statuses[statuses.length - 1], 429);
+  });
+});

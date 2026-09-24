@@ -10,7 +10,7 @@ export interface ToastData {
 
 // Handler stack: multiple ToastContainers can be mounted (e.g. one at the
 // root and another inside a presented formSheet). The most-recently-mounted
-// handler wins — that's the one visually closest to the user. When the
+// handler wins, that's the one visually closest to the user. When the
 // in-sheet container unmounts, the root container takes over again.
 const _handlers: Array<(data: ToastData) => void> = [];
 

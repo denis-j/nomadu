@@ -1,5 +1,5 @@
 /**
- * Visa rule engine — citizenship-aware lookup.
+ * Visa rule engine, citizenship-aware lookup.
  *
  * The policy data lives in `./visaPolicies.ts`. This file defines the schema
  * and the resolver: given a citizenship code and the destinations a user has
@@ -10,7 +10,7 @@
  *      citizenship code, that rule wins.
  *   2. Otherwise fall back to `default`.
  *   3. If the resolved rule is `null`, no tracking is needed (freedom of
- *      movement, no visa required, etc.) — destination is skipped.
+ *      movement, no visa required, etc.), destination is skipped.
  *
  * Schengen is special: it's treated as a single aggregated destination
  * ("SCHENGEN") so that day-counting works across all member states at once,
@@ -31,7 +31,7 @@ export type RuleType =
   | 'visa_free'         // X days per stay, resets on exit
   | 'rolling_window'    // X days per Y-day window
   | 'visa_on_arrival'   // visa issued at border, but trackable like visa_free
-  | 'visa_required';    // no automatic tracking — user must add their own visa
+  | 'visa_required';    // no automatic tracking, user must add their own visa
 
 export interface VisaRule {
   allowedDays: number;
@@ -42,7 +42,7 @@ export interface VisaRule {
   label: string;
   /** URL to authoritative source (e.g. Wikipedia, embassy) for verification. */
   source?: string;
-  /** YYYY-MM-DD — when this rule was last cross-checked against its source. */
+  /** YYYY-MM-DD, when this rule was last cross-checked against its source. */
   lastVerified?: string;
 }
 
@@ -177,7 +177,7 @@ export function getApplicableRules(
   const visited = new Set(visitedCountryCodes);
   const rules: ApplicableRule[] = [];
 
-  // 1. Schengen Area — handled as one aggregated rule so days roll across
+  // 1. Schengen Area, handled as one aggregated rule so days roll across
   //    all member states together. Skip if the user is an EU/EEA/CH citizen
   //    and the override resolves to null (freedom of movement).
   const visitedSchengen = SCHENGEN_COUNTRIES.filter(
