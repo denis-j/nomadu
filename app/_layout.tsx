@@ -15,6 +15,11 @@ import { useOTAUpdates } from '../hooks/useOTAUpdates';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { Colors } from '../constants/colors';
 import { initMonitoring, reportError, setMonitoringUser } from '../lib/monitoring';
+// Defines the background location task. It has to exist as soon as the JS
+// starts: when iOS wakes the app for a move, the update is handed to the task
+// right away, and the definition used to wait until the map screen or the
+// location hook loaded, behind auth, RevenueCat and the whole first render.
+import '../lib/location';
 import { ensureLocalDataOwner } from '../lib/localOwner';
 
 // First statement in the module, so a failure anywhere below is still

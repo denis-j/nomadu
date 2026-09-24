@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View , Pressable } from 'react-native';
 import { showToast } from '../../../lib/toast';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';

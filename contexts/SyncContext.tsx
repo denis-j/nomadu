@@ -71,17 +71,29 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     // be pushed into this one before they are wiped.
     const owned = ensureLocalDataOwner(uid);
 
-    // Initial sync + start listener
-    owned
-      .then(() => {
-        if (!active) return;
-        doSync(uid);
-        startRealtimeSync(uid);
-      })
-      .catch((err) => {
-        reportError(err, 'local-owner');
-        if (active) setSyncStatus('error');
-      });
+    // Initial sync + start listener. Not when iOS launched the app in the
+    // background for a location update: that wake has a few seconds, and a
+    // full sync plus five live listeners in it is what the watchdog kills.
+    // The foreground handler below starts both once the user opens the app.
+    let started = false;
+    const start = () => {
+      if (started) return;
+      started = true;
+      owned
+        .then(() => {
+          if (!active) return;
+          doSync(uid);
+          startRealtimeSync(uid);
+        })
+        .catch((err) => {
+          reportError(err, 'local-owner');
+          if (active) setSyncStatus('error');
+        });
+    };
+    // Only an explicit "background" holds back: right after launch the state
+    // can still read "unknown", and waiting for an "active" that never comes
+    // would leave the app without a sync.
+    if (AppState.currentState !== 'background') start();
 
     // Local edits go out a couple of seconds after the last one, so a
     // friend following the trip sees the change now, not at the next start.
@@ -114,6 +126,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     });
     const appState = AppState.addEventListener('change', (next) => {
       if (next !== 'active') return;
+      if (!started) {
+        start();
+        return;
+      }
       const stale = Date.now() - lastOkRef.current > FOREGROUND_RESYNC_MS;
       if (dirtyRef.current || stale) owned.then(() => doSync(uid)).catch(() => {});
     });

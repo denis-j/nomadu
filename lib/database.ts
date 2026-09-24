@@ -38,10 +38,24 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   return opening;
 }
 
+/**
+ * Bump when `migrate` gains a step. Every step is written to be safe to run
+ * again, but running all of them (table checks, duplicate clean-ups, a pass
+ * over every journey's stops) on each launch, background location wakes
+ * included, was work before the first screen for nothing.
+ */
+const SCHEMA_VERSION = 1;
+
 async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
+  // Per connection, so on every open.
   await database.execAsync(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
+  `);
+  const version = await database.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  if ((version?.user_version ?? 0) >= SCHEMA_VERSION) return;
+
+  await database.execAsync(`
 
     CREATE TABLE IF NOT EXISTS visits (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -310,6 +324,8 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
       await database.runAsync('UPDATE journey_legs SET start_date = ?, end_date = ? WHERE id = ?', [dates[i].start_date, dates[i].end_date, legs[i].id]);
     }
   }
+
+  await database.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
 // Parses YYYY-MM-DD as local time (not UTC) to avoid off-by-one day in timezones ahead of UTC
@@ -1211,6 +1227,15 @@ export async function deleteJourneyLeg(id: number): Promise<void> {
 }
 
 // ─── Sync Helpers ───
+
+/** sync_id → updated_at of every synced trip, for skipping cloud documents that bring nothing new. */
+export async function getTripSyncStamps(): Promise<Map<string, string | null>> {
+  const database = await getDatabase();
+  const rows = await database.getAllAsync<{ sync_id: string; updated_at: string | null }>(
+    'SELECT sync_id, updated_at FROM trips WHERE sync_id IS NOT NULL',
+  );
+  return new Map(rows.map((r) => [r.sync_id, r.updated_at]));
+}
 
 export async function getAllTripsForSync(): Promise<Trip[]> {
   const database = await getDatabase();

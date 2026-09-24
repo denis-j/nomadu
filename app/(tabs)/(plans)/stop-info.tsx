@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import RNMapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Haptics from 'expo-haptics';
 import { deleteJourneyLeg, parseDate } from '../../../lib/database';

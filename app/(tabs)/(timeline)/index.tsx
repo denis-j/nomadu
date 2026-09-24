@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Host, Menu, Button as ExpoUIButton, Image as ExpoUIImage } from '@expo/ui/swift-ui';
 import * as Haptics from 'expo-haptics';
 import { useTrips } from '../../../hooks/useTrips';

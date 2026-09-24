@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Alert, LayoutAnimation, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { Card } from '../../../components/visaForm';
 import { Dropdown } from '../../../components/Dropdown';

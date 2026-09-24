@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActionSheetIOS, Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { Avatar, avatarPeople, type AvatarPerson } from './TravellerAvatars';

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import Purchases, { CustomerInfo } from 'react-native-purchases';
-import { ENTITLEMENT_ID, checkProEntitlement, configureRevenueCat, identifyUser, rememberEntitlement } from '../lib/revenueCat';
+import { ENTITLEMENT_ID, checkProEntitlement, configureRevenueCat, identifyUser, readValidSnapshotFor, rememberEntitlement } from '../lib/revenueCat';
 
 interface SubscriptionState {
   isPro: boolean;
@@ -54,7 +54,20 @@ export function useSubscription(uid: string | null = null): SubscriptionState {
       // Child effects run before the root layout's, so make sure the SDK is
       // configured here rather than assuming it already is (idempotent).
       await configureRevenueCat();
-      if (uid) await identifyUser(uid);
+      if (uid) {
+        // Route on the last confirmed answer for this account right away;
+        // the live check below confirms or revokes it.
+        const known = await readValidSnapshotFor(uid);
+        if (known && !cancelled) {
+          setIsPro(true);
+          setExpirationDate(known.expirationDate);
+          setProductIdentifier(known.productIdentifier);
+          setVerified(false);
+          setCheckedFor(uid);
+          setLoading(false);
+        }
+        await identifyUser(uid);
+      }
       const result = await checkProEntitlement();
       if (cancelled) return;
       setIsPro(result.isActive);

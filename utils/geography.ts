@@ -1,7 +1,8 @@
-import geoData from '../constants/geo-data.json';
+import countriesData from '../constants/countries.json';
 
 /**
- * Country and city lookups, backed by `constants/geo-data.json`.
+ * Country and city lookups, backed by `constants/countries.json` and
+ * `constants/cities.json`.
  *
  * Built from GeoNames by `scripts/build-cities.mjs`, which drops anything
  * marked as a section of a populated place. The previous source
@@ -27,10 +28,19 @@ export interface CityInfo {
 /** [name, latitude, longitude, population, alternateSpellings] */
 type CityRow = [string, number, number, number, string[]];
 
-const RAW = geoData as unknown as {
-  countries: [string, string][];
-  cities: Record<string, CityRow[]>;
-};
+const COUNTRIES = countriesData as unknown as [string, string][];
+
+/**
+ * The cities (3.6 MB, 64,000 rows) are read on first use, not at start.
+ * Everything that only needs a country name or code, which is most of the
+ * app and the visa and tax logic, used to pay for parsing all of them
+ * before the first screen, and so did every background location wake.
+ */
+let _cities: Record<string, CityRow[]> | null = null;
+function cities(): Record<string, CityRow[]> {
+  if (!_cities) _cities = require('../constants/cities.json') as Record<string, CityRow[]>;
+  return _cities;
+}
 
 /** ISO 3166-1 alpha-2 to the regional-indicator pair that renders as a flag. */
 function isoToFlag(isoCode: string): string {
@@ -49,7 +59,7 @@ let _byIso: Map<string, CountryInfo> | null = null;
 
 function ensureCountries() {
   if (_allCountries) return;
-  _allCountries = RAW.countries.map(([isoCode, name]) => ({
+  _allCountries = COUNTRIES.map(([isoCode, name]) => ({
     name,
     isoCode,
     flag: isoToFlag(isoCode),
@@ -66,7 +76,7 @@ function getCitiesForIso(isoCode: string): string[] {
   const cached = cityNameCache.get(isoCode);
   if (cached) return cached;
 
-  const rows = RAW.cities[isoCode] ?? [];
+  const rows = cities()[isoCode] ?? [];
   const seen = new Set<string>();
   const names: string[] = [];
   for (const [name] of rows) {
@@ -134,7 +144,7 @@ export async function searchCitiesByCountry(
   countryName: string,
   query: string,
 ): Promise<string[]> {
-  const rows = RAW.cities[resolveIsoCode(countryName)] ?? [];
+  const rows = cities()[resolveIsoCode(countryName)] ?? [];
   const q = query.trim().toLowerCase();
   if (!q) return getCitiesForIso(resolveIsoCode(countryName)).slice(0, 50);
 
@@ -180,7 +190,7 @@ export function nearestCity(
   isoCode: string,
   maxKm: number = 30,
 ): { name: string; distanceKm: number } | null {
-  const rows = RAW.cities[isoCode.toUpperCase()];
+  const rows = cities()[isoCode.toUpperCase()];
   if (!rows) return null;
 
   // Plain nearest-neighbour is wrong for anywhere inside a large city: a
@@ -288,7 +298,7 @@ export function getCountryFlag(countryName: string): string | undefined {
  * where a geocoder is not available (the server placing an agent's stops).
  */
 export function findCityCoords(name: string, isoCode: string): { latitude: number; longitude: number; name: string } | null {
-  const rows = RAW.cities[isoCode.toUpperCase()];
+  const rows = cities()[isoCode.toUpperCase()];
   if (!rows) return null;
   const wanted = name.trim().toLowerCase();
   let best: CityRow | null = null;

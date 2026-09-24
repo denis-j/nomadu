@@ -78,10 +78,20 @@ interface Snapshot {
   expirationDate: string | null;
   productIdentifier: string | null;
   cachedAt: number;
+  /** The RevenueCat app user id (the Firebase uid once identified) it describes. */
+  appUserId?: string | null;
+}
+
+async function currentAppUserId(): Promise<string | null> {
+  try {
+    return await Purchases.getAppUserID();
+  } catch {
+    return null;
+  }
 }
 
 async function writeSnapshot(entitlement: Omit<Entitlement, 'verified'>): Promise<void> {
-  const snapshot: Snapshot = { ...entitlement, cachedAt: Date.now() };
+  const snapshot: Snapshot = { ...entitlement, cachedAt: Date.now(), appUserId: await currentAppUserId() };
   await AsyncStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot)).catch(() => {});
 }
 
@@ -125,6 +135,28 @@ function snapshotStillValid(snapshot: Snapshot): boolean {
 }
 
 /**
+ * The last confirmed Pro status of this account, if it still holds.
+ *
+ * What the app routes on at launch, before RevenueCat has answered: waiting
+ * for `logIn` and `getCustomerInfo` held the first screen for as long as the
+ * network took, and on a slow connection abroad that was many seconds. The
+ * live answer follows and replaces it. Only a snapshot taken for this very
+ * account counts; one without an owner (older builds) or from another
+ * account on the same phone is ignored.
+ */
+export async function readValidSnapshotFor(uid: string): Promise<Entitlement | null> {
+  if (!REVENUECAT_ENABLED) return null;
+  const snapshot = await readSnapshot();
+  if (!snapshot || snapshot.appUserId !== uid || !snapshotStillValid(snapshot)) return null;
+  return {
+    isActive: true,
+    expirationDate: snapshot.expirationDate,
+    productIdentifier: snapshot.productIdentifier,
+    verified: false,
+  };
+}
+
+/**
  * Current Pro status.
  *
  * The previous version returned `isActive: false` whenever the lookup threw,
@@ -154,7 +186,10 @@ export async function checkProEntitlement(): Promise<Entitlement> {
     return { ...fresh, verified: true };
   } catch {
     const snapshot = await readSnapshot();
-    if (snapshot && snapshotStillValid(snapshot)) {
+    // Only the snapshot of the account RevenueCat is on now: a second account
+    // on the same phone must not inherit the first one's Pro while offline.
+    const owner = await currentAppUserId();
+    if (snapshot && snapshotStillValid(snapshot) && (!snapshot.appUserId || snapshot.appUserId === owner)) {
       return {
         isActive: true,
         expirationDate: snapshot.expirationDate,
@@ -203,6 +238,9 @@ export async function restorePurchases(): Promise<CustomerInfo> {
 export async function identifyUser(uid: string): Promise<void> {
   if (!REVENUECAT_ENABLED) return;
   try {
+    // A network round trip at every launch otherwise; the SDK keeps the
+    // identified user across launches.
+    if ((await currentAppUserId()) === uid) return;
     await Purchases.logIn(uid);
   } catch {
     // Non-critical: app works without RevenueCat identification

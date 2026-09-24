@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';

@@ -10,7 +10,7 @@ import {
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Svg, { Circle } from 'react-native-svg';
 import { CloudBackdrop, type CloudPatch } from '../../../components/CloudBackdrop';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useStats } from '../../../hooks/useStats';

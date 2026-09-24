@@ -17,6 +17,7 @@ import {
 import { db } from './firebase';
 import {
   markAllTripsDeleted,
+  getTripSyncStamps,
   getInstallId,
   updateJourneyShareCodeBySyncId,
   clearJourneyShareCodeBySyncId,
@@ -52,7 +53,7 @@ import {
   type AccommodationStatus,
 } from './accommodationModel';
 import { pullDocumentsFromCloud, pushDocumentsToCloud, watchDocuments } from './documentSync';
-import { parseSyncStamp } from './syncTime';
+import { localIsNewer, parseSyncStamp } from './syncTime';
 import { cloudChanged } from './syncTrigger';
 import { clearBadgeProgress } from './badges';
 import { reportError } from './monitoring';
@@ -210,14 +211,34 @@ export async function pushTripsToCloud(uid: string): Promise<void> {
 
 // ─── Pull (cloud → local) ───
 
+/**
+ * Would this cloud trip change anything here? Nearly every document a pull
+ * or the listener's first snapshot delivers is one this phone already holds
+ * at the same stamp, or a tombstone for a row it never had. Each of those
+ * used to cost its own SQLite round trips, several hundred at every start,
+ * right while the first screen was rendering.
+ */
+function tripBringsNews(stamps: Map<string, string | null>, syncId: string, updatedAt: string, deleted: boolean): boolean {
+  if (!stamps.has(syncId)) return !deleted;
+  return !localIsNewer(stamps.get(syncId) ?? null, updatedAt);
+}
+
+function rememberTripStamp(stamps: Map<string, string | null>, syncId: string, updatedAt: string, deleted: boolean): void {
+  if (deleted) stamps.delete(syncId);
+  else stamps.set(syncId, updatedAt);
+}
+
 export async function pullTripsFromCloud(uid: string): Promise<void> {
   const snapshot = await getDocs(tripsCollection(uid));
+  const stamps = await getTripSyncStamps();
 
   for (const docSnap of snapshot.docs) {
     const data = docSnap.data();
     const updatedAt = data.updated_at instanceof Timestamp
       ? data.updated_at.toDate().toISOString()
       : new Date().toISOString();
+    if (!tripBringsNews(stamps, docSnap.id, updatedAt, data.deleted === true)) continue;
+    rememberTripStamp(stamps, docSnap.id, updatedAt, data.deleted === true);
 
     await upsertTripFromCloud({
       sync_id: docSnap.id,
@@ -748,13 +769,19 @@ export function startRealtimeSync(uid: string): Unsubscribe {
     if (snapshot.docChanges().length > 0) cloudChanged();
   });
 
+  // Loaded once, on the first snapshot, and kept in step: that first
+  // snapshot is the whole collection again, right after the pull read it.
+  let tripStamps: Map<string, string | null> | null = null;
   const unsubscribeTrips = onSnapshot(tripsCollection(uid), async (snapshot) => {
+    if (!tripStamps) tripStamps = await getTripSyncStamps();
     for (const change of snapshot.docChanges()) {
       if (change.type === 'added' || change.type === 'modified') {
         const data = change.doc.data();
         const updatedAt = data.updated_at instanceof Timestamp
           ? data.updated_at.toDate().toISOString()
           : new Date().toISOString();
+        if (!tripBringsNews(tripStamps, change.doc.id, updatedAt, data.deleted === true)) continue;
+        rememberTripStamp(tripStamps, change.doc.id, updatedAt, data.deleted === true);
 
         await upsertTripFromCloud({
           sync_id: change.doc.id,

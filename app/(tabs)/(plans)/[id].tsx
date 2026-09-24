@@ -23,7 +23,7 @@ import {
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import RNMapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Haptics from 'expo-haptics';
 import { useJourney } from '../../../hooks/useJourney';

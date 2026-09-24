@@ -3,7 +3,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import RNMapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { getMergedTripContaining, markTripGroupDeleted, parseDate, Trip } from '../../lib/database';
 import { MissingRoute } from '../../components/MissingRoute';
 import { reportError } from '../../lib/monitoring';

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Updates from 'expo-updates';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { reportError } from '../lib/monitoring';

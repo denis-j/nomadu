@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { PlatformColor, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { httpsCallable } from 'firebase/functions';

@@ -4,7 +4,7 @@ import { ActivityIndicator, Linking, Modal, PlatformColor, Pressable, RefreshCon
 import * as Haptics from 'expo-haptics';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useNavigation, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { SymbolView } from 'expo-symbols';
 import { useVisaTracker } from '../../../hooks/useVisaTracker';
 import { Colors } from '../../../constants/colors';

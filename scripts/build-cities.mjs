@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Build `constants/geo-data.json` from the GeoNames dumps.
+ * Build `constants/countries.json` and `constants/cities.json` from the GeoNames dumps.
  *
  * Replaces the `country-state-city` package, which had two problems for this
  * app. It shipped a 7.7 MB city file with 148k entries, and it mixed city
@@ -25,7 +25,8 @@ import { tmpdir } from 'node:os';
 import https from 'node:https';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = join(ROOT, 'constants', 'geo-data.json');
+const OUT_COUNTRIES = join(ROOT, 'constants', 'countries.json');
+const OUT_CITIES = join(ROOT, 'constants', 'cities.json');
 const WORK = join(tmpdir(), 'nomadu-geonames');
 
 /**
@@ -161,11 +162,14 @@ for (const list of Object.values(byCountry)) {
 const withCities = countries.filter(([iso]) => (byCountry[iso]?.length ?? 0) > 0);
 const withoutCities = countries.length - withCities.length;
 
-writeFileSync(OUT, JSON.stringify({ countries: withCities, cities: byCountry }));
+// Two files: the countries are needed everywhere at start, the cities only
+// by the pickers and the location snapping, which load them on first use.
+writeFileSync(OUT_COUNTRIES, JSON.stringify(withCities));
+writeFileSync(OUT_CITIES, JSON.stringify(byCountry));
 rmSync(WORK, { recursive: true, force: true });
 
-const bytes = readFileSync(OUT).length;
+const bytes = readFileSync(OUT_CITIES).length + readFileSync(OUT_COUNTRIES).length;
 console.log(`  Länder:            ${withCities.length}  (${withoutCities} ohne Städte verworfen)`);
 console.log(`  Städte:            ${kept.toLocaleString('de-DE')}`);
 console.log(`  davon verworfen:   ${dropped.toLocaleString('de-DE')} (Ortsteile, aufgegeben, zerstört)`);
-console.log(`  geschrieben:       ${OUT.replace(ROOT + '/', '')} (${(bytes / 1048576).toFixed(2)} MB)`);
+console.log(`  geschrieben:       constants/countries.json + constants/cities.json (${(bytes / 1048576).toFixed(2)} MB)`);

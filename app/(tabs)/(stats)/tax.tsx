@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Linking, Modal, PlatformColor, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { SymbolView } from 'expo-symbols';
 import { useIsFocused } from '@react-navigation/native';
 import { useTaxTracker } from '../../../hooks/useTaxTracker';

@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 
