@@ -50,7 +50,7 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { signIn: googleSignIn, ready: googleReady } = useGoogleAuth();
+  const { signIn: googleSignIn } = useGoogleAuth();
 
   const handleSignUp = async () => {
     if (!email || !password) {
@@ -158,7 +158,12 @@ export default function SignUpScreen() {
                     returnKeyType="done"
                     onSubmitEditing={handleSignUp}
                   />
-                  <TouchableOpacity onPress={() => setShowPassword((v) => !v)} hitSlop={10}>
+                  <TouchableOpacity
+                    onPress={() => setShowPassword((v) => !v)}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                  >
                     <Ionicons
                       name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                       size={20}

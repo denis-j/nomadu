@@ -574,10 +574,19 @@ type TimelineRow = (CountryGroupData | { trip: Trip; daysInMonth: number }) & {
   key: string;
 };
 
+/** An untracked stretch, rendered in line between the trips it separates. */
+type GapRow = { gap: GapInterval; key: string };
+
+type TimelineItem = TimelineRow | GapRow;
+
+function isGapRow(item: TimelineItem): item is GapRow {
+  return 'gap' in item;
+}
+
 interface Section {
   title: string;
-  /** The rows SectionList renders, newest first. */
-  data: TimelineRow[];
+  /** The rows SectionList renders, newest first, gaps interleaved by date. */
+  data: TimelineItem[];
   /** Trip count for the header pill; `data` is grouped and would undercount. */
   tripCount: number;
   totalDays: number;
@@ -671,7 +680,7 @@ export default function TimelineScreen() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const [result] = await Promise.all([
+    await Promise.all([
       refresh(),
       new Promise((r) => setTimeout(r, 800)),
     ]);
@@ -759,14 +768,12 @@ export default function TimelineScreen() {
         const daysInCalendarMonth = monthEnd.getDate();
 
         // Per-trip days clipped to this month
-        let totalDays = 0;
         const dataWithDays = data.map((trip) => {
           const tripStart = parseDate(trip.start_date);
           const tripEnd = trip.end_date ? parseDate(trip.end_date) : new Date();
           const from = tripStart > monthStart ? tripStart : monthStart;
           const to = tripEnd < monthEnd ? tripEnd : monthEnd;
           const daysInMonth = from > to ? 0 : Math.floor((to.getTime() - from.getTime()) / 86_400_000) + 1;
-          totalDays += daysInMonth;
           return { trip, daysInMonth };
         });
 
@@ -811,17 +818,44 @@ export default function TimelineScreen() {
         const effectiveEnd = monthEnd < today ? monthEnd : today;
         const gaps = computeGaps(data, monthStart, effectiveEnd);
 
-        const rows: TimelineRow[] = groupByCountryRuns(
-          [...dataWithDays].sort(
-            (a, b) => parseDate(b.trip.start_date).getTime() - parseDate(a.trip.start_date).getTime(),
-          ),
-        ).map((item, idx) => ({
-          ...item,
-          key: isCountryGroup(item)
-            ? `grp-${item.countryCode}-${title}-${idx}`
-            : `${item.trip.id}-${title}`,
-        }));
         const sortedGaps = [...gaps].sort((a, b) => b.from.getTime() - a.from.getTime());
+        const sortedTrips = [...dataWithDays].sort(
+          (a, b) => parseDate(b.trip.start_date).getTime() - parseDate(a.trip.start_date).getTime(),
+        );
+
+        // Gaps are computed per month and clipped to it, so a stretch across a
+        // month boundary already arrives as one gap per month; within the month
+        // it sorts by its start, the same date the trips sort by. A gap goes
+        // above every trip that started before it, and splits country runs so
+        // it lands exactly between the two trips around it.
+        const rows: TimelineItem[] = [];
+        let groupIdx = 0;
+        let run: typeof sortedTrips = [];
+        const flushRun = () => {
+          for (const item of groupByCountryRuns(run)) {
+            rows.push({
+              ...item,
+              key: isCountryGroup(item)
+                ? `grp-${item.countryCode}-${title}-${groupIdx++}`
+                : `${item.trip.id}-${title}`,
+            });
+          }
+          run = [];
+        };
+        let g = 0;
+        for (const entry of sortedTrips) {
+          const start = parseDate(entry.trip.start_date);
+          while (g < sortedGaps.length && sortedGaps[g].from > start) {
+            flushRun();
+            rows.push({ gap: sortedGaps[g], key: `gap-${title}-${sortedGaps[g].from.toISOString()}` });
+            g++;
+          }
+          run.push(entry);
+        }
+        flushRun();
+        for (; g < sortedGaps.length; g++) {
+          rows.push({ gap: sortedGaps[g], key: `gap-${title}-${sortedGaps[g].from.toISOString()}` });
+        }
 
         return {
           title,
@@ -890,7 +924,7 @@ export default function TimelineScreen() {
     () => {
       if (Platform.OS !== 'ios') {
         return (
-          <Pressable onPress={() => openSheet()} hitSlop={8}>
+          <Pressable onPress={() => openSheet()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Add trip">
             <Ionicons name="add" size={28} color={Colors.primary} />
           </Pressable>
         );
@@ -980,6 +1014,16 @@ export default function TimelineScreen() {
             </View>
           )}
           renderItem={({ item }) => {
+            if (isGapRow(item)) {
+              return (
+                <GapIndicator
+                  fromDate={item.gap.from}
+                  toDate={item.gap.to}
+                  days={item.gap.days}
+                  onAdd={(from, to) => openSheet(from, to)}
+                />
+              );
+            }
             if (isCountryGroup(item)) {
               return (
                 <CountryGroupCard
@@ -1000,19 +1044,6 @@ export default function TimelineScreen() {
               />
             );
           }}
-          renderSectionFooter={({ section }) => (
-            <>
-              {section.gaps.map((gap) => (
-                <GapIndicator
-                  key={`gap-${section.title}-${gap.from.toISOString()}`}
-                  fromDate={gap.from}
-                  toDate={gap.to}
-                  days={gap.days}
-                  onAdd={(from, to) => openSheet(from, to)}
-                />
-              ))}
-            </>
-          )}
         />
       </View>
     );

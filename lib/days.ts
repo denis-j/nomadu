@@ -70,3 +70,18 @@ export function chainDates<T extends { start_date: string; end_date: string }>(
     return { start_date: start, end_date: toYmd(endDate) };
   });
 }
+
+/**
+ * "Sep 5, 2026": a day as the app writes it wherever the year matters. One
+ * fixed format in English, like the rest of the app; the phone's language
+ * used to leak in ("23. Sept. 2026") next to raw "2026-07-03".
+ */
+export function formatDay(ymd: string | null | undefined): string {
+  if (!ymd) return '';
+  return fromYmd(ymd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** "Sep 24, 2026, 2:05 PM": a moment, for stamps like the last sync. */
+export function formatMoment(iso: string): string {
+  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}

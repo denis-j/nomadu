@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Linking, Modal, PlatformColor, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { formatDay } from '../../../lib/days';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useNavigation, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -100,9 +101,9 @@ function ExpiredVisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => 
         <CardHeader visa={visa} interactive={!!onPress} />
         <Text style={styles.visaNeededHint}>
           {isDateExpired(visa)
-            ? `Expired on ${visa.validUntil}. Update or remove this visa.`
+            ? `Expired on ${formatDay(visa.validUntil)}. Update or remove this visa.`
             : visa.singleEntryUsed
-              ? `Single entry, used up when you left on ${visa.leftOn}. A new entry needs a new visa.`
+              ? `Single entry, used up when you left on ${formatDay(visa.leftOn)}. A new entry needs a new visa.`
               : 'Expired.'}
         </Text>
       </Glass>
@@ -130,7 +131,7 @@ function VisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void })
 
       {visa.daysAllowed > 0 && stayOver ? (
         <Text style={styles.visaNeededHint}>
-          Counter reset when you left on {visa.leftOn}.
+          Counter reset when you left on {formatDay(visa.leftOn)}.
           {visa.lastStayDays ? ` Last stay: ${visa.lastStayDays} of ${visa.daysAllowed} days.` : ''}
         </Text>
       ) : visa.daysAllowed > 0 ? (
@@ -163,7 +164,7 @@ function VisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void })
           <Text style={styles.visaNeededHint}>
             {hasNoExpiry(visa.validUntil)
               ? 'No expiry date. Only your days are counted.'
-              : `Valid until ${visa.validUntil}`}
+              : `Valid until ${formatDay(visa.validUntil)}`}
           </Text>
         )
       )}
@@ -188,7 +189,7 @@ function SourceFooter({ visa }: { visa: VisaStatus }) {
   return (
     <View style={styles.sourceFooter}>
       {visa.lastVerified && (
-        <Text style={styles.sourceText}>Verified {visa.lastVerified}</Text>
+        <Text style={styles.sourceText}>Verified {formatDay(visa.lastVerified)}</Text>
       )}
       {visa.source && (
         <Pressable
@@ -293,7 +294,7 @@ export default function VisaScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <Pressable hitSlop={12} onPress={goToAdd}>
+        <Pressable hitSlop={12} onPress={goToAdd} accessibilityRole="button" accessibilityLabel="Add visa">
           <Ionicons name="add" size={26} color={Colors.text} />
         </Pressable>
       ),

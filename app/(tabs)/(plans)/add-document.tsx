@@ -184,7 +184,7 @@ function AddDocumentScreenContent() {
                 <Text style={styles.pickedName} numberOfLines={1}>{picked.name ?? 'Photo'}</Text>
                 <Text style={styles.pickedMime} numberOfLines={1}>{picked.mime ?? 'file'}</Text>
               </View>
-              <Pressable onPress={() => setPicked(null)} hitSlop={8}>
+              <Pressable onPress={() => setPicked(null)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Remove file">
                 <Ionicons name="close-circle" size={22} color={Colors.textTertiary} />
               </Pressable>
             </View>

@@ -235,8 +235,8 @@ const MAX_UNTRACKED_GAP_DAYS = 14;
  * and in Southeast Asia it works even when you are only gone for an afternoon.
  * So the stay ends at any recorded border crossing, not only when a full day
  * was spent abroad. Countries where a quick exit does NOT buy a new allowance
- * are the ones with an annual or rolling cap (Schengen 90/180, Canada
- * 180/365), and those are `rolling_window` rules that never reach this
+ * are the ones with an annual or rolling cap (Schengen 90/180, Turkey
+ * 90/180), and those are `rolling_window` rules that never reach this
  * function.
  *
  * Two trips to the same country therefore merge unless something sits

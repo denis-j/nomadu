@@ -18,9 +18,8 @@ import {
   JourneyTraveller,
   renameJourneyTraveller,
   travellerLabel,
-} from '../../../lib/database';
+ parseDate } from '../../../lib/database';
 import { DocumentKind, documentUri, isImageMime, isPdfMime, kindMeta } from '../../../lib/documents';
-import { parseDate } from '../../../lib/database';
 import { MissingRoute } from '../../../components/MissingRoute';
 import { useJourneyExists } from '../../../hooks/useJourneyExists';
 
@@ -85,7 +84,7 @@ function DocumentsScreenContent() {
   useLayoutEffect(() => {
     nav.setOptions({
       headerRight: () => (
-        <Pressable hitSlop={12} onPress={() => addDocument()}>
+        <Pressable hitSlop={12} onPress={() => addDocument()} accessibilityRole="button" accessibilityLabel="Add document">
           <Ionicons name="add" size={26} color={Colors.text} />
         </Pressable>
       ),

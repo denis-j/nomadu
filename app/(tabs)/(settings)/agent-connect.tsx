@@ -69,14 +69,14 @@ export default function ConnectAgentSheet() {
           <Card>
             <View style={styles.hand}>
               <Text style={styles.rowTitle}>Instructions</Text>
-              <Text style={styles.rowText}>Go into {ready.label}'s prompt or memory. They explain what the data is and what it can do.</Text>
+              <Text style={styles.rowText}>Go into {ready.label}&apos;s prompt or memory. They explain what the data is and what it can do.</Text>
               <SecondaryButton icon="document-text-outline" label="Copy instructions" onPress={() => copy(agentSetupText(ready.editTimeline), 'Instructions')} />
             </View>
             <View style={styles.separator} />
             <View style={styles.hand}>
               <Text style={styles.rowTitle}>Key</Text>
               <Text style={styles.rowText}>
-                Goes into {ready.label}'s secrets or environment as <Text style={styles.mono}>{TOKEN_ENV_NAME}</Text>, never into the prompt. It is a password.
+                Goes into {ready.label}&apos;s secrets or environment as <Text style={styles.mono}>{TOKEN_ENV_NAME}</Text>, never into the prompt. It is a password.
               </Text>
               <SecondaryButton icon="key-outline" label="Copy key" onPress={() => copy(ready.token, 'Key')} />
             </View>

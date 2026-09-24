@@ -54,10 +54,10 @@ export interface DestinationPolicy {
    * `citizens` is an array of ISO2 codes (or a citizenship-group constant).
    * A `null` rule means "no tracking" (e.g. freedom of movement).
    */
-  overrides?: Array<{
+  overrides?: {
     citizens: readonly string[];
     rule: VisaRule | null;
-  }>;
+  }[];
 }
 
 export interface ApplicableRule {

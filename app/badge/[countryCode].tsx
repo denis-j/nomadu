@@ -56,7 +56,7 @@ export default function BadgeFullscreenScreen() {
       <>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>No badge for "{code}"</Text>
+          <Text style={styles.errorText}>No badge for &quot;{code}&quot;</Text>
           <Pressable onPress={handleClose} style={styles.errorClose}>
             <Text style={styles.errorCloseText}>Close</Text>
           </Pressable>
@@ -79,6 +79,8 @@ export default function BadgeFullscreenScreen() {
                 <Pressable
                   onPress={handleClose}
                   hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close"
                   style={({ pressed }) => [styles.closeInner, pressed && { opacity: 0.6 }]}
                 >
                   <Ionicons name="close" size={20} color={Colors.white} />
@@ -88,6 +90,8 @@ export default function BadgeFullscreenScreen() {
               <Pressable
                 onPress={handleClose}
                 hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
                 style={({ pressed }) => [styles.closeBtnFallback, pressed && { opacity: 0.6 }]}
               >
                 <Ionicons name="close" size={20} color={Colors.white} />

@@ -233,7 +233,7 @@ export default function PassportScreen() {
                   returnKeyType="search"
                 />
                 {query.length > 0 && (
-                  <Pressable onPress={() => { setQuery(''); inputRef.current?.focus(); }} hitSlop={8}>
+                  <Pressable onPress={() => { setQuery(''); inputRef.current?.focus(); }} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
                     <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
                   </Pressable>
                 )}

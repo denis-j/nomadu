@@ -106,30 +106,6 @@ export async function forwardGeocode(
   return null;
 }
 
-// Check if two locations are in different cities (rough threshold ~500m)
-export function isSignificantMove(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number,
-  thresholdKm: number = 0.5,
-): boolean {
-  const R = 6371;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
-  return distance >= thresholdKm;
-}
-
-function toRad(deg: number): number {
-  return deg * (Math.PI / 180);
-}
-
 // Map of common country names to ISO 3166-1 alpha-2 codes
 const countryToCodeMap: Record<string, string> = {
   'afghanistan': 'AF', 'albania': 'AL', 'algeria': 'DZ', 'argentina': 'AR',

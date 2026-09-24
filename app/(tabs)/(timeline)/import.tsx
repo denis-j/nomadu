@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -51,16 +51,33 @@ export default function ImportScreen() {
   const [candidates, setCandidates] = useState<ImportCandidate[]>([]);
   const [results, setResults] = useState<ImportResult[]>([]);
 
+  // Swiping the sheet down unmounts the screen without going through
+  // handleClose, so the parsing loop checks this flag instead. Without it the
+  // remaining images would still be sent to the AI (and billed) and state
+  // would be set on an unmounted component.
+  const cancelledRef = useRef(false);
+  useEffect(() => {
+    cancelledRef.current = false;
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, []);
+
+  const cancelAndClose = useCallback(() => {
+    cancelledRef.current = true;
+    router.back();
+  }, [router]);
+
   const handleClose = useCallback(() => {
     if (step === 'parsing' || step === 'committing') {
       Alert.alert('Cancel import?', 'Your in-progress import will be discarded.', [
         { text: 'Keep going', style: 'cancel' },
-        { text: 'Cancel', style: 'destructive', onPress: () => router.back() },
+        { text: 'Cancel', style: 'destructive', onPress: cancelAndClose },
       ]);
       return;
     }
-    router.back();
-  }, [step, router]);
+    cancelAndClose();
+  }, [step, cancelAndClose]);
 
   const runParsing = useCallback(async (picked: PickedImage[]) => {
     setStep('parsing');
@@ -69,6 +86,7 @@ export default function ImportScreen() {
     setResults([]);
 
     const existing = await getExistingTripsForDedup();
+    if (cancelledRef.current) return;
 
     const allCandidates: ImportCandidate[] = [];
     const allResults: ImportResult[] = [];
@@ -76,6 +94,9 @@ export default function ImportScreen() {
     // Sequential parsing to give a clear per-image progress feel and avoid rate limits
     for (let i = 0; i < picked.length; i++) {
       const { result, candidates: cs } = await importFromImage(picked[i].base64, i, existing);
+      // The request itself cannot be aborted, but once the sheet is gone its
+      // result is dropped and no further images are sent.
+      if (cancelledRef.current) return;
       allCandidates.push(...cs);
       allResults.push(result);
       setProgress((prev) =>
@@ -94,6 +115,7 @@ export default function ImportScreen() {
 
     // Small breath, then transition
     await new Promise((r) => setTimeout(r, 400));
+    if (cancelledRef.current) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setStep('review');
   }, []);
@@ -126,9 +148,10 @@ export default function ImportScreen() {
     try {
       const inserted = await commitImport(toInsert);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // brief success then close
+      // brief success then close. If the sheet was already swiped away,
+      // router.back() would pop the screen underneath it instead.
       setTimeout(() => {
-        router.back();
+        if (!cancelledRef.current) router.back();
         setTimeout(() => {
           showToast(`Added ${inserted} ${inserted === 1 ? 'trip' : 'trips'}`);
         }, 300);
@@ -136,7 +159,7 @@ export default function ImportScreen() {
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       showToast(`Import failed: ${err?.message ?? String(err)}`, 'error');
-      setStep('review');
+      if (!cancelledRef.current) setStep('review');
     }
   }, [candidates, router]);
 
@@ -159,7 +182,7 @@ export default function ImportScreen() {
       <Stack.Screen
         options={{
           headerLeft: () => (
-            <Pressable onPress={handleClose} hitSlop={12}>
+            <Pressable onPress={handleClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
               <Ionicons name="close" size={22} color={Colors.text} />
             </Pressable>
           ),
@@ -324,7 +347,7 @@ function ReviewStep({
         </View>
         <Text style={reviewStyles.emptyTitle}>No trips found</Text>
         <Text style={reviewStyles.emptyText}>
-          We couldn't read any trip information from {imageCount === 1 ? 'that screenshot' : 'those screenshots'}.
+          We couldn&apos;t read any trip information from {imageCount === 1 ? 'that screenshot' : 'those screenshots'}.
           Try clearer images, or add a trip manually.
         </Text>
       </ScrollView>
@@ -449,7 +472,7 @@ function CandidateRow({
           <Text style={[rowStyles.daysUnit, dup && rowStyles.dimmed]}>d</Text>
         </View>
       )}
-      <Pressable onPress={onRemove} hitSlop={10} style={rowStyles.removeBtn}>
+      <Pressable onPress={onRemove} hitSlop={10} style={rowStyles.removeBtn} accessibilityRole="button" accessibilityLabel="Remove trip">
         <Ionicons name="close" size={18} color={Colors.textTertiary} />
       </Pressable>
     </Pressable>

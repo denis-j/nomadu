@@ -44,10 +44,6 @@ async function readSet(): Promise<Set<string>> {
   }
 }
 
-export async function getUnlockedBadges(): Promise<Set<string>> {
-  return readSet();
-}
-
 export async function isBadgeUnlocked(countryCode: string): Promise<boolean> {
   const set = await readSet();
   return set.has(countryCode.toUpperCase());

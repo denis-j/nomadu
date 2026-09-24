@@ -75,6 +75,8 @@ export default function ForgotPasswordScreen() {
               <Pressable
                 onPress={() => router.back()}
                 hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Back"
                 style={({ pressed }) => [styles.backInner, pressed && { opacity: 0.6 }]}
               >
                 <Ionicons name="chevron-back" size={22} color={Colors.text} />
@@ -84,6 +86,8 @@ export default function ForgotPasswordScreen() {
             <Pressable
               onPress={() => router.back()}
               hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
               style={({ pressed }) => [styles.backBtnFallback, pressed && { opacity: 0.6 }]}
             >
               <Ionicons name="chevron-back" size={22} color={Colors.text} />

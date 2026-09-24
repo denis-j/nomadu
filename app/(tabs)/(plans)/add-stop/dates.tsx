@@ -129,7 +129,7 @@ export default function AddStopDatesScreen() {
         options={{
           title: isEditing ? 'Edit Dates' : 'Dates',
           headerRight: () => (
-            <Pressable onPress={handleNext} hitSlop={8}>
+            <Pressable onPress={handleNext} hitSlop={8} accessibilityRole="button" accessibilityLabel="Next">
               <SymbolView
                 name="arrow.right"
                 tintColor={PlatformColor('label')}

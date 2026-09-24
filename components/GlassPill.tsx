@@ -1,5 +1,5 @@
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import type { ReactNode } from 'react';
 import { Colors } from '../constants/colors';
 

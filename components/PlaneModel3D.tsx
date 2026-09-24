@@ -1,6 +1,6 @@
 import { Asset } from 'expo-asset';
 import { useEffect, useState } from 'react';
-import { StyleSheet, View, ViewStyle } from 'react-native';
+import { StyleSheet, ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,

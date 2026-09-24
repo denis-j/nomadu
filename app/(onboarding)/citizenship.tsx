@@ -40,19 +40,6 @@ const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
-const gradientColorSets = [
-  {
-    colors: ['#4DC1FF', '#8AD3FF', '#DBF0FF'],
-    start: { x: 0, y: 0 },
-    end: { x: 1, y: 1 },
-  },
-  {
-    colors: ['#8AD3FF', '#DBF0FF', '#FFFFFF'],
-    start: { x: 1, y: 0 },
-    end: { x: 0, y: 1 },
-  },
-];
-
 // Country coordinates for map pins
 const COUNTRY_COORDS: Record<string, { latitude: number; longitude: number }> = {
   'Germany': { latitude: 51.16, longitude: 10.45 },
@@ -232,7 +219,7 @@ export default function CitizenshipScreen() {
         {/* Header + Search */}
         <View style={styles.topContent} pointerEvents="box-none">
           <Animated.View entering={FadeInUp.duration(500).springify()} style={styles.header}>
-            <Text style={styles.title}>Where's home?</Text>
+            <Text style={styles.title}>{"Where's home?"}</Text>
             <Text style={styles.subtitle}>Tap your country on the map</Text>
           </Animated.View>
 
@@ -248,7 +235,7 @@ export default function CitizenshipScreen() {
                 autoCorrect={false}
               />
               {isSearching && (
-                <TouchableOpacity onPress={() => setQuery('')}>
+                <TouchableOpacity onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel="Clear search">
                   <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
                 </TouchableOpacity>
               )}

@@ -9,6 +9,7 @@ import { GlassPill } from './GlassPill';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { NO_EXPIRY, hasNoExpiry, type EntriesAllowed } from '../lib/userVisas';
+import { formatDay } from '../lib/days';
 
 /**
  * The pieces the visa form is built from.
@@ -35,20 +36,8 @@ export const addMonths = (ymd: string, months: number): string => {
   return toYmd(new Date(y, m - 1 + months, d));
 };
 
-/** "6 Sep 2026". The raw YYYY-MM-DD was accurate and unreadable. */
-const formatHuman = (ymd: string): string => {
-  const [y, m, d] = ymd.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric',
-  });
-};
-
-const daysInclusive = (from: string, to: string): number => {
-  const [fy, fm, fd] = from.split('-').map(Number);
-  const [ty, tm, td] = to.split('-').map(Number);
-  const ms = new Date(ty, tm - 1, td).getTime() - new Date(fy, fm - 1, fd).getTime();
-  return Math.round(ms / 86400000) + 1;
-};
+/** "Sep 6, 2026". The raw YYYY-MM-DD was accurate and unreadable. */
+const formatHuman = formatDay;
 
 // ─── Content ────────────────────────────────────────────────────────────────
 

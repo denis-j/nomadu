@@ -32,7 +32,8 @@ const SHARED_GRADIENT_COLORS = [
 
 export default function OnboardingLayout() {
   const segments = useSegments();
-  const currentScreen = segments[1];
+  // Typed as the root segment only; inside this group the second is the screen.
+  const currentScreen = (segments as string[])[1];
   const step = stepForSegment(currentScreen);
 
   return (

@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Purchases, {
   LOG_LEVEL,
@@ -210,16 +209,6 @@ export async function rememberEntitlement(
 ): Promise<void> {
   if (!REVENUECAT_ENABLED) return;
   await writeSnapshot(entitlement);
-}
-
-export async function getOfferings(): Promise<PurchasesOffering | null> {
-  if (!REVENUECAT_ENABLED) return null;
-  try {
-    const offerings = await Purchases.getOfferings();
-    return offerings.current;
-  } catch {
-    return null;
-  }
 }
 
 export async function getCustomerInfo(): Promise<CustomerInfo | null> {

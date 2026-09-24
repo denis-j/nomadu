@@ -5,7 +5,6 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Trip } from '../lib/database';
 import { mapState } from '../lib/mapState';
-import { Colors } from '../constants/colors';
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const toRad = (d: number) => (d * Math.PI) / 180;

@@ -150,7 +150,7 @@ export default function EditStopScreen() {
         options={{
           title: 'Edit Stop',
           headerRight: () => (
-            <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }}>
+            <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel="Save stop">
               <SymbolView name="checkmark" tintColor={PlatformColor('label')} weight="semibold" size={22} />
             </Pressable>
           ),

@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Dimensions,
   Keyboard,
@@ -26,7 +26,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -161,12 +160,12 @@ export function SheetLayer({
         {title && (
           <View style={styles.header}>
             {onBack ? (
-              <TouchableOpacity style={styles.backButton} onPress={onBack}>
+              <TouchableOpacity style={styles.backButton} onPress={onBack} accessibilityRole="button" accessibilityLabel="Back">
                 <Ionicons name="chevron-back" size={20} color="#007AFF" />
               </TouchableOpacity>
             ) : null}
             <Text style={[styles.title, onBack && { marginLeft: 12 }]}>{title}</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={close}>
+            <TouchableOpacity style={styles.closeButton} onPress={close} accessibilityRole="button" accessibilityLabel="Close">
               <Ionicons name="close" size={20} color="#8E8E93" />
             </TouchableOpacity>
           </View>
@@ -184,7 +183,7 @@ export function SheetLayer({
               autoCorrect={false}
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityRole="button" accessibilityLabel="Clear search">
                 <Ionicons name="close-circle" size={18} color="#C7C7CC" />
               </TouchableOpacity>
             )}
@@ -227,7 +226,7 @@ export function SheetBackdrop({
   return (
     <Animated.View style={[styles.backdrop, animStyle]} pointerEvents={visible ? 'auto' : 'none'}>
       <BlurView intensity={blurIntensity} style={styles.blurView}>
-        <TouchableOpacity style={styles.backdropTouchable} onPress={onPress} activeOpacity={1} />
+        <TouchableOpacity style={styles.backdropTouchable} onPress={onPress} activeOpacity={1} accessibilityRole="button" accessibilityLabel="Close" />
       </BlurView>
     </Animated.View>
   );

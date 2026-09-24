@@ -42,7 +42,7 @@ export default function CreateJourneyScreen() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <Pressable onPress={handleCreate} disabled={!canSave} hitSlop={8} style={{ opacity: canSave ? 1 : 0.3 }}>
+            <Pressable onPress={handleCreate} disabled={!canSave} hitSlop={8} style={{ opacity: canSave ? 1 : 0.3 }} accessibilityRole="button" accessibilityLabel="Create trip">
               <SymbolView name="checkmark" tintColor={PlatformColor('label')} weight="semibold" size={22} />
             </Pressable>
           ),

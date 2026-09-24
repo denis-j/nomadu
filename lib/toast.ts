@@ -12,7 +12,7 @@ export interface ToastData {
 // root and another inside a presented formSheet). The most-recently-mounted
 // handler wins, that's the one visually closest to the user. When the
 // in-sheet container unmounts, the root container takes over again.
-const _handlers: Array<(data: ToastData) => void> = [];
+const _handlers: ((data: ToastData) => void)[] = [];
 
 export function registerToast(fn: (data: ToastData) => void): () => void {
   _handlers.push(fn);

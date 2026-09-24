@@ -22,17 +22,22 @@ export default function CreateCityScreen() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  // True until the first page arrives, so the empty state does not flash
+  // before there is anything to show.
+  const [initialLoading, setInitialLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<string[] | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!country) return;
+    if (!country) { setInitialLoading(false); return; }
+    setInitialLoading(true);
     getCitiesByCountryPaginated(country, 1, 30).then((r) => {
       setCities(r.cities);
       setHasMore(r.hasMore);
       setPage(1);
+      setInitialLoading(false);
     });
   }, [country]);
 
@@ -79,7 +84,8 @@ export default function CreateCityScreen() {
   };
 
   const displayed = searchResults ?? cities;
-  const isSearching = query.trim() !== '' && searchLoading;
+  const trimmedQuery = query.trim();
+  const isSearching = (trimmedQuery !== '' && searchLoading) || (trimmedQuery === '' && initialLoading);
 
   return (
     <>
@@ -124,6 +130,21 @@ export default function CreateCityScreen() {
         {!isSearching && displayed.length === 0 && (
           <Text style={styles.empty}>No cities found</Text>
         )}
+        {/* The city list is not exhaustive, so a search that finds nothing
+            lets the user continue with the name as typed. The country is
+            already known, and the save step geocodes the name and stores
+            no coordinates when that fails. */}
+        {!isSearching && trimmedQuery !== '' && displayed.length === 0 && (
+          <Pressable
+            style={({ pressed }) => [styles.item, styles.customItem, pressed && styles.itemPressed]}
+            onPress={() => pickCity(trimmedQuery)}
+          >
+            <Text style={[styles.itemText, styles.customItemText]} numberOfLines={1}>
+              {`Use "${trimmedQuery}"`}
+            </Text>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </>
   );
@@ -153,6 +174,15 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: PlatformColor('label'),
+  },
+  customItem: {
+    marginTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: PlatformColor('separator'),
+  },
+  customItemText: {
+    color: PlatformColor('link'),
+    fontWeight: '500',
   },
   chevron: {
     fontSize: 20,

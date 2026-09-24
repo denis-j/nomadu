@@ -95,7 +95,7 @@ function RootNavigator() {
         router.replace('/(onboarding)/welcome');
       }
     } else if (!isPro) {
-      if (segments[0] !== '(onboarding)' || segments[1] !== 'paywall') {
+      if (!inOnboardingGroup || screen !== 'paywall') {
         router.replace('/(onboarding)/paywall');
       }
     } else {

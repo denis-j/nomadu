@@ -80,7 +80,7 @@ export default function GuideStartScreen() {
         options={{
           title: 'Start date',
           headerRight: () => (
-            <Pressable onPress={create} disabled={busy} hitSlop={8} style={{ opacity: busy ? 0.4 : 1 }}>
+            <Pressable onPress={create} disabled={busy} hitSlop={8} style={{ opacity: busy ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel="Create trip">
               <SymbolView name="checkmark" tintColor={PlatformColor('label')} weight="semibold" size={22} />
             </Pressable>
           ),

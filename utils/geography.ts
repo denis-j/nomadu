@@ -91,11 +91,6 @@ function getCitiesForIso(isoCode: string): string[] {
 
 // ─── Countries ───────────────────────────────────────────────────────────────
 
-export function getAllCountries(): CountryInfo[] {
-  ensureCountries();
-  return _allCountries!;
-}
-
 export function getCountryNames(): string[] {
   ensureCountries();
   return _countryNames!;
@@ -123,10 +118,6 @@ export function searchCountries(query: string): string[] {
 function resolveIsoCode(countryName: string): string {
   ensureCountries();
   return _byLowerName!.get(countryName.toLowerCase())?.isoCode ?? 'XX';
-}
-
-export async function getCitiesByCountryAsync(countryName: string): Promise<string[]> {
-  return getCitiesForIso(resolveIsoCode(countryName));
 }
 
 export async function getCitiesByCountryPaginated(
@@ -285,11 +276,6 @@ export function getCountryCode(countryName: string): string {
 export function getCountryName(isoCode: string): string | undefined {
   ensureCountries();
   return _byIso!.get(isoCode.toLowerCase())?.name;
-}
-
-export function getCountryFlag(countryName: string): string | undefined {
-  ensureCountries();
-  return _byLowerName!.get(countryName.toLowerCase())?.flag;
 }
 
 /**

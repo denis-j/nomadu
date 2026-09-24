@@ -3,6 +3,11 @@ import * as Crypto from 'expo-crypto';
 import { localIsNewer } from './syncTime';
 import { chainDates, countDays, toYmd } from './days';
 import { localChanged, timelineChanged } from './syncTrigger';
+import { getCountryName } from '../utils/geography';
+
+// ─── Stats Queries ───
+
+import type { Stats } from './stats';
 
 let db: SQLite.SQLiteDatabase | null = null;
 let opening: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -44,7 +49,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
  * over every journey's stops) on each launch, background location wakes
  * included, was work before the first screen for nothing.
  */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
   // Per connection, so on every open.
@@ -328,7 +333,27 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
     }
   }
 
+  // Migration: country names in English. The geocoder answered in the
+  // phone's language before it was told not to, so older entries read
+  // "Deutschland" or "Mexiko" next to English ones. The code decides.
+  for (const table of ['trips', 'journey_legs'] as const) {
+    const pairs = await database.getAllAsync<{ country_code: string; country: string }>(
+      `SELECT DISTINCT country_code, country FROM ${table} WHERE country_code IS NOT NULL AND country_code != ''`,
+    );
+    for (const { country_code, country } of pairs) {
+      const name = getCountryName(country_code);
+      if (name && name !== country) {
+        await database.runAsync(`UPDATE ${table} SET country = ? WHERE country_code = ? AND country = ?`, [name, country_code, country]);
+      }
+    }
+  }
+
   await database.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+}
+
+/** The English name for a country code, so every entry reads the same whatever language it came in. */
+function countryNameFor(code: string | null | undefined, given: string): string {
+  return (code && getCountryName(code)) || given;
 }
 
 // Parses YYYY-MM-DD as local time (not UTC) to avoid off-by-one day in timezones ahead of UTC
@@ -365,13 +390,6 @@ export async function insertVisit(
     [latitude, longitude, city, country, countryCode],
   );
   return result.lastInsertRowId;
-}
-
-export async function getLatestVisit(): Promise<Visit | null> {
-  const database = await getDatabase();
-  return database.getFirstAsync<Visit>(
-    'SELECT * FROM visits ORDER BY arrived_at DESC LIMIT 1',
-  );
 }
 
 // ─── Trip CRUD ───
@@ -607,21 +625,6 @@ export async function getAllTrips(): Promise<Trip[]> {
   return merged;
 }
 
-export async function deleteTrip(id: number): Promise<void> {
-  const database = await getDatabase();
-  await database.runAsync('DELETE FROM trips WHERE id = ?', [id]);
-  timelineChanged();
-}
-
-export async function markTripDeleted(id: number): Promise<void> {
-  const database = await getDatabase();
-  await database.runAsync(
-    `UPDATE trips SET deleted = 1, updated_at = datetime('now') WHERE id = ?`,
-    [id],
-  );
-  timelineChanged();
-}
-
 /** The timeline entry a row belongs to: the row itself plus any it was merged with. */
 export async function getMergedTripContaining(id: number): Promise<Trip | null> {
   const entry = (await getAllTrips()).find((t) => t.member_ids?.includes(id));
@@ -677,11 +680,6 @@ export async function updateTripGroup(
     }
   });
   timelineChanged();
-}
-
-export async function getTripById(id: number): Promise<Trip | null> {
-  const database = await getDatabase();
-  return database.getFirstAsync<Trip>('SELECT * FROM trips WHERE id = ?', [id]);
 }
 
 export async function getTripsByCity(city: string, countryCode: string): Promise<Trip[]> {
@@ -956,6 +954,18 @@ export async function upsertJourneyFromCloud(
   sharedOwner: { uid: string; name: string } | null = null,
 ): Promise<void> {
   const database = await getDatabase();
+  // All or nothing: the journey's stamp used to be written before its
+  // stops, and an interruption in between left a half list of stops that
+  // the stamp then declared current.
+  await database.withExclusiveTransactionAsync((tx) => applyJourneyFromCloud(tx, remote, sharedOwner));
+}
+
+async function applyJourneyFromCloud(
+  database: SQLite.SQLiteDatabase,
+  remote: Omit<JourneyForSync, 'id' | 'share_code' | 'shared_owner_uid'>,
+  sharedOwner: { uid: string; name: string } | null,
+): Promise<void> {
+  remote = { ...remote, legs: remote.legs.map((l) => ({ ...l, country: countryNameFor(l.country_code, l.country) })) };
   const existing = await database.getFirstAsync<Journey>('SELECT * FROM journeys WHERE sync_id = ?', [remote.sync_id]);
 
   // Last write wins between this phone and the cloud; a friend's trip has
@@ -1253,14 +1263,6 @@ export async function getAllTripsForSync(): Promise<Trip[]> {
   );
 }
 
-export async function getTripsModifiedSince(timestamp: string): Promise<Trip[]> {
-  const database = await getDatabase();
-  return database.getAllAsync<Trip>(
-    'SELECT * FROM trips WHERE updated_at > ? ORDER BY id ASC',
-    [timestamp],
-  );
-}
-
 export async function upsertTripFromCloud(trip: {
   sync_id: string;
   city: string;
@@ -1276,6 +1278,7 @@ export async function upsertTripFromCloud(trip: {
   local_id?: number | null;
   install_id?: string | null;
 }): Promise<void> {
+  trip = { ...trip, country: countryNameFor(trip.country_code, trip.country) };
   const database = await getDatabase();
 
   // Check if we already have this trip by sync_id
@@ -1521,18 +1524,6 @@ export async function addJourneyDocument(input: {
   return result.lastInsertRowId;
 }
 
-export async function updateJourneyDocument(
-  id: number,
-  input: { traveller_id: number | null; kind: string; title: string },
-): Promise<void> {
-  const database = await getDatabase();
-  await database.runAsync(
-    'UPDATE journey_documents SET traveller_id = ?, kind = ?, title = ?, updated_at = ? WHERE id = ?',
-    [input.traveller_id, input.kind, input.title.trim(), new Date().toISOString(), id],
-  );
-  localChanged();
-}
-
 /** Removes the row. The caller deletes the file, so the two never drift. */
 export async function deleteJourneyDocument(id: number): Promise<void> {
   const database = await getDatabase();
@@ -1584,10 +1575,6 @@ export async function upsertJourneyDocumentFromCloud(input: {
     [input.journey_id, input.traveller_id, input.kind, input.title, input.file_name, input.mime, input.sync_id, input.cloud_path, input.uploader_uid, input.updated_at],
   );
 }
-
-// ─── Stats Queries ───
-
-import type { Stats } from './stats';
 export type { Stats } from './stats';
 
 /**
@@ -1624,14 +1611,6 @@ export async function markAllTripsDeleted(): Promise<void> {
   await database.execAsync(`
     UPDATE trips SET deleted = 1, updated_at = datetime('now') WHERE deleted = 0;
     DELETE FROM visits;
-  `);
-}
-
-export async function clearAllData(): Promise<void> {
-  const database = await getDatabase();
-  await database.execAsync(`
-    DELETE FROM visits;
-    DELETE FROM trips;
   `);
 }
 
@@ -1689,6 +1668,46 @@ export async function isFromThisInstall(installId: string | null | undefined): P
   return !!installId && installId === (await getInstallId());
 }
 
+/** How long a deleted row stays on the phone after its deletion went to the cloud. */
+const TOMBSTONE_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Remove rows deleted here long ago, once the deletion is in the cloud.
+ *
+ * A deleted row is kept as a marker so the push can tell the cloud and the
+ * other devices; after that it only took up space, forever. Only local rows
+ * go: the cloud keeps its markers, because a phone that was offline for
+ * months still needs to learn about the deletion. A pull that meets such a
+ * marker with no row here does nothing, so the row does not come back.
+ *
+ * Pushed means older than the collection's push mark (see pushScope in
+ * lib/sync.ts). A journey that still has documents stays: its files on disk
+ * belong to those rows.
+ */
+export async function purgeSyncedTombstones(): Promise<number> {
+  const database = await getDatabase();
+  const cutoff = new Date(Date.now() - TOMBSTONE_KEEP_MS).toISOString();
+  const tables: { table: string; mark: string; also?: string }[] = [
+    { table: 'trips', mark: 'trips' },
+    { table: 'user_visas', mark: 'visas' },
+    { table: 'journeys', mark: 'journeys', also: 'AND NOT EXISTS (SELECT 1 FROM journey_documents d WHERE d.journey_id = journeys.id)' },
+    { table: 'accommodations', mark: 'accommodations' },
+  ];
+  let purged = 0;
+  for (const { table, mark, also } of tables) {
+    const pushedUntil = await getMeta(`push_mark:${mark}`);
+    if (!pushedUntil) continue;
+    // julianday reads both stamp formats in use ("2026-09-24 10:00:00" and ISO).
+    const result = await database.runAsync(
+      `DELETE FROM ${table}
+       WHERE deleted = 1 AND julianday(updated_at) < julianday(?) AND julianday(updated_at) < julianday(?) ${also ?? ''}`,
+      [cutoff, pushedUntil],
+    );
+    purged += result.changes;
+  }
+  return purged;
+}
+
 export async function getMeta(key: string): Promise<string | null> {
   const database = await getDatabase();
   const row = await database.getFirstAsync<{ value: string | null }>(
@@ -1706,34 +1725,5 @@ export async function setMeta(key: string, value: string): Promise<void> {
   );
 }
 
-export async function exportTrips(): Promise<Trip[]> {
-  return getAllTrips();
-}
-
 // ─── Seed Data (for development/demo) ───
 
-export async function seedDemoData(): Promise<void> {
-  const database = await getDatabase();
-
-  const existing = await database.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(*) as count FROM trips',
-  );
-  if (existing && existing.count > 0) return;
-
-  const demoTrips = [
-    { city: 'Lisbon', country: 'Portugal', code: 'PT', lat: 38.7223, lng: -9.1393, start: '2025-11-01', end: '2025-11-28', days: 28 },
-    { city: 'Barcelona', country: 'Spain', code: 'ES', lat: 41.3874, lng: 2.1686, start: '2025-12-01', end: '2025-12-20', days: 20 },
-    { city: 'Bangkok', country: 'Thailand', code: 'TH', lat: 13.7563, lng: 100.5018, start: '2026-01-05', end: '2026-01-25', days: 21 },
-    { city: 'Chiang Mai', country: 'Thailand', code: 'TH', lat: 18.7883, lng: 98.9853, start: '2026-01-26', end: '2026-02-15', days: 21 },
-    { city: 'Tokyo', country: 'Japan', code: 'JP', lat: 35.6762, lng: 139.6503, start: '2026-02-18', end: '2026-03-05', days: 16 },
-    { city: 'Ljubljana', country: 'Slovenia', code: 'SI', lat: 46.0569, lng: 14.5058, start: '2026-03-08', end: null, days: 8 },
-  ];
-
-  for (const trip of demoTrips) {
-    await database.runAsync(
-      `INSERT INTO trips (city, country, country_code, latitude, longitude, start_date, end_date, days)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [trip.city, trip.country, trip.code, trip.lat, trip.lng, trip.start, trip.end, trip.days],
-    );
-  }
-}

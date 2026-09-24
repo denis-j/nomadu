@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef } from 'react';
 import { PlatformColor, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
@@ -28,7 +28,6 @@ const RANGE_COLOR = '#000000';
 const RANGE_BG = 'rgba(0,0,0,0.08)';
 
 export default function CreateDatesScreen() {
-  const router = useRouter();
   const parentNav = useNavigation();
   const params = useLocalSearchParams<Params>();
   const { country, city } = params;
@@ -150,7 +149,7 @@ export default function CreateDatesScreen() {
         options={{
           title: isEditing ? 'Edit Dates' : 'Trip Dates',
           headerRight: () => (
-            <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }}>
+            <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel="Save trip">
               <SymbolView
                 name="checkmark"
                 tintColor={PlatformColor('label')}

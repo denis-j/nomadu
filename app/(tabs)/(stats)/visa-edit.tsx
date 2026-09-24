@@ -160,6 +160,8 @@ export default function EditVisaScreen() {
               onPress={handleSave}
               disabled={saving}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Save visa"
               style={{ opacity: saving ? 0.3 : canSave ? 1 : 0.5 }}
             >
               <SymbolView name="checkmark" tintColor={PlatformColor('label')} weight="semibold" size={22} />

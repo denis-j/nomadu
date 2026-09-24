@@ -109,7 +109,7 @@ export default function PermissionsScreen() {
             </CloudyButton>
 
             <TouchableOpacity onPress={handleSkip} disabled={loading} hitSlop={8}>
-              <Text style={styles.skipText}>I'll set this up later</Text>
+              <Text style={styles.skipText}>{"I'll set this up later"}</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>

@@ -3,7 +3,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { fireArrivalIfNew, runUsageThresholdCheck, resetArrivalState, resetUsageThresholdState, rescheduleVisaExpiryReminders, requestNotificationPermissions } from '../../../lib/notifications';
+import { fireArrivalIfNew, runUsageThresholdCheck, resetArrivalState, resetUsageThresholdState, requestNotificationPermissions } from '../../../lib/notifications';
 import { Colors } from '../../../constants/colors';
 import { MissingRoute } from '../../../components/MissingRoute';
 import { Typography } from '../../../constants/typography';
@@ -84,7 +84,7 @@ function DebugScreenContent() {
         <Text style={styles.sectionTitle}>Permissions</Text>
         <DebugButton
           label="Request Notification Permission"
-          onPress={requestNotificationPermissions}
+          onPress={async () => { await requestNotificationPermissions(); }}
         />
       </Glass>
 

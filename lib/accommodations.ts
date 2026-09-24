@@ -5,7 +5,6 @@ import { localChanged } from './syncTrigger';
 import {
   EMPTY_REQUIREMENTS,
   addOption,
-  clearBooking,
   createPlan,
   removeOption,
   saveBooking,
@@ -328,10 +327,6 @@ export async function selectAccommodationOption(stopSyncId: string, optionId: st
 
 export async function saveAccommodationBooking(stopSyncId: string, input: unknown): Promise<LocalAccommodation> {
   return writeLocal(saveBooking(await requirePlan(stopSyncId), input));
-}
-
-export async function clearAccommodationBooking(stopSyncId: string): Promise<LocalAccommodation> {
-  return writeLocal(clearBooking(await requirePlan(stopSyncId)));
 }
 
 /** Tombstone: the plan disappears from the app and, through the sync, from the agent. */

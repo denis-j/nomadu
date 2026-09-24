@@ -160,6 +160,10 @@ export default function TaxScreen() {
         {citizenshipCode && <Flag code={citizenshipCode} size={14} />}
         <Text style={styles.subtitle}> {citizenshipCountry} citizenship · {year}</Text>
       </View>
+      {/* Every country counted by the calendar year, which is how most but not
+          all of them count (the UK's year starts on 6 April, Australia's on
+          1 July): said up front rather than only in the disclaimer below. */}
+      <Text style={[styles.subtitle, styles.estimate]}>Calendar-year estimate: days from Jan 1 to Dec 31</Text>
 
       {taxStatuses.length === 0 ? (
         <View style={styles.emptyForYear}>
@@ -285,6 +289,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     flex: 1,
+  },
+  estimate: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: Colors.textTertiary,
   },
   subtitleRow: {
     flexDirection: 'row',

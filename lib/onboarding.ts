@@ -18,7 +18,7 @@ const FIXED_RESIDENCE_KEY = (uid: string) => `@fixed_residence_${uid}`;
 const ONBOARDING_GOAL_KEY = (uid: string) => `@onboarding_goal_${uid}`;
 
 /** AsyncStorage key suffixes that the onboarding flow writes under a UID. */
-const ONBOARDING_KEY_BUILDERS: ReadonlyArray<(uid: string) => string> = [
+const ONBOARDING_KEY_BUILDERS: readonly ((uid: string) => string)[] = [
   ONBOARDING_COMPLETE_KEY,
   CITIZENSHIP_KEY,
   FIXED_RESIDENCE_KEY,
@@ -70,12 +70,6 @@ export async function setHasFixedResidence(
 ): Promise<void> {
   await AsyncStorage.setItem(FIXED_RESIDENCE_KEY(uid), String(hasFixedResidence));
   pushProfileToCloud(uid).catch(() => {});
-}
-
-export async function getOnboardingGoal(uid: string): Promise<OnboardingGoal | null> {
-  const value = await AsyncStorage.getItem(ONBOARDING_GOAL_KEY(uid));
-  if (value === 'tax' || value === 'visa' || value === 'history') return value;
-  return null;
 }
 
 export async function setOnboardingGoal(

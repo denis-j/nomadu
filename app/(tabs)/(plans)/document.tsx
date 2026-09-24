@@ -87,10 +87,10 @@ export default function DocumentScreen() {
           title: doc?.title ?? '',
           headerRight: () => (
             <View style={styles.headerActions}>
-              <Pressable onPress={share} hitSlop={8} disabled={!doc || missing}>
+              <Pressable onPress={share} hitSlop={8} disabled={!doc || missing} accessibilityRole="button" accessibilityLabel="Share document">
                 <Ionicons name="share-outline" size={22} color={Colors.text} />
               </Pressable>
-              <Pressable onPress={remove} hitSlop={8} disabled={!doc}>
+              <Pressable onPress={remove} hitSlop={8} disabled={!doc} accessibilityRole="button" accessibilityLabel="Delete document">
                 <Ionicons name="trash-outline" size={21} color={Colors.error} />
               </Pressable>
             </View>

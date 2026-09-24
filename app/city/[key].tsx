@@ -1,9 +1,8 @@
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import RNMapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { getTripsByCity, parseDate, Trip } from '../../lib/database';
 import { MissingRoute } from '../../components/MissingRoute';

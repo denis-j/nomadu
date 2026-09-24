@@ -23,6 +23,7 @@ import { IslandSheet } from '../../../components/IslandSheet';
 import { Avatar } from '../../../components/TravellerAvatars';
 import { useProfile } from '../../../lib/profile';
 import { avatarSeed } from '../../../lib/avatarSeed';
+import { formatMoment } from '../../../lib/days';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -143,7 +144,7 @@ export default function SettingsScreen() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
-    return new Date(dateStr).toLocaleDateString(undefined, {
+    return new Date(dateStr).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -384,7 +385,7 @@ export default function SettingsScreen() {
             <View style={styles.separator} />
             <View style={styles.row}>
               <Text style={styles.rowLabel}>Last synced</Text>
-              <Text style={styles.rowValue}>{formatDate(lastSynced)}</Text>
+              <Text style={styles.rowValue}>{formatMoment(lastSynced)}</Text>
             </View>
           </>
         )}
@@ -546,7 +547,7 @@ export default function SettingsScreen() {
             <View style={styles.sheetItemText}>
               <Text style={styles.sheetItemTitle}>City-level only</Text>
               <Text style={styles.sheetItemDesc}>
-                We only need to know which city and country you're in, not your exact position.
+                We only need to know which city and country you&apos;re in, not your exact position.
               </Text>
             </View>
           </View>

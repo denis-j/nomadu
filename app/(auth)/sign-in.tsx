@@ -49,7 +49,7 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { signIn: googleSignIn, ready: googleReady } = useGoogleAuth();
+  const { signIn: googleSignIn } = useGoogleAuth();
 
   const handleSignIn = async () => {
     if (!email || !password) {
@@ -158,7 +158,13 @@ export default function SignInScreen() {
                       <Text style={styles.forgotInline}>Forgot?</Text>
                     </TouchableOpacity>
                   </Link>
-                  <TouchableOpacity onPress={() => setShowPassword((v) => !v)} hitSlop={10} style={styles.eyeBtn}>
+                  <TouchableOpacity
+                    onPress={() => setShowPassword((v) => !v)}
+                    hitSlop={10}
+                    style={styles.eyeBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                  >
                     <Ionicons
                       name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                       size={20}

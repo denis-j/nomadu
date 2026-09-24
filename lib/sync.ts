@@ -40,7 +40,7 @@ import {
   upsertTripFromCloud,
   type JourneySyncLeg,
   type JourneySyncTraveller,
-  type Trip,
+  purgeSyncedTombstones,
 } from './database';
 import {
   getAllUserVisasForSync,
@@ -788,6 +788,7 @@ export async function syncAll(uid: string): Promise<void> {
     ['documents:pull', () => pullDocumentsFromCloud(uid)],
     ['documents:push', () => pushDocumentsToCloud(uid)],
     ['profile:push', () => pushProfileToCloud(uid)],
+    ['tombstones:purge', async () => { await purgeSyncedTombstones(); }],
   ];
 
   let first: unknown = null;
@@ -837,6 +838,18 @@ export function startRealtimeSync(uid: string): Unsubscribe {
 
   let stopped = false;
   const later: Unsubscribe[] = [];
+  // Every snapshot is applied to SQLite one after the other, in the order
+  // they arrived, across all listeners. The callbacks are async and were
+  // run side by side: an older version of a journey could finish after a
+  // newer one and bring back a stop that had been deleted. Snapshots still
+  // waiting when the listeners stop are dropped, so nothing of a previous
+  // account lands after the local data was handed to the next one.
+  let queue: Promise<void> = Promise.resolve();
+  const inOrder = (name: string, apply: (snapshot: QuerySnapshot) => Promise<void>) => (snapshot: QuerySnapshot) => {
+    queue = queue
+      .then(() => (stopped ? undefined : apply(snapshot)))
+      .catch((err) => reportError(err, `sync:${name}-realtime`));
+  };
   // Trips, journeys and plans are listened to from the pull cursor on, not
   // from the beginning: the first snapshot of a whole-collection listener is
   // the whole collection, read and applied again right after the pull did
@@ -850,7 +863,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
     listenQuery(name, coll)
       .then((q) => {
         if (stopped) return;
-        later.push(onSnapshot(q, onChange, (err) => reportError(err, `sync:${name}-listen`)));
+        later.push(onSnapshot(q, inOrder(name, onChange), (err) => reportError(err, `sync:${name}-listen`)));
       })
       .catch((err) => reportError(err, `sync:${name}-listen`));
   };
@@ -890,7 +903,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
 
   // Trips followed: a friend's edit shows up here; a trip no longer shared
   // with us leaves the query and is tombstoned.
-  const unsubscribeFollowed = onSnapshot(query(sharedJourneysCollection(), where('member_uids', 'array-contains', uid)), async (snapshot) => {
+  const unsubscribeFollowed = onSnapshot(query(sharedJourneysCollection(), where('member_uids', 'array-contains', uid)), inOrder('followed', async (snapshot) => {
     for (const change of snapshot.docChanges()) {
       try {
         if (change.type === 'removed') {
@@ -903,12 +916,12 @@ export function startRealtimeSync(uid: string): Unsubscribe {
       }
     }
     if (snapshot.docChanges().length > 0) cloudChanged();
-  });
+  }));
 
   // Trips shared: a friend joining becomes a traveller within seconds. A
   // mirror that disappeared means sharing was stopped, from here or through
   // account deletion.
-  const unsubscribeShared = onSnapshot(query(sharedJourneysCollection(), where('owner_uid', '==', uid)), async (snapshot) => {
+  const unsubscribeShared = onSnapshot(query(sharedJourneysCollection(), where('owner_uid', '==', uid)), inOrder('shared', async (snapshot) => {
     for (const change of snapshot.docChanges()) {
       try {
         if (change.type === 'removed') {
@@ -923,7 +936,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
       }
     }
     if (snapshot.docChanges().length > 0) cloudChanged();
-  });
+  }));
 
   // Loaded once, on the first snapshot, and kept in step: that first
   // snapshot is the whole collection again, right after the pull read it.

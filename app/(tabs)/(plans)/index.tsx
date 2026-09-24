@@ -214,7 +214,7 @@ export default function JourneysScreen() {
 
   const headerRight = useCallback(
     () => (
-      <Pressable onPress={openNewSheet} hitSlop={8}>
+      <Pressable onPress={openNewSheet} hitSlop={8} accessibilityRole="button" accessibilityLabel="Add trip">
         <Ionicons name="add" size={28} color={Colors.primary} />
       </Pressable>
     ),

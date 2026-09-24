@@ -848,7 +848,7 @@ function AISuggestionsSection({
           {loading ? (
             <Text style={styles.aiStatus}>Finding stops…</Text>
           ) : (
-            <TouchableOpacity onPress={onRefresh} hitSlop={10} accessibilityLabel="New suggestions">
+            <TouchableOpacity onPress={onRefresh} hitSlop={10} accessibilityRole="button" accessibilityLabel="New suggestions">
               <Ionicons name="refresh" size={16} color={Colors.textSecondary} />
             </TouchableOpacity>
           )}
@@ -905,6 +905,8 @@ function AISuggestionsSection({
               <TouchableOpacity
                 onPress={submitDraft}
                 disabled={loading || !draft.trim()}
+                accessibilityRole="button"
+                accessibilityLabel="Get suggestions"
                 style={{ opacity: !draft.trim() || loading ? 0.3 : 1 }}
                 hitSlop={8}
               >

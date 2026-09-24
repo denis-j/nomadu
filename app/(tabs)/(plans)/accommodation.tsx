@@ -652,7 +652,7 @@ function OptionItem({
             {o.amenities.length > 0 && <Text style={styles.optionDetailText}>{o.amenities.map(amenityLabel).join(', ')}</Text>}
             {o.risks ? <Text style={styles.optionDetailText}>Risk: {o.risks}</Text> : null}
             {o.notes ? <Text style={styles.optionDetailText}>{o.notes}</Text> : null}
-            {o.last_checked_at ? <Text style={styles.optionChecked}>Checked {new Date(o.last_checked_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</Text> : null}
+            {o.last_checked_at ? <Text style={styles.optionChecked}>Checked {new Date(o.last_checked_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text> : null}
 
             {readOnly && o.url ? (
               <Pressable onPress={() => Linking.openURL(o.url!)} style={({ pressed }) => [styles.actionButton, styles.actionSelf, pressed && { opacity: 0.7 }]}>

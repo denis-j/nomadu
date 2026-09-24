@@ -63,7 +63,8 @@ export default function AnimatedGradientBackground({
           ]}
         >
           <LinearGradient
-            colors={colorSet.colors}
+            // Every set has at least two stops; the gradient's type insists on seeing that.
+            colors={colorSet.colors as [string, string, ...string[]]}
             style={styles.gradient}
             start={colorSet.start || { x: 0, y: 0 }}
             end={colorSet.end || { x: 1, y: 1 }}

@@ -8,8 +8,10 @@
  *   - Schengen Area aggregate (90/180 rolling window across all member states)
  *   - US Visa Waiver Program (citizenship-group ESTA override)
  *   - Ireland Common Travel Area (UK + EU citizens skip the rule entirely)
- *   - Rolling-window rules (UK 180/365, AE 90/180, …), the dataset only
- *     stores per-stay numbers, so multi-window logic needs a manual entry
+ *   - Rolling-window rules (AE 90/180, …), the dataset only stores
+ *     per-stay numbers, so multi-window logic needs a manual entry
+ *   - Rules the upstream matrix has not caught up with yet (Brazil's e-Visa
+ *     for US, Canadian and Australian passports since April 2025)
  *
  * When in doubt, the dataset's per-citizenship number is probably more
  * accurate than a hand-curated default. Keep this file lean.
@@ -65,9 +67,18 @@ const ninetyDaysVisaFree = (label: string, source?: string): VisaRule => ({
   allowedDays: 90, windowDays: 0, ruleType: 'visa_free', label, source,
 });
 
-const visaRequired = (source?: string): VisaRule => ({
+const visaRequired = (source?: string, label = 'Visa required'): VisaRule => ({
   allowedDays: 0, windowDays: 0, ruleType: 'visa_required',
-  label: 'Visa required', source,
+  label, source,
+});
+
+/**
+ * Up to six months per visit, no cap across visits. The UK and Canada count
+ * each entry on its own; an officer may refuse someone who seems to be living
+ * there on back-to-back visits, but there is no 180/365 rule to track.
+ */
+const sixMonthsPerVisit = (label: string, source: string): VisaRule => ({
+  allowedDays: 180, windowDays: 0, ruleType: 'visa_free', label, source,
 });
 
 // ─── Destination policies ──────────────────────────────────────────────────
@@ -100,11 +111,9 @@ export const DESTINATION_POLICIES: Record<string, DestinationPolicy> = {
     ],
   },
   CA: {
-    default: {
-      allowedDays: 180, windowDays: 365, ruleType: 'rolling_window',
-      label: '180 days per year (eTA)',
-      source: 'https://en.wikipedia.org/wiki/Visa_policy_of_Canada',
-    },
+    // The border officer sets the length, six months unless stamped otherwise.
+    default: sixMonthsPerVisit('Up to 6 months per visit',
+      'https://en.wikipedia.org/wiki/Visa_policy_of_Canada'),
   },
   MX: {
     default: {
@@ -116,6 +125,11 @@ export const DESTINATION_POLICIES: Record<string, DestinationPolicy> = {
   BR: {
     default: ninetyDaysVisaFree('90 days visa-free',
       'https://en.wikipedia.org/wiki/Visa_policy_of_Brazil'),
+    overrides: [
+      // Visa exemption ended on 10 April 2025; the dataset still lists 90 days.
+      { citizens: ['US', 'CA', 'AU'], rule: visaRequired(
+        'https://en.wikipedia.org/wiki/Visa_policy_of_Brazil', 'e-Visa required') },
+    ],
   },
   AR: {
     default: ninetyDaysVisaFree('90 days visa-free',
@@ -171,11 +185,11 @@ export const DESTINATION_POLICIES: Record<string, DestinationPolicy> = {
 
   // ─── Europe (non-Schengen) ───────────────────────────────────────────────
   GB: {
-    default: {
-      allowedDays: 180, windowDays: 365, ruleType: 'rolling_window',
-      label: '180 days per visit',
-      source: 'https://en.wikipedia.org/wiki/Visa_policy_of_the_United_Kingdom',
-    },
+    default: sixMonthsPerVisit('Up to 6 months per visit',
+      'https://en.wikipedia.org/wiki/Visa_policy_of_the_United_Kingdom'),
+    overrides: [
+      { citizens: ['IE'], rule: null }, // CTA
+    ],
   },
   IE: {
     default: ninetyDaysVisaFree('90 days visa-free',
