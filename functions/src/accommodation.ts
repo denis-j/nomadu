@@ -14,7 +14,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { Timestamp, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import type { Request } from 'firebase-functions/v2/https';
 import type { Response } from 'express';
 
@@ -98,6 +98,7 @@ async function storePlan(uid: string, plan: AccommodationPlan, existing: Firebas
     local_id: existing?.local_id ?? null,
     created_by: existing?.created_by ?? 'agent',
     updated_at: Timestamp.now(),
+    synced_at: FieldValue.serverTimestamp(),
     deleted: false,
   });
   return planFromDoc(plan.id, (await ref.get()).data()!);
@@ -217,7 +218,7 @@ export async function tombstonePlansForStops(uid: string, stopIds: string[]): Pr
   for (const stopId of stopIds) {
     const ref = plansCol(uid).doc(stopId);
     const snap = await ref.get();
-    if (snap.exists && snap.get('deleted') !== true) await ref.update({ deleted: true, updated_at: now });
+    if (snap.exists && snap.get('deleted') !== true) await ref.update({ deleted: true, updated_at: now, synced_at: FieldValue.serverTimestamp() });
   }
 }
 
@@ -311,7 +312,7 @@ async function route(caller: Caller, req: Request, res: Response, journeyId: str
     }
     if (req.method === 'DELETE') {
       require();
-      await plansCol(uid).doc(stopId).update({ deleted: true, updated_at: Timestamp.now() });
+      await plansCol(uid).doc(stopId).update({ deleted: true, updated_at: Timestamp.now(), synced_at: FieldValue.serverTimestamp() });
       send(res, 200, { ok: true });
       return;
     }

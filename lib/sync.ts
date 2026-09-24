@@ -4,19 +4,27 @@ import {
   Timestamp,
   collection,
   doc,
+  documentId,
   getDocs,
   onSnapshot,
   query,
+  serverTimestamp,
   setDoc,
   updateDoc,
   where,
   writeBatch,
+  type CollectionReference,
   type DocumentData,
+  type Query,
+  type QueryDocumentSnapshot,
+  type QuerySnapshot,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import {
   markAllTripsDeleted,
+  getMeta,
+  setMeta,
   getTripSyncStamps,
   getInstallId,
   updateJourneyShareCodeBySyncId,
@@ -119,24 +127,130 @@ const LEGACY_ID_PREFIX = 'local_';
 /** Firestore commits at most 500 operations per batch. */
 const BATCH_LIMIT = 500;
 
+// ─── Reading only what changed ───
+//
+// Every start used to read each collection whole, three times over: the
+// pull, the push (to compare stamps) and the first snapshot of the live
+// listener. For a traveller with a few hundred trips that was well over a
+// thousand document reads and as many SQLite calls before the phone was
+// idle, on every launch.
+//
+// Now every write carries `synced_at`, set by the server (the device clock
+// can be off by any amount, so `updated_at` cannot serve as a cursor). A
+// pull asks for what changed since the newest `synced_at` it has seen, the
+// listener starts from the same point, and a push looks up only the cloud
+// copies of rows edited since its last run. Once a day a full pull runs
+// anyway: documents written by app versions from before `synced_at` have no
+// such field and are invisible to the query otherwise. The cursors live in
+// `app_meta`, which is wiped with the data when another account signs in.
+
+export type SyncedCollection = 'trips' | 'visas' | 'journeys' | 'accommodations';
+
+/** How often a pull reads the whole collection regardless of cursors. */
+const FULL_PULL_EVERY_MS = 24 * 60 * 60 * 1000;
+/** Overlap on both cursors: a few documents read twice cost less than one missed. */
+const CURSOR_MARGIN_MS = 5 * 60 * 1000;
+/** Firestore's limit for an `in` filter. */
+const IN_LIMIT = 30;
+
+async function pullCursor(name: SyncedCollection): Promise<{ since: Date | null; full: boolean }> {
+  const [cursor, lastFull] = await Promise.all([getMeta(`pull_cursor:${name}`), getMeta(`pull_full:${name}`)]);
+  const full = !cursor || !lastFull || Date.now() - Date.parse(lastFull) > FULL_PULL_EVERY_MS;
+  return { since: cursor ? new Date(Date.parse(cursor) - CURSOR_MARGIN_MS) : null, full };
+}
+
+/** The listener's starting point: changes since the last pull, or everything. */
+async function listenQuery(name: SyncedCollection, coll: CollectionReference): Promise<Query> {
+  const cursor = await getMeta(`pull_cursor:${name}`);
+  return cursor
+    ? query(coll, where('synced_at', '>', Timestamp.fromDate(new Date(Date.parse(cursor) - CURSOR_MARGIN_MS))))
+    : coll;
+}
+
+/**
+ * The documents a pull has to look at, and what to record once they are
+ * applied. The cursor only moves after the caller is done, so a pull that
+ * fails half way is repeated from the same point.
+ */
+async function changedDocs(
+  name: SyncedCollection,
+  coll: CollectionReference,
+): Promise<{ docs: QueryDocumentSnapshot[]; done: () => Promise<void> }> {
+  const { since, full } = await pullCursor(name);
+  const startedAt = new Date().toISOString();
+  const snapshot = full || !since
+    ? await getDocs(coll)
+    : await getDocs(query(coll, where('synced_at', '>', Timestamp.fromDate(since))));
+  if (__DEV__) console.log(`[sync] ${name} pull: ${full || !since ? 'full' : 'changes only'}, ${snapshot.size} documents`);
+  let newest = 0;
+  for (const d of snapshot.docs) {
+    const at = d.data().synced_at;
+    if (at instanceof Timestamp) newest = Math.max(newest, at.toMillis());
+  }
+  return {
+    docs: snapshot.docs,
+    done: async () => {
+      const previous = Date.parse((await getMeta(`pull_cursor:${name}`)) ?? '') || 0;
+      await setMeta(`pull_cursor:${name}`, new Date(Math.max(previous, newest)).toISOString());
+      if (full) await setMeta(`pull_full:${name}`, startedAt);
+    },
+  };
+}
+
+/**
+ * What a push has to consider: rows edited since its last successful run
+ * (all rows the first time), and the cloud copies of just those, for the
+ * last-write-wins check. `done` moves the mark after the batch committed.
+ */
+async function pushScope<T>(
+  name: SyncedCollection,
+  coll: CollectionReference,
+  rows: T[],
+  syncIdOf: (row: T) => string | null,
+  stampOf: (row: T) => string | null,
+  alwaysInclude: (row: T) => boolean = () => false,
+): Promise<{ rows: T[]; cloud: Map<string, DocumentData>; done: () => Promise<void> }> {
+  const mark = await getMeta(`push_mark:${name}`);
+  const startedAt = new Date().toISOString();
+  const cloud = new Map<string, DocumentData>();
+
+  if (!mark) {
+    const snapshot = await getDocs(coll);
+    snapshot.forEach((d) => cloud.set(d.id, d.data()));
+  } else {
+    const since = Date.parse(mark) - CURSOR_MARGIN_MS;
+    rows = rows.filter((row) => {
+      if (!syncIdOf(row) || alwaysInclude(row)) return true;
+      const stamp = stampOf(row);
+      return !stamp || parseSyncStamp(stamp).getTime() > since;
+    });
+    const ids = rows.map(syncIdOf).filter((id): id is string => !!id);
+    for (let i = 0; i < ids.length; i += IN_LIMIT) {
+      const chunk = ids.slice(i, i + IN_LIMIT);
+      const snapshot = await getDocs(query(coll, where(documentId(), 'in', chunk)));
+      snapshot.forEach((d) => cloud.set(d.id, d.data()));
+    }
+  }
+  if (__DEV__) console.log(`[sync] ${name} push: ${mark ? 'changed rows' : 'all rows'}, ${rows.length} rows, ${cloud.size} cloud copies read`);
+  return { rows, cloud, done: () => setMeta(`push_mark:${name}`, startedAt) };
+}
+
 function isLegacySyncId(syncId: string | null | undefined): syncId is string {
   return typeof syncId === 'string' && syncId.startsWith(LEGACY_ID_PREFIX);
 }
 
 export async function pushTripsToCloud(uid: string): Promise<void> {
-  const trips = await getAllTripsForSync();
-  if (trips.length === 0) return;
+  const allTrips = await getAllTripsForSync();
+  if (allTrips.length === 0) return;
   const installId = await getInstallId();
 
   const trips_ = tripsCollection(uid);
 
-  // One read for the whole collection. The previous version fetched each trip
-  // individually before deciding whether to write it, so a user with 200 trips
-  // paid 200 document reads and 200 sequential round trips on every sync, and
-  // a sync runs on every app start.
-  const snapshot = await getDocs(trips_);
-  const cloud = new Map<string, DocumentData>();
-  snapshot.forEach((docSnap) => cloud.set(docSnap.id, docSnap.data()));
+  // Only rows edited since the last push, and only their cloud copies (see
+  // pushScope). Legacy ids are always included so they still get re-keyed.
+  const scope = await pushScope('trips', trips_, allTrips, (t) => t.sync_id, (t) => t.updated_at, (t) => isLegacySyncId(t.sync_id));
+  const trips = scope.rows;
+  const cloud = scope.cloud;
 
   // Written to SQLite only after the batch commits, so a failed push cannot
   // leave a local row pointing at a cloud document that was never created.
@@ -184,6 +298,7 @@ export async function pushTripsToCloud(uid: string): Promise<void> {
         local_id: trip.id,
         install_id: installId,
         updated_at: Timestamp.fromDate(localUpdatedAt),
+        synced_at: serverTimestamp(),
         deleted: trip.deleted === 1,
       },
       { merge: true },
@@ -207,6 +322,7 @@ export async function pushTripsToCloud(uid: string): Promise<void> {
   for (const { tripId, syncId } of idsToPersist) {
     await setSyncId(tripId, syncId);
   }
+  await scope.done();
 }
 
 // ─── Pull (cloud → local) ───
@@ -229,10 +345,10 @@ function rememberTripStamp(stamps: Map<string, string | null>, syncId: string, u
 }
 
 export async function pullTripsFromCloud(uid: string): Promise<void> {
-  const snapshot = await getDocs(tripsCollection(uid));
+  const changed = await changedDocs('trips', tripsCollection(uid));
   const stamps = await getTripSyncStamps();
 
-  for (const docSnap of snapshot.docs) {
+  for (const docSnap of changed.docs) {
     const data = docSnap.data();
     const updatedAt = data.updated_at instanceof Timestamp
       ? data.updated_at.toDate().toISOString()
@@ -256,6 +372,7 @@ export async function pullTripsFromCloud(uid: string): Promise<void> {
       install_id: typeof data.install_id === 'string' ? data.install_id : null,
     });
   }
+  await changed.done();
 }
 
 // ─── Visas (local ↔ cloud) ───
@@ -271,15 +388,15 @@ export async function pullTripsFromCloud(uid: string): Promise<void> {
  * writes, UUID ids minted locally and only persisted after the commit.
  */
 export async function pushVisasToCloud(uid: string): Promise<void> {
-  const visas = await getAllUserVisasForSync();
-  if (visas.length === 0) return;
+  const allVisas = await getAllUserVisasForSync();
+  if (allVisas.length === 0) return;
   const installId = await getInstallId();
 
   const visas_ = visasCollection(uid);
 
-  const snapshot = await getDocs(visas_);
-  const cloud = new Map<string, DocumentData>();
-  snapshot.forEach((docSnap) => cloud.set(docSnap.id, docSnap.data()));
+  const scope = await pushScope('visas', visas_, allVisas, (v) => v.sync_id, (v) => v.updated_at);
+  const visas = scope.rows;
+  const cloud = scope.cloud;
 
   const idsToPersist: { visaId: number; syncId: string }[] = [];
 
@@ -323,6 +440,7 @@ export async function pushVisasToCloud(uid: string): Promise<void> {
         local_id: visa.id,
         install_id: installId,
         updated_at: Timestamp.fromDate(localUpdatedAt),
+        synced_at: serverTimestamp(),
         deleted: visa.deleted === 1,
       },
       { merge: true },
@@ -339,12 +457,13 @@ export async function pushVisasToCloud(uid: string): Promise<void> {
   for (const { visaId, syncId } of idsToPersist) {
     await setUserVisaSyncId(visaId, syncId);
   }
+  await scope.done();
 }
 
 export async function pullVisasFromCloud(uid: string): Promise<void> {
-  const snapshot = await getDocs(visasCollection(uid));
+  const changed = await changedDocs('visas', visasCollection(uid));
 
-  for (const docSnap of snapshot.docs) {
+  for (const docSnap of changed.docs) {
     const data = docSnap.data();
     const updatedAt = data.updated_at instanceof Timestamp
       ? data.updated_at.toDate().toISOString()
@@ -367,6 +486,7 @@ export async function pullVisasFromCloud(uid: string): Promise<void> {
       install_id: typeof data.install_id === 'string' ? data.install_id : null,
     });
   }
+  await changed.done();
 }
 
 // ─── Journeys ───
@@ -375,13 +495,13 @@ export async function pullVisasFromCloud(uid: string): Promise<void> {
 // insert (and by the migration), so nothing has to be written back here.
 
 export async function pushJourneysToCloud(uid: string): Promise<void> {
-  const journeys = await getAllJourneysForSync();
-  if (journeys.length === 0) return;
+  const allJourneys = await getAllJourneysForSync();
+  if (allJourneys.length === 0) return;
 
   const journeys_ = journeysCollection(uid);
-  const snapshot = await getDocs(journeys_);
-  const cloud = new Map<string, DocumentData>();
-  snapshot.forEach((docSnap) => cloud.set(docSnap.id, docSnap.data()));
+  const scope = await pushScope('journeys', journeys_, allJourneys, (j) => j.sync_id, (j) => j.updated_at);
+  const journeys = scope.rows;
+  const cloud = scope.cloud;
 
   let batch = writeBatch(db);
   let ops = 0;
@@ -410,12 +530,13 @@ export async function pushJourneysToCloud(uid: string): Promise<void> {
       updated_at: Timestamp.fromDate(localUpdatedAt),
       deleted: journey.deleted,
     };
-    batch.set(doc(journeys_, journey.sync_id), { ...data, local_id: journey.id });
+    batch.set(doc(journeys_, journey.sync_id), { ...data, local_id: journey.id, synced_at: serverTimestamp() });
     ops++;
     if (journey.share_code) mirrors.push({ syncId: journey.sync_id, data: { ...data, owner_uid: uid } });
     if (ops >= BATCH_LIMIT) await commit();
   }
   await commit();
+  await scope.done();
 
   // The mirror the friends follow. Written one by one, outside the batch:
   // a mirror whose sharing was stopped meanwhile is refused by the rules,
@@ -445,10 +566,11 @@ function journeyFromDoc(id: string, data: DocumentData) {
 }
 
 export async function pullJourneysFromCloud(uid: string): Promise<void> {
-  const snapshot = await getDocs(journeysCollection(uid));
-  for (const docSnap of snapshot.docs) {
+  const changed = await changedDocs('journeys', journeysCollection(uid));
+  for (const docSnap of changed.docs) {
     await upsertJourneyFromCloud(journeyFromDoc(docSnap.id, docSnap.data()));
   }
+  await changed.done();
 }
 
 // ─── Trips shared with friends ───
@@ -499,13 +621,13 @@ export async function pullMembersFromCloud(uid: string): Promise<void> {
 // journeys it belongs to.
 
 export async function pushAccommodationsToCloud(uid: string): Promise<void> {
-  const plans = await getAllAccommodationsForSync();
-  if (plans.length === 0) return;
+  const allPlans = await getAllAccommodationsForSync();
+  if (allPlans.length === 0) return;
 
   const plans_ = accommodationsCollection(uid);
-  const snapshot = await getDocs(plans_);
-  const cloud = new Map<string, DocumentData>();
-  snapshot.forEach((docSnap) => cloud.set(docSnap.id, docSnap.data()));
+  const scope = await pushScope('accommodations', plans_, allPlans, (p) => p.id, (p) => p.updated_at);
+  const plans = scope.rows;
+  const cloud = scope.cloud;
 
   let batch = writeBatch(db);
   let ops = 0;
@@ -538,13 +660,16 @@ export async function pushAccommodationsToCloud(uid: string): Promise<void> {
       notes: plan.notes,
       local_id: plan.local_id,
       updated_at: Timestamp.fromDate(localUpdatedAt),
+      synced_at: serverTimestamp(),
       deleted: plan.deleted,
     });
     ops++;
     if (ops >= BATCH_LIMIT) await commit();
   }
   await commit();
-  await mirrorAccommodations(plans.filter((p) => !p.deleted));
+  await scope.done();
+  // The mirror gets every plan, not only the ones pushed just now.
+  await mirrorAccommodations(allPlans.filter((p) => !p.deleted));
 }
 
 /** What the mirror last got per shared trip, so an unchanged set is not written again. */
@@ -614,14 +739,15 @@ function accommodationFromDoc(id: string, data: DocumentData) {
 }
 
 export async function pullAccommodationsFromCloud(uid: string): Promise<void> {
-  const snapshot = await getDocs(accommodationsCollection(uid));
-  for (const docSnap of snapshot.docs) {
+  const changed = await changedDocs('accommodations', accommodationsCollection(uid));
+  for (const docSnap of changed.docs) {
     const plan = accommodationFromDoc(docSnap.id, docSnap.data());
     // A document without dates cannot be stored (NOT NULL); nothing writes
     // one, but a hand-edited document must not break the whole pull.
     if (!plan.deleted && (!plan.check_in || !plan.check_out || !plan.journey_id)) continue;
     await upsertAccommodationFromCloud(plan);
   }
+  await changed.done();
 }
 
 // ─── Bidirectional Sync ───
@@ -699,10 +825,30 @@ function notifyDocumentsChanged(): void {
 export function startRealtimeSync(uid: string): Unsubscribe {
   stopRealtimeSync();
 
+  let stopped = false;
+  const later: Unsubscribe[] = [];
+  // Trips, journeys and plans are listened to from the pull cursor on, not
+  // from the beginning: the first snapshot of a whole-collection listener is
+  // the whole collection, read and applied again right after the pull did
+  // the same. The query needs the cursor from SQLite, so these start a
+  // moment later than the others.
+  const listenFrom = (
+    name: SyncedCollection,
+    coll: CollectionReference,
+    onChange: (snapshot: QuerySnapshot) => Promise<void>,
+  ) => {
+    listenQuery(name, coll)
+      .then((q) => {
+        if (stopped) return;
+        later.push(onSnapshot(q, onChange, (err) => reportError(err, `sync:${name}-listen`)));
+      })
+      .catch((err) => reportError(err, `sync:${name}-listen`));
+  };
+
   // Journeys: what an agent or another device writes shows up without a
   // restart. Documents of the same journey edited here in the meantime keep
   // winning through the updated_at comparison in the upsert.
-  const unsubscribeJourneys = onSnapshot(journeysCollection(uid), async (snapshot) => {
+  listenFrom('journeys', journeysCollection(uid), async (snapshot) => {
     for (const change of snapshot.docChanges()) {
       if (change.type === 'added' || change.type === 'modified') {
         try {
@@ -717,7 +863,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
 
   // Accommodation plans: the agent's research lands on the phone while the
   // trip is open, same as its stops.
-  const unsubscribeAccommodations = onSnapshot(accommodationsCollection(uid), async (snapshot) => {
+  listenFrom('accommodations', accommodationsCollection(uid), async (snapshot) => {
     for (const change of snapshot.docChanges()) {
       if (change.type === 'added' || change.type === 'modified') {
         try {
@@ -772,7 +918,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
   // Loaded once, on the first snapshot, and kept in step: that first
   // snapshot is the whole collection again, right after the pull read it.
   let tripStamps: Map<string, string | null> | null = null;
-  const unsubscribeTrips = onSnapshot(tripsCollection(uid), async (snapshot) => {
+  listenFrom('trips', tripsCollection(uid), async (snapshot) => {
     if (!tripStamps) tripStamps = await getTripSyncStamps();
     for (const change of snapshot.docChanges()) {
       if (change.type === 'added' || change.type === 'modified') {
@@ -806,7 +952,6 @@ export function startRealtimeSync(uid: string): Unsubscribe {
   // Documents of shared trips: one listener per trip, set up once the
   // trips are known. `notifyDocumentsChanged` wakes the open wallet.
   let unsubscribeDocuments: Unsubscribe | null = null;
-  let stopped = false;
   watchDocuments(uid, notifyDocumentsChanged).then((u) => {
     if (stopped) u();
     else unsubscribeDocuments = u;
@@ -814,9 +959,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
 
   const unsubscribe: Unsubscribe = () => {
     stopped = true;
-    unsubscribeTrips();
-    unsubscribeJourneys();
-    unsubscribeAccommodations();
+    later.forEach((u) => u());
     unsubscribeFollowed();
     unsubscribeShared();
     unsubscribeDocuments?.();

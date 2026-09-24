@@ -515,6 +515,7 @@ async function handle(req: Request, res: Response): Promise<void> {
         ...buildStay(req.body ?? {}, null),
         local_id: null,
         updated_at: Timestamp.now(),
+        synced_at: FieldValue.serverTimestamp(),
         deleted: false,
         created_by: 'agent',
       });
@@ -532,7 +533,7 @@ async function handle(req: Request, res: Response): Promise<void> {
       const ref = col.doc(id);
       const snap = await ref.get();
       if (!snap.exists || snap.get('deleted') === true) throw new ApiError(404, 'not-found', 'No such stay.');
-      await ref.update({ ...buildStay(req.body ?? {}, snap.data()!), updated_at: Timestamp.now() });
+      await ref.update({ ...buildStay(req.body ?? {}, snap.data()!), updated_at: Timestamp.now(), synced_at: FieldValue.serverTimestamp() });
       send(res, 200, publicTrip(id, (await ref.get()).data()!));
       return;
     }
@@ -541,7 +542,7 @@ async function handle(req: Request, res: Response): Promise<void> {
       const ref = col.doc(id);
       const snap = await ref.get();
       if (!snap.exists) throw new ApiError(404, 'not-found', 'No such stay.');
-      await ref.update({ deleted: true, updated_at: Timestamp.now() });
+      await ref.update({ deleted: true, updated_at: Timestamp.now(), synced_at: FieldValue.serverTimestamp() });
       send(res, 200, { ok: true });
       return;
     }
@@ -595,6 +596,7 @@ async function handle(req: Request, res: Response): Promise<void> {
         travellers: [{ sync_id: randomUUID(), name: 'You', sort_order: 0 }],
         local_id: null,
         updated_at: Timestamp.now(),
+        synced_at: FieldValue.serverTimestamp(),
         deleted: false,
         created_by: 'agent',
       });
@@ -607,7 +609,7 @@ async function handle(req: Request, res: Response): Promise<void> {
       const snap = await ref.get();
       if (!snap.exists || snap.get('deleted') === true) throw new ApiError(404, 'not-found', 'No such journey.');
       const body = req.body ?? {};
-      const patch: Record<string, unknown> = { updated_at: Timestamp.now() };
+      const patch: Record<string, unknown> = { updated_at: Timestamp.now(), synced_at: FieldValue.serverTimestamp() };
       if (typeof body.title === 'string' && body.title.trim()) patch.title = body.title.trim().slice(0, 80);
       const before = (snap.get('legs') ?? []) as any[];
       if (body.stops !== undefined) patch.legs = buildLegs(body.stops, before);
@@ -626,7 +628,7 @@ async function handle(req: Request, res: Response): Promise<void> {
       const ref = col.doc(id);
       const snap = await ref.get();
       if (!snap.exists) throw new ApiError(404, 'not-found', 'No such journey.');
-      await ref.update({ deleted: true, updated_at: Timestamp.now() });
+      await ref.update({ deleted: true, updated_at: Timestamp.now(), synced_at: FieldValue.serverTimestamp() });
       await tombstonePlansForJourney(uid, id);
       send(res, 200, { ok: true });
       return;
