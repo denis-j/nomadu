@@ -2,7 +2,9 @@ import { getAllTrips, getAllJourneys, getAllTripsRaw, getStats, Trip, Stats, Jou
 import { getCitizenship, getHasFixedResidence } from './onboarding';
 import { calculateAllVisaStatuses, VisaStatus } from './visaCalculations';
 import { calculateAllTaxStatuses, TaxStatus } from './taxCalculations';
-import { getProfile } from './profile';
+import { avatarSvg, avatarUri } from './avatars';
+import { avatarSeed } from './avatarSeed';
+import { getProfile, prefetchSuggestedFaces } from './profile';
 
 let tripsCache: Trip[] | null = null;
 let statsCache: Stats | null = null;
@@ -42,7 +44,12 @@ export async function prefetchAll(): Promise<void> {
 
 export async function prefetchUserData(uid: string): Promise<void> {
   // The chosen face, so the avatar rows have it in their first frame.
-  await getProfile(uid).catch(() => {});
+  const profile = await getProfile(uid).catch(() => null);
+  // Faces for Settings and the profile editor, in the background.
+  const face = profile?.avatar ?? avatarSeed(uid);
+  avatarUri(face);
+  avatarSvg(face);
+  prefetchSuggestedFaces().catch(() => {});
   try {
     const citizenship = await getCitizenship(uid);
     if (!citizenship) return;

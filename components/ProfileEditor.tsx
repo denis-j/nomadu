@@ -1,13 +1,13 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
-import { avatarSvg, avatarUri, useAvatar } from '../lib/avatars';
+import { useAvatar } from '../lib/avatars';
 import { AnimatedFace } from './AnimatedFace';
-import { randomAvatarSeed } from '../lib/profile';
+import { suggestedFaces } from '../lib/profile';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -15,7 +15,6 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 const BIG = 132;
 const SMALL = 48;
-const ALTERNATIVES = 5;
 
 /**
  * Name and face, as friends on a shared trip see them. A face is suggested;
@@ -35,11 +34,8 @@ export function ProfileEditor({
   onAvatarChange: (seed: string) => void;
   autoFocus?: boolean;
 }) {
-  const alternatives = useMemo(() => Array.from({ length: ALTERNATIVES }, randomAvatarSeed), []);
-  // Fetched ahead, so a tap on one shows it at once.
-  useEffect(() => {
-    alternatives.forEach((seed) => { avatarUri(seed); avatarSvg(seed); });
-  }, [alternatives]);
+  // Saved and fetched ahead (prefetchSuggestedFaces), so they show at once.
+  const alternatives = useMemo(suggestedFaces, []);
 
   const pick = (seed: string) => {
     Haptics.selectionAsync();

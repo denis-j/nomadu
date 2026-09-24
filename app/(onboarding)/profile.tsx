@@ -19,7 +19,7 @@ import { CloudyButton } from '../../components/CloudyButton';
 import { ProfileEditor } from '../../components/ProfileEditor';
 import { useAuth } from '../../hooks/useAuth';
 import { LOCAL_ONBOARDING_UID } from '../../lib/onboarding';
-import { getProfile, randomAvatarSeed, setProfile } from '../../lib/profile';
+import { getProfile, setProfile, suggestedFaces } from '../../lib/profile';
 
 /**
  * Onboarding step 1: a name and a face. A face is suggested straight away;
@@ -32,7 +32,8 @@ export default function ProfileScreen() {
   const { user } = useAuth();
   const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
   const [name, setName] = useState('');
-  const [avatar, setAvatar] = useState(randomAvatarSeed);
+  // The first of the offered faces, already fetched on the welcome screen.
+  const [avatar, setAvatar] = useState(() => suggestedFaces()[0]);
 
   // Coming back to this step shows what was picked before.
   useEffect(() => {

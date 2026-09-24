@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { useEffect, useState } from 'react';
+import { avatarSvg, avatarUri } from './avatars';
 
 /**
  * The name and face someone picked for themselves.
@@ -25,6 +26,38 @@ export const PROFILE_AVATAR_KEY = (uid: string) => `@profile_avatar_${uid}`;
 /** A fresh face to suggest: random, so every tap on the dice shows another one. */
 export function randomAvatarSeed(): string {
   return Crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+}
+
+const SUGGESTIONS_KEY = '@avatar_suggestions';
+const SUGGESTION_COUNT = 5;
+let suggestions: string[] | null = null;
+
+/**
+ * The faces offered next to your own in the profile editor. The same few
+ * every time, kept on disk with their pictures, so the editor opens with
+ * them already drawn instead of fetching new ones on each visit.
+ */
+export function suggestedFaces(): string[] {
+  if (!suggestions) {
+    suggestions = Array.from({ length: SUGGESTION_COUNT }, randomAvatarSeed);
+    AsyncStorage.setItem(SUGGESTIONS_KEY, JSON.stringify(suggestions)).catch(() => {});
+  }
+  return suggestions;
+}
+
+/** Read the saved suggestions and fetch their pictures ahead, at start-up and before onboarding needs them. */
+export async function prefetchSuggestedFaces(): Promise<void> {
+  if (!suggestions) {
+    try {
+      const saved = JSON.parse((await AsyncStorage.getItem(SUGGESTIONS_KEY)) ?? 'null');
+      if (!suggestions && Array.isArray(saved) && saved.length === SUGGESTION_COUNT && saved.every((x) => typeof x === 'string')) {
+        suggestions = saved;
+      }
+    } catch {
+      // Unreadable: suggestedFaces draws new ones.
+    }
+  }
+  await Promise.all(suggestedFaces().flatMap((seed) => [avatarUri(seed), avatarSvg(seed)]));
 }
 
 let current: { uid: string; profile: Profile } | null = null;

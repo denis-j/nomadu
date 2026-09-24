@@ -25,6 +25,7 @@ import { PlaneModel3D } from '../../components/PlaneModel3D';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { playCollectSound } from '../../lib/sound';
+import { prefetchSuggestedFaces } from '../../lib/profile';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const PLANE_WIDTH = 240;
@@ -38,6 +39,11 @@ const FLASH_OUT_MS = 420;
 
 export default function WelcomeScreen() {
   const router = useRouter();
+
+  // The faces the next step offers, fetched while this one plays.
+  useEffect(() => {
+    prefetchSuggestedFaces().catch(() => {});
+  }, []);
 
   const flight = useSharedValue(0);
   useEffect(() => {
