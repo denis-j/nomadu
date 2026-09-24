@@ -79,7 +79,7 @@ service cloud.firestore {
       allow update: if request.auth != null
         && resource.data.owner_uid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['title', 'legs', 'travellers', 'accommodations', 'updated_at', 'deleted', 'owner_uid', 'owner_name']);
+          .hasOnly(['title', 'legs', 'travellers', 'accommodations', 'updated_at', 'deleted', 'owner_name']);
       allow create, delete: if false;
 
       // Documents shared on the trip: the file is in Storage under the same
@@ -97,14 +97,29 @@ service cloud.firestore {
         function isMember() {
           return request.auth != null && request.auth.uid in trip().member_uids;
         }
+        // The file behind a record: this trip, this owner, the folder of the
+        // record's audience, the record's own id. Downloads trust this path,
+        // and a member who could point it anywhere could make the others
+        // fetch another trip's file.
+        function pathFits(data) {
+          return data.path is string && data.path.matches(
+            'shared/' + journeyId + '/' + trip().owner_uid + '/'
+            + (data.traveller_uid == null ? 'all' : 'u/' + data.traveller_uid)
+            + '/' + docId + '([.][a-z0-9]{1,5})?');
+        }
         allow read: if isOwner()
           || (isMember() && (resource.data.traveller_uid == null || resource.data.traveller_uid == request.auth.uid));
         allow create: if (isOwner() || isMember())
           && request.resource.data.uploader_uid == request.auth.uid
-          && (isOwner() || request.resource.data.traveller_uid == null || request.resource.data.traveller_uid == request.auth.uid);
-        allow update: if (isOwner() || resource.data.uploader_uid == request.auth.uid)
-          && request.resource.data.uploader_uid == resource.data.uploader_uid;
-        allow delete: if isOwner() || resource.data.uploader_uid == request.auth.uid;
+          && (isOwner() || request.resource.data.traveller_uid == null || request.resource.data.traveller_uid == request.auth.uid)
+          && pathFits(request.resource.data);
+        // Only people still on the trip: a member who was removed kept the
+        // right to rewrite and delete what they had uploaded.
+        allow update: if (isOwner() || (isMember() && resource.data.uploader_uid == request.auth.uid))
+          && request.resource.data.uploader_uid == resource.data.uploader_uid
+          && (isOwner() || request.resource.data.traveller_uid == null || request.resource.data.traveller_uid == request.auth.uid)
+          && pathFits(request.resource.data);
+        allow delete: if isOwner() || (isMember() && resource.data.uploader_uid == request.auth.uid);
       }
     }
 

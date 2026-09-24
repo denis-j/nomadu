@@ -1,6 +1,6 @@
 import { File } from 'expo-file-system';
 import { Timestamp, collection, deleteDoc, doc, getDocs, onSnapshot, query, setDoc, where, type DocumentData, type Unsubscribe } from 'firebase/firestore';
-import { deleteObject, getDownloadURL, getMetadata, ref, uploadBytes } from 'firebase/storage';
+import { getDownloadURL, getMetadata, ref, uploadBytes } from 'firebase/storage';
 import { db, storage } from './firebase';
 import {
   deleteJourneyDocument,
@@ -108,11 +108,28 @@ export async function pushDocumentsToCloud(uid: string): Promise<void> {
     const ownerUid = party.journey.shared_owner_uid ?? uid;
     for (const d of await getJourneyDocuments(party.journey.id)) {
       if (!d.sync_id) continue;
-      const audience = audienceOf(d, party, uid);
-      if (audience === undefined) continue;
       // Not ours to rewrite: a document that came from someone else.
       if (d.uploader_uid && d.uploader_uid !== uid) continue;
       const record = records.get(d.sync_id);
+      const audience = audienceOf(d, party, uid);
+      if (audience === undefined) {
+        // No longer for anyone else (given to yourself, or to a name without
+        // an account): the cloud copy goes, where it used to stay visible to
+        // whoever it had been for. The function deletes the file.
+        if (record && (record.uploader_uid ?? uid) === uid) {
+          try {
+            await deleteDoc(doc(recordsOf(party.journey.sync_id), d.sync_id));
+            await setJourneyDocumentCloudPath(d.id, null);
+          } catch (err) {
+            reportError(err, 'documents:unshare');
+          }
+        }
+        continue;
+      }
+      // Where the file has to be for its current audience. A document moved
+      // to someone else lives in their folder now; left in the old one, the
+      // new person was refused and the old one kept access.
+      const wanted = cloudPathFor(party.journey.sync_id, ownerUid, audience, d.sync_id, d.file_name);
       const localStamp = d.updated_at ? parseSyncStamp(d.updated_at) : new Date(0);
       if (record && record.updated_at instanceof Timestamp && record.updated_at.toDate() >= localStamp) continue;
       try {
@@ -120,8 +137,8 @@ export async function pushDocumentsToCloud(uid: string): Promise<void> {
         // upload happened, on this phone or another. Uploading again is an
         // overwrite, which the storage rules refuse, and the attempt was
         // repeated on every sync.
-        let cloudPath = d.cloud_path;
-        if (!cloudPath && typeof record?.path === 'string' && record.path) {
+        let cloudPath = d.cloud_path === wanted ? d.cloud_path : null;
+        if (!cloudPath && record?.path === wanted) {
           cloudPath = record.path;
           await setJourneyDocumentCloudPath(d.id, cloudPath);
         }
@@ -129,7 +146,7 @@ export async function pushDocumentsToCloud(uid: string): Promise<void> {
           const file = new File(documentUri(d.file_name));
           if (!file.exists) continue;
           if ((file.size ?? 0) > MAX_BYTES) continue;
-          cloudPath = cloudPathFor(party.journey.sync_id, ownerUid, audience, d.sync_id, d.file_name);
+          cloudPath = wanted;
           // An earlier attempt may have uploaded the file and then failed on
           // the record: the file is there, only the record is missing.
           const target = ref(storage, cloudPath);
@@ -163,18 +180,38 @@ export async function pushDocumentsToCloud(uid: string): Promise<void> {
 }
 
 /** One cloud record into the wallet: the file fetched once, the row kept in step. */
-async function takeRecord(party: Party, id: string, x: DocumentData): Promise<void> {
+const SAFE_ID = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * The record's file path, if it is where a document of this trip belongs:
+ * this trip, its owner, a folder for everyone or for one account, the
+ * record's own id and a plain extension. Returns the extension to name the
+ * local copy with. Records are written by other phones, and a path pointing
+ * into another trip, or an extension with a slash in it, used to be followed
+ * as given, the latter writing outside the documents folder.
+ */
+export function checkedDocumentPath(path: string, journeyId: string, ownerUid: string, docId: string): { ext: string } | null {
+  if (![journeyId, ownerUid, docId].every((part) => SAFE_ID.test(part))) return null;
+  const m = new RegExp(`^shared/${journeyId}/${ownerUid}/(?:all|u/[A-Za-z0-9]+)/${docId}(\\.[a-z0-9]{1,5})?$`).exec(path);
+  return m ? { ext: m[1] ?? '' } : null;
+}
+
+async function takeRecord(party: Party, id: string, x: DocumentData, uid: string): Promise<void> {
   const existing = await getJourneyDocumentBySyncId(id);
   const travellerUid = typeof x.traveller_uid === 'string' ? x.traveller_uid : null;
   const traveller = travellerUid ? party.travellers.find((t) => t.uid === travellerUid) ?? null : null;
   // A friend we cannot place yet (their traveller row is still on its way): next time.
   if (travellerUid && !traveller) return;
   const path = String(x.path ?? '');
+  const checked = checkedDocumentPath(path, party.journey.sync_id, party.journey.shared_owner_uid ?? uid, id);
+  if (!checked) {
+    reportError(new Error('Shared document with an unexpected path'), 'documents:path');
+    return;
+  }
   const updatedAt = x.updated_at instanceof Timestamp ? x.updated_at.toDate().toISOString() : new Date().toISOString();
   let fileName = existing?.file_name;
   if (!fileName) {
-    const dot = path.lastIndexOf('.');
-    fileName = `${id}${dot >= 0 ? path.slice(dot) : ''}`;
+    fileName = `${id}${checked.ext}`;
     const url = await getDownloadURL(ref(storage, path));
     await File.downloadFileAsync(url, new File(documentsDirectory(), fileName), { idempotent: true });
   }
@@ -215,7 +252,7 @@ export async function pullDocumentsFromCloud(uid: string): Promise<void> {
       for (const snap of snaps) {
         for (const d of snap.docs) {
           seen.add(d.id);
-          await takeRecord(party, d.id, d.data());
+          await takeRecord(party, d.id, d.data(), uid);
         }
       }
       // Ours that are no longer there: removed on another phone.
@@ -244,7 +281,7 @@ export async function watchDocuments(uid: string, refresh: () => void): Promise<
         for (const change of snapshot.docChanges()) {
           try {
             if (change.type === 'removed') await dropRecord(change.doc.id);
-            else await takeRecord(party, change.doc.id, change.doc.data());
+            else await takeRecord(party, change.doc.id, change.doc.data(), uid);
           } catch (err) {
             reportError(err, 'documents:realtime');
           }
@@ -256,14 +293,13 @@ export async function watchDocuments(uid: string, refresh: () => void): Promise<
   return () => subs.forEach((u) => u());
 }
 
-/** Delete on this phone and, if it was shared, in the cloud: file first, then the record. */
+/**
+ * Delete on this phone and, if it was shared, in the cloud. Only the record
+ * is deleted from here: clients may not delete files (storage.rules), the
+ * `sharedDocumentFiles` function removes the file once the record is gone.
+ */
 export async function deleteDocumentEverywhere(d: JourneyDocument, journeySyncId: string | null): Promise<void> {
   if (d.cloud_path && d.sync_id && journeySyncId) {
-    try {
-      await deleteObject(ref(storage, d.cloud_path));
-    } catch (err) {
-      reportError(err, 'documents:delete-file');
-    }
     try {
       await deleteDoc(doc(recordsOf(journeySyncId), d.sync_id));
     } catch (err) {

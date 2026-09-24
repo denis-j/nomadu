@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { Timestamp, __get, __reset, __seed } from './fakeFirestore';
 import { __storageDeleted, __storageReset } from './fakeStorage';
 import { forgetUser, join, leave, mirrorOf, newCode, preview, removeMember, share, sharePageHtml, unshare } from '../src/share';
+import { isTripFile, staleFile } from '../src/documentFiles';
 
 const LEGS = [
   { sync_id: 's1', city: 'Hanoi', country: 'Vietnam', country_code: 'VN', start_date: '2026-11-01', end_date: '2026-11-04', transport: 'flight', notes: null, sort_order: 0 },
@@ -211,5 +212,43 @@ describe('the page', () => {
     const html = sharePageHtml(code, __get('shared_journeys/j2') as any);
     assert.doesNotMatch(html, /<script>alert/);
     assert.match(html, /&lt;script&gt;/);
+  });
+});
+
+describe('who a journey id belongs to', () => {
+  test('an ex-member cannot take over a trip id after it was unshared', async () => {
+    const { code } = await share('owner', { journeyId: 'j1' });
+    await join('anna', { code });
+    await unshare('owner', { journeyId: 'j1' });
+    // Anna knows the id and makes a journey of her own under it.
+    __seed('users/anna/journeys/j1', { title: 'Mine now', legs: [], travellers: [], deleted: false });
+    await rejects(share('anna', { journeyId: 'j1' }), 'permission-denied');
+    // The owner can share it again.
+    await share('owner', { journeyId: 'j1' });
+    assert.equal(__get('shared_journeys/j1')!.owner_uid, 'owner');
+  });
+
+
+  test('a deleted account gives up its claims', async () => {
+    await share('owner', { journeyId: 'j1' });
+    assert.ok(__get('shared_owners/j1'));
+    await forgetUser('owner');
+    assert.equal(__get('shared_owners/j1'), undefined);
+  });
+});
+
+describe('files of shared documents', () => {
+  test('a deleted record or a new path frees the old file, nothing else does', () => {
+    const rec = { path: 'shared/j1/owner/all/d1.jpg', title: 'Passport' };
+    assert.equal(staleFile(rec, undefined, 'j1'), 'shared/j1/owner/all/d1.jpg');
+    assert.equal(staleFile(rec, { ...rec, path: 'shared/j1/owner/u/anna/d1.jpg' }, 'j1'), 'shared/j1/owner/all/d1.jpg');
+    assert.equal(staleFile(rec, { ...rec, title: 'Renamed' }, 'j1'), null);
+    assert.equal(staleFile(undefined, rec, 'j1'), null);
+  });
+  test('only files of that trip, whatever a record claims', () => {
+    assert.equal(isTripFile('shared/j1/owner/all/d1.jpg', 'j1'), true);
+    assert.equal(isTripFile('shared/j2/owner/all/d1.jpg', 'j1'), false);
+    assert.equal(isTripFile('shared/j1/../j2/owner/all/d1.jpg', 'j1'), false);
+    assert.equal(isTripFile(42, 'j1'), false);
   });
 });

@@ -30,6 +30,13 @@ import { avatarSeed } from '../../lib/avatarSeed';
 const REGION = 'us-central1';
 export const SHARED = 'shared_journeys';
 export const INVITES = 'invites';
+/**
+ * Who first shared a journey id, kept after unsharing. Without it, an
+ * ex-member who knows the id could create a journey of their own under it,
+ * share it first, and become the owner of that id: the real owner's next
+ * share then failed with "Not your trip". Closed to clients.
+ */
+export const SHARED_OWNERS = 'shared_owners';
 export const SHARE_BASE = 'https://us-central1-nomady-dcff6.cloudfunctions.net/sharePage';
 export const APP_SCHEME = 'nomady';
 export const STORE_URL = 'https://nomadu.app';
@@ -115,6 +122,10 @@ export async function share(uid: string, data: { journeyId?: unknown; name?: unk
   const ref = db.collection(SHARED).doc(journeyId);
   const existing = await ref.get();
   if (existing.exists && existing.get('owner_uid') !== uid) throw new HttpsError('permission-denied', 'Not your trip.');
+  const claim = db.collection(SHARED_OWNERS).doc(journeyId);
+  const claimed = await claim.get();
+  if (claimed.exists && claimed.get('owner_uid') !== uid) throw new HttpsError('permission-denied', 'Not your trip.');
+  if (!claimed.exists) await claim.set({ owner_uid: uid, created_at: Timestamp.now() });
 
   const code = existing.exists && typeof existing.get('invite_code') === 'string' ? (existing.get('invite_code') as string) : newCode();
   const name = await ownerName(uid, data.name);
@@ -150,7 +161,13 @@ export async function preview(uid: string, data: { code?: unknown }) {
   const { journeyId, shared } = await loadInvite(code);
   const x = shared.data() as SharedDoc;
   const legs = x.legs ?? [];
+  const isOwner = x.owner_uid === uid;
+  const isMember = (x.member_uids ?? []).includes(uid);
   return {
+    // Not a secret any more: document files cannot be listed and each one
+    // sits behind its own random id, which only members read from the
+    // records; taking the id over after an unshare is stopped by the claim
+    // in SHARED_OWNERS. Builds already out open the trip with it.
     journey_id: journeyId,
     title: x.title,
     owner_name: x.owner_name,
@@ -169,8 +186,8 @@ export async function preview(uid: string, data: { code?: unknown }) {
       end_date: String(l.end_date ?? ''),
     })),
     members: (x.member_uids ?? []).length,
-    is_owner: x.owner_uid === uid,
-    is_member: (x.member_uids ?? []).includes(uid),
+    is_owner: isOwner,
+    is_member: isMember,
   };
 }
 
@@ -286,6 +303,9 @@ export async function unshare(uid: string, data: { journeyId?: unknown }) {
   if (shared.get('owner_uid') !== uid) throw new HttpsError('permission-denied', 'Not your trip.');
   const code = shared.get('invite_code');
   if (typeof code === 'string') await db.collection(INVITES).doc(code).delete();
+  // Trips shared before the claim existed get it now, while the owner is
+  // still known: after this the mirror is gone.
+  await db.collection(SHARED_OWNERS).doc(journeyId).set({ owner_uid: uid, created_at: Timestamp.now() });
   await purgeShared(journeyId, uid);
   logger.info('journey unshared', { uid, journeyId });
   return { ok: true };
@@ -300,6 +320,8 @@ export async function forgetUser(uid: string): Promise<void> {
     if (typeof code === 'string') await db.collection(INVITES).doc(code).delete();
     await purgeShared(d.id, uid);
   }
+  const claims = await db.collection(SHARED_OWNERS).where('owner_uid', '==', uid).get();
+  for (const d of claims.docs) await d.ref.delete();
   const memberOf = await db.collection(SHARED).where('member_uids', 'array-contains', uid).get();
   for (const d of memberOf.docs) {
     await purgeUploads(d.id, uid);

@@ -87,11 +87,11 @@ export default function JoinTripScreen() {
     setBusy(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      await joinJourney(code!, name.trim());
+      const joined = await joinJourney(code!, name.trim());
       await pullSharedJourneysFromCloud(user.uid);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast(`You are on ${preview.title}`);
-      await openTrip(preview.journey_id);
+      await openTrip(joined.journey_id);
     } catch (err: any) {
       showToast(err?.message ?? 'Could not join', 'error');
       setBusy(false);
