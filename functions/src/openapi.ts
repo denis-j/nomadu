@@ -335,18 +335,21 @@ const visaStatus = {
 
 const taxStatus = {
   type: 'object',
-  description: 'Days present in a country this calendar year against its tax residency threshold.',
-  required: ['country', 'countryCode', 'ruleLabel', 'thresholdDays', 'daysPresent', 'daysRemaining', 'percentUsed', 'year', 'status'],
+  description: 'Days present in a country against its tax residency threshold, counted over that country\'s tax year: the calendar year for most, 6 April to 5 April for GB, 1 July to 30 June for AU, the busiest 12-month window for NZ.',
+  required: ['country', 'countryCode', 'ruleLabel', 'thresholdDays', 'daysPresent', 'daysRemaining', 'percentUsed', 'year', 'periodStart', 'periodEnd', 'periodKind', 'status'],
   properties: {
     country: { type: 'string', example: 'Thailand' },
     countryCode: countryCode,
     flag: { type: 'string' },
-    ruleLabel: { type: 'string', example: '180 days in a calendar year' },
-    thresholdDays: { type: 'integer', example: 180 },
+    ruleLabel: { type: 'string', example: '183 days in the 2026/27 tax year (Apr 6 to Apr 5)' },
+    thresholdDays: { type: 'integer', example: 183 },
     daysPresent: { type: 'integer' },
     daysRemaining: { type: 'integer' },
     percentUsed: { type: 'number' },
-    year: { type: 'integer', example: 2026 },
+    year: { type: 'integer', example: 2026, description: 'The year asked for; which days that covers is in periodStart and periodEnd.' },
+    periodStart: { type: 'string', format: 'date', example: '2026-04-06', description: 'First day counted.' },
+    periodEnd: { type: 'string', format: 'date', example: '2027-04-05', description: 'Last day counted.' },
+    periodKind: { type: 'string', enum: ['year', 'rolling'], description: 'A fixed tax year, or any window of that length (NZ).' },
     status: { type: 'string', enum: ['safe', 'caution', 'warning', 'resident'] },
   },
 };
@@ -589,7 +592,7 @@ export function openapi() {
           tags: ['Insights'],
           operationId: 'getTax',
           summary: 'Tax residency exposure per country',
-          description: 'Days present this calendar year against each country\'s residency threshold. `resident` means the threshold is reached.',
+          description: 'Days present against each country\'s residency threshold, each over its own tax year (see TaxStatus). `resident` means the threshold is reached.',
           responses: {
             200: {
               description: 'OK',

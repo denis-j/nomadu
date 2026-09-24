@@ -160,10 +160,11 @@ export default function TaxScreen() {
         {citizenshipCode && <Flag code={citizenshipCode} size={14} />}
         <Text style={styles.subtitle}> {citizenshipCountry} citizenship · {year}</Text>
       </View>
-      {/* Every country counted by the calendar year, which is how most but not
-          all of them count (the UK's year starts on 6 April, Australia's on
-          1 July): said up front rather than only in the disclaimer below. */}
-      <Text style={[styles.subtitle, styles.estimate]}>Calendar-year estimate: days from Jan 1 to Dec 31</Text>
+      {/* Which stretch each card counts is on the card itself (ruleLabel);
+          this says up front that it differs, and that it is an estimate. */}
+      <Text style={[styles.subtitle, styles.estimate]}>
+        Estimate by each country&apos;s tax year: the calendar year for most, from Apr 6 in the UK, from Jul 1 in Australia, any 12 months in New Zealand.
+      </Text>
 
       {taxStatuses.length === 0 ? (
         <View style={styles.emptyForYear}>

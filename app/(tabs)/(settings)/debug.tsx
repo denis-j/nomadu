@@ -155,7 +155,7 @@ function DebugScreenContent() {
           sublabel="France · 137 of 183 days"
           onPress={() => runUsageThresholdCheck(
             [],
-            [{ country: 'France', countryCode: 'FR_75', flag: '🇫🇷', ruleLabel: `183 days in ${new Date().getFullYear()}`, year: new Date().getFullYear(), thresholdDays: 183, daysPresent: 137, daysRemaining: 46, percentUsed: 75, status: 'caution' }],
+            [{ country: 'France', countryCode: 'FR_75', flag: '🇫🇷', ruleLabel: `183 days in ${new Date().getFullYear()}`, year: new Date().getFullYear(), periodStart: `${new Date().getFullYear()}-01-01`, periodEnd: `${new Date().getFullYear()}-12-31`, periodKind: 'year', thresholdDays: 183, daysPresent: 137, daysRemaining: 46, percentUsed: 75, status: 'caution' }],
           )}
         />
         <View style={styles.sep} />
@@ -164,7 +164,7 @@ function DebugScreenContent() {
           sublabel="France · 165 of 183 days"
           onPress={() => runUsageThresholdCheck(
             [],
-            [{ country: 'France', countryCode: 'FR_90', flag: '🇫🇷', ruleLabel: `183 days in ${new Date().getFullYear()}`, year: new Date().getFullYear(), thresholdDays: 183, daysPresent: 165, daysRemaining: 18, percentUsed: 90, status: 'warning' }],
+            [{ country: 'France', countryCode: 'FR_90', flag: '🇫🇷', ruleLabel: `183 days in ${new Date().getFullYear()}`, year: new Date().getFullYear(), periodStart: `${new Date().getFullYear()}-01-01`, periodEnd: `${new Date().getFullYear()}-12-31`, periodKind: 'year', thresholdDays: 183, daysPresent: 165, daysRemaining: 18, percentUsed: 90, status: 'warning' }],
           )}
         />
         <View style={styles.sep} />
@@ -173,7 +173,7 @@ function DebugScreenContent() {
           sublabel="France · 183+ days reached"
           onPress={() => runUsageThresholdCheck(
             [],
-            [{ country: 'France', countryCode: 'FR_100', flag: '🇫🇷', ruleLabel: `183 days in ${new Date().getFullYear()}`, year: new Date().getFullYear(), thresholdDays: 183, daysPresent: 185, daysRemaining: 0, percentUsed: 101, status: 'resident' }],
+            [{ country: 'France', countryCode: 'FR_100', flag: '🇫🇷', ruleLabel: `183 days in ${new Date().getFullYear()}`, year: new Date().getFullYear(), periodStart: `${new Date().getFullYear()}-01-01`, periodEnd: `${new Date().getFullYear()}-12-31`, periodKind: 'year', thresholdDays: 183, daysPresent: 185, daysRemaining: 0, percentUsed: 101, status: 'resident' }],
           )}
         />
       </Glass>

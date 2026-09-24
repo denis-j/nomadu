@@ -188,7 +188,10 @@ export async function runUsageThresholdCheck(
   for (const tax of taxStatuses) {
     for (const threshold of THRESHOLDS) {
       if (tax.percentUsed < threshold) continue;
-      const key = usageKey('tax', tax.countryCode, threshold, String(new Date().getFullYear()));
+      // Once per tax year, not per calendar year: the UK's runs across New
+      // Year and would warn twice. A moving window has no start to key on.
+      const period = tax.periodKind === 'year' ? tax.periodStart : String(new Date().getFullYear());
+      const key = usageKey('tax', tax.countryCode, threshold, period);
       if (await alreadySent(key)) continue;
       await markSent(key);
 
