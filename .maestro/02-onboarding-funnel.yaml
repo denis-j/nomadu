@@ -46,26 +46,20 @@ tags:
 - tapOn:
     text: "No, I'm fully nomadic"
 
-# ── Step 4: experimental features ──────────────────────────────────
-# (The storage question is gone: cloud sync is no longer optional.)
-- extendedWaitUntil:
-    visible: ".*Try experimental features.*"
-    timeout: 5000
-- tapOn: ".*No, keep it simple.*"
-
-# ── Step 5: permissions ─────────────────────────────────────────────
+# ── Step 4: permissions ─────────────────────────────────────────────
+# (No experimental-features step any more: the Plan tab is always on.)
 - extendedWaitUntil:
     visible: "Track your journey"
     timeout: 5000
 # Skip rather than enable so we don't fight the iOS system dialog
 - tapOn: "I'll set this up later"
 
-# ── Step 6: loading bridge ─────────────────────────────────────────
+# ── Step 5: loading bridge ─────────────────────────────────────────
 - extendedWaitUntil:
     visible: "Setting up your tracking engine"
     timeout: 5000
 
-# ── Step 7: lands on sign-up ────────────────────────────────────────
+# ── Step 6: lands on sign-up ────────────────────────────────────────
 - extendedWaitUntil:
     visible: "Create account"
     timeout: 8000

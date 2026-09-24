@@ -40,13 +40,13 @@ const OPTIONS: Option[] = [
     goal: 'tax',
     icon: 'shield-checkmark',
     title: 'Avoid tax residency traps',
-    description: 'Stay ahead of 183-day rules and substantial-presence tests.',
+    description: 'See how close you are to 183 days in each country.',
   },
   {
     goal: 'visa',
     icon: 'airplane',
     title: 'Track visa limits easily',
-    description: 'Never overstay a Schengen, ESTA, or tourist allowance again.',
+    description: 'Keep an eye on Schengen 90/180, ESTA and visa-free days.',
   },
   {
     goal: 'history',
@@ -81,7 +81,7 @@ export default function GoalScreen() {
             style={styles.header}
           >
             <Text style={styles.title}>What brings you here?</Text>
-            <Text style={styles.subtitle}>Pick what fits you best. We'll tailor the rest.</Text>
+            <Text style={styles.subtitle}>Pick what fits you best.</Text>
           </Animated.View>
 
           <View style={styles.options}>
@@ -117,7 +117,7 @@ export default function GoalScreen() {
             entering={FadeIn.delay(OPTION_BASE_DELAY + 3 * OPTION_STAGGER + 80).duration(ENTER_DURATION)}
             style={styles.footer}
           >
-            <Text style={styles.footerText}>You can change this anytime in Settings.</Text>
+            <Text style={styles.footerText}>Every feature stays available, whatever you pick.</Text>
           </Animated.View>
         </View>
       </SafeAreaView>

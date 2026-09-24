@@ -32,15 +32,14 @@ interface Stage {
   duration: number;
 }
 
-// Static loading stages. Onboarding preferences are still collected for
-// future use, but personalisation (per-goal, per-citizenship, per-residence
-// copy) is deliberately turned off here for now, the screen reads the same
-// for every user.
+// Static loading stages, the same for every user: personalisation is off.
+// Each line says only what the app really does; "230+ tax residency rules"
+// promised something the single 183-day count does not deliver.
 const STAGES: Stage[] = [
   { text: 'Setting up your tracking engine…', duration: 1100 },
-  { text: 'Loading 195 country profiles…', duration: 1000 },
-  { text: 'Cross-checking visa rules…', duration: 1100 },
-  { text: 'Cross-checking 230+ tax residency rules…', duration: 1100 },
+  { text: 'Loading country profiles…', duration: 1000 },
+  { text: 'Matching visa rules to your passport…', duration: 1100 },
+  { text: 'Setting up your 183-day counts…', duration: 1100 },
   { text: 'Preparing your dashboard…', duration: 1000 },
   { text: 'Almost ready…', duration: 800 },
   { text: 'Ready.', duration: 700 },

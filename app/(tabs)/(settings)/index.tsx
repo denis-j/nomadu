@@ -18,8 +18,7 @@ import { clearAllTravelData, startRealtimeSync } from '../../../lib/sync';
 import { restorePurchases } from '../../../lib/revenueCat';
 import { useSync } from '../../../contexts/SyncContext';
 import { Flag } from '../../../components/Flag';
-import { getHasFixedResidence, setHasFixedResidence, setExperimentalsEnabled } from '../../../lib/onboarding';
-import { useExperimentals } from '../../../hooks/useExperimentals';
+import { getHasFixedResidence, setHasFixedResidence } from '../../../lib/onboarding';
 import { IslandSheet } from '../../../components/IslandSheet';
 
 const hasGlass = isLiquidGlassAvailable();
@@ -37,7 +36,6 @@ export default function SettingsScreen() {
   const router = useRouter();
   const [fixedResidence, setFixedResidence] = useState(true);
   const [isClearing, setIsClearing] = useState(false);
-  const experimentalsEnabled = useExperimentals();
 
   useEffect(() => {
     if (user) {
@@ -396,26 +394,6 @@ export default function SettingsScreen() {
           <Text style={styles.rowLabel}>How it works</Text>
           <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
         </Pressable>
-      </Glass>
-
-      {/* Experimental */}
-      <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
-        <Text style={styles.sectionTitle}>Experimental</Text>
-        <View style={styles.row}>
-          <View style={styles.rowContent}>
-            <Text style={styles.rowLabel}>Show Plan</Text>
-            <Text style={styles.rowDescription}>
-              Enable the Plan tab to draft upcoming trips. Work in progress.
-            </Text>
-          </View>
-          <Switch
-            value={experimentalsEnabled}
-            onValueChange={(val) => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setExperimentalsEnabled(val);
-            }}
-          />
-        </View>
       </Glass>
 
       {/* Danger Zone */}

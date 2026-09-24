@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNotificationCheck } from '../../hooks/useNotificationCheck';
 import { requestNotificationPermissions } from '../../lib/notifications';
-import { useExperimentals } from '../../hooks/useExperimentals';
 import { consumePendingInvite } from '../../lib/sharing';
 
 const { Trigger } = NativeTabs;
@@ -13,7 +12,6 @@ const NOTIF_ASKED_KEY = 'notif_permission_asked';
 
 export default function TabLayout() {
   useNotificationCheck();
-  const experimentalsEnabled = useExperimentals();
   const router = useRouter();
 
   // An invite link opened while signed out was parked; now that the tabs
@@ -44,7 +42,7 @@ export default function TabLayout() {
         <Trigger.Icon sf={{ default: 'clock', selected: 'clock.fill' }} />
         <Trigger.Label>Timeline</Trigger.Label>
       </Trigger>
-      <Trigger name="(plans)" hidden={!experimentalsEnabled}>
+      <Trigger name="(plans)">
         <Trigger.Icon sf={{ default: '1.calendar', selected: '31.calendar' }} />
         <Trigger.Label>Plan</Trigger.Label>
       </Trigger>

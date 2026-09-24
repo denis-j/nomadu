@@ -64,7 +64,7 @@ export default function ResidenceScreen() {
     playCardTapSound();
     const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
     setHasFixedResidence(uid, choice === 'yes');
-    router.push('/(onboarding)/experimentals');
+    router.push('/(onboarding)/permissions');
   };
 
   return (

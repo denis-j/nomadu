@@ -14,7 +14,6 @@ const ONBOARDING_COMPLETE_KEY = (uid: string) => `@onboarding_complete_${uid}`;
 const CITIZENSHIP_KEY = (uid: string) => `@citizenship_${uid}`;
 const FIXED_RESIDENCE_KEY = (uid: string) => `@fixed_residence_${uid}`;
 const ONBOARDING_GOAL_KEY = (uid: string) => `@onboarding_goal_${uid}`;
-const EXPERIMENTALS_ENABLED_KEY = '@experimentals_enabled';
 
 /** AsyncStorage key suffixes that the onboarding flow writes under a UID. */
 const ONBOARDING_KEY_BUILDERS: ReadonlyArray<(uid: string) => string> = [
@@ -25,26 +24,6 @@ const ONBOARDING_KEY_BUILDERS: ReadonlyArray<(uid: string) => string> = [
 ];
 
 export type OnboardingGoal = 'tax' | 'visa' | 'history';
-
-type ExperimentalsListener = (enabled: boolean) => void;
-const experimentalsListeners = new Set<ExperimentalsListener>();
-
-export async function getExperimentalsEnabled(): Promise<boolean> {
-  const value = await AsyncStorage.getItem(EXPERIMENTALS_ENABLED_KEY);
-  return value === 'true';
-}
-
-export async function setExperimentalsEnabled(enabled: boolean): Promise<void> {
-  await AsyncStorage.setItem(EXPERIMENTALS_ENABLED_KEY, String(enabled));
-  experimentalsListeners.forEach((l) => l(enabled));
-}
-
-export function subscribeExperimentalsEnabled(listener: ExperimentalsListener): () => void {
-  experimentalsListeners.add(listener);
-  return () => {
-    experimentalsListeners.delete(listener);
-  };
-}
 
 export async function isOnboardingComplete(uid: string): Promise<boolean> {
   const value = await AsyncStorage.getItem(ONBOARDING_COMPLETE_KEY(uid));

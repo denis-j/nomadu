@@ -27,7 +27,7 @@ const OWNER_KEY = 'owner_uid';
 /**
  * Device state that describes the previous account's data but is not keyed
  * by its uid. Preferences that belong to the phone (disclaimers seen,
- * experimentals, a pending invite link) stay.
+ * a pending invite link) stay.
  */
 const ACCOUNT_BOUND_KEYS = [
   '@tracking_pending',
