@@ -96,6 +96,8 @@ export function countDaysInRollingWindow(
   windowDays: number,
   refDate: Date = today(),
   notBefore?: string,
+  /** Days that do not count, e.g. covered by a national visa of that country. */
+  exclude?: (countryCode: string, ymd: string) => boolean,
 ): number {
   const codesSet = new Set(countryCodes);
   const windowStart = new Date(refDate);
@@ -119,11 +121,30 @@ export function countDaysInRollingWindow(
     const overlapEnd = tripEnd < refDate ? tripEnd : new Date(refDate);
 
     if (overlapStart <= overlapEnd) {
-      eachDay(overlapStart, overlapEnd, (day) => uniqueDays.add(day));
+      eachDay(overlapStart, overlapEnd, (day) => {
+        if (!exclude?.(trip.country_code, day)) uniqueDays.add(day);
+      });
     }
   }
 
   return uniqueDays.size;
+}
+
+/**
+ * Days a national visa or residence permit covers, per country.
+ *
+ * Time spent in a Schengen state on that state's own long-stay visa (a
+ * Spanish digital nomad visa, a German residence permit) does not count
+ * toward the 90/180 short-stay rule; days in the other member states still
+ * do. Counting them sent a US citizen living in Spain on a D visa an overstay
+ * warning. A visa the user entered with its own 90/180 window is a
+ * short-stay visa and is left out of this.
+ */
+function nationalVisaCover(userVisas: UserVisa[]): (countryCode: string, ymd: string) => boolean {
+  const ranges = userVisas
+    .filter((uv) => !uv.deleted && !(uv.max_days_per_window && uv.window_days))
+    .map((uv) => ({ code: uv.country_code, from: uv.valid_from, to: uv.valid_to }));
+  return (countryCode, ymd) => ranges.some((r) => r.code === countryCode && ymd >= r.from && ymd <= r.to);
 }
 
 /** One trip reduced to the country and the days it covers, clamped to today. */
@@ -198,6 +219,15 @@ export interface CurrentStay {
 }
 
 /**
+ * Longest stretch without any location data that still counts as staying.
+ * Gaps are common (phone off, indoors, tracking paused), and treating each as
+ * "left the country" handed out a fresh allowance for nothing: Thailand from
+ * 1 to 28 March and again from 30 March read as 7 days instead of 35.
+ * Longer silences are more likely a trip that was not recorded.
+ */
+const MAX_UNTRACKED_GAP_DAYS = 14;
+
+/**
  * Find the most recent continuous stay in a country and count its days.
  *
  * A per-stay allowance is really a per-*entry* allowance: leaving and coming
@@ -209,9 +239,11 @@ export interface CurrentStay {
  * 180/365), and those are `rolling_window` rules that never reach this
  * function.
  *
- * Two trips to the same country therefore only merge when nothing else sits
- * between them: no trip abroad, and no untracked gap of a full day (where we
- * have no data and assume the traveller was away).
+ * Two trips to the same country therefore merge unless something sits
+ * between them: a recorded trip abroad, or a gap without data longer than
+ * `MAX_UNTRACKED_GAP_DAYS`. A shorter gap counts as days in the country:
+ * the traveller was most likely still there, and assuming otherwise is the
+ * error that ends in an overstay.
  *
  * Two boundaries matter beyond that. Trips that start after `refDate` are
  * ignored and open-ended trips stop counting at `refDate`, so a journey
@@ -266,8 +298,8 @@ export function getCurrentStay(
     const tripEnd = endOf(trip);
     const tripStart = parseDate(trip.start_date);
 
-    // No data for a full day: assume they were away, allowance resets.
-    if (daysBetween(tripEnd, earliest) > 1) break;
+    // A long silence: probably an unrecorded trip, allowance resets.
+    if (daysBetween(tripEnd, earliest) > MAX_UNTRACKED_GAP_DAYS + 1) break;
     // A recorded trip abroad in between: visa run, allowance resets even if
     // they were back the same day.
     if (wasAbroadBetween(abroad, countryCode, tripEnd, earliest)) break;
@@ -275,6 +307,12 @@ export function getCurrentStay(
     if (floor && tripEnd < floor) break;
 
     addDays(startOf(trip), tripEnd);
+    // The untracked days in between count as spent here.
+    const gapStart = new Date(tripEnd);
+    gapStart.setDate(gapStart.getDate() + 1);
+    const gapEnd = new Date(earliest);
+    gapEnd.setDate(gapEnd.getDate() - 1);
+    if (gapStart <= gapEnd) addDays(floor && gapStart < floor ? new Date(floor) : gapStart, gapEnd);
     if (tripEnd > blockEnd) blockEnd = tripEnd;
     if (startOf(trip) < blockStart) blockStart = startOf(trip);
     if (tripStart < earliest) earliest = tripStart;
@@ -288,6 +326,9 @@ export function getCurrentStay(
   }
   return { days: 0, since: null, lastStayDays: uniqueDays.size, leftOn: toYmd(blockEnd) };
 }
+
+/** Period marker for rolling windows; see `runUsageThresholdCheck`. */
+export const ROLLING_PERIOD = 'rolling';
 
 function getStatusFromPercent(percent: number): VisaStatus['status'] {
   if (percent > 100) return 'exceeded';
@@ -398,7 +439,9 @@ function buildUserVisaStatus(
       ? { lastStayDays: stay.lastStayDays, leftOn: stay.leftOn }
       : {}),
     // Keyed per visa row so a renewal for the same country warns again.
-    usagePeriod: stay?.since ?? `uv${uv.id}-${refDate.getFullYear()}`,
+    usagePeriod: uv.max_days_per_window && uv.window_days
+      ? `uv${uv.id}-${ROLLING_PERIOD}`
+      : stay?.since ?? `uv${uv.id}-${refDate.getFullYear()}`,
   };
 }
 
@@ -422,9 +465,15 @@ export function calculateAllVisaStatuses(
   const year = refDate.getFullYear();
   const travelSpans = buildTravelSpans(trips, refDate);
 
+  // Only a visa that is valid today replaces the default rule. One that
+  // starts next month used to switch tracking off now: a traveller at day 54
+  // of 60 read as 0 of 180 because their DTV begins in October.
   const supersededCountries = new Set(
-    userVisas.filter((uv) => uv.valid_to >= ymdToday).map((uv) => uv.country_code),
+    userVisas
+      .filter((uv) => !uv.deleted && uv.valid_from <= ymdToday && uv.valid_to >= ymdToday)
+      .map((uv) => uv.country_code),
   );
+  const coveredByNationalVisa = nationalVisaCover(userVisas);
 
   const visitedCodes = [...new Set(trips.map((t) => t.country_code))];
   const applicableRules = getApplicableRules(citizenshipCode, visitedCodes);
@@ -462,7 +511,10 @@ export function calculateAllVisaStatuses(
     let stay: CurrentStay | null = null;
 
     if (rule.ruleType === 'rolling_window') {
-      daysUsed = countDaysInRollingWindow(trips, countryCodes, rule.windowDays, refDate);
+      daysUsed = countDaysInRollingWindow(
+        trips, countryCodes, rule.windowDays, refDate, undefined,
+        destinationCode === 'SCHENGEN' ? coveredByNationalVisa : undefined,
+      );
     } else {
       stay = getCurrentStay(trips, destinationCode, refDate, undefined, travelSpans);
       daysUsed = stay.days;
@@ -486,7 +538,11 @@ export function calculateAllVisaStatuses(
       ...(stay && stay.leftOn
         ? { lastStayDays: stay.lastStayDays, leftOn: stay.leftOn }
         : {}),
-      usagePeriod: stay?.since ?? String(year),
+      // A rolling window has no calendar period: its warnings re-arm when
+      // the count drops below the threshold again (see notifications.ts).
+      // Tied to the year, a second stretch over the limit in the same year
+      // went unwarned and old warnings fired again on 1 January.
+      usagePeriod: rule.ruleType === 'rolling_window' ? ROLLING_PERIOD : stay?.since ?? String(year),
     };
   });
 

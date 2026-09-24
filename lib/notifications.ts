@@ -118,6 +118,13 @@ const THRESHOLDS = [75, 90, 100] as const;
  * warning at all. Visa statuses therefore carry their own `usagePeriod`, the
  * start date of the running stay.
  */
+/**
+ * Same value as `ROLLING_PERIOD` in visaCalculations.ts, kept as a copy: a
+ * real import would load the visa tables into every background location
+ * wake, which only needs this file for arrival notifications.
+ */
+const ROLLING_PERIOD = 'rolling';
+
 function usageKey(
   type: 'visa' | 'tax',
   code: string,
@@ -150,9 +157,14 @@ export async function runUsageThresholdCheck(
     // visa_needed and expired states have no day count → no usage threshold.
     if (visa.status === 'visa_needed' || visa.status === 'expired') continue;
 
+    const rolling = visa.usagePeriod.endsWith(ROLLING_PERIOD);
     for (const threshold of THRESHOLDS) {
-      if (visa.percentUsed < threshold) continue;
       const key = usageKey('visa', visa.destinationCode, threshold, visa.usagePeriod);
+      if (visa.percentUsed < threshold) {
+        // Back under the line: the next time the window fills up, warn again.
+        if (rolling) await AsyncStorage.removeItem(key);
+        continue;
+      }
       if (await alreadySent(key)) continue;
       await markSent(key);
 
