@@ -72,6 +72,10 @@ function RootNavigator() {
 
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboardingGroup = segments[0] === '(onboarding)';
+    // Screens of the onboarding group that only make sense with an account:
+    // someone who deletes theirs from the paywall starts over at welcome.
+    const screen = (segments as string[])[1];
+    const needsAccount = inOnboardingGroup && (screen === 'paywall' || screen === 'celebrate');
 
     if (!user) {
       // Reverse funnel: the user is allowed to explore onboarding without
@@ -81,7 +85,7 @@ function RootNavigator() {
         if (!inAuthGroup) {
           router.replace('/(auth)/sign-up');
         }
-      } else if (!inOnboardingGroup && !inAuthGroup) {
+      } else if ((!inOnboardingGroup && !inAuthGroup) || needsAccount) {
         router.replace('/(onboarding)/welcome');
       }
     } else if (!onboardingDone) {

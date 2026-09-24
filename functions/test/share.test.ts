@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { Timestamp, __get, __reset, __seed } from './fakeFirestore';
 import { __storageDeleted, __storageReset } from './fakeStorage';
-import { forgetUser, join, leave, mirrorOf, newCode, preview, removeMember, share, sharePageHtml, unshare } from '../src/share';
+import { forgetUser, join, leave, mirrorOf, newCode, preview, removeMember, share, sharePageHtml, spreadProfile, unshare } from '../src/share';
 import { isTripFile, staleFile } from '../src/documentFiles';
 
 const LEGS = [
@@ -266,6 +266,30 @@ describe('chosen faces', () => {
     const { code } = await share('owner', { journeyId: 'j1' });
     const seen = await preview('bob', { code });
     assert.match(seen.owner_avatar, /^[0-9a-f]{16}$/);
+  });
+  test('a new face and name reach the trips someone is on, and the ones they share', async () => {
+    __seed('users/anna', { displayName: 'Anna', avatar: 'annaface2' });
+    const { code } = await share('owner', { journeyId: 'j1' });
+    await join('anna', { code });
+    const shared = __get('shared_journeys/j1')!;
+    __seed('shared_journeys/j1', { ...shared, travellers: [{ sync_id: 't1', name: 'Anna', uid: 'anna', avatar: 'annaface2' }, { sync_id: 't0', name: 'You', uid: 'owner' }] });
+
+    await spreadProfile('anna', { displayName: 'Anna', avatar: 'annaface2' }, { displayName: 'Anna B', avatar: 'annaface3' });
+    const after = __get('shared_journeys/j1')! as any;
+    assert.equal(after.members.anna.avatar, 'annaface3');
+    assert.equal(after.members.anna.name, 'Anna B');
+    assert.deepEqual(after.travellers[0], { sync_id: 't1', name: 'Anna B', uid: 'anna', avatar: 'annaface3' });
+    assert.deepEqual(after.travellers[1], { sync_id: 't0', name: 'You', uid: 'owner' });
+
+    await spreadProfile('owner', { displayName: 'Denis' }, { displayName: 'Denis', avatar: 'ownerface9' });
+    assert.equal((await preview('bob', { code })).owner_avatar, 'ownerface9');
+    assert.equal(__get('shared_journeys/j1')!.owner_name, 'Denis');
+  });
+  test('an unrelated profile change leaves the trips alone, including the name given on joining', async () => {
+    const { code } = await share('owner', { journeyId: 'j1' });
+    await join('anna', { code, name: 'Annie' });
+    await spreadProfile('anna', { displayName: 'Anna', citizenship: 'DE' }, { displayName: 'Anna', citizenship: 'FR' });
+    assert.equal((__get('shared_journeys/j1')!.members as any).anna.name, 'Annie');
   });
   test('an avatar value that is not a plain seed is ignored', async () => {
     __seed('users/owner', { displayName: 'Denis', avatar: 'x"><script>' });

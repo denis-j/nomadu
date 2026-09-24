@@ -24,6 +24,7 @@ import { randomInt } from 'node:crypto';
 import { Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-functions/v2/https';
+import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import * as logger from 'firebase-functions/logger';
 import { avatarSeed } from '../../lib/avatarSeed';
 
@@ -94,10 +95,14 @@ async function ownerName(uid: string, given: unknown): Promise<string> {
   return cleanName(given, cleanName(profile.get('displayName'), 'A friend'));
 }
 
+/** A picked face as stored on the profile: a plain DiceBear seed, or nothing. */
+function cleanAvatar(value: unknown): string | null {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(value) ? value : null;
+}
+
 /** The face someone picked in the app (a DiceBear seed), if any. */
 async function profileAvatar(uid: string): Promise<string | null> {
-  const value = (await getFirestore().doc(`users/${uid}`).get()).get('avatar');
-  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(value) ? value : null;
+  return cleanAvatar((await getFirestore().doc(`users/${uid}`).get()).get('avatar'));
 }
 
 interface SharedDoc {
@@ -348,6 +353,58 @@ export async function forgetUser(uid: string): Promise<void> {
     await d.ref.update({ member_uids: (d.get('member_uids') as string[]).filter((m) => m !== uid), members });
   }
 }
+
+/**
+ * Someone changed their name or face: every shared trip shows the new one.
+ * As a member, their entry in the member list and their traveller row in
+ * the mirror the others follow (the owner's phone takes the list over on
+ * its next sync, the mirror covers the time until then). As an owner, the
+ * name and face the invite shows. Only what changed is written, so the
+ * name someone gave when joining stays until they change it.
+ */
+export async function spreadProfile(uid: string, before: FirebaseFirestore.DocumentData | undefined, after: FirebaseFirestore.DocumentData | undefined): Promise<void> {
+  if (!after) return;
+  const name = cleanName(after.displayName, '');
+  const avatar = cleanAvatar(after.avatar);
+  const nameChanged = !!name && name !== cleanName(before?.displayName, '');
+  const avatarChanged = avatar !== cleanAvatar(before?.avatar);
+  if (!nameChanged && !avatarChanged) return;
+  const db = getFirestore();
+
+  const memberOf = await db.collection(SHARED).where('member_uids', 'array-contains', uid).get();
+  for (const d of memberOf.docs) {
+    await db.runTransaction(async (tx) => {
+      const fresh = (await tx.get(d.ref)).data() as SharedDoc | undefined;
+      const me = fresh?.members?.[uid];
+      if (!fresh || !me) return;
+      const members = { ...fresh.members };
+      const entry: SharedDoc['members'][string] = { ...me };
+      if (nameChanged) entry.name = name;
+      if (avatarChanged) {
+        if (avatar) entry.avatar = avatar;
+        else delete entry.avatar;
+      }
+      members[uid] = entry;
+      const travellers = (fresh.travellers ?? []).map((t: any) => (t?.uid === uid
+        ? { ...t, ...(nameChanged && { name }), ...(avatarChanged && { avatar: avatar ?? null }) }
+        : t));
+      tx.update(d.ref, { members, travellers });
+    });
+  }
+
+  const owned = await db.collection(SHARED).where('owner_uid', '==', uid).get();
+  for (const d of owned.docs) {
+    await d.ref.update({
+      ...(nameChanged && { owner_name: name }),
+      // Empty: back to the default face (ownerAvatar).
+      ...(avatarChanged && { owner_avatar: avatar ?? '' }),
+    });
+  }
+  logger.info('profile spread to shared trips', { uid, member: memberOf.size, owner: owned.size });
+}
+
+export const sharedProfiles = onDocumentWritten({ document: 'users/{uid}', region: REGION }, (event) =>
+  spreadProfile(event.params.uid, event.data?.before.data(), event.data?.after.data()));
 
 const opts = { region: REGION };
 export const shareJourney = onCall(opts, (request) => share(requireUid(request), request.data ?? {}));

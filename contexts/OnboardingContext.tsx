@@ -26,20 +26,27 @@ const OnboardingContext = createContext<OnboardingContextValue>({
  * `*_pending` keys onto the real UID before computing `onboardingDone`.
  */
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
-  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+  // Stored with the account it was read for. A value for another account is
+  // not an answer yet: right after signing out or deleting, the layout would
+  // otherwise route on the old account's "done" before the effect below
+  // has run (children's effects run first) and send the user to sign-up
+  // instead of welcome.
+  const [state, setState] = useState<{ uid: string; done: boolean } | null>(null);
   const { user } = useAuth();
+  const currentUid = user?.uid ?? LOCAL_ONBOARDING_UID;
+  const onboardingDone = state?.uid === currentUid ? state.done : null;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       if (!user) {
         const done = await isOnboardingComplete(LOCAL_ONBOARDING_UID);
-        if (!cancelled) setOnboardingDone(done);
+        if (!cancelled) setState({ uid: LOCAL_ONBOARDING_UID, done });
         return;
       }
       await migrateLocalOnboardingData(user.uid);
       const done = await isOnboardingComplete(user.uid);
-      if (!cancelled) setOnboardingDone(done);
+      if (!cancelled) setState({ uid: user.uid, done });
     })();
     return () => {
       cancelled = true;
@@ -49,7 +56,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const markOnboardingComplete = useCallback(async () => {
     const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
     await completeOnboardingStorage(uid);
-    setOnboardingDone(true);
+    setState({ uid, done: true });
   }, [user]);
 
   return (
