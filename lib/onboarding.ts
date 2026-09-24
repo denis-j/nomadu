@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { updateProfile } from 'firebase/auth';
+import { auth, db } from './firebase';
+import { PROFILE_AVATAR_KEY, PROFILE_NAME_KEY, getProfile, resetProfileCache, setProfile } from './profile';
 
 /**
  * Reverse funnel placeholder UID used while the user is going through the
@@ -21,6 +23,8 @@ const ONBOARDING_KEY_BUILDERS: ReadonlyArray<(uid: string) => string> = [
   CITIZENSHIP_KEY,
   FIXED_RESIDENCE_KEY,
   ONBOARDING_GOAL_KEY,
+  PROFILE_NAME_KEY,
+  PROFILE_AVATAR_KEY,
 ];
 
 export type OnboardingGoal = 'tax' | 'visa' | 'history';
@@ -108,6 +112,8 @@ export async function migrateLocalOnboardingData(realUid: string): Promise<void>
       await AsyncStorage.removeItem(fromKey);
     }
   }
+  // The cached profile was the placeholder's; the real uid reads it fresh.
+  resetProfileCache();
 }
 
 /** Wipe all `*_pending` onboarding keys. Safe to call at any time. */
@@ -123,20 +129,42 @@ export async function clearLocalOnboardingData(): Promise<void> {
  * idempotent; the sync calls it on every run as a backfill.
  */
 export async function pushProfileToCloud(uid: string): Promise<void> {
-  const [citizenship, hasFixedResidence] = await Promise.all([
+  const [citizenship, hasFixedResidence, profile] = await Promise.all([
     getCitizenship(uid),
     getHasFixedResidence(uid),
+    getProfile(uid),
   ]);
-  if (!citizenship && hasFixedResidence === null) return;
+  if (!citizenship && hasFixedResidence === null && !profile.name && !profile.avatar) return;
+  // The account's display name is what an invite shows and what a friend's
+  // trip calls this person; it comes from the name picked in onboarding.
+  if (profile.name && auth.currentUser?.uid === uid && auth.currentUser.displayName !== profile.name) {
+    await updateProfile(auth.currentUser, { displayName: profile.name }).catch(() => {});
+  }
   await setDoc(
     doc(db, 'users', uid),
     {
       ...(citizenship && { citizenship }),
       ...(hasFixedResidence !== null && { hasFixedResidence }),
+      ...(profile.name && { displayName: profile.name }),
+      ...(profile.avatar && { avatar: profile.avatar }),
       // So the agent API counts days up to the user's today, not the
       // server's: in UTC+7 before 07:00 the server is still on yesterday.
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     },
     { merge: true },
   );
+}
+
+/**
+ * Name and face from the account, for a phone that has none yet: a new
+ * device, or a reinstall. Never overwrites what was chosen on this phone.
+ */
+export async function pullProfileFromCloud(uid: string): Promise<void> {
+  const local = await getProfile(uid);
+  if (local.name && local.avatar) return;
+  const snap = await getDoc(doc(db, 'users', uid));
+  const data = snap.data() ?? {};
+  const name = local.name || (typeof data.displayName === 'string' ? data.displayName : '') || auth.currentUser?.displayName || '';
+  const avatar = local.avatar || (typeof data.avatar === 'string' ? data.avatar : null);
+  if (name !== local.name || avatar !== local.avatar) await setProfile(uid, { name, avatar });
 }

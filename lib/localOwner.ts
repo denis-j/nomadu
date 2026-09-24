@@ -12,6 +12,7 @@ import {
 import { forgetAccommodationPlans } from '../hooks/useAccommodations';
 import { reportError } from './monitoring';
 import { cloudChanged } from './syncTrigger';
+import { resetProfileCache } from './profile';
 
 /**
  * Which account the data on this phone belongs to.
@@ -82,6 +83,7 @@ export async function wipeLocalData(): Promise<void> {
   await wipeLocalDatabase();
   resetPrefetchCaches();
   forgetAccommodationPlans();
+  resetProfileCache();
 
   // The rest is cleanup around the data, which is already gone. A failure
   // here must not stop the new account from signing in.

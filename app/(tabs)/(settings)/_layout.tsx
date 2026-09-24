@@ -20,6 +20,14 @@ export default function SettingsStack() {
         }}
       />
       <Stack.Screen
+        name="profile"
+        options={{
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.75, 1.0],
+        }}
+      />
+      <Stack.Screen
         name="agent"
         options={{
           title: 'AI agent',

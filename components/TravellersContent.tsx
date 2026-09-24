@@ -110,7 +110,7 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
       <View style={styles.faces}>
         {people.map((p) => (
           <Pressable key={p.key} onPress={() => personMenu(p)} disabled={!isOwner} style={({ pressed }) => [styles.person, pressed && { opacity: 0.6 }]}>
-            <Avatar person={p} size={44} />
+            <Avatar person={p} size={44} animated />
             {/* First name only under a face; the full name is in the menu title. */}
             <Text style={styles.name} numberOfLines={1}>{p.label.split(/\s+/)[0]}</Text>
           </Pressable>

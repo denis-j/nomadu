@@ -44,7 +44,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
  * over every journey's stops) on each launch, background location wakes
  * included, was work before the first screen for nothing.
  */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
   // Per connection, so on every open.
@@ -293,6 +293,9 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
     ['journeys', 'shared_owner_uid TEXT'],
     ['journeys', 'shared_owner_name TEXT'],
     ['journey_travellers', 'uid TEXT'],
+    // The face a traveller picked (a DiceBear seed, lib/profile.ts); null
+    // draws the default from their account or row id.
+    ['journey_travellers', 'avatar TEXT'],
     // A plan that came with a friend's trip: shown, never pushed as ours.
     ['accommodations', 'followed INTEGER NOT NULL DEFAULT 0'],
     // Documents of a shared trip travel through Storage: a stable id for
@@ -785,7 +788,7 @@ export async function getAllJourneys(): Promise<Journey[]> {
         WHERE l2.journey_id = j.id
       ) AS countries,
       (
-        SELECT json_group_array(json_array(t.name, t.uid, t.sync_id))
+        SELECT json_group_array(json_array(t.name, t.uid, t.sync_id, t.avatar))
         FROM journey_travellers t
         WHERE t.journey_id = j.id
         ORDER BY t.sort_order ASC, t.id ASC
@@ -892,6 +895,8 @@ export interface JourneySyncTraveller {
   sort_order: number;
   /** The friend's account, once they joined through the app. */
   uid?: string | null;
+  /** Their chosen face, see JourneyTraveller.avatar. */
+  avatar?: string | null;
 }
 
 export interface JourneyForSync {
@@ -934,7 +939,7 @@ export async function getAllJourneysForSync(): Promise<JourneyForSync[]> {
       })),
     travellers: travellers
       .filter((t) => t.journey_id === j.id)
-      .map((t) => ({ sync_id: t.sync_id!, name: t.name, sort_order: t.sort_order, uid: t.uid ?? null })),
+      .map((t) => ({ sync_id: t.sync_id!, name: t.name, sort_order: t.sort_order, uid: t.uid ?? null, avatar: t.avatar ?? null })),
     share_code: j.share_code ?? null,
     shared_owner_uid: j.shared_owner_uid ?? null,
   }));
@@ -1015,11 +1020,11 @@ export async function upsertJourneyFromCloud(
   for (const t of remote.travellers) {
     const local = localTravellers.find((x) => x.sync_id === t.sync_id);
     if (local) {
-      await database.runAsync('UPDATE journey_travellers SET name = ?, sort_order = ?, uid = ? WHERE id = ?', [t.name, t.sort_order, t.uid ?? null, local.id]);
+      await database.runAsync('UPDATE journey_travellers SET name = ?, sort_order = ?, uid = ?, avatar = ? WHERE id = ?', [t.name, t.sort_order, t.uid ?? null, t.avatar ?? null, local.id]);
     } else {
       await database.runAsync(
-        'INSERT OR IGNORE INTO journey_travellers (journey_id, name, sort_order, sync_id, uid) VALUES (?, ?, ?, ?, ?)',
-        [journeyId, t.name, t.sort_order, t.sync_id, t.uid ?? null],
+        'INSERT OR IGNORE INTO journey_travellers (journey_id, name, sort_order, sync_id, uid, avatar) VALUES (?, ?, ?, ?, ?, ?)',
+        [journeyId, t.name, t.sort_order, t.sync_id, t.uid ?? null, t.avatar ?? null],
       );
     }
   }
@@ -1084,7 +1089,7 @@ export async function forgetFollowedJourney(syncId: string): Promise<void> {
  * by hand under that exact name takes over that row. Returns whether
  * anything changed, so the caller can push the new list to the mirror.
  */
-export async function syncJourneyMembers(syncId: string, members: { uid: string; name: string }[], ownerUid: string): Promise<boolean> {
+export async function syncJourneyMembers(syncId: string, members: { uid: string; name: string; avatar?: string | null }[], ownerUid: string): Promise<boolean> {
   const database = await getDatabase();
   const journey = await database.getFirstAsync<{ id: number }>('SELECT id FROM journeys WHERE sync_id = ? AND deleted = 0', [syncId]);
   if (!journey) return false;
@@ -1099,22 +1104,23 @@ export async function syncJourneyMembers(syncId: string, members: { uid: string;
     }
   }
   for (const m of members) {
+    const avatar = m.avatar ?? null;
     const byUid = travellers.find((t) => t.uid === m.uid);
     if (byUid) {
-      if (byUid.name !== m.name) {
-        await database.runAsync('UPDATE journey_travellers SET name = ? WHERE id = ?', [m.name, byUid.id]);
+      if (byUid.name !== m.name || (byUid.avatar ?? null) !== avatar) {
+        await database.runAsync('UPDATE journey_travellers SET name = ?, avatar = ? WHERE id = ?', [m.name, avatar, byUid.id]);
         changed = true;
       }
       continue;
     }
     const byName = travellers.find((t) => !t.uid && t.name.trim().toLowerCase() === m.name.trim().toLowerCase());
     if (byName) {
-      await database.runAsync('UPDATE journey_travellers SET uid = ? WHERE id = ?', [m.uid, byName.id]);
+      await database.runAsync('UPDATE journey_travellers SET uid = ?, avatar = ? WHERE id = ?', [m.uid, avatar, byName.id]);
     } else {
       await database.runAsync(
-        `INSERT INTO journey_travellers (journey_id, name, sort_order, sync_id, uid)
-         VALUES (?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM journey_travellers WHERE journey_id = ?), ?, ?)`,
-        [journey.id, m.name, journey.id, Crypto.randomUUID(), m.uid],
+        `INSERT INTO journey_travellers (journey_id, name, sort_order, sync_id, uid, avatar)
+         VALUES (?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM journey_travellers WHERE journey_id = ?), ?, ?, ?)`,
+        [journey.id, m.name, journey.id, Crypto.randomUUID(), m.uid, avatar],
       );
     }
     changed = true;
@@ -1359,6 +1365,8 @@ export interface JourneyTraveller {
   sync_id: string | null;
   /** Set when this traveller is a friend who joined through the app. */
   uid: string | null;
+  /** Their chosen face (DiceBear seed), when they picked one. */
+  avatar?: string | null;
 }
 
 export interface JourneyDocument {
@@ -1413,6 +1421,24 @@ async function touchJourney(journeyId: number): Promise<void> {
  * time a journey's wallet is used, so journeys that never touch documents
  * carry no rows.
  */
+/**
+ * Put this account's chosen face on its own traveller rows (on trips it owns;
+ * on a friend's trip the friend's phone writes the row). Touches the journeys
+ * that changed so the next push carries the face to the others.
+ */
+export async function applyMyAvatar(uid: string, avatar: string | null): Promise<void> {
+  const database = await getDatabase();
+  const rows = await database.getAllAsync<{ id: number; journey_id: number }>(
+    `SELECT t.id, t.journey_id FROM journey_travellers t JOIN journeys j ON j.id = t.journey_id
+     WHERE t.uid = ? AND j.shared_owner_uid IS NULL AND j.deleted = 0 AND t.avatar IS NOT ?`,
+    [uid, avatar],
+  );
+  for (const r of rows) {
+    await database.runAsync('UPDATE journey_travellers SET avatar = ? WHERE id = ?', [avatar, r.id]);
+  }
+  for (const journeyId of new Set(rows.map((r) => r.journey_id))) await touchJourney(journeyId);
+}
+
 export async function ensureSelfTraveller(journeyId: number, uid: string | null = null): Promise<JourneyTraveller[]> {
   const database = await getDatabase();
   const existing = await getJourneyTravellers(journeyId);

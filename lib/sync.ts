@@ -23,6 +23,7 @@ import {
 import { db } from './firebase';
 import {
   markAllTripsDeleted,
+  applyMyAvatar,
   getMeta,
   setMeta,
   getTripSyncStamps,
@@ -65,7 +66,8 @@ import { localIsNewer, parseSyncStamp } from './syncTime';
 import { cloudChanged } from './syncTrigger';
 import { clearBadgeProgress } from './badges';
 import { reportError } from './monitoring';
-import { pushProfileToCloud } from './onboarding';
+import { pullProfileFromCloud, pushProfileToCloud } from './onboarding';
+import { getProfile } from './profile';
 
 const LAST_SYNC_KEY = (uid: string) => `@last_sync_${uid}`;
 
@@ -495,6 +497,9 @@ export async function pullVisasFromCloud(uid: string): Promise<void> {
 // insert (and by the migration), so nothing has to be written back here.
 
 export async function pushJourneysToCloud(uid: string): Promise<void> {
+  // This account's chosen face onto its own traveller rows first, so the
+  // journeys it changes go out in this very push.
+  await applyMyAvatar(uid, (await getProfile(uid)).avatar);
   const allJourneys = await getAllJourneysForSync();
   if (allJourneys.length === 0) return;
 
@@ -583,9 +588,13 @@ function sharedOwnerOf(data: DocumentData) {
   return { uid: String(data.owner_uid ?? ''), name: String(data.owner_name ?? 'A friend') };
 }
 
-function membersOf(data: DocumentData): { uid: string; name: string }[] {
-  const members = (data.members ?? {}) as Record<string, { name?: unknown }>;
-  return Object.entries(members).map(([uid, m]) => ({ uid, name: typeof m?.name === 'string' && m.name.trim() ? m.name.trim() : 'Friend' }));
+function membersOf(data: DocumentData): { uid: string; name: string; avatar: string | null }[] {
+  const members = (data.members ?? {}) as Record<string, { name?: unknown; avatar?: unknown }>;
+  return Object.entries(members).map(([uid, m]) => ({
+    uid,
+    name: typeof m?.name === 'string' && m.name.trim() ? m.name.trim() : 'Friend',
+    avatar: typeof m?.avatar === 'string' && m.avatar ? m.avatar : null,
+  }));
 }
 
 async function takeFollowedJourney(id: string, data: DocumentData): Promise<void> {
@@ -769,6 +778,7 @@ export async function syncAll(uid: string): Promise<void> {
     ['trips:push', () => pushTripsToCloud(uid)],
     ['visas:pull', () => pullVisasFromCloud(uid)],
     ['visas:push', () => pushVisasToCloud(uid)],
+    ['profile:pull', () => pullProfileFromCloud(uid)],
     ['journeys:pull', () => pullJourneysFromCloud(uid)],
     ['members:pull', () => pullMembersFromCloud(uid)],
     ['journeys:push', () => pushJourneysToCloud(uid)],

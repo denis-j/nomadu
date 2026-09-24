@@ -94,12 +94,19 @@ async function ownerName(uid: string, given: unknown): Promise<string> {
   return cleanName(given, cleanName(profile.get('displayName'), 'A friend'));
 }
 
+/** The face someone picked in the app (a DiceBear seed), if any. */
+async function profileAvatar(uid: string): Promise<string | null> {
+  const value = (await getFirestore().doc(`users/${uid}`).get()).get('avatar');
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(value) ? value : null;
+}
+
 interface SharedDoc {
   owner_uid: string;
   owner_name: string;
   invite_code: string;
   member_uids: string[];
-  members: Record<string, { name: string; joined_at: Timestamp }>;
+  members: Record<string, { name: string; joined_at: Timestamp; avatar?: string }>;
+  owner_avatar?: string;
   title: string;
   legs: any[];
   travellers: any[];
@@ -129,10 +136,12 @@ export async function share(uid: string, data: { journeyId?: unknown; name?: unk
 
   const code = existing.exists && typeof existing.get('invite_code') === 'string' ? (existing.get('invite_code') as string) : newCode();
   const name = await ownerName(uid, data.name);
+  const avatar = await profileAvatar(uid);
   await ref.set(
     {
       owner_uid: uid,
       owner_name: name,
+      ...(avatar && { owner_avatar: avatar }),
       invite_code: code,
       member_uids: existing.exists ? existing.get('member_uids') ?? [] : [],
       members: existing.exists ? existing.get('members') ?? {} : {},
@@ -176,7 +185,7 @@ export async function preview(uid: string, data: { code?: unknown }) {
     // The invite screen draws the owner's face from this, the same seed the
     // trip's own traveller row uses once you are on it. Hashed, so the
     // invite never carries the owner's account id.
-    owner_avatar: avatarSeed(x.owner_uid),
+    owner_avatar: ownerAvatar(x),
     start_date: legs[0]?.start_date ?? null,
     end_date: legs.length ? legs[legs.length - 1].end_date : null,
     stops: legs.map((l: any) => ({
@@ -198,6 +207,7 @@ export async function join(uid: string, data: { code?: unknown; name?: unknown }
   const x = shared.data() as SharedDoc;
   if (x.owner_uid === uid) throw new HttpsError('failed-precondition', 'This is your own trip.');
   const profile = await getFirestore().doc(`users/${uid}`).get();
+  const avatar = await profileAvatar(uid);
   // Read and write in one transaction: two people joining at the same moment
   // each wrote the member list they had read, and one of them vanished from
   // it; parallel joins could also go past MAX_MEMBERS.
@@ -213,6 +223,7 @@ export async function join(uid: string, data: { code?: unknown; name?: unknown }
     members[uid] = {
       name: cleanName(data.name, cleanName(profile.get('displayName'), 'Friend')),
       joined_at: members[uid]?.joined_at ?? Timestamp.now(),
+      ...(avatar && { avatar }),
     };
     tx.update(shared.ref, { member_uids: uids, members });
   });
@@ -365,8 +376,16 @@ function humanDate(ymd: string): string {
  * hashed seed (see lib/avatarSeed.ts). The account id itself never reaches
  * this page or the avatar service.
  */
-const AVATAR_URL = (uid: string) =>
-  `https://api.dicebear.com/9.x/avataaars/png?seed=${avatarSeed(uid)}&size=112`;
+const AVATAR_URL = (seed: string) =>
+  `https://api.dicebear.com/10.x/thumbs/svg?seed=${encodeURIComponent(seed)}&animationVariant=medium&${AVATAR_PARAMS}`;
+/** The app's colours for the faces; keep in step with AVATAR_PARAMS in lib/avatars.ts. */
+const AVATAR_PARAMS =
+  'backgroundColor=4dc1ff,8ad3ff,2fa8e8&shapeColor=ffffff,f2faff&eyesColor=0b2541&mouthColor=0b2541';
+
+/** The owner's face: the one they picked, or the default drawn from their id. */
+function ownerAvatar(x: { owner_uid: string; owner_avatar?: unknown }): string {
+  return typeof x.owner_avatar === 'string' && x.owner_avatar ? x.owner_avatar : avatarSeed(x.owner_uid);
+}
 
 /** The trip as a page: what the link shows to someone without the app. */
 export function sharePageHtml(code: string, x: SharedDoc): string {
@@ -408,7 +427,7 @@ export function sharePageHtml(code: string, x: SharedDoc): string {
 <body>
 <main>
   <div class="from">
-    <img src="${AVATAR_URL(x.owner_uid)}" alt="" width="56" height="56">
+    <img src="${AVATAR_URL(ownerAvatar(x))}" alt="" width="56" height="56">
     <div>
       <p class="who">${escape(x.owner_name)} invites you along</p>
       <h1>${escape(x.title)}</h1>

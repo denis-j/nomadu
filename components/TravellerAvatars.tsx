@@ -4,7 +4,9 @@ import { Image } from 'expo-image';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useAvatar } from '../lib/avatars';
+import { AnimatedFace } from './AnimatedFace';
 import { avatarSeed } from '../lib/avatarSeed';
+import { myAvatarSeed } from '../lib/profile';
 import { travellerLabel, type JourneyTraveller } from '../lib/database';
 import { myName } from '../lib/sharing';
 
@@ -41,7 +43,7 @@ export interface AvatarPerson {
 
 /**
  * The faces for a row read straight from the trip list's query, which
- * carries its travellers as `[name, uid, sync_id]` triples rather than as
+ * carries its travellers as `[name, uid, sync_id, avatar]` rows rather than as
  * rows (see getAllJourneys). Same shape as `avatarPeople`, without a
  * second read per card.
  */
@@ -59,8 +61,8 @@ export function avatarPeopleFromJson(
   }
   if (!Array.isArray(raw)) return [];
   const travellers: JourneyTraveller[] = raw
-    .filter((t): t is [string, string | null, string | null] => Array.isArray(t) && typeof t[0] === 'string')
-    .map((t, i) => ({ id: i, journey_id: 0, name: t[0], sort_order: i, uid: t[1] ?? null, sync_id: t[2] ?? null }));
+    .filter((t): t is [string, string | null, string | null, string | null] => Array.isArray(t) && typeof t[0] === 'string')
+    .map((t, i) => ({ id: i, journey_id: 0, name: t[0], sort_order: i, uid: t[1] ?? null, sync_id: t[2] ?? null, avatar: t[3] ?? null }));
   return avatarPeople(travellers, uid, journey);
 }
 
@@ -78,7 +80,11 @@ export function avatarPeople(
     const owner = journey?.shared_owner_uid
       ? t.uid === journey.shared_owner_uid || (!t.uid && t.name === 'You')
       : t.uid === ownerUid || (!t.uid && t.name === 'You');
-    return { key: String(t.id), label, account: !!t.uid || owner, owner, seed: avatarSeed(t.uid ?? t.sync_id) };
+    // Whose face: this account's own pick for its own row, the pick that
+    // came with a friend's row, else the default drawn from the id.
+    const isMe = !!uid && (t.uid === uid || (!journey?.shared_owner_uid && owner && !t.uid));
+    const seed = (isMe ? myAvatarSeed(uid) : null) ?? t.avatar ?? avatarSeed(t.uid ?? t.sync_id);
+    return { key: String(t.id), label, account: !!t.uid || owner, owner, seed };
   });
   return people.sort((a, b) => Number(b.owner) - Number(a.owner));
 }
@@ -87,10 +93,13 @@ export function Avatar({
   person,
   size = 40,
   style,
+  animated,
 }: {
   person: Pick<AvatarPerson, 'label' | 'account' | 'owner' | 'seed'>;
   size?: number;
   style?: StyleProp<ViewStyle>;
+  /** Blink and sway (AnimatedFace), for a face shown on its own rather than in a stack. */
+  animated?: boolean;
 }) {
   const fontSize = Math.round(size * 0.36);
   const face = useAvatar(person.seed);
@@ -106,7 +115,10 @@ export function Avatar({
       ]}
     >
       {face ? (
-        <Image source={{ uri: face }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+        <>
+          <Image source={{ uri: face }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+          {animated ? <AnimatedFace seed={person.seed} size={size} /> : null}
+        </>
       ) : (
         <Text style={[styles.initials, { fontSize }, !person.account && styles.initialsMuted]}>{initialsOf(person.label)}</Text>
       )}

@@ -5,21 +5,36 @@ import { Directory, File, Paths } from 'expo-file-system';
  * A face for every traveller, without asking anyone for a photo.
  *
  * DiceBear draws a cartoon avatar from a seed, deterministically: the same
- * seed is the same face on every phone. The seed is the traveller's account
- * id, or the traveller row's sync id for a name typed into the wallet, so
- * the owner and every friend see the same person the same way and nothing
- * about the person is sent, only an opaque id.
+ * seed is the same face on every phone. The seed is the face someone picked
+ * (lib/profile.ts), or else drawn from their account id or the traveller
+ * row's sync id, so the owner and every friend see the same person the same
+ * way and nothing about the person is sent, only an opaque id.
  *
- * Each picture is fetched once and kept in the cache directory. Offline
- * with nothing cached, the disc shows initials instead; the picture fills
- * in the next time it can. The style is one constant: `avataaars` is free
- * for commercial use without attribution, most other DiceBear styles are
- * CC BY and would need a line in the settings.
+ * Style `thumbs`, DiceBear's own design under CC0: free for commercial use
+ * without attribution. Colours are the app's own, cloud-white faces on its
+ * sky blues with navy features, instead of the style's random palette.
+ *
+ * Two forms of each face, both fetched once and kept in the cache directory:
+ *
+ *   - PNG, 384 px, sharp at the largest size the app draws: for the small
+ *     discs in lists, where many sit side by side.
+ *   - SVG with DiceBear's own CSS animation (a blink, a sway): for the few
+ *     places a face is on its own, drawn by AnimatedFace in a web view,
+ *     because React Native does not run CSS animations.
+ *
+ * Offline with nothing cached, the disc shows initials instead; the picture
+ * fills in the next time it can. The public invite page draws the same face
+ * (functions/src/share.ts), so both must use the same parameters.
  */
 
-const STYLE = 'avataaars';
-const PIXELS = 192;
-const BASE = `https://api.dicebear.com/9.x/${STYLE}/png`;
+export const AVATAR_STYLE = 'thumbs';
+const API = `https://api.dicebear.com/10.x/${AVATAR_STYLE}`;
+/** Keep in step with AVATAR_PARAMS in functions/src/share.ts. */
+export const AVATAR_PARAMS =
+  'backgroundColor=4dc1ff,8ad3ff,2fa8e8&shapeColor=ffffff,f2faff&eyesColor=0b2541&mouthColor=0b2541';
+const PIXELS = 384;
+/** Part of the cache file name: a change of style or colours fetches afresh. */
+const VERSION = 'thumbs10c';
 
 function cacheDir(): Directory {
   const dir = new Directory(Paths.cache, 'avatars');
@@ -28,49 +43,79 @@ function cacheDir(): Directory {
 }
 
 /** A file name the seed cannot break out of. */
-function fileFor(seed: string): File {
+function fileFor(seed: string, ext: 'png' | 'svg'): File {
   const safe = seed.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80);
-  return new File(cacheDir(), `${STYLE}-${safe}.png`);
+  return new File(cacheDir(), `${VERSION}-${safe}.${ext}`);
+}
+
+function urlFor(seed: string, ext: 'png' | 'svg'): string {
+  const s = encodeURIComponent(seed);
+  return ext === 'png'
+    ? `${API}/png?seed=${s}&size=${PIXELS}&${AVATAR_PARAMS}`
+    : `${API}/svg?seed=${s}&animationVariant=medium&${AVATAR_PARAMS}`;
 }
 
 const inFlight = new Map<string, Promise<string | null>>();
 const known = new Map<string, string | null>();
 
-/** The local uri of the seed's face, downloading it first if needed; null when that fails. */
-export async function avatarUri(seed: string): Promise<string | null> {
-  const hit = known.get(seed);
-  if (hit !== undefined) return hit;
-  let pending = inFlight.get(seed);
+/**
+ * Fetch-once with a shared in-flight promise per key. `read` turns the file
+ * on disk into what callers get: its uri for the PNG, its text for the SVG.
+ */
+function cached(seed: string, ext: 'png' | 'svg', read: (file: File) => Promise<string>): Promise<string | null> {
+  const key = `${ext}:${seed}`;
+  const hit = known.get(key);
+  if (hit !== undefined) return Promise.resolve(hit);
+  let pending = inFlight.get(key);
   if (!pending) {
     pending = (async () => {
       try {
-        const file = fileFor(seed);
-        if (!file.exists) {
-          await File.downloadFileAsync(`${BASE}?seed=${encodeURIComponent(seed)}&size=${PIXELS}`, file);
-        }
-        known.set(seed, file.uri);
-        return file.uri;
+        const file = fileFor(seed, ext);
+        if (!file.exists) await File.downloadFileAsync(urlFor(seed, ext), file);
+        const value = await read(file);
+        known.set(key, value);
+        return value;
       } catch {
         // Offline, or the service is down: initials do for now and the
         // next call tries again.
         return null;
       } finally {
-        inFlight.delete(seed);
+        inFlight.delete(key);
       }
     })();
-    inFlight.set(seed, pending);
+    inFlight.set(key, pending);
   }
   return pending;
 }
 
-/** The face for a seed, once it is on disk. */
-export function useAvatar(seed: string | null): string | null {
-  const [uri, setUri] = useState<string | null>(() => (seed ? known.get(seed) ?? null : null));
+/** The local uri of the seed's still face, downloading it first if needed; null when that fails. */
+export function avatarUri(seed: string): Promise<string | null> {
+  return cached(seed, 'png', async (file) => file.uri);
+}
+
+/** The seed's animated face as SVG markup; null when it cannot be had. */
+export function avatarSvg(seed: string): Promise<string | null> {
+  return cached(seed, 'svg', (file) => file.text());
+}
+
+function useCached(seed: string | null, ext: 'png' | 'svg', load: (seed: string) => Promise<string | null>): string | null {
+  const [value, setValue] = useState<string | null>(() => (seed ? known.get(`${ext}:${seed}`) ?? null : null));
   useEffect(() => {
     if (!seed) return;
     let live = true;
-    avatarUri(seed).then((u) => { if (live) setUri(u); });
+    setValue(known.get(`${ext}:${seed}`) ?? null);
+    load(seed).then((v) => { if (live) setValue(v); });
     return () => { live = false; };
-  }, [seed]);
-  return uri;
+  }, [seed, ext, load]);
+  return value;
+}
+
+/** The still face for a seed, once it is on disk. */
+export function useAvatar(seed: string | null): string | null {
+  return useCached(seed, 'png', avatarUri);
+}
+
+/** The animated face for a seed, once it is on disk. */
+export function useAvatarSvg(seed: string | null): string | null {
+  return useCached(seed, 'svg', avatarSvg);
 }

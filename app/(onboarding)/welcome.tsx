@@ -80,7 +80,7 @@ export default function WelcomeScreen() {
     );
 
     setTimeout(() => {
-      router.push('/(onboarding)/citizenship');
+      router.push('/(onboarding)/profile');
     }, FLASH_IN_MS);
   };
 

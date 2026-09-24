@@ -202,7 +202,7 @@ describe('the page', () => {
     assert.match(html, /🇻🇳/);
     assert.match(html, new RegExp(`href="nomady://join/${code}"`));
     // The owner's face, drawn from the hashed seed and not from their account id.
-    assert.match(html, /api\.dicebear\.com\/9\.x\/avataaars\/png\?seed=[0-9a-f]{16}&size=112/);
+    assert.match(html, /api\.dicebear\.com\/10\.x\/thumbs\/svg\?seed=[0-9a-f]{16}&animationVariant=medium&backgroundColor=4dc1ff/);
     assert.doesNotMatch(html, /owner_uid|owner/);
   });
 
@@ -250,5 +250,26 @@ describe('files of shared documents', () => {
     assert.equal(isTripFile('shared/j2/owner/all/d1.jpg', 'j1'), false);
     assert.equal(isTripFile('shared/j1/../j2/owner/all/d1.jpg', 'j1'), false);
     assert.equal(isTripFile(42, 'j1'), false);
+  });
+});
+
+describe('chosen faces', () => {
+  test('the owner\'s and a member\'s picked avatars travel with the trip', async () => {
+    __seed('users/owner', { displayName: 'Denis', avatar: 'ownerface1' });
+    __seed('users/anna', { displayName: 'Anna', avatar: 'annaface2' });
+    const { code } = await share('owner', { journeyId: 'j1' });
+    assert.equal((await preview('bob', { code })).owner_avatar, 'ownerface1');
+    await join('anna', { code });
+    assert.equal((__get('shared_journeys/j1')!.members as any).anna.avatar, 'annaface2');
+  });
+  test('without a pick, the default face is drawn from the id, never the id itself', async () => {
+    const { code } = await share('owner', { journeyId: 'j1' });
+    const seen = await preview('bob', { code });
+    assert.match(seen.owner_avatar, /^[0-9a-f]{16}$/);
+  });
+  test('an avatar value that is not a plain seed is ignored', async () => {
+    __seed('users/owner', { displayName: 'Denis', avatar: 'x"><script>' });
+    const { code } = await share('owner', { journeyId: 'j1' });
+    assert.match((await preview('bob', { code })).owner_avatar, /^[0-9a-f]{16}$/);
   });
 });

@@ -20,6 +20,9 @@ import { useSync } from '../../../contexts/SyncContext';
 import { Flag } from '../../../components/Flag';
 import { getHasFixedResidence, setHasFixedResidence } from '../../../lib/onboarding';
 import { IslandSheet } from '../../../components/IslandSheet';
+import { Avatar } from '../../../components/TravellerAvatars';
+import { useProfile } from '../../../lib/profile';
+import { avatarSeed } from '../../../lib/avatarSeed';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -30,6 +33,7 @@ export default function SettingsScreen() {
   const [trackingSheetVisible, setTrackingSheetVisible] = useState(false);
   const { isPro, expirationDate, productIdentifier, loading } = useSubscription();
   const { user, signOut: handleSignOut } = useAuth();
+  const profile = useProfile(user?.uid ?? null);
   const { syncStatus, lastSynced, triggerSync } = useSync();
   const { country: passportCountry, countryCode: passportCode } = usePassport();
   const { granted: notificationsGranted } = useNotificationPermission();
@@ -205,6 +209,29 @@ export default function SettingsScreen() {
       {/* Account */}
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
         <Text style={styles.sectionTitle}>Account</Text>
+        <Pressable
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/(tabs)/(settings)/profile');
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Edit your name and picture"
+        >
+          <View style={styles.profileRow}>
+            <Avatar
+              person={{ label: profile?.name || 'You', account: true, owner: false, seed: profile?.avatar ?? avatarSeed(user?.uid) }}
+              size={40}
+              animated
+            />
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>{profile?.name || 'Your name'}</Text>
+              <Text style={styles.rowDescription}>How friends see you on a shared trip</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+        </Pressable>
+        <View style={styles.separator} />
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Email</Text>
           <Text style={styles.rowValue}>{user?.email ?? 'Not set'}</Text>
@@ -549,6 +576,7 @@ function StatusBadge({ granted, label }: { granted: boolean; label?: string }) {
 }
 
 const styles = StyleSheet.create({
+  profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   content: {
     padding: 16,
     gap: 16,

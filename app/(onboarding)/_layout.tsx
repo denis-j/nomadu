@@ -4,14 +4,15 @@ import { StyleSheet, View } from 'react-native';
 import AnimatedGradientBackground from '../../components/animated-gradient-background';
 import { OnboardingProgress } from '../../components/OnboardingProgress';
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 function stepForSegment(segment: string | undefined): number | null {
   switch (segment) {
-    case 'citizenship': return 1;
-    case 'goal': return 2;
-    case 'residence': return 3;
-    case 'permissions': return 4;
+    case 'profile': return 1;
+    case 'citizenship': return 2;
+    case 'goal': return 3;
+    case 'residence': return 4;
+    case 'permissions': return 5;
     default: return null;
   }
 }
@@ -47,6 +48,7 @@ export default function OnboardingLayout() {
         }}
       >
         <Stack.Screen name="welcome" />
+        <Stack.Screen name="profile" />
         <Stack.Screen name="citizenship" />
         <Stack.Screen name="goal" />
         <Stack.Screen name="residence" />

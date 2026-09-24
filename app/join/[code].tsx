@@ -126,7 +126,7 @@ export default function JoinTripScreen() {
           <>
             {/* The inviter, with the face they carry on the trip itself. */}
             <View style={styles.whoRow}>
-              <Avatar person={{ label: preview.owner_name, account: true, owner: true, seed: preview.owner_avatar }} size={44} />
+              <Avatar person={{ label: preview.owner_name, account: true, owner: true, seed: preview.owner_avatar }} size={44} animated />
               <View style={styles.whoText}>
                 <Text style={styles.who}>{preview.owner_name} invites you along</Text>
                 <Text style={styles.title}>{preview.title}</Text>
