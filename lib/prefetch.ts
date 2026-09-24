@@ -54,6 +54,9 @@ export async function prefetchUserData(uid: string): Promise<void> {
     const citizenship = await getCitizenship(uid);
     if (!citizenship) return;
     citizenshipCache = { country: citizenship.country, countryCode: citizenship.countryCode };
+    // prefetchAll ran before the citizenship was known, so its stats counted
+    // days at home as away. Redone here, before the screens show them.
+    statsCache = await getStats(null, citizenship.countryCode);
 
     const { getAllUserVisas } = await import('./userVisas');
     const [trips, hasFixedResidence, userVisas] = await Promise.all([

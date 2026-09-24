@@ -30,7 +30,6 @@ import {
   getInstallId,
   updateJourneyShareCodeBySyncId,
   clearJourneyShareCodeBySyncId,
-  forgetFollowedJourney,
   getAllJourneysForSync,
   getAllTripsForSync,
   getFollowedJourneySyncIds,
@@ -62,6 +61,7 @@ import {
   type AccommodationStatus,
 } from './accommodationModel';
 import { pullDocumentsFromCloud, pushDocumentsToCloud, watchDocuments } from './documentSync';
+import { forgetFollowedJourneyWithDocuments } from './documents';
 import { localIsNewer, parseSyncStamp } from './syncTime';
 import { cloudChanged } from './syncTrigger';
 import { clearBadgeProgress } from './badges';
@@ -611,7 +611,7 @@ export async function pullSharedJourneysFromCloud(uid: string): Promise<void> {
   }
   // Followed here but no longer shared with us: the owner stopped, or we left.
   for (const syncId of await getFollowedJourneySyncIds()) {
-    if (!seen.has(syncId)) await forgetFollowedJourney(syncId);
+    if (!seen.has(syncId)) await forgetFollowedJourneyWithDocuments(syncId);
   }
 }
 
@@ -907,7 +907,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
     for (const change of snapshot.docChanges()) {
       try {
         if (change.type === 'removed') {
-          await forgetFollowedJourney(change.doc.id);
+          await forgetFollowedJourneyWithDocuments(change.doc.id);
         } else {
           await takeFollowedJourney(change.doc.id, change.doc.data());
         }
@@ -916,7 +916,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
       }
     }
     if (snapshot.docChanges().length > 0) cloudChanged();
-  }));
+  }), (err) => reportError(err, 'sync:followed-listen'));
 
   // Trips shared: a friend joining becomes a traveller within seconds. A
   // mirror that disappeared means sharing was stopped, from here or through
@@ -936,7 +936,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
       }
     }
     if (snapshot.docChanges().length > 0) cloudChanged();
-  }));
+  }), (err) => reportError(err, 'sync:shared-listen'));
 
   // Loaded once, on the first snapshot, and kept in step: that first
   // snapshot is the whole collection again, right after the pull read it.
@@ -950,23 +950,28 @@ export function startRealtimeSync(uid: string): Unsubscribe {
           ? data.updated_at.toDate().toISOString()
           : new Date().toISOString();
         if (!tripBringsNews(tripStamps, change.doc.id, updatedAt, data.deleted === true)) continue;
-        rememberTripStamp(tripStamps, change.doc.id, updatedAt, data.deleted === true);
 
-        await upsertTripFromCloud({
-          sync_id: change.doc.id,
-          city: data.city,
-          country: data.country,
-          country_code: data.country_code,
-          latitude: data.latitude ?? null,
-          longitude: data.longitude ?? null,
-          start_date: data.start_date,
-          end_date: data.end_date ?? null,
-          days: data.days ?? 1,
-          updated_at: updatedAt,
-          deleted: data.deleted === true,
-          local_id: data.local_id ?? null,
-          install_id: typeof data.install_id === 'string' ? data.install_id : null,
-        });
+        // One broken document must not cost the rest of the snapshot.
+        try {
+          await upsertTripFromCloud({
+            sync_id: change.doc.id,
+            city: data.city,
+            country: data.country,
+            country_code: data.country_code,
+            latitude: data.latitude ?? null,
+            longitude: data.longitude ?? null,
+            start_date: data.start_date,
+            end_date: data.end_date ?? null,
+            days: data.days ?? 1,
+            updated_at: updatedAt,
+            deleted: data.deleted === true,
+            local_id: data.local_id ?? null,
+            install_id: typeof data.install_id === 'string' ? data.install_id : null,
+          });
+          rememberTripStamp(tripStamps, change.doc.id, updatedAt, data.deleted === true);
+        } catch (err) {
+          reportError(err, 'sync:trips-realtime');
+        }
       }
     }
     if (snapshot.docChanges().length > 0) cloudChanged();
@@ -998,7 +1003,7 @@ export function stopRealtimeSync(): void {
   }
 }
 
-// ─── Wipe travel data (trips + visits), local + cloud. Plans are preserved. ───
+// ─── Wipe travel data (trips), local + cloud. Plans are preserved. ───
 
 /**
  * Clear every trip, here and on every device of the account.

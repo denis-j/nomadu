@@ -1,7 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Crypto from 'expo-crypto';
 import type Ionicons from '@expo/vector-icons/Ionicons';
-import { deleteJourney, getJourneyDocuments } from './database';
+import { deleteJourney, forgetFollowedJourney, getJourneyDocuments } from './database';
 
 /**
  * Travel documents: the files a trip needs at the border and the desk.
@@ -128,4 +128,20 @@ export async function deleteJourneyWithDocuments(journeyId: number): Promise<voi
     }
   }
   await deleteJourney(journeyId);
+}
+
+/**
+ * A friend's trip leaves this phone (we left, were removed, or sharing
+ * stopped), with the files of its documents. The rows went by cascade and
+ * the downloaded files stayed on the disk: someone else's passport photo,
+ * unlisted, kept for good.
+ */
+export async function forgetFollowedJourneyWithDocuments(syncId: string): Promise<void> {
+  for (const fileName of await forgetFollowedJourney(syncId)) {
+    try {
+      removeDocumentFile(fileName);
+    } catch (err) {
+      console.warn('[documents] could not remove file', fileName, err);
+    }
+  }
 }

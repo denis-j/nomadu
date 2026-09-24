@@ -11,6 +11,7 @@ import { Typography } from '../../../constants/typography';
 import { getJourneyDocument, getJourneyTravellers, getJourneyWithLegs, JourneyDocument, parseDate } from '../../../lib/database';
 import { documentExists, documentUri, isImageMime, kindMeta } from '../../../lib/documents';
 import { deleteDocumentEverywhere } from '../../../lib/documentSync';
+import { reportError } from '../../../lib/monitoring';
 import { showToast } from '../../../lib/toast';
 import { MissingRoute } from '../../../components/MissingRoute';
 
@@ -65,8 +66,15 @@ export default function DocumentScreen() {
         style: 'destructive',
         onPress: async () => {
           // A shared document goes from the cloud too, so the others lose it as well.
-          const journey = await getJourneyWithLegs(doc.journey_id);
-          await deleteDocumentEverywhere(doc, journey?.sync_id ?? null);
+          // Only the phone is waited for; the cloud catches up when there is signal.
+          try {
+            const journey = await getJourneyWithLegs(doc.journey_id);
+            await deleteDocumentEverywhere(doc, journey?.sync_id ?? null);
+          } catch (err) {
+            reportError(err, 'documents:delete');
+            showToast('Could not delete the document', 'error');
+            return;
+          }
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           router.back();
           showToast('Document deleted');

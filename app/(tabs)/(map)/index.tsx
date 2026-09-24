@@ -208,6 +208,9 @@ export default function MapScreen() {
   const { taxStatuses } = useTaxTracker();
   const appState = useRef(AppState.currentState);
   const [detecting, setDetecting] = useState(false);
+  // Null until the first check, so the empty chip does not flash the wrong
+  // hint before we know which one applies.
+  const [hasLocationPermission, setHasLocationPermission] = useState<boolean | null>(null);
 
   // On mount and when returning to foreground: fetch location immediately if
   // tracking is active, then refresh trips so the chip updates without waiting
@@ -215,6 +218,7 @@ export default function MapScreen() {
   useEffect(() => {
     async function checkAndRefresh() {
       const perms = await checkLocationPermissions();
+      setHasLocationPermission(perms.foreground);
       if (!perms.foreground) return;
 
       // Start background tracking if permission allows and task isn't running yet
@@ -274,14 +278,21 @@ export default function MapScreen() {
             visaStatuses={visaStatuses}
             taxStatuses={taxStatuses}
           />
-        ) : !loading ? (
+        ) : !loading && (detecting || hasLocationPermission !== null) ? (
           <ChipWrapper
             {...chipGlassProps}
             style={[styles.chip, !hasGlass && styles.chipFallback]}
           >
             <Ionicons name={detecting ? 'locate-outline' : 'navigate-outline'} size={16} color={Colors.textSecondary} />
             <Text style={styles.emptyText}>
-              {detecting ? 'Detecting your location…' : 'Enable location tracking to see your trips'}
+              {/* Asking for tracking only makes sense when it is actually
+                  off. With permission granted and no trips yet, the first
+                  recorded location is simply still to come. */}
+              {detecting
+                ? 'Detecting your location…'
+                : hasLocationPermission
+                  ? 'Your first stay appears once a location is recorded'
+                  : 'Enable location tracking to see your trips'}
             </Text>
           </ChipWrapper>
         ) : null}

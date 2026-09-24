@@ -49,7 +49,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
  * over every journey's stops) on each launch, background location wakes
  * included, was work before the first screen for nothing.
  */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
   // Per connection, so on every open.
@@ -61,19 +61,6 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
   if ((version?.user_version ?? 0) >= SCHEMA_VERSION) return;
 
   await database.execAsync(`
-
-    CREATE TABLE IF NOT EXISTS visits (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      latitude REAL NOT NULL,
-      longitude REAL NOT NULL,
-      city TEXT,
-      country TEXT,
-      country_code TEXT,
-      arrived_at TEXT NOT NULL,
-      departed_at TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
-    );
-
     CREATE TABLE IF NOT EXISTS trips (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       city TEXT NOT NULL,
@@ -348,6 +335,11 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
     }
   }
 
+  // Migration: every location fix used to be written to a `visits` table
+  // that nothing ever read, a row per fix for as long as the app was
+  // installed. Trips are what the app keeps.
+  await database.execAsync('DROP TABLE IF EXISTS visits');
+
   await database.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
@@ -360,36 +352,6 @@ function countryNameFor(code: string | null | undefined, given: string): string 
 export function parseDate(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d);
-}
-
-// ─── Visit CRUD ───
-
-export interface Visit {
-  id: number;
-  latitude: number;
-  longitude: number;
-  city: string | null;
-  country: string | null;
-  country_code: string | null;
-  arrived_at: string;
-  departed_at: string | null;
-  created_at: string;
-}
-
-export async function insertVisit(
-  latitude: number,
-  longitude: number,
-  city: string | null,
-  country: string | null,
-  countryCode: string | null,
-): Promise<number> {
-  const database = await getDatabase();
-  const result = await database.runAsync(
-    `INSERT INTO visits (latitude, longitude, city, country, country_code, arrived_at)
-     VALUES (?, ?, ?, ?, ?, datetime('now'))`,
-    [latitude, longitude, city, country, countryCode],
-  );
-  return result.lastInsertRowId;
 }
 
 // ─── Trip CRUD ───
@@ -1085,12 +1047,15 @@ export async function getFollowedJourneySyncIds(): Promise<string[]> {
  * and a tombstone with a fresh stamp would out-date the owner's mirror and
  * block the pull if we ever came back through the same link.
  */
-export async function forgetFollowedJourney(syncId: string): Promise<void> {
+/** Returns the file names of the trip's documents, whose files the caller removes (forgetFollowedJourneyWithDocuments). */
+export async function forgetFollowedJourney(syncId: string): Promise<string[]> {
   const database = await getDatabase();
   const row = await database.getFirstAsync<{ id: number }>('SELECT id FROM journeys WHERE sync_id = ? AND shared_owner_uid IS NOT NULL', [syncId]);
-  if (!row) return;
+  if (!row) return [];
+  const files = await database.getAllAsync<{ file_name: string }>('SELECT file_name FROM journey_documents WHERE journey_id = ?', [row.id]);
   await database.runAsync('DELETE FROM journeys WHERE id = ?', [row.id]);
   await database.runAsync('DELETE FROM accommodations WHERE journey_sync_id = ? AND followed = 1', [syncId]);
+  return files.map((f) => f.file_name);
 }
 
 /**
@@ -1610,7 +1575,6 @@ export async function markAllTripsDeleted(): Promise<void> {
   const database = await getDatabase();
   await database.execAsync(`
     UPDATE trips SET deleted = 1, updated_at = datetime('now') WHERE deleted = 0;
-    DELETE FROM visits;
   `);
 }
 
@@ -1634,7 +1598,6 @@ export async function wipeLocalDatabase(): Promise<void> {
       DELETE FROM plans;
       DELETE FROM user_visas;
       DELETE FROM trips;
-      DELETE FROM visits;
       DELETE FROM app_meta;
     `);
   });

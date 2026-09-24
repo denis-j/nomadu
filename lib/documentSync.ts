@@ -1,5 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File } from 'expo-file-system';
-import { Timestamp, collection, deleteDoc, doc, getDocs, onSnapshot, query, setDoc, where, type DocumentData, type Unsubscribe } from 'firebase/firestore';
+import { FirestoreError, Timestamp, collection, deleteDoc, doc, getDocs, onSnapshot, query, setDoc, where, type DocumentData, type Unsubscribe } from 'firebase/firestore';
 import { getDownloadURL, getMetadata, ref, uploadBytes } from 'firebase/storage';
 import { db, storage } from './firebase';
 import {
@@ -60,6 +61,72 @@ function cloudPathFor(
   return `shared/${journeySyncId}/${ownerUid}/${where}/${docSyncId}${ext}`;
 }
 
+/**
+ * Records deleted here that the cloud may not know about yet. Firestore only
+ * holds a queued write in memory, so a delete made offline was lost when the
+ * app closed, and the next pull brought the document back. Kept until the
+ * delete is confirmed; the push retries them, the pull does not take them.
+ */
+const PENDING_DELETES_KEY = 'documents:pending-deletes';
+
+interface PendingDelete {
+  journey: string;
+  doc: string;
+}
+
+let pendingDeletes: PendingDelete[] | null = null;
+// One read-modify-write at a time, so two deletes in a row both stay.
+let pendingQueue: Promise<unknown> = Promise.resolve();
+
+async function readPendingDeletes(): Promise<PendingDelete[]> {
+  if (pendingDeletes) return pendingDeletes;
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_DELETES_KEY);
+    pendingDeletes = raw ? (JSON.parse(raw) as PendingDelete[]) : [];
+  } catch {
+    pendingDeletes = [];
+  }
+  return pendingDeletes;
+}
+
+/** Another account takes over the phone: its deletes are not ours to send. */
+export async function forgetPendingDeletes(): Promise<void> {
+  await pendingQueue;
+  pendingDeletes = [];
+  await AsyncStorage.removeItem(PENDING_DELETES_KEY);
+}
+
+function changePendingDeletes(change: (list: PendingDelete[]) => PendingDelete[]): Promise<void> {
+  const run = pendingQueue.then(async () => {
+    pendingDeletes = change(await readPendingDeletes());
+    await AsyncStorage.setItem(PENDING_DELETES_KEY, JSON.stringify(pendingDeletes));
+  });
+  pendingQueue = run.catch(() => {});
+  return run;
+}
+
+/** The record deleted in the cloud; once confirmed, or when it never can be, it is forgotten. */
+async function deleteRecord(p: PendingDelete): Promise<void> {
+  try {
+    await deleteDoc(doc(recordsOf(p.journey), p.doc));
+  } catch (err) {
+    // Not ours to delete (another account on this phone now): trying again will not help.
+    if (!(err instanceof FirestoreError && err.code === 'permission-denied')) throw err;
+  }
+  await changePendingDeletes((list) => list.filter((x) => x.doc !== p.doc));
+}
+
+/** Not awaited: offline the write waits for the network, and the push with it. */
+async function retryPendingDeletes(): Promise<void> {
+  for (const p of await readPendingDeletes()) {
+    deleteRecord(p).catch((err) => reportError(err, 'documents:delete-record'));
+  }
+}
+
+async function isPendingDelete(id: string): Promise<boolean> {
+  return (await readPendingDeletes()).some((x) => x.doc === id);
+}
+
 interface Party {
   journey: JourneyForSync;
   /** Followed here (a member) or shared from here (the owner). */
@@ -88,6 +155,7 @@ function audienceOf(d: JourneyDocument, party: Party, uid: string): string | nul
 
 /** Push what may leave: new files uploaded, records of changed ones rewritten. */
 export async function pushDocumentsToCloud(uid: string): Promise<void> {
+  await retryPendingDeletes();
   for (const party of await parties()) {
     const records = new Map<string, DocumentData>();
     try {
@@ -197,6 +265,8 @@ export function checkedDocumentPath(path: string, journeyId: string, ownerUid: s
 }
 
 async function takeRecord(party: Party, id: string, x: DocumentData, uid: string): Promise<void> {
+  // Deleted here, the cloud not told yet: not a new document.
+  if (await isPendingDelete(id)) return;
   const existing = await getJourneyDocumentBySyncId(id);
   const travellerUid = typeof x.traveller_uid === 'string' ? x.traveller_uid : null;
   const traveller = travellerUid ? party.travellers.find((t) => t.uid === travellerUid) ?? null : null;
@@ -297,14 +367,21 @@ export async function watchDocuments(uid: string, refresh: () => void): Promise<
  * Delete on this phone and, if it was shared, in the cloud. Only the record
  * is deleted from here: clients may not delete files (storage.rules), the
  * `sharedDocumentFiles` function removes the file once the record is gone.
+ *
+ * Returns once the phone is done. The cloud part runs on its own: offline,
+ * Firestore holds the write until it is back and the promise did not settle
+ * until then, so the screen hung. Remembered first, so a closed app or a
+ * failed write is retried by the next push.
  */
 export async function deleteDocumentEverywhere(d: JourneyDocument, journeySyncId: string | null): Promise<void> {
   if (d.cloud_path && d.sync_id && journeySyncId) {
+    const pending = { journey: journeySyncId, doc: d.sync_id };
     try {
-      await deleteDoc(doc(recordsOf(journeySyncId), d.sync_id));
+      await changePendingDeletes((list) => [...list.filter((x) => x.doc !== pending.doc), pending]);
     } catch (err) {
-      reportError(err, 'documents:delete-record');
+      reportError(err, 'documents:delete-pending');
     }
+    deleteRecord(pending).catch((err) => reportError(err, 'documents:delete-record'));
   }
   await deleteJourneyDocument(d.id);
   removeDocumentFile(d.file_name);

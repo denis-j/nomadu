@@ -1,6 +1,6 @@
 import { Alert } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { forgetFollowedJourney } from './database';
+import { forgetFollowedJourneyWithDocuments } from './documents';
 import { leaveJourney, presentInvite, shareJourney, unshareJourney, type ShareableJourney } from './sharing';
 import { showToast } from './toast';
 
@@ -55,7 +55,7 @@ export function leaveTrip(journey: ShareableJourney): Promise<void> {
           try {
             if (journey.sync_id) {
               await leaveJourney(journey.sync_id);
-              await forgetFollowedJourney(journey.sync_id);
+              await forgetFollowedJourneyWithDocuments(journey.sync_id);
             }
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             showToast('You left the trip');

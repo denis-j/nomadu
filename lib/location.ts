@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getCurrentTrip, insertTrip, insertVisit, updateTripEndDate } from './database';
+import { getCurrentTrip, insertTrip, updateTripEndDate } from './database';
 import { reverseGeocode } from './geocoding';
 import { fireArrivalIfNew } from './notifications';
 import { reportError } from './monitoring';
@@ -71,7 +71,6 @@ async function processFix(fix: Fix, source: 'background' | 'foreground'): Promis
     if (lastFixAt != null && fix.timestamp <= lastFixAt) return;
 
     const geo = await reverseGeocode(fix.latitude, fix.longitude);
-    await insertVisit(fix.latitude, fix.longitude, geo.city, geo.country, geo.countryCode);
     if (!geo.city || !geo.country || !geo.countryCode) {
       await saveState(fix.timestamp, pending);
       return;

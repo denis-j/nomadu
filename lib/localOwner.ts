@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Directory, Paths } from 'expo-file-system';
+import { forgetPendingDeletes } from './documentSync';
 import { getMeta, setMeta, wipeLocalDatabase } from './database';
 import { resetPrefetchCaches } from './prefetch';
 import { resetSyncState } from './sync';
@@ -97,6 +98,7 @@ export async function wipeLocalData(): Promise<void> {
     ['notif-dedup', () => resetUsageThresholdState()],
     ['notif-arrival', () => resetArrivalState()],
     ['notif-expiry', () => rescheduleVisaExpiryReminders([])],
+    ['doc-deletes', () => forgetPendingDeletes()],
   ];
   for (const [name, run] of steps) {
     try {

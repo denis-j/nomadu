@@ -271,11 +271,13 @@ function CountryGroupCard({
   group,
   overlappingTripIds,
   onDelete,
+  onDeleteMany,
   onEdit,
 }: {
   group: CountryGroupData;
   overlappingTripIds: Set<number>;
   onDelete: (id: number) => void;
+  onDeleteMany: (ids: number[]) => void;
   onEdit: (trip: Trip) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -301,9 +303,7 @@ function CountryGroupCard({
         if (index === 0) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           LayoutAnimation.configureNext(EXPAND_CONFIG);
-          for (const { trip } of group.items) {
-            onDelete(trip.id);
-          }
+          onDeleteMany(group.items.map(({ trip }) => trip.id));
         }
       },
     );
@@ -636,6 +636,9 @@ export default function TimelineScreen() {
    * which a sync rewrites, so the same question came back at every launch.
    * A fresh fragment changes the fingerprint and is worth asking about
    * again; the same old mess is not.
+   *
+   * `askedRef` is only true while the alert is on screen, so focusing the
+   * tab again cannot stack a second one on top of it.
    */
   const askedRef = useRef(false);
   useFocusEffect(
@@ -658,16 +661,32 @@ export default function TimelineScreen() {
             {
               text: 'Not now',
               style: 'cancel',
-              onPress: () => { AsyncStorage.setItem(REPAIR_HIDDEN_KEY, print).catch(() => {}); },
+              onPress: () => {
+                AsyncStorage.setItem(REPAIR_HIDDEN_KEY, print).catch(() => {});
+                // The stored fingerprint keeps this same offer away; a new
+                // fragment later on should still be asked about.
+                askedRef.current = false;
+              },
             },
             {
               text: 'Tidy up',
               onPress: async () => {
-                await applyTripRepair(plan);
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                AsyncStorage.removeItem(REPAIR_HIDDEN_KEY).catch(() => {});
-                showToast('Timeline tidied up');
-                refresh();
+                try {
+                  await applyTripRepair(plan);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  AsyncStorage.removeItem(REPAIR_HIDDEN_KEY).catch(() => {});
+                  showToast('Timeline tidied up');
+                } catch (error) {
+                  console.error('Failed to tidy up timeline:', error);
+                  showToast('Could not tidy up your timeline', 'error');
+                } finally {
+                  // The flag only stops a second alert while this one is
+                  // open. Left set, the offer never came back for the rest
+                  // of the session, not after a failure and not when new
+                  // duplicates were recorded later.
+                  askedRef.current = false;
+                  refresh();
+                }
               },
             },
           ],
@@ -918,6 +937,26 @@ export default function TimelineScreen() {
     refresh();
   }, [refresh]);
 
+  /**
+   * "Delete All Stops" on a country group. Going through handleDelete per
+   * stop re-read the whole timeline once for every stop, so the list
+   * flickered through each intermediate state. The deletes run one after
+   * the other here and the timeline is read once at the end, even when one
+   * of them fails, so the list shows whatever did get deleted.
+   */
+  const handleDeleteMany = useCallback(async (ids: number[]) => {
+    try {
+      for (const id of ids) {
+        await markTripGroupDeleted(id);
+      }
+    } catch (error) {
+      console.error('Failed to delete stops:', error);
+      showToast('Could not delete all stops', 'error');
+    } finally {
+      refresh();
+    }
+  }, [refresh]);
+
   // ─── Header ───
 
   const headerRight = useCallback(
@@ -1030,6 +1069,7 @@ export default function TimelineScreen() {
                   group={item}
                   overlappingTripIds={overlappingTripIds}
                   onDelete={handleDelete}
+                  onDeleteMany={handleDeleteMany}
                   onEdit={openEditSheet}
                 />
               );

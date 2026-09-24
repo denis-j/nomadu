@@ -22,8 +22,6 @@ type Params = {
 const fmt = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-const todayStr = fmt(new Date());
-
 const RANGE_COLOR = '#000000';
 const RANGE_BG = 'rgba(0,0,0,0.08)';
 
@@ -32,6 +30,10 @@ export default function CreateDatesScreen() {
   const params = useLocalSearchParams<Params>();
   const { country, city } = params;
   const isEditing = !!params.id;
+  // Read on every render rather than once at module load: the module stays
+  // loaded for the whole session, so after midnight the real today was
+  // past maxDate and could not be picked.
+  const todayStr = fmt(new Date());
 
   const initialStart = params.start ? parseDate(params.start) : new Date();
   const initialEnd = params.end ? parseDate(params.end) : new Date();
