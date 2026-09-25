@@ -1,5 +1,4 @@
-import { Asset } from 'expo-asset';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { StyleSheet, ViewStyle } from 'react-native';
 import Animated, {
   Easing,
@@ -16,6 +15,9 @@ import {
   Model,
   useCameraManipulator,
 } from 'react-native-filament';
+import { useGlbUri } from '../hooks/useGlbUri';
+
+const PLANE = require('../assets/glb/plane.glb');
 
 interface PlaneModel3DProps {
   /** Canvas width/height. Defaults to 240×200. */
@@ -77,7 +79,7 @@ function PlaneScene({ cameraZ }: { cameraZ: number }) {
     orbitSpeed: [0, 0],
   });
 
-  const uri = usePlaneGlbUri();
+  const uri = useGlbUri(PLANE);
 
   return (
     <FilamentView style={styles.filament} enableTransparentRendering>
@@ -86,27 +88,6 @@ function PlaneScene({ cameraZ }: { cameraZ: number }) {
       {uri && <Model source={{ uri }} scale={[4, 4, 4]} />}
     </FilamentView>
   );
-}
-
-/** Resolves the bundled plane.glb to a concrete file:// URI for Filament. */
-function usePlaneGlbUri(): string | null {
-  const [uri, setUri] = useState<string | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    const asset = Asset.fromModule(require('../assets/glb/plane.glb'));
-    asset
-      .downloadAsync()
-      .then(() => {
-        if (cancelled) return;
-        const resolved = asset.localUri ?? asset.uri;
-        setUri(decodeURI(resolved));
-      })
-      .catch((e) => console.error('Failed to resolve plane.glb', e));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  return uri;
 }
 
 const styles = StyleSheet.create({

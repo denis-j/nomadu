@@ -1,20 +1,23 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect } from 'react';
-import { Image, StyleSheet, Text } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { StyleSheet } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
   withRepeat,
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { Colors } from '../constants/colors';
-import { Typography } from '../constants/typography';
 
-const ICON = require('../assets/icons/splash-icon-cloud.png');
+import { LogoModel3D } from './LogoModel3D';
+
+const LOGO_SIZE = 280;
+/** Once the logo shows, it stays at least this long, so it is seen turning. */
+const MIN_LOGO_MS = 700;
+/** The splash never waits longer than this for the logo; the app comes first. */
+const MAX_WAIT_MS = 1500;
 
 const EASE_OUT = Easing.out(Easing.cubic);
 const EASE_IN = Easing.in(Easing.cubic);
@@ -29,13 +32,20 @@ export default function SplashScreen({ ready, onDone }: Props) {
   const iconScale = useSharedValue(0.92);
   const iconOpacity = useSharedValue(0);
   const iconBreath = useSharedValue(1);
-  const textOpacity = useSharedValue(0);
   const containerOpacity = useSharedValue(1);
 
-  useEffect(() => {
+  const mountedAt = useRef(Date.now());
+  const [logoShownAt, setLogoShownAt] = useState<number | null>(null);
+
+  // The 3D logo fades in once Filament has loaded it, not before: an empty
+  // canvas fading in first would read as a blank square.
+  const onLogoReady = useCallback(() => {
+    setLogoShownAt((at) => at ?? Date.now());
     iconOpacity.value = withTiming(1, { duration: 380, easing: EASE_OUT });
     iconScale.value = withTiming(1, { duration: 480, easing: EASE_OUT });
-    textOpacity.value = withDelay(220, withTiming(1, { duration: 340, easing: EASE_OUT }));
+  }, [iconOpacity, iconScale]);
+
+  useEffect(() => {
 
     // Continuous gentle breathing on the icon so the screen never feels frozen
     // while the JS bundle is booting.
@@ -51,13 +61,18 @@ export default function SplashScreen({ ready, onDone }: Props) {
 
   useEffect(() => {
     if (!ready) return;
+    // Leave once the app is ready and the logo has been seen for a moment;
+    // if it has not appeared by MAX_WAIT_MS, leave anyway.
+    const now = Date.now();
+    const untilSeen = logoShownAt != null ? logoShownAt + MIN_LOGO_MS - now : mountedAt.current + MAX_WAIT_MS - now;
+    const hold = Math.min(Math.max(untilSeen, 0), mountedAt.current + MAX_WAIT_MS - now);
     const timer = setTimeout(() => {
       containerOpacity.value = withTiming(0, { duration: 320, easing: EASE_IN }, (done) => {
         if (done) runOnJS(onDone)();
       });
-    }, 280);
+    }, 280 + Math.max(hold, 0));
     return () => clearTimeout(timer);
-  }, [ready]);
+  }, [ready, logoShownAt]);
 
   const containerStyle = useAnimatedStyle(() => ({
     opacity: containerOpacity.value,
@@ -67,8 +82,6 @@ export default function SplashScreen({ ready, onDone }: Props) {
     opacity: iconOpacity.value,
     transform: [{ scale: iconScale.value * iconBreath.value }],
   }));
-
-  const textStyle = useAnimatedStyle(() => ({ opacity: textOpacity.value }));
 
   // pointerEvents=none so touches pass through during the fade-out window
   // (the welcome CTA below it would otherwise be unreachable).
@@ -83,12 +96,8 @@ export default function SplashScreen({ ready, onDone }: Props) {
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <Animated.View style={[styles.iconWrapper, iconStyle]}>
-        <Image source={ICON} style={styles.icon} />
-      </Animated.View>
-      <Animated.View style={textStyle}>
-        <Text style={styles.appName}>Nomadu</Text>
-        <Text style={styles.tagline}>The most beautiful way to track the world</Text>
+      <Animated.View style={iconStyle}>
+        <LogoModel3D size={LOGO_SIZE} onReady={onLogoReady} />
       </Animated.View>
     </Animated.View>
   );
@@ -119,16 +128,5 @@ const styles = StyleSheet.create({
     height: 124,
     borderRadius: 28,
     borderCurve: 'continuous',
-  },
-  appName: {
-    ...Typography.brandDisplay,
-    textAlign: 'center',
-  },
-  tagline: {
-    ...Typography.bodyMedium,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 6,
-    letterSpacing: 0.1,
   },
 });

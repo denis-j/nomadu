@@ -4,7 +4,6 @@ import { Link } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Platform,
   Pressable,
   SafeAreaView,
@@ -15,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LogoModel3D } from '../../components/LogoModel3D';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import AnimatedGradientBackground from '../../components/animated-gradient-background';
 import { CloudyButton } from '../../components/CloudyButton';
@@ -23,6 +23,8 @@ import { Typography } from '../../constants/typography';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { signInWithEmail, signInWithApple } from '../../lib/auth';
 import { showToast } from '../../lib/toast';
+
+const LOGO_SIZE = 130;
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -104,11 +106,8 @@ export default function SignInScreen() {
               entering={FadeIn.duration(400)}
               style={styles.titleContainer}
             >
-              <Image
-                source={require('../../assets/icons/app-icon.png')}
-                style={styles.appIcon}
-                resizeMode="contain"
-              />
+              {/* The logo in 3D: one quick turn on arrival, then it turns under a finger. */}
+              <LogoModel3D size={LOGO_SIZE} motion="intro" style={styles.appIcon} />
               <Text style={styles.title}>Welcome home</Text>
               <Text style={styles.subtitle}>Sign in to continue your journey</Text>
             </Animated.View>
@@ -248,10 +247,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 44,
   },
+  // Bigger than the 80pt picture it replaces, with the extra taken out of
+  // the margins, so the rest of the screen stays where it was.
   appIcon: {
-    width: 80,
-    height: 80,
-    marginBottom: 30,
+    marginTop: -(LOGO_SIZE - 80) / 2,
+    marginBottom: 30 - (LOGO_SIZE - 80) / 2,
   },
   title: {
     ...Typography.brandDisplay,
