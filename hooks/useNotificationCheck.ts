@@ -7,10 +7,12 @@ import { calculateAllVisaStatuses } from '../lib/visaCalculations';
 import { calculateAllTaxStatuses } from '../lib/taxCalculations';
 import { rescheduleVisaExpiryReminders, runUsageThresholdCheck } from '../lib/notifications';
 import { getAllUserVisas } from '../lib/userVisas';
+import { getCitizenshipCache, getTaxStatusesCache, getVisaStatusesCache } from '../lib/prefetch';
 
 export function useNotificationCheck() {
   const { user } = useAuth();
   const lastCheck = useRef<number>(0);
+  const firstRun = useRef(true);
 
   const runCheck = async () => {
     if (!user) return;
@@ -23,14 +25,22 @@ export function useNotificationCheck() {
       const citizenship = await getCitizenship(user.uid);
       if (!citizenship) return;
 
-      const hasFixedResidence = await getHasFixedResidence(user.uid);
-      const [trips, userVisas] = await Promise.all([
-        getAllTripsRaw(),
-        getAllUserVisas(),
-      ]);
-
-      const visaStatuses = calculateAllVisaStatuses(trips, citizenship.countryCode, userVisas);
-      const taxStatuses = calculateAllTaxStatuses(trips, citizenship.countryCode, hasFixedResidence ?? true);
+      const userVisas = await getAllUserVisas();
+      // The first check after start-up runs a moment after the prefetch
+      // computed the same statuses from the same data; it takes those
+      // instead of working them out a second time.
+      const cachedVisa = getVisaStatusesCache();
+      const cachedTax = getTaxStatusesCache();
+      const fresh = getCitizenshipCache()?.countryCode === citizenship.countryCode && cachedVisa && cachedTax;
+      let visaStatuses = cachedVisa ?? [];
+      let taxStatuses = cachedTax ?? [];
+      if (!fresh || firstRun.current === false) {
+        const hasFixedResidence = await getHasFixedResidence(user.uid);
+        const trips = await getAllTripsRaw();
+        visaStatuses = calculateAllVisaStatuses(trips, citizenship.countryCode, userVisas);
+        taxStatuses = calculateAllTaxStatuses(trips, citizenship.countryCode, hasFixedResidence ?? true);
+      }
+      firstRun.current = false;
 
       await runUsageThresholdCheck(visaStatuses, taxStatuses);
       // Reschedule absolute-time expiry reminders so newly-added visas get

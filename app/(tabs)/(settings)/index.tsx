@@ -15,7 +15,6 @@ import { usePassport } from '../../../hooks/usePassport';
 import { useNotificationPermission } from '../../../hooks/useNotificationPermission';
 import { deleteAccount } from '../../../lib/auth';
 import { clearAllTravelData, startRealtimeSync } from '../../../lib/sync';
-import { restorePurchases } from '../../../lib/revenueCat';
 import { useSync } from '../../../contexts/SyncContext';
 import { Flag } from '../../../components/Flag';
 import { getHasFixedResidence, setHasFixedResidence } from '../../../lib/onboarding';
@@ -33,7 +32,7 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 export default function SettingsScreen() {
   const { permissions } = useLocation();
   const [trackingSheetVisible, setTrackingSheetVisible] = useState(false);
-  const { isPro, expirationDate, productIdentifier, loading } = useSubscription();
+  const { isPro, expirationDate, productIdentifier } = useSubscription();
   const { user, signOut: handleSignOut } = useAuth();
   const profile = useProfile(user?.uid ?? null);
   const { syncStatus, lastSynced, triggerSync } = useSync();
@@ -97,11 +96,6 @@ export default function SettingsScreen() {
     );
   };
 
-  const handleUpgrade = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/paywall');
-  };
-
   const handleManageSubscription = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
@@ -121,18 +115,6 @@ export default function SettingsScreen() {
       } else {
         Linking.openURL('https://play.google.com/store/account/subscriptions');
       }
-    }
-  };
-
-  const handleRestore = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      await restorePurchases();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Restored', 'Your purchases have been restored.');
-    } catch {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Restore Failed', 'Could not restore purchases. Please try again.');
     }
   };
 
@@ -311,56 +293,31 @@ export default function SettingsScreen() {
       {/* Subscription */}
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
         <Text style={styles.sectionTitle}>Subscription</Text>
-        {!loading && !isPro && (
+        {/* Only Pro reaches the tabs: everyone else is on the paywall (app/_layout.tsx),
+            which also offers restoring a purchase. */}
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Plan</Text>
+          <View style={[styles.badge, styles.badgeGranted]}>
+            <Text style={[styles.badgeText, styles.badgeTextGranted]}>{planLabel()}</Text>
+          </View>
+        </View>
+        {expirationDate && (
           <>
-            <Pressable
-              style={({ pressed }) => [styles.upgradeButton, pressed && styles.upgradeButtonPressed]}
-              onPress={handleUpgrade}
-            >
-              <View style={styles.upgradeContent}>
-                <Ionicons name="star" size={20} color={Colors.white} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.upgradeTitle}>Upgrade to Pro</Text>
-                  <Text style={styles.upgradeSubtitle}>Unlock all features</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
-              </View>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              onPress={handleRestore}
-            >
-              <Text style={[styles.rowLabel, { color: Colors.primary }]}>Restore Purchases</Text>
-            </Pressable>
-          </>
-        )}
-        {(loading || isPro) && (
-          <>
-            <View style={styles.row}>
-              <Text style={styles.rowLabel}>Plan</Text>
-              <View style={[styles.badge, styles.badgeGranted]}>
-                <Text style={[styles.badgeText, styles.badgeTextGranted]}>{planLabel()}</Text>
-              </View>
-            </View>
-            {expirationDate && (
-              <>
-                <View style={styles.separator} />
-                <View style={styles.row}>
-                  <Text style={styles.rowLabel}>Renews</Text>
-                  <Text style={styles.rowValue}>{formatDate(expirationDate)}</Text>
-                </View>
-              </>
-            )}
             <View style={styles.separator} />
-            <Pressable
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              onPress={handleManageSubscription}
-            >
-              <Text style={[styles.rowLabel, { color: Colors.primary }]}>Manage Subscription</Text>
-              <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
-            </Pressable>
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>Renews</Text>
+              <Text style={styles.rowValue}>{formatDate(expirationDate)}</Text>
+            </View>
           </>
         )}
+        <View style={styles.separator} />
+        <Pressable
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          onPress={handleManageSubscription}
+        >
+          <Text style={[styles.rowLabel, { color: Colors.primary }]}>Manage Subscription</Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+        </Pressable>
       </Glass>
 
       {/* Cloud Sync */}
@@ -743,30 +700,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   // ─── Upgrade Button ───
-  upgradeButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
-    borderCurve: 'continuous',
-  },
-  upgradeButtonPressed: {
-    opacity: 0.85,
-  },
-  upgradeContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  upgradeTitle: {
-    ...Typography.titleSmall,
-    color: Colors.white,
-  },
-  upgradeSubtitle: {
-    ...Typography.bodySmall,
-    color: Colors.whiteAlpha75,
-    marginTop: 1,
-  },
   // ─── Sheet ───
   sheetContent: {
     gap: 22,

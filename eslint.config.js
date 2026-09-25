@@ -5,6 +5,7 @@ const expoConfig = require("eslint-config-expo/flat");
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ["dist/*"],
+    // functions/lib is the compiled output of the Cloud Functions, not source.
+    ignores: ["dist/*", "functions/lib/*"],
   }
 ]);

@@ -11,7 +11,7 @@
     "icon": "./assets/app-icons/Icon-iOS-Default-1024x1024@1x.png",
     "userInterfaceStyle": "light",
     "runtimeVersion": {
-      "policy": "appVersion"
+      "policy": "fingerprint"
     },
     "updates": {
       "fallbackToCacheTimeout": 0,
@@ -78,7 +78,6 @@
           "isAndroidBackgroundLocationEnabled": true
         }
       ],
-      "@react-native-community/datetimepicker",
       "expo-apple-authentication",
       [
         "expo-notifications",
@@ -88,7 +87,6 @@
           "sounds": []
         }
       ],
-      "expo-video",
       "expo-font",
       [
         "expo-audio",
@@ -114,6 +112,14 @@
           "photosPermission": "Nomadu reads the screenshots and documents you pick, to add trips to your timeline and keep tickets with your trip.",
           "cameraPermission": "Nomadu uses the camera when you photograph a ticket, visa or booking to keep it with your trip.",
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-gradient.png",
+          "resizeMode": "cover",
+          "backgroundColor": "#8AD3FF"
         }
       ]
     ],

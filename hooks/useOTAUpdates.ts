@@ -40,7 +40,11 @@ export function useOTAUpdates() {
       }
     };
 
-    check();
+    // No check here on launch: expo-updates already checks by itself when
+    // the app loads (checkAutomatically defaults to ON_LOAD), and this one
+    // fetched the same update a second time. From here on, a return from
+    // the background is what triggers it.
+    lastCheckRef.current = Date.now();
 
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') check();

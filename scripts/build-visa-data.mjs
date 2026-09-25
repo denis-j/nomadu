@@ -16,6 +16,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import https from 'node:https';
+import { Buffer } from 'node:buffer';
 
 const SRC = 'https://raw.githubusercontent.com/ilyankou/passport-index-dataset/master/passport-index-matrix-iso2.csv';
 const OUT = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'constants', 'visa-data.json');

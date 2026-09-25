@@ -38,15 +38,4 @@ export const Colors = {
   // Map
   markerDefault: '#4A90A4',
   markerVisited: '#E8976E',
-
-  // Dark mode
-  dark: {
-    background: '#0F1419',
-    surface: '#1A1F25',
-    surfaceSecondary: '#252B33',
-    border: '#2F3740',
-    text: '#F1F3F5',
-    textSecondary: '#8B95A1',
-    textTertiary: '#5C6773',
-  },
 } as const;
