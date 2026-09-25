@@ -109,7 +109,7 @@ function LogoScene({ motion, onReady, state }: { motion: LogoMotion; onReady?: (
   const cameraManipulator = useCameraManipulator({
     // Close enough that the N fills most of its square, with room left for
     // its depth as it turns.
-    orbitHomePosition: [0, 0, 3.0],
+    orbitHomePosition: [0, 0, 3.6],
     targetPosition: [0, 0, 0],
     orbitSpeed: [0, 0],
   });
