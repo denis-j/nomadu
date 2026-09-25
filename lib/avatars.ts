@@ -98,12 +98,33 @@ export function avatarSvg(seed: string): Promise<string | null> {
   return cached(seed, 'svg', (file) => file.text());
 }
 
+/**
+ * What is known without waiting: an earlier answer, or for the still face a
+ * file already on disk (checking is synchronous). Without this every face
+ * showed its initials for a frame after each mount and then swapped to the
+ * picture, a flicker in every header and list.
+ */
+function knownNow(seed: string | null, ext: 'png' | 'svg'): string | null {
+  if (!seed) return null;
+  const hit = known.get(`${ext}:${seed}`);
+  if (hit !== undefined) return hit;
+  if (ext !== 'png') return null;
+  try {
+    const file = fileFor(seed, 'png');
+    if (!file.exists) return null;
+    known.set(`png:${seed}`, file.uri);
+    return file.uri;
+  } catch {
+    return null;
+  }
+}
+
 function useCached(seed: string | null, ext: 'png' | 'svg', load: (seed: string) => Promise<string | null>): string | null {
-  const [value, setValue] = useState<string | null>(() => (seed ? known.get(`${ext}:${seed}`) ?? null : null));
+  const [value, setValue] = useState<string | null>(() => knownNow(seed, ext));
   useEffect(() => {
     if (!seed) return;
     let live = true;
-    setValue(known.get(`${ext}:${seed}`) ?? null);
+    setValue(knownNow(seed, ext));
     load(seed).then((v) => { if (live) setValue(v); });
     return () => { live = false; };
   }, [seed, ext, load]);

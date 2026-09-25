@@ -37,7 +37,10 @@
         "NSCameraUsageDescription": "Nomadu uses the camera when you photograph a ticket, visa or booking to keep it with your trip."
       },
       "appleTeamId": "Y6KMGQ9398",
-      "buildNumber": "5"
+      "buildNumber": "5",
+      "entitlements": {
+        "com.apple.developer.devicecheck.appattest-environment": "production"
+      }
     },
     "android": {
       "adaptiveIcon": {

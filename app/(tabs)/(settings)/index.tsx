@@ -24,6 +24,7 @@ import { Avatar } from '../../../components/TravellerAvatars';
 import { useProfile } from '../../../lib/profile';
 import { avatarSeed } from '../../../lib/avatarSeed';
 import { formatMoment } from '../../../lib/days';
+import { IMPRINT_URL, PRIVACY_URL, TERMS_URL, openLegal } from '../../../constants/legal';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -500,6 +501,21 @@ export default function SettingsScreen() {
           <Text style={styles.rowLabel}>Storage</Text>
           <Text style={styles.rowValue}>Local + Cloud</Text>
         </View>
+        <View style={styles.separator} />
+        <Pressable style={styles.row} onPress={() => openLegal(PRIVACY_URL)} accessibilityRole="link">
+          <Text style={styles.rowLabel}>Privacy Policy</Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+        </Pressable>
+        <View style={styles.separator} />
+        <Pressable style={styles.row} onPress={() => openLegal(TERMS_URL)} accessibilityRole="link">
+          <Text style={styles.rowLabel}>Terms of Use</Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+        </Pressable>
+        <View style={styles.separator} />
+        <Pressable style={styles.row} onPress={() => openLegal(IMPRINT_URL)} accessibilityRole="link">
+          <Text style={styles.rowLabel}>Legal Notice</Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+        </Pressable>
       </Glass>
 
       <Text style={styles.footer}>

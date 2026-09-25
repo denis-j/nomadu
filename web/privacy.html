@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy · Nomadu</title>
+<meta name="description" content="How Nomadu handles your location, trips, documents and account data.">
+<link rel="stylesheet" href="/legal.css">
+</head>
+<body>
+<main>
+  <header>
+    <a class="brand" href="/">Nomadu</a>
+    <h1>Privacy Policy</h1>
+    <p class="meta">Last updated: September 25, 2026</p>
+  </header>
+
+  <p class="lead">Nomadu keeps track of where you have been so you can see your days per country, your visa allowances and your tax exposure. That means it handles personal data, some of it sensitive: your location history, your trips and, if you add them, travel documents. This page says what the app collects, why, where it goes and what you can do about it.</p>
+
+  <nav class="toc" aria-label="Contents">
+    <ol>
+      <li><a href="#controller">Who is responsible</a></li>
+      <li><a href="#summary">In short</a></li>
+      <li><a href="#account">Your account</a></li>
+      <li><a href="#location">Location</a></li>
+      <li><a href="#trips">Trips, visas, plans and documents</a></li>
+      <li><a href="#sharing">Sharing a trip</a></li>
+      <li><a href="#ai">AI features</a></li>
+      <li><a href="#agents">Connecting an AI agent</a></li>
+      <li><a href="#purchases">Subscriptions</a></li>
+      <li><a href="#crashes">Crash reports</a></li>
+      <li><a href="#other">Other services</a></li>
+      <li><a href="#bases">Legal bases</a></li>
+      <li><a href="#transfers">Where data is stored</a></li>
+      <li><a href="#retention">How long data is kept</a></li>
+      <li><a href="#rights">Your rights</a></li>
+      <li><a href="#children">Children</a></li>
+      <li><a href="#changes">Changes</a></li>
+    </ol>
+  </nav>
+
+  <section id="controller">
+    <h2>1. Who is responsible</h2>
+    <p>The controller for the processing described here is:</p>
+    <address>
+      <strong>TJ Labs UG (haftungsbeschränkt)</strong><br>
+      Kolonnenstraße 8<br>
+      10827 Berlin, Germany<br>
+      Represented by the managing director, Julien Tietke<br>
+      Email: <a href="mailto:info@tj-labs.de">info@tj-labs.de</a>
+    </address>
+    <p>For anything about your data, write to the email address above.</p>
+  </section>
+
+  <section id="summary">
+    <h2>2. In short</h2>
+    <ul>
+      <li>We do not sell your data and do not use it for advertising. The app has no ads and no cross-app tracking.</li>
+      <li>Your trips, visas and plans are stored on your phone and, so that they survive a new phone and reach your other devices, in your account in the cloud.</li>
+      <li>Documents you add (passports, tickets, bookings) stay on your phone, unless you add them to a trip you share with others.</li>
+      <li>You can delete your account and all its data in the app at any time: Settings, Delete Account.</li>
+    </ul>
+  </section>
+
+  <section id="account">
+    <h2>3. Your account</h2>
+    <p>To use Nomadu you create an account with your email address and a password, or sign in with Apple or Google. We receive your email address and, from Apple or Google, a user identifier; with Sign in with Apple you can choose to hide your real address.</p>
+    <p>In the app you also give a name and pick a cartoon face. Both are shown to the people you share a trip with. The face is drawn from a random code, not from a photo of you. We also store your nationality and whether you have a fixed residence, because the visa and tax calculations depend on them.</p>
+    <p>Accounts are run on Google Firebase (Authentication, Cloud Firestore, Cloud Storage, Cloud Functions), provided by Google LLC.</p>
+  </section>
+
+  <section id="location">
+    <h2>4. Location</h2>
+    <p>With your permission, Nomadu reads your phone's location, also in the background, to notice when you arrive in a new city or country and record the stay. You decide in the iOS settings whether it may do so always, only while you use the app, or never. Without it, you can still add trips by hand.</p>
+    <p>From a location the app only keeps the result: the city, the country and the dates of your stay, with the city's coordinates for the map. To find the city, the coordinates of a location fix are sent to Apple's geocoding service built into iOS and, if that gives no answer, to OpenStreetMap's Nominatim service (OpenStreetMap Foundation, United Kingdom). A raw history of every position is not kept.</p>
+  </section>
+
+  <section id="trips">
+    <h2>5. Trips, visas, plans and documents</h2>
+    <p>Your stays, the visas you enter, the trips you plan (stops, dates, travellers, accommodation options and bookings, notes) are stored on your phone and synced to your account in Cloud Firestore, so they are there on a new phone and on your other devices.</p>
+    <p>Documents you add to a trip, such as passport scans, tickets or booking confirmations, are stored only on your phone. The exception is a trip you share: see the next section.</p>
+  </section>
+
+  <section id="sharing">
+    <h2>6. Sharing a trip</h2>
+    <p>You can invite others to a trip you planned. Everyone who joins sees the trip as you do: its stops and dates, the travellers, the accommodation options and bookings, including booking details and notes. Your name and face are shown to them, and theirs to you.</p>
+    <p>A document you add to a shared trip for everyone, or for one particular person, is uploaded to Cloud Storage so it reaches them. Only the people it is meant for, and you as the owner, can download it. When a document is deleted, it is removed from the cloud and from the other phones; when someone leaves the trip, the documents of that trip are removed from their phone.</p>
+    <p>An invite link opens a public page with the trip's title, its stops and dates, and the owner's name and face, so the invited person knows what they are joining. Anyone who has the link can see that page. You can stop sharing at any time, which ends the link.</p>
+  </section>
+
+  <section id="ai">
+    <h2>7. AI features</h2>
+    <p>Some features use Google's Gemini models, called through our own server rather than from your phone:</p>
+    <ul>
+      <li><strong>Import from screenshots:</strong> the images you choose (for example of a booking or of Google Maps timeline) are sent to extract the stays in them.</li>
+      <li><strong>City tips:</strong> the name of a city and its country are sent.</li>
+      <li><strong>Suggestions for the next stop:</strong> the stops of the trip you are planning are sent.</li>
+    </ul>
+    <p>Only what the feature needs is sent, together with no account details. You use these features only when you tap them. The data is processed by Google LLC under the Gemini API terms.</p>
+  </section>
+
+  <section id="agents">
+    <h2>8. Connecting an AI agent</h2>
+    <p>You can create a key in the app that lets an AI agent of your choice (for example an assistant you run yourself) read and change your trips, visas and plans through our interface. The agent receives only what it asks for with that key, and only while the key exists; you can revoke it in the app at any time. What the agent then does with the data is up to the provider of that agent, not us.</p>
+  </section>
+
+  <section id="purchases">
+    <h2>9. Subscriptions</h2>
+    <p>Payments are handled by Apple through the App Store; we never see your payment details. To know whether your subscription is active on all your devices, we use RevenueCat (RevenueCat, Inc., USA), which receives your account's user identifier and the purchase information from the App Store.</p>
+  </section>
+
+  <section id="crashes">
+    <h2>10. Crash reports</h2>
+    <p>If the app crashes or runs into an error, a report goes to Sentry (Functional Software, Inc.), hosted in its EU region in Germany. It contains technical details: the error, the device model, the iOS and app version, and your account's user identifier, so a report can be matched with a support request. It does not contain your email address, your trips or your location.</p>
+  </section>
+
+  <section id="other">
+    <h2>11. Other services</h2>
+    <ul>
+      <li><strong>Faces:</strong> the cartoon faces are drawn by the DiceBear service (Florian Körner, Germany), which receives the random code of a face. Like any web request, this includes your IP address.</li>
+      <li><strong>App updates:</strong> small updates to the app are delivered by Expo (650 Industries, Inc., USA), which receives technical data such as the app version.</li>
+      <li><strong>Notifications:</strong> reminders about visas and tax days are created on your phone; no push service is involved.</li>
+    </ul>
+  </section>
+
+  <section id="bases">
+    <h2>12. Legal bases</h2>
+    <p>If the EU or UK General Data Protection Regulation applies to you, we rely on:</p>
+    <ul>
+      <li>Article 6(1)(b), performing our contract with you, for your account, your trips and plans, syncing, sharing and the features you use;</li>
+      <li>Article 6(1)(a), your consent, for reading your location and for notifications, given through the iOS permission and revocable there at any time;</li>
+      <li>Article 6(1)(f), our legitimate interest in a working, secure app, for crash reports and for protecting the service against abuse.</li>
+    </ul>
+    <p>Documents you add may contain special categories of data (for example a passport photo). They are processed only because you add them and only in the way described above.</p>
+  </section>
+
+  <section id="transfers">
+    <h2>13. Where data is stored</h2>
+    <p>Your account data is stored with Google Firebase in the United States. Google, RevenueCat and Expo are companies based in the United States. Transfers are covered by the EU-U.S. Data Privacy Framework where the company is certified under it, and otherwise by the European Commission's standard contractual clauses.</p>
+  </section>
+
+  <section id="retention">
+    <h2>14. How long data is kept</h2>
+    <p>Your data is kept as long as you have an account. When you delete your account in the app, your account, your trips, visas, plans, shared documents and your part in trips shared with you are deleted from our systems. Entries you delete in the app are deleted from the cloud as well; a small marker that the entry was deleted is kept so your other devices learn about it. Crash reports are deleted by Sentry at the end of its retention period, at most 90 days.</p>
+  </section>
+
+  <section id="rights">
+    <h2>15. Your rights</h2>
+    <p>You have the right to access your data, to have it corrected or deleted, to restrict or object to its processing, and to receive it in a portable format. Where processing is based on consent, you can withdraw it at any time. To use these rights, write to the address in section 1.</p>
+    <p>You also have the right to complain to a data protection supervisory authority, in particular in the country where you live or work. The authority responsible for us is the Berlin Commissioner for Data Protection and Freedom of Information (Berliner Beauftragte für Datenschutz und Informationsfreiheit).</p>
+  </section>
+
+  <section id="children">
+    <h2>16. Children</h2>
+    <p>Nomadu is not directed at children under 16, and we do not knowingly collect their data.</p>
+  </section>
+
+  <section id="changes">
+    <h2>17. Changes</h2>
+    <p>If the app starts handling data in a new way, this page is updated first, and the date at the top changes. For significant changes we will tell you in the app.</p>
+  </section>
+
+  <footer>
+    <a href="/terms">Terms of Use</a>
+    <span aria-hidden="true">·</span>
+    <a href="/privacy">Privacy Policy</a>
+    <span aria-hidden="true">·</span>
+    <a href="/impressum" rel="nofollow">Legal Notice</a>
+  </footer>
+</main>
+</body>
+</html>

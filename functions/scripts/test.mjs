@@ -17,12 +17,25 @@ const testDir = resolve(root, 'test');
 const outDir = resolve(root, 'lib/test');
 const fake = resolve(testDir, 'fakeFirestore.ts');
 const fakeStorage = resolve(testDir, 'fakeStorage.ts');
+const fakeAppCheck = resolve(testDir, 'fakeAppCheck.ts');
 
 const fakeFirestorePlugin = {
   name: 'fake-firestore',
   setup(build) {
     build.onResolve({ filter: /^firebase-admin\/firestore$/ }, () => ({ path: fake }));
     build.onResolve({ filter: /^firebase-admin\/storage$/ }, () => ({ path: fakeStorage }));
+  },
+};
+
+// lib/appCheck.ts talks to the keychain, App Attest, Sentry and the Firebase
+// JS SDK; test/fakeAppCheck.ts stands in for all four.
+const fakeAppCheckPlugin = {
+  name: 'fake-app-check',
+  setup(build) {
+    build.onResolve({ filter: /^(expo-secure-store|firebase\/app-check)$/ }, () => ({ path: fakeAppCheck }));
+    build.onResolve({ filter: /modules\/app-attest$/ }, () => ({ path: fakeAppCheck }));
+    build.onResolve({ filter: /^\.\/monitoring$/ }, (args) =>
+      args.importer.endsWith('lib/appCheck.ts') ? { path: fakeAppCheck } : undefined);
   },
 };
 
@@ -36,7 +49,7 @@ await esbuild.build({
   outdir: outDir,
   outExtension: { '.js': '.cjs' },
   sourcemap: 'inline',
-  plugins: [fakeFirestorePlugin, stubPlugin],
+  plugins: [fakeFirestorePlugin, fakeAppCheckPlugin, stubPlugin],
   external: ['firebase-admin', 'firebase-functions', 'express'],
   logLevel: 'warning',
 });

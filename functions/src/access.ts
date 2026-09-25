@@ -163,7 +163,13 @@ export async function requirePro(uid: string, what: string): Promise<void> {
  */
 export function requireAppCheck(request: CallableRequest, what: string): void {
   const mode = appCheckMode();
-  if (mode === 'off' || request.app) return;
+  if (mode === 'off') return;
+  if (request.app) {
+    // While watching (log), the share of calls that pass is the number to
+    // look at before switching to enforce.
+    if (mode === 'log') logger.info('app check passed', { uid: request.auth?.uid, what, appId: request.app.appId });
+    return;
+  }
   if (mode === 'log') {
     logger.warn('would refuse: no App Check token', { uid: request.auth?.uid, what });
     return;

@@ -5,6 +5,7 @@ import { calculateAllTaxStatuses, TaxStatus } from './taxCalculations';
 import { avatarSvg, avatarUri } from './avatars';
 import { avatarSeed } from './avatarSeed';
 import { getProfile, prefetchSuggestedFaces } from './profile';
+import { prefetchJourneyDetails, resetJourneyDetails } from './journeyDetails';
 
 let tripsCache: Trip[] | null = null;
 let statsCache: Stats | null = null;
@@ -28,6 +29,7 @@ export function resetPrefetchCaches(): void {
   visaStatusesCache = null;
   taxStatusesCache = null;
   citizenshipCache = null;
+  resetJourneyDetails();
 }
 
 export async function prefetchAll(): Promise<void> {
@@ -37,6 +39,8 @@ export async function prefetchAll(): Promise<void> {
       getStats(),
       getAllJourneys(),
     ]);
+    // Each trip's stops, travellers and documents, so its screen opens complete.
+    await prefetchJourneyDetails(journeysCache.map((j) => j.id));
   } catch (err) {
     console.error('Prefetch failed:', err);
   }

@@ -55,7 +55,6 @@ import { calculateAllVisaStatuses, VisaStatus } from '../../../lib/visaCalculati
 import { getAllUserVisas } from '../../../lib/userVisas';
 import { calculateAllTaxStatuses, TaxStatus } from '../../../lib/taxCalculations';
 import { SCHENGEN_COUNTRIES, getRuleForCitizen } from '../../../constants/visaRules';
-import { countryCodeToFlag } from '../../../lib/geocoding';
 import { chainDates, countDays, fromYmd, toYmd } from '../../../lib/days';
 import { getCountryCode } from '../../../utils/geography';
 import { Flag } from '../../../components/Flag';
@@ -64,6 +63,7 @@ import { cachedMapSnapshot, storeMapSnapshot } from '../../../lib/mapSnapshot';
 import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
+import { getCitizenshipCache, getTaxStatusesCache, getVisaStatusesCache } from '../../../lib/prefetch';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { MissingRoute } from '../../../components/MissingRoute';
@@ -209,12 +209,21 @@ function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; h
   const [snapshot, setSnapshot] = useState<string | null>(() => (coords.length ? cachedMapSnapshot(cacheKey) : null));
   const [ready, setReady] = useState(false);
   const [live, setLive] = useState(false);
+  // Only a picture taken just now fades in; one from the cache is simply there.
+  const [fresh, setFresh] = useState(false);
 
-  useEffect(() => {
+  // A new set of stops (and, on opening, the stops arriving at all) looks
+  // the picture up in the same render. An effect did it a frame later: the
+  // live map and its spinner showed for a frame, then the cached picture
+  // faded in, and the glass header over it flickered with every change.
+  const [shownFor, setShownFor] = useState(cacheKey);
+  if (shownFor !== cacheKey) {
+    setShownFor(cacheKey);
     setSnapshot(coords.length ? cachedMapSnapshot(cacheKey) : null);
     setReady(false);
     setLive(false);
-  }, [cacheKey]);
+    setFresh(false);
+  }
 
   const initialRegion = useMemo(() => {
     if (coords.length === 0) return undefined;
@@ -273,6 +282,7 @@ function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; h
           throw new Error(`unusable map region ${JSON.stringify(region)}`);
         }
         const path = await map.takeSnapshot({ region, format: 'png', quality: 1, result: 'file' });
+        setFresh(true);
         setSnapshot(storeMapSnapshot(cacheKey, path));
       } catch (err) {
         console.warn('[JourneyMap] snapshot failed, keeping the live map:', err);
@@ -287,7 +297,7 @@ function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; h
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Open the route on a map" style={[styles.mapCard, { marginTop: -headerHeight }]}>
       {snapshot ? (
-        <Image source={{ uri: snapshot }} style={styles.map} contentFit="cover" transition={180} />
+        <Image source={{ uri: snapshot }} style={styles.map} contentFit="cover" transition={fresh ? 180 : 0} />
       ) : (
         <>
           <RNMapView
@@ -412,6 +422,16 @@ function TripMorphChip({
   const facesWidth = avatarStackWidth(people.length, FACE, 2, 0.35);
   const sidePad = 8 + facesWidth;
 
+  // Measured again when what it holds changes (a renamed trip, a friend
+  // joining); kept otherwise, the morph animates from it.
+  const contentKey = `${title}|${owner ?? ''}|${span?.status ?? ''}|${facesWidth}`;
+  const measuredFor = useRef(contentKey);
+  useEffect(() => {
+    if (measuredFor.current === contentKey || open) return;
+    measuredFor.current = contentKey;
+    setChipWidth(0);
+  }, [contentKey, open]);
+
   useEffect(() => {
     if (open) setMounted(true);
     progress.value = withTiming(open ? 1 : 0, open ? MORPH_OPEN : MORPH_CLOSE);
@@ -435,7 +455,10 @@ function TripMorphChip({
       style={[styles.morph, !hasGlass && styles.titleChipFallback, containerStyle]}
       onLayout={(e) => {
         // The capsule's natural width, measured once with the text in it.
-        if (ready && chipWidth === 0) setChipWidth(Math.min(e.nativeEvent.layout.width, maxWidth.closed));
+        if (ready && chipWidth === 0) {
+          measuredFor.current = contentKey;
+          setChipWidth(Math.min(e.nativeEvent.layout.width, maxWidth.closed));
+        }
       }}
     >
       {hasGlass && <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />}
@@ -526,6 +549,8 @@ type LegCardProps = {
   visaStatuses: VisaStatus[];
   taxStatuses: TaxStatus[];
   citizenshipCode: string | null;
+  /** Fade the connector in when it appears: for a stop added, not for the ones there on opening. */
+  enter?: boolean;
 };
 
 const LegCard = React.memo(function LegCard({
@@ -538,8 +563,8 @@ const LegCard = React.memo(function LegCard({
   visaStatuses,
   taxStatuses,
   citizenshipCode,
+  enter = true,
 }: LegCardProps) {
-  const emojiFlag = countryCodeToFlag(leg.country_code); // used in chip labels
   const days = legDays(leg.start_date, leg.end_date);
 
   const isSchengen = !!leg.country_code && (SCHENGEN_COUNTRIES as readonly string[]).includes(leg.country_code);
@@ -580,14 +605,14 @@ const LegCard = React.memo(function LegCard({
   if (trackedVisa && (trackedVisa.status !== 'ok' || firstInCountry)) {
     const color = visaChipColor(trackedVisa.status);
     const label = isSchengen
-      ? `🇪🇺 ${trackedVisa.daysRemaining}d Schengen left`
-      : `${emojiFlag} ${trackedVisa.daysRemaining}d visa left`;
+      ? `${trackedVisa.daysRemaining}d Schengen left`
+      : `${trackedVisa.daysRemaining}d visa left`;
     chips.push({ label, color });
   } else if (!trackedVisa && plannedVisaExceeds) {
     // No tracked data but this leg alone exceeds the limit
     const label = isSchengen
-      ? `🇪🇺 ${plannedDays}d > ${visaLimit}d Schengen`
-      : `${emojiFlag} ${plannedDays}d > ${visaLimit}d visa`;
+      ? `${plannedDays}d > ${visaLimit}d Schengen`
+      : `${plannedDays}d > ${visaLimit}d visa`;
     chips.push({ label, color: Colors.error });
   }
 
@@ -616,7 +641,7 @@ const LegCard = React.memo(function LegCard({
   return (
     <View style={styles.legWrapper}>
       <Animated.View
-        entering={FadeIn.duration(250)}
+        entering={enter ? FadeIn.duration(250) : undefined}
         exiting={FadeOut.duration(150)}
         style={styles.connector}
       >
@@ -968,7 +993,14 @@ export default function JourneyDetailScreen() {
   // What the last visit computed, so the chips are on the cards in their
   // first frame when the screen comes back; the fresh computation below
   // replaces them once it is in.
-  const known = user?.uid ? lastVisaTax.get(user.uid) : undefined;
+  // On the first visit, what start-up already computed from the same trips
+  // and visas (lib/prefetch.ts), so the list need not wait for it.
+  const prefetched = getVisaStatusesCache();
+  const known = user?.uid
+    ? lastVisaTax.get(user.uid) ?? (prefetched && getCitizenshipCache()
+      ? { visa: prefetched, tax: getTaxStatusesCache() ?? [], citizenship: getCitizenshipCache()!.countryCode }
+      : undefined)
+    : undefined;
   const [visaStatuses, setVisaStatuses] = useState<VisaStatus[]>(known?.visa ?? []);
   const [taxStatuses, setTaxStatuses] = useState<TaxStatus[]>(known?.tax ?? []);
   const [citizenshipCode, setCitizenshipCode] = useState<string | null>(known?.citizenship ?? null);
@@ -1298,6 +1330,14 @@ export default function JourneyDetailScreen() {
     );
   }, [journeyId, legs, setJourney]);
 
+  // The stops there when the list first shows appear with it; only one
+  // added later fades its connector in. Fading them all on opening, next to
+  // cards that were simply there, read as a flicker.
+  const initialLegIds = useRef<Set<number> | null>(null);
+  if (staysLoaded && visaLoaded && initialLegIds.current === null && legs.length > 0) {
+    initialLegIds.current = new Set(legs.map((l) => l.id));
+  }
+
   const renderItem = useCallback(({ item, drag, getIndex }: RenderItemParams<JourneyLeg>) => {
     const index = getIndex() ?? 0;
     return (
@@ -1312,6 +1352,7 @@ export default function JourneyDetailScreen() {
           visaStatuses={visaStatuses}
           taxStatuses={taxStatuses}
           citizenshipCode={citizenshipCode}
+          enter={!initialLegIds.current?.has(item.id)}
         />
       </ScaleDecorator>
     );
@@ -1409,7 +1450,9 @@ export default function JourneyDetailScreen() {
             renderItem={renderItem}
             onDragEnd={handleReorder}
             ListHeaderComponent={listHeader}
-            ListFooterComponent={listFooter}
+            // Not before the stops: shown alone, the suggestions sat right under
+            // the documents and were pushed down when the stops came in.
+            ListFooterComponent={staysLoaded && visaLoaded ? listFooter : null}
             contentInsetAdjustmentBehavior="never"
             // Without a map nothing pushes the content below the transparent header.
             contentContainerStyle={styles.content}
@@ -1432,7 +1475,9 @@ export default function JourneyDetailScreen() {
           journeyId={journeyId}
           title={journey?.title ?? ''}
           legs={legs}
-          ready={!!journey}
+          // With the travellers too: their faces came a moment later and
+          // widened a capsule that had already been measured without them.
+          ready={!!journey && docs.loaded}
           owner={journey?.shared_owner_name ?? null}
           people={people}
           open={travellersOpen}

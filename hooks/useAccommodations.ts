@@ -19,6 +19,11 @@ export function forgetAccommodationPlans(): void {
   lastPlans.clear();
 }
 
+/** Read ahead at start-up (lib/journeyDetails.ts), so the first visit does not wait either. */
+export async function prefetchJourneyAccommodations(journeyId: number): Promise<void> {
+  lastPlans.set(journeyId, await getAccommodationsForJourney(journeyId));
+}
+
 /**
  * The accommodation plans of one journey (its local id), by stop sync id,
  * read alongside the journey itself and refreshed when the screen regains

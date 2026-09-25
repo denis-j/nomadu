@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useCloudRefresh } from './useCloudRefresh';
 import { getJourneyWithLegs, JourneyWithLegs } from '../lib/database';
+import { journeyDetail, rememberJourney } from '../lib/journeyDetails';
 
 /**
  * One journey with its stops, re-read whenever the screen regains focus.
@@ -12,18 +13,25 @@ import { getJourneyWithLegs, JourneyWithLegs } from '../lib/database';
  * moment later every time a sheet closed, which read as a flicker.
  */
 export function useJourney(id: number) {
-  const [journey, setJourney] = useState<JourneyWithLegs | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Starts from the last known state (lib/journeyDetails.ts), so the first
+  // frame already has the stops.
+  const [journey, setJourney] = useState<JourneyWithLegs | null>(() => journeyDetail(id)?.journey ?? null);
+  const [loading, setLoading] = useState(() => journeyDetail(id)?.journey === undefined);
 
-  // Another journey: back to the loading state until it is in.
-  useEffect(() => {
-    setJourney(null);
-    setLoading(true);
-  }, [id]);
+  // Another journey: its last known state, or loading until it is in. Only
+  // on a change of id: run on mount too, it blanked the cached first frame.
+  const [shownId, setShownId] = useState(id);
+  if (shownId !== id) {
+    setShownId(id);
+    const known = journeyDetail(id)?.journey;
+    setJourney(known ?? null);
+    setLoading(known === undefined);
+  }
 
   const refresh = useCallback(async () => {
     try {
       const data = await getJourneyWithLegs(id);
+      rememberJourney(id, data);
       setJourney(data);
     } catch (error) {
       console.error('Failed to load journey:', error);

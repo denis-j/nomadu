@@ -4,6 +4,7 @@ import { initializeFirestore } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
 import { secureAuthStorage } from './secureAuthStorage';
+import { startAppCheck } from './appCheck';
 
 
 const firebaseConfig = {
@@ -15,6 +16,9 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+// Before the services below make their first request, so it carries a token.
+startAppCheck(app);
 
 // Session lives in the keychain, not in AsyncStorage. See secureAuthStorage.ts
 // for why the key is hashed, the value chunked, and old sessions migrated.

@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Image } from 'expo-image';
@@ -103,6 +104,9 @@ export function Avatar({
 }) {
   const fontSize = Math.round(size * 0.36);
   const face = useAvatar(person.seed);
+  // A face already there when the disc appears shows at once; only one that
+  // arrives later fades in. A fade on every mount read as a flicker.
+  const hadFace = useRef(!!face);
   return (
     <Glass
       {...glassProps}
@@ -116,7 +120,7 @@ export function Avatar({
     >
       {face ? (
         <>
-          <Image source={{ uri: face }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+          <Image source={{ uri: face }} style={StyleSheet.absoluteFill} contentFit="cover" transition={hadFace.current ? 0 : 150} />
           {animated ? <AnimatedFace seed={person.seed} size={size} /> : null}
         </>
       ) : (

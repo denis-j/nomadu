@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { PRIVACY_URL, TERMS_URL, openLegal } from '../../constants/legal';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import AnimatedGradientBackground from '../../components/animated-gradient-background';
 import { CloudyButton } from '../../components/CloudyButton';
@@ -224,6 +225,13 @@ export default function SignUpScreen() {
                   </Glass>
                 </TouchableOpacity>
               </View>
+
+              <Text style={styles.legal}>
+                By continuing you agree to the{' '}
+                <Text style={styles.legalLink} onPress={() => openLegal(TERMS_URL)} accessibilityRole="link">Terms of Use</Text>
+                {' '}and the{' '}
+                <Text style={styles.legalLink} onPress={() => openLegal(PRIVACY_URL)} accessibilityRole="link">Privacy Policy</Text>.
+              </Text>
             </Animated.View>
           </View>
       </SafeAreaView>
@@ -310,6 +318,19 @@ const styles = StyleSheet.create({
   continueButtonText: {
     ...Typography.buttonLarge,
     textAlign: 'center',
+  },
+  legal: {
+    ...Typography.bodySmall,
+    fontSize: 12,
+    lineHeight: 17,
+    color: Colors.textTertiary,
+    textAlign: 'center',
+    marginTop: 16,
+    paddingHorizontal: 12,
+  },
+  legalLink: {
+    color: Colors.textSecondary,
+    textDecorationLine: 'underline',
   },
   signInRow: {
     flexDirection: 'row',

@@ -10,8 +10,12 @@ interface AuthState {
 }
 
 export function useAuth(): AuthState {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Firebase already knows the signed-in user once it has restored the
+  // session; starting from null made every screen spend its first render
+  // signed out. Caches keyed by the uid missed, and the journey list showed
+  // its cards without their visa chips, which then popped in.
+  const [user, setUser] = useState<User | null>(() => auth.currentUser);
+  const [loading, setLoading] = useState(() => !auth.currentUser);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {

@@ -10,6 +10,7 @@ import {
 } from '../lib/database';
 import { useAuth } from './useAuth';
 import { onDocumentsChanged } from '../lib/sync';
+import { journeyDetail, rememberJourneyDocuments } from '../lib/journeyDetails';
 
 /**
  * Travellers and documents of one journey, refreshed whenever the screen
@@ -19,10 +20,15 @@ import { onDocumentsChanged } from '../lib/sync';
  */
 export function useJourneyDocuments(journeyId: number, { ensureSelf = false } = {}) {
   const { user } = useAuth();
-  const [travellers, setTravellers] = useState<JourneyTraveller[]>([]);
-  const [documents, setDocuments] = useState<JourneyDocument[]>([]);
-  const [owner, setOwner] = useState<{ shared_owner_uid: string | null; shared_owner_name: string | null } | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  // The last known state first (lib/journeyDetails.ts), then the fresh read.
+  const known = journeyDetail(journeyId);
+  const [travellers, setTravellers] = useState<JourneyTraveller[]>(() => known?.travellers ?? []);
+  const [documents, setDocuments] = useState<JourneyDocument[]>(() => known?.documents ?? []);
+  const [owner, setOwner] = useState<{ shared_owner_uid: string | null; shared_owner_name: string | null } | null>(() =>
+    known?.journey?.shared_owner_uid
+      ? { shared_owner_uid: known.journey.shared_owner_uid, shared_owner_name: known.journey.shared_owner_name }
+      : null);
+  const [loaded, setLoaded] = useState(() => known?.travellers !== undefined);
 
   const refresh = useCallback(async () => {
     try {
@@ -31,6 +37,7 @@ export function useJourneyDocuments(journeyId: number, { ensureSelf = false } = 
         getJourneyDocuments(journeyId),
         getJourneyWithLegs(journeyId),
       ]);
+      rememberJourneyDocuments(journeyId, t, d);
       setTravellers(t);
       setDocuments(d);
       setOwner(j && j.shared_owner_uid ? { shared_owner_uid: j.shared_owner_uid, shared_owner_name: j.shared_owner_name } : null);
