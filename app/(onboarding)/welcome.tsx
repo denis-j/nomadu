@@ -1,15 +1,15 @@
 import * as Haptics from 'expo-haptics';
-import { Link, useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
+import { Link, useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect } from 'react';
 import {
   Dimensions,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
   FadeIn,
@@ -71,6 +71,14 @@ export default function WelcomeScreen() {
     opacity: contentFade.value,
     transform: [{ translateY: (1 - contentFade.value) * -30 }],
   }));
+
+  // Back from the next step (Android's back button) found the content still
+  // faded out: an empty sky with nothing to tap.
+  useFocusEffect(
+    useCallback(() => {
+      contentFade.value = withTiming(1, { duration: FLASH_OUT_MS, easing: Easing.out(Easing.cubic) });
+    }, [contentFade]),
+  );
 
   const handleStart = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);

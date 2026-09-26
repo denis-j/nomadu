@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { PlatformColor, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -7,7 +7,7 @@ import { Card } from '../../../components/visaForm';
 import { GlassPill } from '../../../components/GlassPill';
 import { insertJourney } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
-import { Colors } from '../../../constants/colors';
+import { Colors, systemColor } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 
 const SUGGESTIONS = ['Thailand 2026', 'Summer Vacation', 'City Break', 'Road Trip', 'Beach Holiday'];
@@ -43,7 +43,7 @@ export default function CreateJourneyScreen() {
         options={{
           headerRight: () => (
             <Pressable onPress={handleCreate} disabled={!canSave} hitSlop={8} style={{ opacity: canSave ? 1 : 0.3 }} accessibilityRole="button" accessibilityLabel="Create trip">
-              <SymbolView name="checkmark" tintColor={PlatformColor('label')} weight="semibold" size={22} />
+              <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
             </Pressable>
           ),
         }}

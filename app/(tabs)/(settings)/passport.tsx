@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, Keyboard, PlatformColor, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Dimensions, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Animated, {
   Easing,
@@ -12,7 +12,7 @@ import Animated, {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Colors } from '../../../constants/colors';
+import { Colors, systemColor } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { useAuth } from '../../../hooks/useAuth';
 import { getCitizenship, setCitizenship } from '../../../lib/onboarding';
@@ -263,19 +263,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: PlatformColor('separator'),
+    borderBottomColor: systemColor('separator'),
   },
   currentInfo: {
     gap: 2,
   },
   currentLabel: {
     fontSize: 13,
-    color: PlatformColor('secondaryLabel'),
+    color: systemColor('secondaryLabel'),
   },
   currentCountry: {
     fontSize: 18,
     fontWeight: '700',
-    color: PlatformColor('label'),
+    color: systemColor('label'),
   },
   item: {
     flexDirection: 'row',
@@ -284,26 +284,26 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     gap: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: PlatformColor('separator'),
+    borderBottomColor: systemColor('separator'),
   },
   itemPressed: {
-    backgroundColor: PlatformColor('systemGray5'),
+    backgroundColor: systemColor('systemGray5'),
   },
   itemText: {
     flex: 1,
     fontSize: 16,
-    color: PlatformColor('label'),
+    color: systemColor('label'),
   },
   empty: {
     textAlign: 'center',
-    color: PlatformColor('tertiaryLabel'),
+    color: systemColor('tertiaryLabel'),
     paddingTop: 40,
     fontSize: 15,
   },
   sectionLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: PlatformColor('secondaryLabel'),
+    color: systemColor('secondaryLabel'),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     paddingHorizontal: 20,

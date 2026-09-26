@@ -50,7 +50,9 @@ if (Platform.OS === 'android') {
   Notifications.setNotificationChannelAsync('default', {
     name: 'General',
     importance: Notifications.AndroidImportance.DEFAULT,
-    sound: 'default',
+    // No `sound`: the channel then plays the phone's standard sound. On
+    // Android `sound` names a bundled file, and there is none called
+    // "default" (expo-notifications reported it as missing).
   }).catch(() => {});
 }
 

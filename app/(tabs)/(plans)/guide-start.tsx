@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { PlatformColor, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
 import { Card, SectionLabel } from '../../../components/visaForm';
-import { Colors } from '../../../constants/colors';
+import { Colors, systemColor } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { guideById, guideDays } from '../../../constants/guides';
 import { parseDate } from '../../../lib/database';
@@ -81,7 +81,7 @@ export default function GuideStartScreen() {
           title: 'Start date',
           headerRight: () => (
             <Pressable onPress={create} disabled={busy} hitSlop={8} style={{ opacity: busy ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel="Create trip">
-              <SymbolView name="checkmark" tintColor={PlatformColor('label')} weight="semibold" size={22} />
+              <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
             </Pressable>
           ),
         }}

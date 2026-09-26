@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, PlatformColor, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -20,7 +20,7 @@ import {
   todayStr,
   visaFormStyles,
 } from '../../../components/visaForm';
-import { Colors } from '../../../constants/colors';
+import { Colors, systemColor } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import {
   EntriesAllowed,
@@ -164,7 +164,7 @@ export default function EditVisaScreen() {
               accessibilityLabel="Save visa"
               style={{ opacity: saving ? 0.3 : canSave ? 1 : 0.5 }}
             >
-              <SymbolView name="checkmark" tintColor={PlatformColor('label')} weight="semibold" size={22} />
+              <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
             </Pressable>
           ),
         }}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { PlatformColor, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { systemColor } from '../../../../constants/colors';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { getPopularCountries, searchCountries, getCountryCode } from '../../../../utils/geography';
@@ -92,7 +93,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: PlatformColor('secondaryLabel'),
+    color: systemColor('secondaryLabel'),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     paddingHorizontal: 20,
@@ -106,7 +107,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     gap: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: PlatformColor('separator'),
+    borderBottomColor: systemColor('separator'),
   },
 
   flagWrap: {
@@ -115,15 +116,15 @@ const styles = StyleSheet.create({
   itemText: {
     flex: 1,
     fontSize: 16,
-    color: PlatformColor('label'),
+    color: systemColor('label'),
   },
   chevron: {
     fontSize: 20,
-    color: PlatformColor('tertiaryLabel'),
+    color: systemColor('tertiaryLabel'),
   },
   empty: {
     textAlign: 'center',
-    color: PlatformColor('tertiaryLabel'),
+    color: systemColor('tertiaryLabel'),
     paddingTop: 40,
     fontSize: 15,
   },

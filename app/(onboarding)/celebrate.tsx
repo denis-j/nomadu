@@ -4,12 +4,12 @@ import { useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
 import {
   Image,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { CloudyButton } from '../../components/CloudyButton';
 import { ConfettiBurst } from '../../components/ConfettiBurst';

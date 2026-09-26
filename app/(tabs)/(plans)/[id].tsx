@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   LayoutAnimation,
-  PlatformColor,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -38,7 +38,7 @@ import { TravellersContent } from '../../../components/TravellersContent';
 import { useAuth } from '../../../hooks/useAuth';
 import { EmptyState } from '../../../components/EmptyState';
 import { CloudyButton } from '../../../components/CloudyButton';
-import { Colors } from '../../../constants/colors';
+import { Colors, systemColor } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import {
   JourneyLeg, TransportType,
@@ -175,7 +175,7 @@ const MAP_CHIP_ZONE = 36;
 /** Span shown around a single stop: the city and its surroundings, not the continent. */
 const SINGLE_STOP_DELTA = 1.2;
 /** Bump when the drawing changes (route style, padding) so old pictures are not reused. */
-const SNAPSHOT_STYLE = 'v8';
+const SNAPSHOT_STYLE = 'v9';
 const MAP_PIN = require('../../../assets/icons/map-pin.png');
 
 /**
@@ -193,6 +193,10 @@ const MAP_PIN = require('../../../assets/icons/map-pin.png');
  * fitted into the visible window.
  */
 function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; headerHeight: number; onPress: () => void }) {
+  // iOS starts the list below the status bar, Android (edge to edge) at the
+  // very top; without this the map sat a status bar too high there.
+  const safeTop = useSafeAreaInsets().top;
+  const listTop = Platform.OS === 'android' ? safeTop : 0;
   const mapRef = useRef<RNMapView>(null);
 
   const coordLegs = useMemo(
@@ -295,7 +299,7 @@ function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; h
   if (coords.length === 0 || !initialRegion) return null;
 
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Open the route on a map" style={[styles.mapCard, { marginTop: -headerHeight }]}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Open the route on a map" style={[styles.mapCard, { marginTop: listTop - headerHeight }]}>
       {snapshot ? (
         <Image source={{ uri: snapshot }} style={styles.map} contentFit="cover" transition={fresh ? 180 : 0} />
       ) : (
@@ -305,7 +309,11 @@ function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; h
             style={styles.map}
             provider={PROVIDER_DEFAULT}
             initialRegion={initialRegion}
-            onMapReady={() => setReady(true)}
+            // Google Maps (Android) is ready before its tiles are drawn, and a
+            // snapshot taken then is an empty grey grid that stays cached.
+            {...(Platform.OS === 'android'
+              ? { onMapLoaded: () => setReady(true) }
+              : { onMapReady: () => setReady(true) })}
             scrollEnabled={false}
             zoomEnabled={false}
             rotateEnabled={false}
@@ -920,7 +928,7 @@ function AISuggestionsSection({
                 value={draft}
                 onChangeText={setDraft}
                 placeholder="Somewhere quiet by the sea, good coffee…"
-                placeholderTextColor={PlatformColor('placeholderText')}
+                placeholderTextColor={systemColor('placeholderText')}
                 returnKeyType="search"
                 onSubmitEditing={submitDraft}
                 maxLength={120}

@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router/stack';
+import { headerTransparent, sheetWithHeader } from '../../../constants/colors';
 
 export default function SettingsStack() {
   return (
@@ -14,7 +15,7 @@ export default function SettingsStack() {
         name="passport"
         options={{
           title: 'Passport',
-          headerTransparent: true,
+          headerTransparent,
           headerBlurEffect: 'systemMaterial',
           headerBackButtonDisplayMode: 'minimal',
         }}
@@ -22,7 +23,7 @@ export default function SettingsStack() {
       <Stack.Screen
         name="profile"
         options={{
-          presentation: 'formSheet',
+          presentation: sheetWithHeader,
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.75, 1.0],
         }}
@@ -37,7 +38,7 @@ export default function SettingsStack() {
       <Stack.Screen
         name="agent-connect"
         options={{
-          presentation: 'formSheet',
+          presentation: sheetWithHeader,
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.72, 1.0],
         }}

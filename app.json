@@ -49,6 +49,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
+      "backgroundColor": "#8AD3FF",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -119,7 +120,13 @@
         {
           "image": "./assets/splash-gradient.png",
           "resizeMode": "cover",
-          "backgroundColor": "#8AD3FF"
+          "backgroundColor": "#8AD3FF",
+          "android": {
+            "image": "./assets/splash-icon-android.png",
+            "imageWidth": 288,
+            "resizeMode": "contain",
+            "backgroundColor": "#8AD3FF"
+          }
         }
       ]
     ],

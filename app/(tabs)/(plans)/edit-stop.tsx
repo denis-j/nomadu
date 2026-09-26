@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  PlatformColor,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,6 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { systemColor } from '../../../constants/colors';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Calendar, type DateData } from 'react-native-calendars';
@@ -16,7 +16,7 @@ import { MissingRoute } from '../../../components/MissingRoute';
 import { StopSummary } from '../../../components/StopSummary';
 import { TransportPicker } from '../../../components/TransportPicker';
 import { updateJourneyLeg, parseDate, type TransportType } from '../../../lib/database';
-import { forwardGeocode } from '../../../lib/geocoding';
+import { cityCoords } from '../../../lib/geocoding';
 import { getCountryCode } from '../../../utils/geography';
 import { showToast } from '../../../lib/toast';
 
@@ -120,7 +120,7 @@ export default function EditStopScreen() {
     setSaving(true);
     try {
       const code = getCountryCode(params.country);
-      const coords = await forwardGeocode(`${params.city}, ${params.country}`);
+      const coords = await cityCoords(params.city, params.country, code);
       await updateJourneyLeg(
         Number(params.legId),
         params.city,
@@ -151,7 +151,7 @@ export default function EditStopScreen() {
           title: 'Edit Stop',
           headerRight: () => (
             <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel="Save stop">
-              <SymbolView name="checkmark" tintColor={PlatformColor('label')} weight="semibold" size={22} />
+              <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
             </Pressable>
           ),
         }}
@@ -198,7 +198,7 @@ export default function EditStopScreen() {
           <TextInput
             style={styles.notesInput}
             placeholder="Add notes about this stop…"
-            placeholderTextColor={PlatformColor('tertiaryLabel') as any}
+            placeholderTextColor={systemColor('tertiaryLabel') as any}
             value={notes}
             onChangeText={setNotes}
             multiline
@@ -219,24 +219,24 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: PlatformColor('secondaryLabel'),
+    color: systemColor('secondaryLabel'),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   hint: {
     fontSize: 13,
-    color: PlatformColor('tertiaryLabel'),
+    color: systemColor('tertiaryLabel'),
     marginTop: -8,
   },
   calendarCard: {
-    backgroundColor: PlatformColor('secondarySystemGroupedBackground'),
+    backgroundColor: systemColor('secondarySystemGroupedBackground'),
     borderRadius: 14,
     borderCurve: 'continuous',
     overflow: 'hidden',
     padding: 4,
   },
   inputCard: {
-    backgroundColor: PlatformColor('secondarySystemGroupedBackground'),
+    backgroundColor: systemColor('secondarySystemGroupedBackground'),
     borderRadius: 14,
     borderCurve: 'continuous',
     overflow: 'hidden',
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   notesInput: {
     padding: 16,
     fontSize: 16,
-    color: PlatformColor('label'),
+    color: systemColor('label'),
     minHeight: 80,
   },
 });

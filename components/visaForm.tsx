@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, PlatformColor } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Calendar, type DateData } from 'react-native-calendars';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { Flag } from './Flag';
 import { GlassPill } from './GlassPill';
-import { Colors } from '../constants/colors';
+import { Colors, systemColor } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { NO_EXPIRY, hasNoExpiry, type EntriesAllowed } from '../lib/userVisas';
 import { formatDay } from '../lib/days';
@@ -643,7 +643,7 @@ const s = StyleSheet.create({
   summaryTitle: { ...Typography.titleSmall, fontWeight: '600' },
   summarySub: { ...Typography.bodySmall, color: Colors.textSecondary },
   daysBubble: {
-    backgroundColor: PlatformColor('systemGray5'),
+    backgroundColor: systemColor('systemGray5'),
     borderRadius: 20,
     borderCurve: 'continuous',
     paddingHorizontal: 12,
@@ -652,14 +652,14 @@ const s = StyleSheet.create({
   daysText: {
     fontSize: 13,
     fontWeight: '700',
-    color: PlatformColor('label'),
+    color: systemColor('label'),
     fontVariant: ['tabular-nums'],
   },
 
   sectionTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: PlatformColor('secondaryLabel'),
+    color: systemColor('secondaryLabel'),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginTop: 6,

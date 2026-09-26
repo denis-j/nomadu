@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router/stack';
+import { sheetBackground, sheetWithHeader } from '../../../constants/colors';
 
 export default function TimelineStack() {
   return (
@@ -16,17 +17,17 @@ export default function TimelineStack() {
           presentation: 'formSheet',
           headerShown: false,
           sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
         name="import"
         options={{
-          presentation: 'formSheet',
+          presentation: sheetWithHeader,
           title: 'Import Trips',
           sheetGrabberVisible: true,
           sheetAllowedDetents: [1.0],
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
     </Stack>

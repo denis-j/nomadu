@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router/stack';
+import { sheetBackground, headerTransparent, sheetWithHeader } from '../../../constants/colors';
 
 export default function StatsStack() {
   return (
@@ -20,7 +21,7 @@ export default function StatsStack() {
       <Stack.Screen
         name="visa-edit"
         options={{
-          presentation: 'formSheet',
+          presentation: sheetWithHeader,
           sheetGrabberVisible: true,
           headerBackButtonDisplayMode: 'minimal',
         }}
@@ -33,13 +34,13 @@ export default function StatsStack() {
           presentation: 'formSheet',
           headerShown: false,
           sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
         name="visa-country-picker"
         options={{
-          presentation: 'formSheet',
+          presentation: sheetWithHeader,
           sheetGrabberVisible: true,
           headerBackButtonDisplayMode: 'minimal',
         }}
@@ -49,7 +50,7 @@ export default function StatsStack() {
         options={{
           title: 'Tax Residence',
           headerBackButtonDisplayMode: 'minimal',
-          headerTransparent: true
+          headerTransparent
         }}
       />
     </Stack>

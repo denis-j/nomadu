@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PlatformColor, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
@@ -7,7 +7,7 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
 import { httpsCallable } from 'firebase/functions';
 import { CloudyButton } from '../../../components/CloudyButton';
 import { Card, SectionLabel } from '../../../components/visaForm';
-import { Colors } from '../../../constants/colors';
+import { Colors, systemColor } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { TOKEN_ENV_NAME, agentSetupText } from '../../../lib/agentSetup';
 import { functions } from '../../../lib/firebase';
@@ -102,7 +102,7 @@ export default function ConnectAgentSheet() {
               value={label}
               onChangeText={setLabel}
               placeholder="Name the agent"
-              placeholderTextColor={PlatformColor('placeholderText')}
+              placeholderTextColor={systemColor('placeholderText')}
               returnKeyType="done"
               maxLength={40}
             />

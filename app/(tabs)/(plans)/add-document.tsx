@@ -92,8 +92,11 @@ function AddDocumentScreenContent() {
 
   const takePicked = (p: Picked) => {
     setPicked(p);
-    // A sensible name to start from, the extension is noise here.
-    if (!title.trim() && p.name) setTitle(p.name.replace(/\.[a-z0-9]+$/i, ''));
+    // A sensible name to start from, the extension is noise here. The
+    // Android photo picker names files by their media id ("19.png"), which
+    // is no name at all.
+    const stem = p.name?.replace(/\.[a-z0-9]+$/i, '') ?? '';
+    if (!title.trim() && stem && !/^\d+$/.test(stem)) setTitle(stem);
   };
 
   const fromPhotos = async () => {

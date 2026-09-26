@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
@@ -307,7 +307,8 @@ const styles = StyleSheet.create({
   },
   chipContainer: {
     position: 'absolute',
-    bottom: 100,
+    // iOS lays the tab bar over the map, Android ends the map above it.
+    bottom: Platform.OS === 'ios' ? 100 : 24,
     left: 0,
     right: 0,
     alignItems: 'center',

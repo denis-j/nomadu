@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router/stack';
+import { sheetBackground, headerTransparent } from '../../../../constants/colors';
 
 /**
  * Adding a visa asks three questions, one screen each: which country, which
@@ -14,8 +15,8 @@ export default function AddVisaStack() {
       screenOptions={{
         headerBackButtonDisplayMode: 'minimal',
         headerShadowVisible: false,
-        headerTransparent: true,
-        contentStyle: { backgroundColor: 'transparent' },
+        headerTransparent,
+        contentStyle: { backgroundColor: sheetBackground },
       }}
     />
   );

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { PlatformColor, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { systemColor } from '../../../../constants/colors';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Calendar, type DateData } from 'react-native-calendars';
@@ -131,8 +132,8 @@ export default function AddStopDatesScreen() {
           headerRight: () => (
             <Pressable onPress={handleNext} hitSlop={8} accessibilityRole="button" accessibilityLabel="Next">
               <SymbolView
-                name="arrow.right"
-                tintColor={PlatformColor('label')}
+                name={{ ios: 'arrow.right', android: 'arrow_forward' }}
+                tintColor={systemColor('label')}
                 weight="semibold"
                 size={20}
               />
@@ -182,7 +183,7 @@ const styles = StyleSheet.create({
   },
   hint: {
     fontSize: 13,
-    color: PlatformColor('secondaryLabel'),
+    color: systemColor('secondaryLabel'),
     textAlign: 'center',
   },
 });

@@ -8,12 +8,13 @@ import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
-import { getJourneyDocument, getJourneyTravellers, getJourneyWithLegs, JourneyDocument, parseDate } from '../../../lib/database';
+import { getJourneyDocument, getJourneyTravellers, getJourneyWithLegs, JourneyDocument } from '../../../lib/database';
 import { documentExists, documentUri, isImageMime, kindMeta } from '../../../lib/documents';
 import { deleteDocumentEverywhere } from '../../../lib/documentSync';
 import { reportError } from '../../../lib/monitoring';
 import { showToast } from '../../../lib/toast';
 import { MissingRoute } from '../../../components/MissingRoute';
+import { parseSyncStamp } from '../../../lib/syncTime';
 
 /**
  * One document, full screen.
@@ -145,7 +146,7 @@ export default function DocumentScreen() {
               <Text style={styles.kindPillText}>{meta.short}</Text>
             </View>
             <Text style={styles.captionText} numberOfLines={1}>
-              {owner ? `${owner} · ` : ''}Added {parseDate(doc.created_at.slice(0, 10)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {owner ? `${owner} · ` : ''}Added {parseSyncStamp(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </Text>
           </View>
         )}

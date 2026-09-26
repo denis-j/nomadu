@@ -1,4 +1,5 @@
-import { PlatformColor, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { systemColor } from '../constants/colors';
 
 /**
  * Which stop a form is about, above the fields: the place on the left, the
@@ -36,11 +37,11 @@ const styles = StyleSheet.create({
   place: {
     fontSize: 16,
     fontWeight: '600',
-    color: PlatformColor('label'),
+    color: systemColor('label'),
     flex: 1,
   },
   badge: {
-    backgroundColor: PlatformColor('systemGray5'),
+    backgroundColor: systemColor('systemGray5'),
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 4,
@@ -48,12 +49,12 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 14,
     fontWeight: '700',
-    color: PlatformColor('label'),
+    color: systemColor('label'),
     fontVariant: ['tabular-nums'],
   },
   range: {
     fontSize: 14,
-    color: PlatformColor('secondaryLabel'),
+    color: systemColor('secondaryLabel'),
     textAlign: 'center',
   },
 });

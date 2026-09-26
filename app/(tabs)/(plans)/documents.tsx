@@ -18,10 +18,11 @@ import {
   JourneyTraveller,
   renameJourneyTraveller,
   travellerLabel,
- parseDate } from '../../../lib/database';
+} from '../../../lib/database';
 import { DocumentKind, documentUri, isImageMime, isPdfMime, kindMeta } from '../../../lib/documents';
 import { MissingRoute } from '../../../components/MissingRoute';
 import { useJourneyExists } from '../../../hooks/useJourneyExists';
+import { parseSyncStamp } from '../../../lib/syncTime';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -269,7 +270,7 @@ function DocumentTile({
   const uri = documentUri(doc.file_name);
   const image = isImageMime(doc.mime);
   const pdf = isPdfMime(doc.mime);
-  const added = parseDate(doc.created_at.slice(0, 10)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const added = parseSyncStamp(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.tileWrap, pressed && { opacity: 0.7 }]}>
       <Glass {...glassProps} style={[styles.tile, !hasGlass && styles.tileFallback]}>

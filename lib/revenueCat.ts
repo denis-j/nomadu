@@ -1,17 +1,26 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import Purchases, {
   LOG_LEVEL,
   CustomerInfo,
   PurchasesOffering,
 } from 'react-native-purchases';
 
+// Development uses RevenueCat's Test Store; releases talk to the store of
+// the platform. The Apple key on Android left every release build without
+// an entitlement, stuck on the paywall.
 const API_KEY = __DEV__
   ? 'test_kXXfCMJCdwXmGftKoGShjPwOkJk'
-  : 'appl_mKLVauyQAPTHccyWZkEDCYXRgaZ';
+  : Platform.OS === 'android'
+    ? 'goog_ucEYNulBZUlUAoItzKHxyojtNpL'
+    : 'appl_mKLVauyQAPTHccyWZkEDCYXRgaZ';
 
 const ENTITLEMENT_ID = 'MMM 0 LLC Pro';
 
-const REVENUECAT_ENABLED = true;
+// Off only for Android test builds made with EXPO_PUBLIC_DISABLE_PAYWALL=1 on
+// the command line (never in .env files): everyone counts as Pro there, so
+// a sideloaded APK can be tried without the Play Store. iOS ignores it.
+const REVENUECAT_ENABLED = !(Platform.OS === 'android' && process.env.EXPO_PUBLIC_DISABLE_PAYWALL === '1');
 
 export const PRODUCT_IDS = {
   monthly: 'nomadu_monthly',

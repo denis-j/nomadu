@@ -1,0 +1,20 @@
+diff --git a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/gamma/tabs/image/TabsImageLoader.kt b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/gamma/tabs/image/TabsImageLoader.kt
+index 2e6e2a1..1af52c0 100644
+--- a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/gamma/tabs/image/TabsImageLoader.kt
++++ b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/gamma/tabs/image/TabsImageLoader.kt
+@@ -54,8 +54,14 @@ private fun loadTabImageInternal(
+                 val closeableImage = imageReference.get()
+ 
+                 if (closeableImage is CloseableStaticBitmap) {
++                    // Copy the bitmap so the drawable outlives the Fresco reference
++                    // closed below; Fresco recycles the original when it trims memory
++                    // and the tab bar then crashes drawing it (fixed upstream in 4.28).
+                     val bitmap = closeableImage.underlyingBitmap
+-                    val drawable = bitmap.toDrawable(context.resources)
++                    val drawable =
++                        bitmap
++                            .copy(bitmap.config ?: android.graphics.Bitmap.Config.ARGB_8888, false)
++                            .toDrawable(context.resources)
+                     onLoaded(drawable)
+                 }
+ 

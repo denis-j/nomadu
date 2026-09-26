@@ -1,11 +1,12 @@
 import { useMemo, useState, useRef } from 'react';
-import { PlatformColor, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { systemColor } from '../../../../constants/colors';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
 import { insertTripManual, updateTripGroup, parseDate } from '../../../../lib/database';
-import { forwardGeocode } from '../../../../lib/geocoding';
+import { cityCoords } from '../../../../lib/geocoding';
 import { getCountryCode } from '../../../../utils/geography';
 import { showToast } from '../../../../lib/toast';
 import { hasBadge, isBadgeUnlocked, setPendingUnlock } from '../../../../lib/badges';
@@ -116,7 +117,7 @@ export default function CreateDatesScreen() {
       const code = getCountryCode(country);
       const s = fmt(startDate);
       const e = noEndDate ? null : fmt(endDate);
-      const coords = await forwardGeocode(`${city}, ${country}`);
+      const coords = await cityCoords(city, country, code);
       if (isEditing && params.id) {
         await updateTripGroup(
           Number(params.id), city, country, code, s, e,
@@ -153,8 +154,8 @@ export default function CreateDatesScreen() {
           headerRight: () => (
             <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel="Save trip">
               <SymbolView
-                name="checkmark"
-                tintColor={PlatformColor('label')}
+                name={{ ios: 'checkmark', android: 'check' }}
+                tintColor={systemColor('label')}
                 weight="semibold"
                 size={22}
               />
@@ -238,11 +239,11 @@ const styles = StyleSheet.create({
   summaryLocation: {
     fontSize: 16,
     fontWeight: '600',
-    color: PlatformColor('label'),
+    color: systemColor('label'),
     flex: 1,
   },
   daysBubble: {
-    backgroundColor: PlatformColor('systemGray5'),
+    backgroundColor: systemColor('systemGray5'),
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 4,
@@ -250,16 +251,16 @@ const styles = StyleSheet.create({
   daysText: {
     fontSize: 14,
     fontWeight: '700',
-    color: PlatformColor('label'),
+    color: systemColor('label'),
     fontVariant: ['tabular-nums'],
   },
   hint: {
     fontSize: 13,
-    color: PlatformColor('secondaryLabel'),
+    color: systemColor('secondaryLabel'),
     textAlign: 'center',
   },
   section: {
-    backgroundColor: PlatformColor('secondarySystemGroupedBackground'),
+    backgroundColor: systemColor('secondarySystemGroupedBackground'),
     borderRadius: 14,
     borderCurve: 'continuous',
     overflow: 'hidden',
@@ -273,6 +274,6 @@ const styles = StyleSheet.create({
   },
   toggleLabel: {
     fontSize: 16,
-    color: PlatformColor('label'),
+    color: systemColor('label'),
   },
 });

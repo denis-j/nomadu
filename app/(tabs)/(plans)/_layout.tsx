@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router/stack';
-import { Colors } from '../../../constants/colors';
+import { Colors, sheetBackground, sheetWithHeader } from '../../../constants/colors';
 
 export default function PlansStack() {
   return (
@@ -29,7 +29,7 @@ export default function PlansStack() {
           headerShown: false,
           sheetGrabberVisible: true,
           sheetAllowedDetents: [1.0],
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -41,16 +41,16 @@ export default function PlansStack() {
           presentation: 'formSheet',
           sheetGrabberVisible: true,
           sheetAllowedDetents: [1.0],
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
         name="edit-stop"
         options={{
-          presentation: 'formSheet',
+          presentation: sheetWithHeader,
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.85, 1.0],
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -63,10 +63,10 @@ export default function PlansStack() {
       <Stack.Screen
         name="add-document"
         options={{
-          presentation: 'formSheet',
+          presentation: sheetWithHeader,
           sheetGrabberVisible: true,
           headerBackButtonDisplayMode: 'minimal',
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -92,7 +92,7 @@ export default function PlansStack() {
       <Stack.Screen
         name="guide-start"
         options={{
-          presentation: 'formSheet',
+          presentation: sheetWithHeader,
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.85],
           contentStyle: { backgroundColor: Colors.background },
@@ -101,7 +101,7 @@ export default function PlansStack() {
       <Stack.Screen
         name="journey-map"
         options={{
-          presentation: 'formSheet',
+          presentation: sheetWithHeader,
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.92, 1.0],
           headerBackButtonDisplayMode: 'minimal',
@@ -110,11 +110,11 @@ export default function PlansStack() {
       <Stack.Screen
         name="create"
         options={{
-          presentation: 'formSheet',
+          presentation: sheetWithHeader,
           title: 'New Trip',
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.34],
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
     </Stack>

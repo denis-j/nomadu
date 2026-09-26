@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, PlatformColor, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { systemColor } from '../../../../constants/colors';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { getCitiesByCountryPaginated, searchCitiesByCountry } from '../../../../utils/geography';
@@ -165,28 +166,28 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     gap: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: PlatformColor('separator'),
+    borderBottomColor: systemColor('separator'),
   },
   itemPressed: {
-    backgroundColor: PlatformColor('systemGray5'),
+    backgroundColor: systemColor('systemGray5'),
   },
   itemText: {
     flex: 1,
     fontSize: 16,
-    color: PlatformColor('label'),
+    color: systemColor('label'),
   },
   customItem: {
     marginTop: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: PlatformColor('separator'),
+    borderTopColor: systemColor('separator'),
   },
   customItemText: {
-    color: PlatformColor('link'),
+    color: systemColor('link'),
     fontWeight: '500',
   },
   chevron: {
     fontSize: 20,
-    color: PlatformColor('tertiaryLabel'),
+    color: systemColor('tertiaryLabel'),
   },
   loadMore: {
     padding: 20,
@@ -194,12 +195,12 @@ const styles = StyleSheet.create({
   },
   loadMoreText: {
     fontSize: 15,
-    color: PlatformColor('link'),
+    color: systemColor('link'),
     fontWeight: '500',
   },
   empty: {
     textAlign: 'center',
-    color: PlatformColor('tertiaryLabel'),
+    color: systemColor('tertiaryLabel'),
     paddingTop: 40,
     fontSize: 15,
   },

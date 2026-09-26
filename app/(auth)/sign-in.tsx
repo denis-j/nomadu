@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Platform,
   Pressable,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
@@ -14,13 +13,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LogoModel3D } from '../../components/LogoModel3D';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import AnimatedGradientBackground from '../../components/animated-gradient-background';
 import { CloudyButton } from '../../components/CloudyButton';
+import { KeyboardLift } from '../../components/KeyboardLift';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
-import { useGoogleAuth } from '../../hooks/useGoogleAuth';
+import { googleSignInAvailable, useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { signInWithEmail, signInWithApple } from '../../lib/auth';
 import { showToast } from '../../lib/toast';
 
@@ -100,7 +101,7 @@ export default function SignInScreen() {
       />
 
       <SafeAreaView style={styles.safeArea}>
-          <View style={styles.scrollContent}>
+          <KeyboardLift style={styles.scrollContent}>
             {/* Title */}
             <Animated.View
               entering={FadeIn.duration(400)}
@@ -201,11 +202,14 @@ export default function SignInScreen() {
               entering={FadeIn.delay(200).duration(400)}
               style={styles.socialContainer}
             >
-              <View style={styles.orRow}>
-                <View style={styles.orLine} />
-                <Text style={styles.orText}>or continue with</Text>
-                <View style={styles.orLine} />
-              </View>
+              {/* Nothing to continue with on Android until Google is set up there. */}
+              {(Platform.OS === 'ios' || googleSignInAvailable) && (
+                <View style={styles.orRow}>
+                  <View style={styles.orLine} />
+                  <Text style={styles.orText}>or continue with</Text>
+                  <View style={styles.orLine} />
+                </View>
+              )}
 
               <View style={styles.socialButtons}>
                 {Platform.OS === 'ios' && (
@@ -217,15 +221,17 @@ export default function SignInScreen() {
                   </TouchableOpacity>
                 )}
 
-                <TouchableOpacity onPress={handleGoogleSignIn} disabled={loading} activeOpacity={0.85}>
-                  <Glass {...glassProps} style={[styles.socialButton, !hasGlass && styles.socialButtonFallback]}>
-                    <Ionicons name="logo-google" size={20} color="#EA4335" />
-                    <Text style={styles.socialButtonText}>Continue with Google</Text>
-                  </Glass>
-                </TouchableOpacity>
+                {googleSignInAvailable && (
+                  <TouchableOpacity onPress={handleGoogleSignIn} disabled={loading} activeOpacity={0.85}>
+                    <Glass {...glassProps} style={[styles.socialButton, !hasGlass && styles.socialButtonFallback]}>
+                      <Ionicons name="logo-google" size={20} color="#EA4335" />
+                      <Text style={styles.socialButtonText}>Continue with Google</Text>
+                    </Glass>
+                  </TouchableOpacity>
+                )}
               </View>
             </Animated.View>
-          </View>
+          </KeyboardLift>
       </SafeAreaView>
     </View>
   );

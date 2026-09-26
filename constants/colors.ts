@@ -1,3 +1,5 @@
+import { Platform, PlatformColor, type ColorValue } from 'react-native';
+
 export const Colors = {
   // Primary palette
   primary: '#000000',
@@ -39,3 +41,50 @@ export const Colors = {
   markerDefault: '#4A90A4',
   markerVisited: '#E8976E',
 } as const;
+
+/**
+ * iOS system colours (UIKit's semantic names) that follow dark mode and
+ * accessibility settings there. Android has no colours of these names, and
+ * a PlatformColor it cannot resolve throws while the view is created: the
+ * screens using them crashed on Android. There they fall back to the palette.
+ */
+type SystemColorName =
+  | 'label'
+  | 'secondaryLabel'
+  | 'tertiaryLabel'
+  | 'separator'
+  | 'link'
+  | 'placeholderText'
+  | 'secondarySystemGroupedBackground'
+  | 'systemGray5';
+
+const ANDROID_SYSTEM_COLORS: Record<SystemColorName, string> = {
+  label: Colors.text,
+  secondaryLabel: Colors.textSecondary,
+  tertiaryLabel: Colors.textTertiary,
+  separator: Colors.border,
+  link: '#007AFF',
+  placeholderText: Colors.textTertiary,
+  secondarySystemGroupedBackground: Colors.surface,
+  systemGray5: '#E5E5EA',
+};
+
+export function systemColor(name: SystemColorName): ColorValue {
+  return Platform.OS === 'ios' ? PlatformColor(name) : ANDROID_SYSTEM_COLORS[name];
+}
+
+/**
+ * Under sheets and their headers iOS draws a glass material itself, so the
+ * screens leave their own background transparent. Android draws nothing
+ * there: the sheet showed the screen behind it and the header lay over the
+ * list. On Android they get the app background and a solid header.
+ */
+export const sheetBackground = Platform.OS === 'ios' ? 'transparent' : Colors.background;
+export const headerTransparent = Platform.OS === 'ios';
+
+/**
+ * For sheets that show a native header (title, back, save checkmark).
+ * Android sheets draw no header at all, which left those screens without
+ * their save button, so there they open as a regular page instead.
+ */
+export const sheetWithHeader = Platform.OS === 'ios' ? ('formSheet' as const) : ('card' as const);

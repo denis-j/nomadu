@@ -3,13 +3,13 @@ import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../../constants/colors';
@@ -17,6 +17,7 @@ import { Typography } from '../../constants/typography';
 import { ENTER_DURATION, OPTION_BASE_DELAY, TITLE_DELAY } from '../../constants/onboardingAnimation';
 import { CloudyButton } from '../../components/CloudyButton';
 import { ProfileEditor } from '../../components/ProfileEditor';
+import { KeyboardLift } from '../../components/KeyboardLift';
 import { useAuth } from '../../hooks/useAuth';
 import { LOCAL_ONBOARDING_UID } from '../../lib/onboarding';
 import { getProfile, setProfile, suggestedFaces } from '../../lib/profile';
@@ -57,30 +58,32 @@ export default function ProfileScreen() {
       <StatusBar barStyle="dark-content" />
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            <Animated.View entering={FadeIn.delay(TITLE_DELAY).duration(ENTER_DURATION)} style={styles.header}>
-              <Text style={styles.title}>{"Who's traveling?"}</Text>
-              <Text style={styles.subtitle}>
-                {"Pick a face and tell us your name. It's how friends see you on a shared trip."}
-              </Text>
-            </Animated.View>
+          <KeyboardLift style={styles.flex}>
+            <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+              <Animated.View entering={FadeIn.delay(TITLE_DELAY).duration(ENTER_DURATION)} style={styles.header}>
+                <Text style={styles.title}>{"Who's traveling?"}</Text>
+                <Text style={styles.subtitle}>
+                  {"Pick a face and tell us your name. It's how friends see you on a shared trip."}
+                </Text>
+              </Animated.View>
 
-            <Animated.View entering={FadeIn.delay(OPTION_BASE_DELAY).duration(ENTER_DURATION)}>
-              <ProfileEditor name={name} onNameChange={setName} avatar={avatar} onAvatarChange={setAvatar} />
-            </Animated.View>
+              <Animated.View entering={FadeIn.delay(OPTION_BASE_DELAY).duration(ENTER_DURATION)}>
+                <ProfileEditor name={name} onNameChange={setName} avatar={avatar} onAvatarChange={setAvatar} />
+              </Animated.View>
 
-            <Animated.View entering={FadeIn.delay(OPTION_BASE_DELAY + 120).duration(ENTER_DURATION)} style={styles.footer}>
-              <CloudyButton
-                onPress={next}
-                disabled={!canContinue}
-                style={[styles.cta, !canContinue && styles.ctaDisabled]}
-                innerStyle={styles.ctaInner}
-              >
-                <Text style={styles.ctaText}>Continue</Text>
-              </CloudyButton>
-              <Text style={styles.footerText}>You can change both later in Settings.</Text>
-            </Animated.View>
-          </ScrollView>
+              <Animated.View entering={FadeIn.delay(OPTION_BASE_DELAY + 120).duration(ENTER_DURATION)} style={styles.footer}>
+                <CloudyButton
+                  onPress={next}
+                  disabled={!canContinue}
+                  style={[styles.cta, !canContinue && styles.ctaDisabled]}
+                  innerStyle={styles.ctaInner}
+                >
+                  <Text style={styles.ctaText}>Continue</Text>
+                </CloudyButton>
+                <Text style={styles.footerText}>You can change both later in Settings.</Text>
+              </Animated.View>
+            </ScrollView>
+          </KeyboardLift>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>

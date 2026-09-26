@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import { PlatformColor, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { systemColor } from '../../../../constants/colors';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -10,7 +11,7 @@ import { CityTips } from '../../../../components/MarkdownTips';
 import { StopSummary } from '../../../../components/StopSummary';
 import { TransportPicker } from '../../../../components/TransportPicker';
 import { insertJourneyLeg, updateJourneyLeg, parseDate, type TransportType } from '../../../../lib/database';
-import { forwardGeocode } from '../../../../lib/geocoding';
+import { cityCoords } from '../../../../lib/geocoding';
 import { getCountryCode } from '../../../../utils/geography';
 import { showToast } from '../../../../lib/toast';
 
@@ -55,7 +56,7 @@ export default function AddStopDetailsScreen() {
     setSaving(true);
     try {
       const code = getCountryCode(country);
-      const coords = await forwardGeocode(`${city}, ${country}`);
+      const coords = await cityCoords(city, country, code);
       const notesVal = notes.trim() || null;
       if (isEditing && params.legId) {
         await updateJourneyLeg(Number(params.legId), city, country, code, params.start, params.end, transport, notesVal, coords?.latitude, coords?.longitude);
@@ -81,7 +82,7 @@ export default function AddStopDetailsScreen() {
           title: isEditing ? 'Edit Stop' : 'Stop Details',
           headerRight: () => (
             <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel="Save stop">
-              <SymbolView name="checkmark" tintColor={PlatformColor('label')} weight="semibold" size={22} />
+              <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
             </Pressable>
           ),
         }}

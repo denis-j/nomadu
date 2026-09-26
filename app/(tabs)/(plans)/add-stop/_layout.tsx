@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router/stack';
+import { sheetBackground, headerTransparent } from '../../../../constants/colors';
 
 export default function AddStopStack() {
   return (
@@ -6,8 +7,8 @@ export default function AddStopStack() {
       screenOptions={{
         headerBackButtonDisplayMode: 'minimal',
         headerShadowVisible: false,
-        headerTransparent: true,
-        contentStyle: { backgroundColor: 'transparent' },
+        headerTransparent,
+        contentStyle: { backgroundColor: sheetBackground },
       }}
     />
   );

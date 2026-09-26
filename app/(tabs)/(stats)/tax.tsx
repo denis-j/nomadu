@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, Linking, Modal, PlatformColor, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SymbolView } from 'expo-symbols';
 import { useIsFocused } from '@react-navigation/native';
 import { useTaxTracker } from '../../../hooks/useTaxTracker';
-import { Colors } from '../../../constants/colors';
+import { Colors, systemColor } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { CloudyButton } from '../../../components/CloudyButton';
 import { Flag } from '../../../components/Flag';
@@ -134,7 +134,7 @@ export default function TaxScreen() {
         contentContainerStyle={styles.emptyScroll}
       >
         <View style={styles.emptyInner}>
-          <SymbolView name="person.text.rectangle" size={48} tintColor={PlatformColor('tertiaryLabel')} weight="regular" />
+          <SymbolView name={{ ios: 'person.text.rectangle', android: 'id_card' }} size={48} tintColor={systemColor('tertiaryLabel')} weight="regular" />
           <Text style={styles.emptyTitle}>No citizenship set</Text>
           <Text style={styles.emptySubtitle}>Set your citizenship in Settings to see tax residence tracking.</Text>
         </View>

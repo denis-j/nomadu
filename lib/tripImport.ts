@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { extractTripsFromImage, type ExtractedTrip } from './ai';
-import { countryToCode, forwardGeocode } from './geocoding';
+import { cityCoords, countryToCode } from './geocoding';
 import { getCountryName, nearestCity } from '../utils/geography';
 import { getAllTripsRaw, insertTripManual, type Trip } from './database';
 
@@ -108,7 +108,7 @@ export async function importFromImage(
     const geocoded = await Promise.all(
       extracted.map(async (e, i): Promise<ImportCandidate> => {
         const code = normalizeCountryCode(e);
-        const coords = await forwardGeocode(`${e.city}, ${e.country}`).catch(() => null);
+        const coords = await cityCoords(e.city, e.country, code).catch(() => null);
         const dup = findDuplicate(existingTrips, { city: e.city, startDate: e.startDate });
 
         // The model reads whatever the screenshot said, so it may hand back

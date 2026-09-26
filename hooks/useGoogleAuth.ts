@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { signInWithGoogleToken } from '../lib/auth';
@@ -8,11 +9,22 @@ WebBrowser.maybeCompleteAuthSession();
 
 const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+const ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+
+/**
+ * Android needs an OAuth client of its own (package name plus the SHA-1 of
+ * the signing key). Without one, expo-auth-session threw while rendering and
+ * took the whole sign-in and sign-up screens down with it, email included;
+ * now the Google button is simply not shown until the id is configured.
+ */
+export const googleSignInAvailable = Platform.OS !== 'android' || !!ANDROID_CLIENT_ID;
 
 export function useGoogleAuth() {
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     iosClientId: IOS_CLIENT_ID,
     webClientId: WEB_CLIENT_ID,
+    // A placeholder keeps the hook from throwing; the button is hidden then.
+    androidClientId: ANDROID_CLIENT_ID ?? 'unconfigured',
     redirectUri: AuthSession.makeRedirectUri({
       native: 'com.nomady.app:/oauthredirect',
     }),

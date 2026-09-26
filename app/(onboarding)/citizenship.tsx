@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Dimensions,
   FlatList,
-  SafeAreaView,
+  Platform,
   StatusBar,
   StyleSheet,
   Text,
@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import Animated, {
   FadeIn,
@@ -33,6 +34,7 @@ import {
   searchCountries,
 } from '../../utils/geography';
 import { Flag } from '../../components/Flag';
+import { countryCodeToFlag } from '../../lib/geocoding';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -196,7 +198,14 @@ export default function CitizenshipScreen() {
               onPress={() => handleMarkerPress(name)}
             >
               <View style={[styles.markerWrap, isHovered && styles.markerWrapActive]}>
-                {code && <Flag code={code} size={isHovered ? 22 : 18} />}
+                {code && (Platform.OS === 'android' ? (
+                  // Google Maps draws a marker from a snapshot of its view,
+                  // taken before the flag image arrives: every marker was an
+                  // empty white bubble. Text is there at once.
+                  <Text style={{ fontSize: isHovered ? 20 : 16 }}>{countryCodeToFlag(code)}</Text>
+                ) : (
+                  <Flag code={code} size={isHovered ? 22 : 18} />
+                ))}
               </View>
             </Marker>
           );

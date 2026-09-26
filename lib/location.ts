@@ -221,7 +221,11 @@ export async function isTrackingActive(): Promise<boolean> {
 
 export async function getCurrentLocation(): Promise<Location.LocationObject | null> {
   try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
+    // Only a check, never a request: on Android even a request for a granted
+    // permission opens the system's permission screen for a moment, the app
+    // leaves the foreground and comes back, and the check that runs on every
+    // return asked again, in an endless loop.
+    const { status } = await Location.getForegroundPermissionsAsync();
     if (status !== 'granted') return null;
 
     // A cached position is instant, but only worth anything if it is recent.

@@ -1,6 +1,7 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Appearance, LogBox } from 'react-native';
+import { Appearance, LogBox, Platform } from 'react-native';
 import SplashScreen from '../components/SplashScreen';
 import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
 import { SyncProvider } from '../contexts/SyncContext';
@@ -203,8 +204,26 @@ export default function RootLayout() {
 
   const appReady = ready && !authLoading && (!user || userDataReady);
 
+  // Android's window starts in the splash blue (app.json), so the moment
+  // between the system splash and ours is not black. Once ours is gone the
+  // window goes back to the app's own ground, which shows at screen edges.
+  useEffect(() => {
+    if (!showSplash && Platform.OS === 'android') {
+      // Loaded here, not imported: iOS never needs it, and a build without
+      // the native module would crash on the import alone.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      (require('expo-system-ui') as typeof import('expo-system-ui'))
+        .setBackgroundColorAsync(Colors.background)
+        .catch(() => {});
+    }
+  }, [showSplash]);
+
   return (
     <ErrorBoundary>
+      {/* The app is always light. Screens that set their own style still win
+          while they are open; once none is left, Android fell back to white
+          icons, invisible on the white tab screens (iOS defaults to dark). */}
+      <StatusBar style="dark" />
       {appReady && (
         <OnboardingProvider>
           <SyncProvider>

@@ -1,5 +1,5 @@
 import * as Location from 'expo-location';
-import { getCountryName, nearestCity } from '../utils/geography';
+import { findCityCoords, getCountryName, nearestCity } from '../utils/geography';
 
 // Country code to flag emoji
 export function countryCodeToFlag(code: string): string {
@@ -90,6 +90,22 @@ export async function reverseGeocode(
   return { city: null, country: null, countryCode: null };
 }
 
+
+/**
+ * Coordinates for a city picked in the app. The bundled dataset answers
+ * first: it needs no network, and on Android the system geocoder refuses to
+ * run at all without location permission, which left manual trips off the
+ * map. The geocoder only covers names the dataset does not know.
+ */
+export async function cityCoords(
+  city: string,
+  country: string,
+  countryCode: string,
+): Promise<{ latitude: number; longitude: number } | null> {
+  const known = countryCode ? findCityCoords(city, countryCode) : null;
+  if (known) return { latitude: known.latitude, longitude: known.longitude };
+  return forwardGeocode(`${city}, ${country}`);
+}
 
 // Forward geocode: address string → coordinates
 export async function forwardGeocode(
