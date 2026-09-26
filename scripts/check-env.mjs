@@ -23,6 +23,8 @@ const REQUIRED = [
   'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID',
   'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
   'EXPO_PUBLIC_SENTRY_DSN',
+  // Not a crash when missing, but the build would silently send no analytics.
+  'EXPO_PUBLIC_POSTHOG_KEY',
 ];
 
 const missing = REQUIRED.filter((name) => !process.env[name]?.trim());
