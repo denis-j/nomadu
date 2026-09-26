@@ -94,7 +94,11 @@ function SearchRow({ name, index, onPress }: {
 const APPROACH_REGION = {
   latitude: 30,
   longitude: 10,
-  latitudeDelta: 160,
+  // 160 degrees around 30 degrees north reaches 110 degrees, past the pole.
+  // Apple Maps shrugs that off; Google Maps on Android threw an
+  // IllegalStateException the moment the map was ready and took the whole
+  // app down on this screen. Kept inside the Mercator range there.
+  latitudeDelta: Platform.OS === 'android' ? 110 : 160,
   longitudeDelta: 160,
 };
 const LANDED_REGION = {
