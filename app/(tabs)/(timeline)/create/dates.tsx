@@ -10,6 +10,7 @@ import { cityCoords } from '../../../../lib/geocoding';
 import { getCountryCode } from '../../../../utils/geography';
 import { showToast } from '../../../../lib/toast';
 import { hasBadge, isBadgeUnlocked, setPendingUnlock } from '../../../../lib/badges';
+import { track } from '../../../../lib/analytics';
 
 type Params = {
   country: string;
@@ -125,6 +126,7 @@ export default function CreateDatesScreen() {
         );
       } else {
         await insertTripManual(city, country, code, s, e, coords?.latitude, coords?.longitude);
+        track({ name: 'trip_added', props: { method: 'manual' } });
       }
       // If this trip's country has a badge and we haven't shown it before,
       // queue an unlock. The timeline screen will trigger the fullscreen modal

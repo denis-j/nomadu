@@ -14,6 +14,7 @@ import { insertJourneyLeg, updateJourneyLeg, parseDate, type TransportType } fro
 import { cityCoords } from '../../../../lib/geocoding';
 import { getCountryCode } from '../../../../utils/geography';
 import { showToast } from '../../../../lib/toast';
+import { track } from '../../../../lib/analytics';
 
 type Params = {
   journeyId: string;
@@ -62,6 +63,7 @@ export default function AddStopDetailsScreen() {
         await updateJourneyLeg(Number(params.legId), city, country, code, params.start, params.end, transport, notesVal, coords?.latitude, coords?.longitude);
       } else {
         await insertJourneyLeg(Number(params.journeyId), city, country, code, params.start, params.end, transport, notesVal, coords?.latitude, coords?.longitude);
+        track({ name: 'stop_added' });
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       parentNav.getParent()?.goBack();

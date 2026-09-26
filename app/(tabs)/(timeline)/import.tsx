@@ -26,6 +26,7 @@ import {
   type ImportCandidate,
   type ImportResult,
 } from '../../../lib/tripImport';
+import { track } from '../../../lib/analytics';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -147,6 +148,7 @@ export default function ImportScreen() {
     setStep('committing');
     try {
       const inserted = await commitImport(toInsert);
+      if (inserted > 0) track({ name: 'trip_added', props: { method: 'import', count: inserted } });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // brief success then close. If the sheet was already swiped away,
       // router.back() would pop the screen underneath it instead.

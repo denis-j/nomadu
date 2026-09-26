@@ -19,6 +19,7 @@ import { insertUserVisa } from '../../../../lib/userVisas';
 import { showToast } from '../../../../lib/toast';
 import { Colors } from '../../../../constants/colors';
 import { Typography } from '../../../../constants/typography';
+import { track } from '../../../../lib/analytics';
 
 /** Step 3 of 3: the dates, and a name if you want one. */
 export default function AddVisaWhenScreen() {
@@ -58,6 +59,7 @@ export default function AddVisaWhenScreen() {
         entries_allowed: 'multiple',
         notes: null,
       });
+      track({ name: 'visa_added' });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       nav.getParent()?.goBack();
       showToast('Visa added');

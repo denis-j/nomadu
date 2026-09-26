@@ -1,6 +1,7 @@
 import { insertJourney, insertJourneyLeg } from './database';
 import { showToast } from './toast';
 import type { DestinationGuide } from '../constants/guides';
+import { track } from './analytics';
 
 /**
  * A guide's suggested route as a real trip, from the day the user picked.
@@ -16,6 +17,7 @@ export async function createTripFromGuide(guide: DestinationGuide, start: Date):
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
   const id = await insertJourney(`${guide.flag} ${guide.country}`);
+  track({ name: 'journey_created', props: { from_guide: true } });
   for (const leg of guide.legs) {
     await insertJourneyLeg(
       id,

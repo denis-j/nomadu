@@ -21,6 +21,7 @@ import { KeyboardLift } from '../../components/KeyboardLift';
 import { useAuth } from '../../hooks/useAuth';
 import { LOCAL_ONBOARDING_UID } from '../../lib/onboarding';
 import { getProfile, setProfile, suggestedFaces } from '../../lib/profile';
+import { track } from '../../lib/analytics';
 
 /**
  * Onboarding step 1: a name and a face. A face is suggested straight away;
@@ -50,6 +51,7 @@ export default function ProfileScreen() {
     if (!canContinue) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await setProfile(uid, { name, avatar });
+    track({ name: 'onboarding_profile_done' });
     router.push('/(onboarding)/citizenship');
   };
 

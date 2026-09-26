@@ -7,6 +7,7 @@ import { reverseGeocode } from './geocoding';
 import { fireArrivalIfNew } from './notifications';
 import { reportError } from './monitoring';
 import { decide, MAX_ACCURACY_M, MAX_FOREGROUND_AGE_MS, type Candidate, type Fix } from './tracking';
+import { track } from './analytics';
 
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
 const LAST_FIX_KEY = '@tracking_last_fix_at';
@@ -96,6 +97,7 @@ async function processFix(fix: Fix, source: 'background' | 'foreground'): Promis
         return;
       case 'start':
         await insertTrip(place.city, place.country, place.countryCode, place.latitude, place.longitude, decision.date);
+        track({ name: 'trip_added', props: { method: 'tracking' } });
         notify();
         break;
       case 'extend':
@@ -104,6 +106,7 @@ async function processFix(fix: Fix, source: 'background' | 'foreground'): Promis
       case 'switch':
         await updateTripEndDate(decision.closeTripId, decision.closeDate);
         await insertTrip(place.city, place.country, place.countryCode, place.latitude, place.longitude, decision.startDate);
+        track({ name: 'trip_added', props: { method: 'tracking' } });
         notify();
         break;
       case 'pending':

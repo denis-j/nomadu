@@ -53,6 +53,7 @@ import { currencyForCountry } from '../../../lib/currencies';
 import { parseDate } from '../../../lib/database';
 import { toYmd } from '../../../lib/days';
 import { showToast } from '../../../lib/toast';
+import { track } from '../../../lib/analytics';
 
 type Params = {
   stopSyncId: string;
@@ -496,7 +497,11 @@ function OptionsSection({ plan, apply, stopId, currency }: { plan: Accommodation
             currency={currency}
             onCancel={() => { animate(); setAdding(false); }}
             onAdd={async (input) => {
-              await apply(() => addAccommodationOption(stopId, input), 'Option added');
+              await apply(async () => {
+                const saved = await addAccommodationOption(stopId, input);
+                track({ name: 'accommodation_option_added' });
+                return saved;
+              }, 'Option added');
               animate();
               setAdding(false);
             }}

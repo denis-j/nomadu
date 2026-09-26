@@ -5,11 +5,13 @@ import {
   OAuthProvider,
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  getAdditionalUserInfo,
   sendPasswordResetEmail,
   signInWithCredential,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   type User,
+  type UserCredential,
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { httpsCallable, type FunctionsError } from 'firebase/functions';
@@ -17,6 +19,14 @@ import { auth, db, functions } from './firebase';
 import { identifyUser, logOutUser } from './revenueCat';
 import { wipeLocalData } from './localOwner';
 import { stopRealtimeSync, syncAll } from './sync';
+import { track } from './analytics';
+
+/** Apple and Google sign in and sign up through the same call; Firebase knows which it was. */
+function trackProviderAuth(result: UserCredential, method: 'apple' | 'google') {
+  track(getAdditionalUserInfo(result)?.isNewUser
+    ? { name: 'signed_up', props: { method } }
+    : { name: 'signed_in', props: { method } });
+}
 
 async function ensureUserDocument(user: User) {
   const ref = doc(db, 'users', user.uid);
@@ -34,6 +44,7 @@ async function ensureUserDocument(user: User) {
 export async function signInWithEmail(email: string, password: string) {
   const result = await signInWithEmailAndPassword(auth, email, password);
   await identifyUser(result.user.uid);
+  track({ name: 'signed_in', props: { method: 'email' } });
   return result.user;
 }
 
@@ -43,6 +54,7 @@ export async function signUpWithEmail(email: string, password: string) {
     identifyUser(result.user.uid),
     ensureUserDocument(result.user),
   ]);
+  track({ name: 'signed_up', props: { method: 'email' } });
   return result.user;
 }
 
@@ -79,6 +91,7 @@ export async function signInWithApple() {
     identifyUser(result.user.uid),
     ensureUserDocument(result.user),
   ]);
+  trackProviderAuth(result, 'apple');
   return result.user;
 }
 
@@ -89,6 +102,7 @@ export async function signInWithGoogleToken(idToken: string) {
     identifyUser(result.user.uid),
     ensureUserDocument(result.user),
   ]);
+  trackProviderAuth(result, 'google');
   return result.user;
 }
 
@@ -112,6 +126,7 @@ export async function signOut() {
     ]);
   }
   stopRealtimeSync();
+  track({ name: 'signed_out' });
   await firebaseSignOut(auth);
   await logOutUser();
 }
@@ -141,6 +156,8 @@ export async function deleteAccount(): Promise<void> {
     const message = (err as FunctionsError)?.message;
     throw new Error(message || 'Your account could not be deleted. Please try again.');
   }
+
+  track({ name: 'account_deleted' });
 
   // Past this point the account is gone server-side. Local cleanup must not
   // throw, or the user is left signed into an account that no longer exists.

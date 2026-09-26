@@ -9,6 +9,7 @@ import { insertJourney } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
 import { Colors, systemColor } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
+import { track } from '../../../lib/analytics';
 
 const SUGGESTIONS = ['Thailand 2026', 'Summer Vacation', 'City Break', 'Road Trip', 'Beach Holiday'];
 
@@ -26,6 +27,7 @@ export default function CreateJourneyScreen() {
     setSaving(true);
     try {
       const id = await insertJourney(title.trim());
+      track({ name: 'journey_created', props: { from_guide: false } });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // One navigation update: the sheet goes, the trip comes. Dismissing and
       // pushing on a timer raced the sheet's dismissal and crashed the stack.

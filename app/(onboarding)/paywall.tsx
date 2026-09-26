@@ -8,6 +8,7 @@ import { useSubscription } from '../../hooks/useSubscription';
 import { useAuth } from '../../hooks/useAuth';
 import { deleteAccount } from '../../lib/auth';
 import { Colors } from '../../constants/colors';
+import { track } from '../../lib/analytics';
 
 export default function OnboardingPaywallScreen() {
   const router = useRouter();
@@ -33,12 +34,22 @@ export default function OnboardingPaywallScreen() {
     }
   }, [isPro]);
 
+  useEffect(() => {
+    track({ name: 'paywall_viewed', props: { source: 'onboarding' } });
+  }, []);
+
   const RevenueCatUI = require('react-native-purchases-ui').default;
   return (
     <View style={{ flex: 1 }}>
       <RevenueCatUI.Paywall
-        onPurchaseCompleted={goToCelebrate}
-        onRestoreCompleted={goToCelebrate}
+        onPurchaseCompleted={() => {
+          track({ name: 'purchase_completed', props: { source: 'onboarding' } });
+          goToCelebrate();
+        }}
+        onRestoreCompleted={() => {
+          track({ name: 'purchase_restored', props: { source: 'onboarding' } });
+          goToCelebrate();
+        }}
       />
       <AccountButton />
     </View>

@@ -23,6 +23,7 @@ import { DOCUMENT_KINDS, DocumentKind, importDocumentFile, isImageMime, kindMeta
 import { showToast } from '../../../lib/toast';
 import { MissingRoute } from '../../../components/MissingRoute';
 import { useJourneyExists } from '../../../hooks/useJourneyExists';
+import { track } from '../../../lib/analytics';
 
 interface Picked {
   uri: string;
@@ -153,6 +154,7 @@ function AddDocumentScreenContent() {
         mime: picked.mime,
         uploader_uid: user?.uid ?? null,
       });
+      track({ name: 'document_added', props: { kind } });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       nav.goBack();
       showToast('Document added');

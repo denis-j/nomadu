@@ -16,6 +16,7 @@ import { useOTAUpdates } from '../hooks/useOTAUpdates';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { Colors } from '../constants/colors';
 import { initMonitoring, reportError, setMonitoringUser } from '../lib/monitoring';
+import { setAnalyticsUser, trackScreen } from '../lib/analytics';
 // Defines the background location task. It has to exist as soon as the JS
 // starts: when iOS wakes the app for a move, the update is handed to the task
 // right away, and the definition used to wait until the map screen or the
@@ -56,6 +57,12 @@ function RootNavigator() {
   const { onboardingDone } = useOnboarding();
   const router = useRouter();
   const segments = useSegments();
+
+  // The route pattern ("(tabs)/(plans)/[id]"), never a trip or city id.
+  const screenKey = segments.join('/');
+  useEffect(() => {
+    if (screenKey) trackScreen(screenKey);
+  }, [screenKey]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -200,6 +207,7 @@ export default function RootLayout() {
   // Tag reports with the signed-in user (uid only, never the email address).
   useEffect(() => {
     setMonitoringUser(user?.uid ?? null);
+    setAnalyticsUser(user?.uid ?? null);
   }, [user?.uid]);
 
   const appReady = ready && !authLoading && (!user || userDataReady);

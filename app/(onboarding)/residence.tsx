@@ -23,6 +23,7 @@ import {
   OPTION_BASE_DELAY,
   OPTION_STAGGER,
 } from '../../constants/onboardingAnimation';
+import { track } from '../../lib/analytics';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -64,6 +65,7 @@ export default function ResidenceScreen() {
     playCardTapSound();
     const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
     setHasFixedResidence(uid, choice === 'yes');
+    track({ name: 'onboarding_residence_chosen', props: { fixed_residence: choice === 'yes' } });
     router.push('/(onboarding)/permissions');
   };
 

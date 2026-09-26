@@ -26,6 +26,7 @@ import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { playCollectSound } from '../../lib/sound';
 import { prefetchSuggestedFaces } from '../../lib/profile';
+import { track } from '../../lib/analytics';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const PLANE_WIDTH = 240;
@@ -81,6 +82,7 @@ export default function WelcomeScreen() {
   );
 
   const handleStart = () => {
+    track({ name: 'onboarding_started' });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     playCollectSound();
 

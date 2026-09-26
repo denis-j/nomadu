@@ -35,6 +35,7 @@ import {
 } from '../../utils/geography';
 import { Flag } from '../../components/Flag';
 import { countryCodeToFlag } from '../../lib/geocoding';
+import { track } from '../../lib/analytics';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -138,6 +139,7 @@ export default function CitizenshipScreen() {
     const code = getCountryCode(countryName);
     const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
     await setCitizenship(uid, countryName, code);
+    track({ name: 'onboarding_citizenship_done' });
 
     const coords = COUNTRY_COORDS[countryName];
     if (coords && mapRef.current) {

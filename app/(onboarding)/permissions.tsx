@@ -24,6 +24,7 @@ import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { requestLocationPermissions } from '../../lib/location';
 import { requestNotificationPermissions } from '../../lib/notifications';
+import { track } from '../../lib/analytics';
 
 
 // Minimum visible loading time on the permissions screen before we hand off
@@ -48,12 +49,14 @@ export default function PermissionsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     const started = Date.now();
+    let granted = false;
     try {
-      await requestLocationPermissions();
+      granted = await requestLocationPermissions();
       await requestNotificationPermissions();
     } catch {
       // User denied or error. Continue anyway.
     }
+    track({ name: 'onboarding_location', props: { choice: 'enabled', always_granted: granted } });
     await goNextAfterHold(started);
   };
 
@@ -61,6 +64,7 @@ export default function PermissionsScreen() {
     if (loading) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setLoading(true);
+    track({ name: 'onboarding_location', props: { choice: 'skipped', always_granted: false } });
     await goNextAfterHold(Date.now());
   };
 
