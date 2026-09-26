@@ -49,7 +49,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
  * over every journey's stops) on each launch, background location wakes
  * included, was work before the first screen for nothing.
  */
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
   // Per connection, so on every open.
@@ -290,6 +290,12 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
     ['journey_travellers', 'avatar TEXT'],
     // A plan that came with a friend's trip: shown, never pushed as ours.
     ['accommodations', 'followed INTEGER NOT NULL DEFAULT 0'],
+    // A friend's trip the owner lets us plan: `shared_can_edit` mirrors the
+    // right, `shared_dirty` / `dirty` mark an edit made here that has not
+    // reached the owner yet, so the next look at the mirror does not undo it.
+    ['journeys', 'shared_can_edit INTEGER NOT NULL DEFAULT 0'],
+    ['journeys', 'shared_dirty INTEGER NOT NULL DEFAULT 0'],
+    ['accommodations', 'dirty INTEGER NOT NULL DEFAULT 0'],
     // Documents of a shared trip travel through Storage: a stable id for
     // the cloud record, who uploaded it, where the file is, and a clock.
     ['journey_documents', 'sync_id TEXT'],
@@ -701,9 +707,13 @@ export interface Journey {
   deleted: number;
   /** Set once the owner made an invite link; the push mirrors the trip then. */
   share_code: string | null;
-  /** Set on a trip that belongs to someone else and is followed here. Read-only. */
+  /** Set on a trip that belongs to someone else and is followed here. Read-only unless the owner lets us plan. */
   shared_owner_uid: string | null;
   shared_owner_name: string | null;
+  /** 1 when the owner of a followed trip lets this account plan along. */
+  shared_can_edit: number;
+  /** 1 while an edit made here to a followed trip has not reached the owner. */
+  shared_dirty: number;
   // computed fields from getAllJourneys()
   leg_count?: number;
   first_start?: string | null;
@@ -787,7 +797,9 @@ export async function insertJourney(title: string): Promise<number> {
 export async function updateJourneyTitle(id: number, title: string): Promise<void> {
   const database = await getDatabase();
   await database.runAsync(
-    `UPDATE journeys SET title = ?, updated_at = datetime('now') WHERE id = ?`,
+    `UPDATE journeys SET title = ?, updated_at = datetime('now'),
+       shared_dirty = CASE WHEN shared_owner_uid IS NULL THEN 0 ELSE 1 END
+     WHERE id = ? AND (shared_owner_uid IS NULL OR shared_can_edit = 1)`,
     [title, id],
   );
   localChanged();
@@ -869,6 +881,8 @@ export interface JourneyForSync {
   travellers: JourneySyncTraveller[];
   share_code: string | null;
   shared_owner_uid: string | null;
+  shared_can_edit: boolean;
+  shared_dirty: boolean;
 }
 
 export async function getAllJourneysForSync(): Promise<JourneyForSync[]> {
@@ -902,6 +916,8 @@ export async function getAllJourneysForSync(): Promise<JourneyForSync[]> {
       .map((t) => ({ sync_id: t.sync_id!, name: t.name, sort_order: t.sort_order, uid: t.uid ?? null, avatar: t.avatar ?? null })),
     share_code: j.share_code ?? null,
     shared_owner_uid: j.shared_owner_uid ?? null,
+    shared_can_edit: j.shared_can_edit === 1,
+    shared_dirty: j.shared_dirty === 1,
   }));
 }
 
@@ -911,9 +927,9 @@ export async function getAllJourneysForSync(): Promise<JourneyForSync[]> {
  * in place, extra local ones go, missing ones are inserted.
  */
 export async function upsertJourneyFromCloud(
-  remote: Omit<JourneyForSync, 'id' | 'share_code' | 'shared_owner_uid'>,
+  remote: Omit<JourneyForSync, 'id' | 'share_code' | 'shared_owner_uid' | 'shared_can_edit' | 'shared_dirty'>,
   /** Given for a friend's trip pulled from `shared_journeys`; absent for this account's own. */
-  sharedOwner: { uid: string; name: string } | null = null,
+  sharedOwner: SharedOwner | null = null,
 ): Promise<void> {
   const database = await getDatabase();
   // All or nothing: the journey's stamp used to be written before its
@@ -922,10 +938,22 @@ export async function upsertJourneyFromCloud(
   await database.withExclusiveTransactionAsync((tx) => applyJourneyFromCloud(tx, remote, sharedOwner));
 }
 
+/**
+ * The owner of a followed trip, and what they let us do. `force` takes the
+ * mirror even over an edit made here that has not gone out yet: the owner
+ * refused it as stale, or took the right away.
+ */
+export interface SharedOwner {
+  uid: string;
+  name: string;
+  canEdit?: boolean;
+  force?: boolean;
+}
+
 async function applyJourneyFromCloud(
   database: SQLite.SQLiteDatabase,
-  remote: Omit<JourneyForSync, 'id' | 'share_code' | 'shared_owner_uid'>,
-  sharedOwner: { uid: string; name: string } | null,
+  remote: Omit<JourneyForSync, 'id' | 'share_code' | 'shared_owner_uid' | 'shared_can_edit' | 'shared_dirty'>,
+  sharedOwner: SharedOwner | null,
 ): Promise<void> {
   remote = { ...remote, legs: remote.legs.map((l) => ({ ...l, country: countryNameFor(l.country_code, l.country) })) };
   const existing = await database.getFirstAsync<Journey>('SELECT * FROM journeys WHERE sync_id = ?', [remote.sync_id]);
@@ -933,12 +961,23 @@ async function applyJourneyFromCloud(
   // Last write wins between this phone and the cloud; a friend's trip has
   // no local edits to defend, their mirror is simply the truth.
   if (existing && !sharedOwner && localIsNewer(existing.updated_at, remote.updated_at)) return;
+  // A friend's trip we plan along: our own edit waits for the push, which
+  // sends it to the owner. Only the right itself is taken over meanwhile.
+  if (existing && sharedOwner && existing.shared_dirty === 1 && sharedOwner.canEdit && !sharedOwner.force) {
+    await database.runAsync('UPDATE journeys SET shared_can_edit = 1, shared_owner_name = ? WHERE id = ?', [sharedOwner.name, existing.id]);
+    return;
+  }
 
   let journeyId: number;
   if (existing) {
     await database.runAsync(
-      'UPDATE journeys SET title = ?, updated_at = ?, deleted = ?, shared_owner_uid = ?, shared_owner_name = ? WHERE id = ?',
-      [remote.title, remote.updated_at, remote.deleted ? 1 : 0, sharedOwner?.uid ?? existing.shared_owner_uid, sharedOwner?.name ?? existing.shared_owner_name, existing.id],
+      `UPDATE journeys SET title = ?, updated_at = ?, deleted = ?, shared_owner_uid = ?, shared_owner_name = ?,
+         shared_can_edit = ?, shared_dirty = 0 WHERE id = ?`,
+      [
+        remote.title, remote.updated_at, remote.deleted ? 1 : 0,
+        sharedOwner?.uid ?? existing.shared_owner_uid, sharedOwner?.name ?? existing.shared_owner_name,
+        sharedOwner ? (sharedOwner.canEdit ? 1 : 0) : existing.shared_can_edit, existing.id,
+      ],
     );
     journeyId = existing.id;
   } else {
@@ -946,8 +985,8 @@ async function applyJourneyFromCloud(
     // OR IGNORE: the unique index on sync_id makes a concurrent second insert
     // of the same document (snapshot listener racing the pull) a no-op.
     await database.runAsync(
-      'INSERT OR IGNORE INTO journeys (title, sync_id, updated_at, deleted, shared_owner_uid, shared_owner_name) VALUES (?, ?, ?, 0, ?, ?)',
-      [remote.title, remote.sync_id, remote.updated_at, sharedOwner?.uid ?? null, sharedOwner?.name ?? null],
+      'INSERT OR IGNORE INTO journeys (title, sync_id, updated_at, deleted, shared_owner_uid, shared_owner_name, shared_can_edit) VALUES (?, ?, ?, 0, ?, ?, ?)',
+      [remote.title, remote.sync_id, remote.updated_at, sharedOwner?.uid ?? null, sharedOwner?.name ?? null, sharedOwner?.canEdit ? 1 : 0],
     );
     const row = await database.getFirstAsync<{ id: number }>('SELECT id FROM journeys WHERE sync_id = ?', [remote.sync_id]);
     if (!row) return;
@@ -1031,6 +1070,12 @@ export async function clearJourneyShareCodeBySyncId(syncId: string): Promise<voi
 export async function getJourneyBySyncId(syncId: string): Promise<Journey | null> {
   const database = await getDatabase();
   return database.getFirstAsync<Journey>('SELECT * FROM journeys WHERE sync_id = ? AND deleted = 0', [syncId]);
+}
+
+/** The edit reached the owner. Only if nothing changed here meanwhile. */
+export async function clearSharedDirty(syncId: string, updatedAt: string): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync('UPDATE journeys SET shared_dirty = 0 WHERE sync_id = ? AND updated_at = ?', [syncId, updatedAt]);
 }
 
 /** Sync ids of the trips followed here, so a pull can notice one that is gone. */
@@ -1375,12 +1420,20 @@ export async function addJourneyTraveller(journeyId: number, name: string): Prom
 
 /**
  * Bump a journey's clock: the sync compares whole journeys, stops and
- * travellers included. Never on a friend's trip: a local stamp newer than
- * the owner's would make the pull skip their next change for good.
+ * travellers included. On a friend's trip only when they let us plan it;
+ * there the edit is marked instead of trusted to the clock, which could
+ * make the pull skip the owner's next change for good.
  */
 async function touchJourney(journeyId: number): Promise<void> {
   const database = await getDatabase();
-  await database.runAsync(`UPDATE journeys SET updated_at = datetime('now') WHERE id = ? AND shared_owner_uid IS NULL`, [journeyId]);
+  // A friend's trip only when they let us plan it, and then marked as not
+  // sent yet: the push hands it to the owner (lib/sync.ts, pushSharedEdits).
+  await database.runAsync(
+    `UPDATE journeys SET updated_at = datetime('now'),
+       shared_dirty = CASE WHEN shared_owner_uid IS NULL THEN 0 ELSE 1 END
+     WHERE id = ? AND (shared_owner_uid IS NULL OR shared_can_edit = 1)`,
+    [journeyId],
+  );
   localChanged();
 }
 

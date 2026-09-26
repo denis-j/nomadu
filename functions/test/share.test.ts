@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { Timestamp, __get, __reset, __seed } from './fakeFirestore';
 import { __storageDeleted, __storageReset } from './fakeStorage';
-import { forgetUser, join, leave, mirrorOf, newCode, preview, removeMember, share, sharePageHtml, spreadProfile, unshare } from '../src/share';
+import { forgetUser, join, leave, mirrorOf, newCode, preview, removeMember, setMemberCanEdit, share, sharePageHtml, spreadProfile, unshare, updateShared, updateSharedStay } from '../src/share';
 import { isTripFile, staleFile } from '../src/documentFiles';
 
 const LEGS = [
@@ -295,5 +295,97 @@ describe('chosen faces', () => {
     __seed('users/owner', { displayName: 'Denis', avatar: 'x"><script>' });
     const { code } = await share('owner', { journeyId: 'j1' });
     assert.match((await preview('bob', { code })).owner_avatar, /^[0-9a-f]{16}$/);
+  });
+});
+
+describe('friends who plan along', () => {
+  const later = (iso: string) => ({ updatedAt: iso });
+  const moved = [{ ...LEGS[0] }, { ...LEGS[1], city: 'Hoi An', sync_id: 's2' }, { ...LEGS[1], sync_id: 's3', start_date: '2026-11-08', end_date: '2026-11-10', city: 'Da Nang' }];
+
+  async function sharedWithAnna() {
+    const { code } = await share('owner', { journeyId: 'j1' });
+    await join('anna', { code });
+    return code;
+  }
+
+  test('a member follows by default and cannot change the trip', async () => {
+    await sharedWithAnna();
+    assert.equal((__get('shared_journeys/j1')!.members as any).anna.can_edit, undefined);
+    await rejects(updateShared('anna', { journeyId: 'j1', title: 'X', legs: moved, ...later('2026-09-02T10:00:00Z') }), 'permission-denied');
+  });
+
+  test('only the owner grants and takes back the right, and only to members', async () => {
+    await sharedWithAnna();
+    await rejects(setMemberCanEdit('anna', { journeyId: 'j1', memberUid: 'anna', canEdit: true }), 'permission-denied');
+    await rejects(setMemberCanEdit('owner', { journeyId: 'j1', memberUid: 'bob', canEdit: true }), 'not-found');
+    await rejects(setMemberCanEdit('owner', { journeyId: 'j1', memberUid: 'anna', canEdit: 'yes' }), 'invalid-argument');
+    await setMemberCanEdit('owner', { journeyId: 'j1', memberUid: 'anna', canEdit: true });
+    assert.equal((__get('shared_journeys/j1')!.members as any).anna.can_edit, true);
+    await setMemberCanEdit('owner', { journeyId: 'j1', memberUid: 'anna', canEdit: false });
+    assert.equal((__get('shared_journeys/j1')!.members as any).anna.can_edit, undefined);
+  });
+
+  test('opening the invite again keeps the right', async () => {
+    const code = await sharedWithAnna();
+    await setMemberCanEdit('owner', { journeyId: 'j1', memberUid: 'anna', canEdit: true });
+    await join('anna', { code, name: 'Annie' });
+    const anna = (__get('shared_journeys/j1')!.members as any).anna;
+    assert.equal(anna.can_edit, true);
+    assert.equal(anna.name, 'Annie');
+  });
+
+  test('a member with the right changes the stops in the owner\'s trip and in the mirror', async () => {
+    await sharedWithAnna();
+    await setMemberCanEdit('owner', { journeyId: 'j1', memberUid: 'anna', canEdit: true });
+    const res = await updateShared('anna', { journeyId: 'j1', title: 'Vietnam 2026', legs: moved, ...later('2026-09-02T10:00:00Z') });
+    assert.deepEqual(res, { ok: true, stale: false });
+    const own = __get('users/owner/journeys/j1')! as any;
+    assert.equal(own.title, 'Vietnam 2026');
+    assert.deepEqual(own.legs.map((l: any) => l.city), ['Hanoi', 'Hoi An', 'Da Nang']);
+    assert.ok(own.synced_at, 'the owner\'s pull must see the change');
+    assert.equal(own.travellers.length, 1, 'travellers stay the owner\'s');
+    const mirror = __get('shared_journeys/j1')! as any;
+    assert.deepEqual(mirror.legs.map((l: any) => l.city), ['Hanoi', 'Hoi An', 'Da Nang']);
+  });
+
+  test('an older edit is refused as stale and changes nothing', async () => {
+    await sharedWithAnna();
+    await setMemberCanEdit('owner', { journeyId: 'j1', memberUid: 'anna', canEdit: true });
+    const res = await updateShared('anna', { journeyId: 'j1', title: 'Old', legs: moved, ...later('2026-08-01T10:00:00Z') });
+    assert.deepEqual(res, { ok: false, stale: true });
+    assert.equal((__get('users/owner/journeys/j1')! as any).title, 'Vietnam');
+  });
+
+  test('stops are checked: no junk fields, no broken dates', async () => {
+    await sharedWithAnna();
+    await setMemberCanEdit('owner', { journeyId: 'j1', memberUid: 'anna', canEdit: true });
+    await rejects(updateShared('anna', { journeyId: 'j1', legs: [{ sync_id: 'x', city: 'A', start_date: '2026-11-05', end_date: '2026-11-01' }], ...later('2026-09-02T10:00:00Z') }), 'invalid-argument');
+    await rejects(updateShared('anna', { journeyId: 'j1', legs: 'nope', ...later('2026-09-02T10:00:00Z') }), 'invalid-argument');
+    await updateShared('anna', { journeyId: 'j1', legs: [{ ...LEGS[0], owner_uid: 'anna', secret: 1 }], ...later('2026-09-02T10:00:00Z') });
+    const leg = (__get('users/owner/journeys/j1')! as any).legs[0];
+    assert.equal(leg.secret, undefined);
+    assert.equal(leg.owner_uid, undefined);
+  });
+
+  test('a member who was removed loses the right with it', async () => {
+    await sharedWithAnna();
+    await setMemberCanEdit('owner', { journeyId: 'j1', memberUid: 'anna', canEdit: true });
+    await removeMember('owner', { journeyId: 'j1', memberUid: 'anna' });
+    await rejects(updateShared('anna', { journeyId: 'j1', legs: moved, ...later('2026-09-02T10:00:00Z') }), 'permission-denied');
+  });
+
+  test('a member with the right plans where to stay at a stop of the trip', async () => {
+    await sharedWithAnna();
+    const plan = { stop_id: 's1', status: 'options', check_in: '2026-11-01', check_out: '2026-11-04', options: [{ id: 'o1', name: 'Hanoi Loft' }], updated_at: '2026-09-02T10:00:00Z' };
+    await rejects(updateSharedStay('anna', { journeyId: 'j1', plan }), 'permission-denied');
+    await setMemberCanEdit('owner', { journeyId: 'j1', memberUid: 'anna', canEdit: true });
+    await rejects(updateSharedStay('anna', { journeyId: 'j1', plan: { ...plan, stop_id: 'elsewhere' } }), 'not-found');
+    assert.deepEqual(await updateSharedStay('anna', { journeyId: 'j1', plan }), { ok: true, stale: false });
+    const own = __get('users/owner/accommodations/s1')! as any;
+    assert.equal(own.journey_id, 'j1');
+    assert.equal(own.options[0].name, 'Hanoi Loft');
+    assert.ok(own.synced_at);
+    assert.equal((__get('shared_journeys/j1')! as any).accommodations.s1.options[0].name, 'Hanoi Loft');
+    assert.deepEqual(await updateSharedStay('anna', { journeyId: 'j1', plan: { ...plan, updated_at: '2026-09-01T10:00:00Z' } }), { ok: false, stale: true });
   });
 });

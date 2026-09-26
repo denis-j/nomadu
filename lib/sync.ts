@@ -5,6 +5,7 @@ import {
   collection,
   doc,
   documentId,
+  getDoc,
   getDocs,
   onSnapshot,
   query,
@@ -20,7 +21,8 @@ import {
   type QuerySnapshot,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from './firebase';
 import {
   markAllTripsDeleted,
   applyMyAvatar,
@@ -35,6 +37,7 @@ import {
   getFollowedJourneySyncIds,
   setSyncId,
   syncJourneyMembers,
+  clearSharedDirty,
   upsertJourneyFromCloud,
   upsertTripFromCloud,
   type JourneySyncLeg,
@@ -48,7 +51,9 @@ import {
   type EntriesAllowed,
 } from './userVisas';
 import {
+  clearPlanDirty,
   getAllAccommodationsForSync,
+  getDirtyFollowedPlans,
   replaceFollowedPlans,
   upsertAccommodationFromCloud,
 } from './accommodations';
@@ -597,9 +602,16 @@ function membersOf(data: DocumentData): { uid: string; name: string; avatar: str
   }));
 }
 
-async function takeFollowedJourney(id: string, data: DocumentData): Promise<void> {
-  await upsertJourneyFromCloud(journeyFromDoc(id, data), sharedOwnerOf(data));
-  if (data.deleted !== true) await replaceFollowedPlans(id, followedPlansOf(data));
+/** May this account plan along on the friend's trip in `data`? The owner decides, per member. */
+function canEditOf(data: DocumentData, uid: string): boolean {
+  return (data.members ?? {})[uid]?.can_edit === true;
+}
+
+async function takeFollowedJourney(id: string, data: DocumentData, uid: string, force = false): Promise<void> {
+  const canEdit = canEditOf(data, uid);
+  // Without the right (any more), the mirror is the truth, edits here or not.
+  await upsertJourneyFromCloud(journeyFromDoc(id, data), { ...sharedOwnerOf(data), canEdit, force: force || !canEdit });
+  if (data.deleted !== true) await replaceFollowedPlans(id, followedPlansOf(data), canEdit && !force);
 }
 
 export async function pullSharedJourneysFromCloud(uid: string): Promise<void> {
@@ -607,11 +619,58 @@ export async function pullSharedJourneysFromCloud(uid: string): Promise<void> {
   const seen = new Set<string>();
   for (const docSnap of snapshot.docs) {
     seen.add(docSnap.id);
-    await takeFollowedJourney(docSnap.id, docSnap.data());
+    await takeFollowedJourney(docSnap.id, docSnap.data(), uid);
   }
   // Followed here but no longer shared with us: the owner stopped, or we left.
   for (const syncId of await getFollowedJourneySyncIds()) {
     if (!seen.has(syncId)) await forgetFollowedJourneyWithDocuments(syncId);
+  }
+}
+
+/**
+ * Friends' trips we may plan, changed here: each edit goes to the owner
+ * through the server (functions/src/share.ts, updateShared), which checks
+ * the right and writes the owner's trip and the mirror. An edit older than
+ * the owner's is refused as stale; then the mirror wins here, as it does
+ * when the right was taken away meanwhile.
+ */
+export async function pushSharedEdits(uid: string): Promise<void> {
+  const followed = (await getAllJourneysForSync()).filter((j) => j.shared_owner_uid && !j.deleted);
+  const sendJourney = httpsCallable<unknown, { ok: boolean; stale: boolean }>(functions, 'updateSharedJourney');
+  const sendStay = httpsCallable<unknown, { ok: boolean; stale: boolean }>(functions, 'updateSharedAccommodation');
+  for (const journey of followed) {
+    const plans = journey.shared_can_edit ? await getDirtyFollowedPlans(journey.sync_id) : [];
+    if (!journey.shared_dirty && plans.length === 0) continue;
+    let refused = false;
+    try {
+      if (journey.shared_dirty) {
+        const res = await sendJourney({
+          journeyId: journey.sync_id,
+          title: journey.title,
+          legs: journey.legs,
+          updatedAt: parseSyncStamp(journey.updated_at).toISOString(),
+        });
+        if (res.data.stale) refused = true;
+        else await clearSharedDirty(journey.sync_id, journey.updated_at);
+      }
+      for (const plan of plans) {
+        const { local_id: _l, followed: _f, ...rest } = plan as typeof plan & { followed?: boolean };
+        const res = await sendStay({
+          journeyId: journey.sync_id,
+          plan: { ...rest, updated_at: parseSyncStamp(plan.updated_at).toISOString() },
+        });
+        if (res.data.stale) refused = true;
+        await clearPlanDirty(plan.id, plan.updated_at);
+      }
+    } catch (err: any) {
+      // The right is gone, or the trip: the mirror decides what stays here.
+      if (err?.code === 'functions/permission-denied' || err?.code === 'functions/not-found') refused = true;
+      else throw err;
+    }
+    if (refused) {
+      const mirror = await getDoc(doc(sharedJourneysCollection(), journey.sync_id));
+      if (mirror.exists()) await takeFollowedJourney(mirror.id, mirror.data(), uid, true);
+    }
   }
 }
 
@@ -783,6 +842,7 @@ export async function syncAll(uid: string): Promise<void> {
     ['members:pull', () => pullMembersFromCloud(uid)],
     ['journeys:push', () => pushJourneysToCloud(uid)],
     ['shared:pull', () => pullSharedJourneysFromCloud(uid)],
+    ['shared:push', () => pushSharedEdits(uid)],
     ['accommodations:pull', () => pullAccommodationsFromCloud(uid)],
     ['accommodations:push', () => pushAccommodationsToCloud(uid)],
     ['documents:pull', () => pullDocumentsFromCloud(uid)],
@@ -815,6 +875,7 @@ export async function syncAll(uid: string): Promise<void> {
  */
 export async function pushPlans(uid: string): Promise<void> {
   await pushJourneysToCloud(uid);
+  await pushSharedEdits(uid);
   await pushAccommodationsToCloud(uid);
   await pushDocumentsToCloud(uid);
 }
@@ -909,7 +970,7 @@ export function startRealtimeSync(uid: string): Unsubscribe {
         if (change.type === 'removed') {
           await forgetFollowedJourneyWithDocuments(change.doc.id);
         } else {
-          await takeFollowedJourney(change.doc.id, change.doc.data());
+          await takeFollowedJourney(change.doc.id, change.doc.data(), uid);
         }
       } catch (err) {
         reportError(err, 'sync:followed-realtime');

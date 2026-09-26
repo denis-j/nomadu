@@ -21,12 +21,13 @@
  */
 
 import { randomInt } from 'node:crypto';
-import { Timestamp, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-functions/v2/https';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import * as logger from 'firebase-functions/logger';
 import { avatarSeed } from '../../lib/avatarSeed';
+import { ACCOMMODATION_STATUSES } from '../../lib/accommodationModel';
 
 const REGION = 'us-central1';
 export const SHARED = 'shared_journeys';
@@ -110,7 +111,7 @@ interface SharedDoc {
   owner_name: string;
   invite_code: string;
   member_uids: string[];
-  members: Record<string, { name: string; joined_at: Timestamp; avatar?: string }>;
+  members: Record<string, { name: string; joined_at: Timestamp; avatar?: string; can_edit?: boolean }>;
   owner_avatar?: string;
   title: string;
   legs: any[];
@@ -229,6 +230,8 @@ export async function join(uid: string, data: { code?: unknown; name?: unknown }
       name: cleanName(data.name, cleanName(profile.get('displayName'), 'Friend')),
       joined_at: members[uid]?.joined_at ?? Timestamp.now(),
       ...(avatar && { avatar }),
+      // Opening the link again must not take away what the owner granted.
+      ...(members[uid]?.can_edit === true && { can_edit: true }),
     };
     tx.update(shared.ref, { member_uids: uids, members });
   });
@@ -314,6 +317,166 @@ export async function removeMember(uid: string, data: { journeyId?: unknown; mem
   if (typeof x.invite_code === 'string') await db.collection(INVITES).doc(x.invite_code).delete();
   logger.info('member removed', { uid, journeyId });
   return { ok: true, code, url: inviteUrl(code) };
+}
+
+// ─── Friends who plan along ─────────────────────────────────────────────────
+// By default a member follows the trip. The owner can let one of them plan
+// too, after they joined: that member's phone then edits the trip like its
+// own, and sends each change here. The owner's journey document is the one
+// written, as the agent API does, so the owner's phones take it over on
+// their next pull; the mirror gets it at once for everyone else. Inviting,
+// removing, granting and stopping the sharing stay the owner's.
+
+const MAX_LEGS = 80;
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Owner: let a member plan along, or stop them. */
+export async function setMemberCanEdit(uid: string, data: { journeyId?: unknown; memberUid?: unknown; canEdit?: unknown }) {
+  const journeyId = cleanId(data.journeyId);
+  const memberUid = typeof data.memberUid === 'string' ? data.memberUid.trim() : '';
+  if (!memberUid) throw new HttpsError('invalid-argument', 'Whom?');
+  if (typeof data.canEdit !== 'boolean') throw new HttpsError('invalid-argument', 'Yes or no?');
+  const canEdit = data.canEdit;
+  const ref = getFirestore().collection(SHARED).doc(journeyId);
+  await getFirestore().runTransaction(async (tx) => {
+    const fresh = (await tx.get(ref)).data() as SharedDoc | undefined;
+    if (!fresh) throw new HttpsError('not-found', 'This trip is not shared.');
+    if (fresh.owner_uid !== uid) throw new HttpsError('permission-denied', 'Not your trip.');
+    const me = fresh.members?.[memberUid];
+    if (!me || !(fresh.member_uids ?? []).includes(memberUid)) throw new HttpsError('not-found', 'They are not on this trip.');
+    const entry = { ...me };
+    if (canEdit) entry.can_edit = true;
+    else delete entry.can_edit;
+    tx.update(ref, { members: { ...fresh.members, [memberUid]: entry } });
+  });
+  logger.info('member edit right changed', { uid, journeyId, canEdit });
+  return { ok: true, can_edit: canEdit };
+}
+
+/** A member who may plan: the shared trip and its owner, or an error. */
+async function editableBy(uid: string, journeyId: string): Promise<SharedDoc> {
+  const shared = await getFirestore().collection(SHARED).doc(journeyId).get();
+  if (!shared.exists || shared.get('deleted') === true) throw new HttpsError('not-found', 'This trip is no longer shared.');
+  const x = shared.data() as SharedDoc;
+  if (!(x.member_uids ?? []).includes(uid)) throw new HttpsError('permission-denied', 'You are not on this trip.');
+  if (x.members?.[uid]?.can_edit !== true) throw new HttpsError('permission-denied', 'Only the owner can change this trip.');
+  return x;
+}
+
+function str(value: unknown, max: number): string | null {
+  return typeof value === 'string' ? value.slice(0, max) : null;
+}
+
+function num(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/** The stops as a phone sends them, reduced to the known fields and checked. */
+export function cleanLegs(value: unknown): any[] {
+  if (!Array.isArray(value) || value.length > MAX_LEGS) throw new HttpsError('invalid-argument', 'Those are not stops.');
+  return value.map((l: any, i) => {
+    const syncId = str(l?.sync_id, 64);
+    const start = str(l?.start_date, 10);
+    const end = str(l?.end_date, 10);
+    const city = str(l?.city, 120);
+    if (!syncId || !city || !start || !end || !YMD.test(start) || !YMD.test(end) || end < start) {
+      throw new HttpsError('invalid-argument', `Stop ${i + 1} is incomplete.`);
+    }
+    return {
+      sync_id: syncId,
+      city,
+      country: str(l.country, 120) ?? '',
+      country_code: (str(l.country_code, 2) ?? '').toUpperCase(),
+      latitude: num(l.latitude),
+      longitude: num(l.longitude),
+      start_date: start,
+      end_date: end,
+      transport: str(l.transport, 30),
+      notes: str(l.notes, 2000),
+      sort_order: num(l.sort_order) ?? i,
+    };
+  });
+}
+
+function stampOf(value: unknown): Date {
+  const date = typeof value === 'string' ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) throw new HttpsError('invalid-argument', 'When?');
+  // A phone clock far ahead would win every later conflict.
+  const limit = Date.now() + 5 * 60 * 1000;
+  return date.getTime() > limit ? new Date(limit) : date;
+}
+
+/**
+ * A member with the right: the title and the stops, as their phone has them
+ * now. Older than what the owner has is refused as stale; the phone then
+ * takes the newer version from the mirror. The travellers stay the owner's.
+ */
+export async function updateShared(uid: string, data: { journeyId?: unknown; title?: unknown; legs?: unknown; updatedAt?: unknown }) {
+  const journeyId = cleanId(data.journeyId);
+  const x = await editableBy(uid, journeyId);
+  const title = cleanName(data.title, x.title).slice(0, 80);
+  const legs = cleanLegs(data.legs);
+  const updatedAt = Timestamp.fromDate(stampOf(data.updatedAt));
+  const db = getFirestore();
+  const own = db.doc(`users/${x.owner_uid}/journeys/${journeyId}`);
+  const mirror = db.collection(SHARED).doc(journeyId);
+  const result = await db.runTransaction(async (tx) => {
+    const current = await tx.get(own);
+    if (!current.exists || current.get('deleted') === true) throw new HttpsError('not-found', 'This trip is gone.');
+    const theirs = current.get('updated_at');
+    if (theirs instanceof Timestamp && theirs.toMillis() >= updatedAt.toMillis()) return { ok: false, stale: true };
+    tx.update(own, { title, legs, updated_at: updatedAt, synced_at: FieldValue.serverTimestamp() });
+    tx.update(mirror, { title, legs, updated_at: updatedAt });
+    return { ok: true, stale: false };
+  });
+  logger.info('shared trip edited by member', { uid, journeyId, stale: result.stale });
+  return result;
+}
+
+/** A member with the right: one stop's accommodation plan, the same way. */
+export async function updateSharedStay(uid: string, data: { journeyId?: unknown; plan?: unknown }) {
+  const journeyId = cleanId(data.journeyId);
+  const x = await editableBy(uid, journeyId);
+  const p = (data.plan ?? {}) as Record<string, unknown>;
+  const stopId = cleanId(p.stop_id ?? p.id);
+  if (!(x.legs ?? []).some((l: any) => l?.sync_id === stopId)) throw new HttpsError('not-found', 'That stop is not on this trip.');
+  const checkIn = str(p.check_in, 10);
+  const checkOut = str(p.check_out, 10);
+  if (!checkIn || !checkOut || !YMD.test(checkIn) || !YMD.test(checkOut)) throw new HttpsError('invalid-argument', 'Dates?');
+  const plan = {
+    journey_id: journeyId,
+    stop_id: stopId,
+    needed: p.needed !== false,
+    status: (ACCOMMODATION_STATUSES as readonly string[]).includes(p.status as string) ? p.status : 'open',
+    check_in: checkIn,
+    check_out: checkOut,
+    requirements: p.requirements && typeof p.requirements === 'object' ? p.requirements : {},
+    options: Array.isArray(p.options) ? p.options.slice(0, 40) : [],
+    selected_option_id: str(p.selected_option_id, 64),
+    booking: p.booking && typeof p.booking === 'object' ? p.booking : null,
+    notes: str(p.notes, 4000),
+    deleted: p.deleted === true,
+  };
+  if (JSON.stringify(plan).length > 200_000) throw new HttpsError('invalid-argument', 'That plan is too big.');
+  const updatedAt = Timestamp.fromDate(stampOf(p.updated_at));
+  const db = getFirestore();
+  const own = db.doc(`users/${x.owner_uid}/accommodations/${stopId}`);
+  const mirror = db.collection(SHARED).doc(journeyId);
+  const result = await db.runTransaction(async (tx) => {
+    // Firestore wants every read of a transaction before its first write.
+    const current = await tx.get(own);
+    const fresh = (await tx.get(mirror)).data() ?? {};
+    const theirs = current.exists ? current.get('updated_at') : null;
+    if (theirs instanceof Timestamp && theirs.toMillis() >= updatedAt.toMillis()) return { ok: false, stale: true };
+    tx.set(own, { ...plan, updated_at: updatedAt, synced_at: FieldValue.serverTimestamp() });
+    const map = { ...((fresh.accommodations ?? {}) as Record<string, unknown>) };
+    if (plan.deleted) delete map[stopId];
+    else map[stopId] = { ...plan, id: stopId, updated_at: updatedAt.toDate().toISOString() };
+    tx.update(mirror, { accommodations: map });
+    return { ok: true, stale: false };
+  });
+  logger.info('shared stay edited by member', { uid, journeyId, stale: result.stale });
+  return result;
 }
 
 /** Owner: the trip is private again. Members' phones tombstone their copy. */
@@ -413,6 +576,9 @@ export const joinJourney = onCall(opts, (request) => join(requireUid(request), r
 export const leaveJourney = onCall(opts, (request) => leave(requireUid(request), request.data ?? {}));
 export const removeJourneyMember = onCall(opts, (request) => removeMember(requireUid(request), request.data ?? {}));
 export const unshareJourney = onCall(opts, (request) => unshare(requireUid(request), request.data ?? {}));
+export const setJourneyMemberCanEdit = onCall(opts, (request) => setMemberCanEdit(requireUid(request), request.data ?? {}));
+export const updateSharedJourney = onCall(opts, (request) => updateShared(requireUid(request), request.data ?? {}));
+export const updateSharedAccommodation = onCall(opts, (request) => updateSharedStay(requireUid(request), request.data ?? {}));
 
 // ─── The page ────────────────────────────────────────────────────────────────
 

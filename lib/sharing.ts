@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Share } from 'react-native';
+import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { auth, functions } from './firebase';
+import { auth, db, functions } from './firebase';
 import { setJourneyShareCode, updateJourneyShareCodeBySyncId, type Journey } from './database';
 import { localChanged } from './syncTrigger';
 
@@ -9,9 +10,10 @@ import { localChanged } from './syncTrigger';
  * Inviting friends to a trip, the app's side of functions/src/share.ts.
  *
  * One person plans, the others come along: the owner makes a link, a friend
- * opens it, and from then on the trip is on the friend's phone too, live
- * and read-only. The heavy lifting (the code, the mirror, who is a member)
- * is the server's; here is only what the screens need.
+ * opens it, and from then on the trip is on the friend's phone too, live.
+ * Read-only, unless the owner lets that friend plan along afterwards. The
+ * heavy lifting (the code, the mirror, who is a member, who may edit) is
+ * the server's; here is only what the screens need.
  */
 
 export const SHARE_BASE = 'https://us-central1-nomady-dcff6.cloudfunctions.net/sharePage';
@@ -67,6 +69,18 @@ export async function removeMember(journeySyncId: string, memberUid: string): Pr
   const res = await call<{ journeyId: string; memberUid: string }, { ok: boolean; code?: string }>('removeJourneyMember')({ journeyId: journeySyncId, memberUid });
   // The old invite code died with the removal; the one shown here must be the new one.
   if (res.data.code) await updateJourneyShareCodeBySyncId(journeySyncId, res.data.code);
+}
+
+/** Owner: which members may plan along, as the shared trip says now. */
+export async function getMemberEditors(journeySyncId: string): Promise<Set<string>> {
+  const snap = await getDoc(doc(db, 'shared_journeys', journeySyncId));
+  const members = (snap.exists() ? snap.get('members') : null) ?? {};
+  return new Set(Object.entries(members as Record<string, { can_edit?: boolean }>).filter(([, m]) => m?.can_edit === true).map(([uid]) => uid));
+}
+
+/** Owner: let a member plan along (stops, dates, where to stay), or stop them. */
+export async function setMemberCanEdit(journeySyncId: string, memberUid: string, canEdit: boolean): Promise<void> {
+  await call<{ journeyId: string; memberUid: string; canEdit: boolean }, { ok: boolean }>('setJourneyMemberCanEdit')({ journeyId: journeySyncId, memberUid, canEdit });
 }
 
 export async function leaveJourney(journeySyncId: string): Promise<void> {

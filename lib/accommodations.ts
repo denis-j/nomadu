@@ -55,6 +55,8 @@ interface PlanRow {
   updated_at: string;
   deleted: number;
   followed: number;
+  /** 1 while an edit made here to a friend's plan has not reached the owner. */
+  dirty: number;
 }
 
 interface OptionRow {
@@ -272,9 +274,25 @@ async function writePlan(plan: AccommodationPlan, updatedAt: string, followed = 
   return planFromRows(row, await loadOptions(row.id));
 }
 
-/** A write from this phone (never from a pull): the sync should push soon. */
+/** Is this plan part of a friend's trip followed here? Then it stays theirs. */
+async function isFollowedTrip(journeySyncId: string): Promise<boolean> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ id: number }>('SELECT id FROM journeys WHERE sync_id = ? AND shared_owner_uid IS NOT NULL', [journeySyncId]);
+  return !!row;
+}
+
+/**
+ * A write from this phone (never from a pull): the sync should push soon.
+ * On a friend's trip we may plan, the plan stays theirs (`followed`) and is
+ * marked, so the push sends it to the owner and the mirror does not undo it.
+ */
 async function writeLocal(plan: AccommodationPlan): Promise<LocalAccommodation> {
-  const out = await writePlan(plan, nowIso());
+  const followed = await isFollowedTrip(plan.journey_id);
+  const out = await writePlan(plan, nowIso(), followed);
+  if (followed) {
+    const db = await getDatabase();
+    await db.runAsync('UPDATE accommodations SET dirty = 1 WHERE sync_id = ?', [plan.id]);
+  }
   localChanged();
   return out;
 }
@@ -332,7 +350,10 @@ export async function saveAccommodationBooking(stopSyncId: string, input: unknow
 /** Tombstone: the plan disappears from the app and, through the sync, from the agent. */
 export async function deleteAccommodation(stopSyncId: string): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync('UPDATE accommodations SET deleted = 1, updated_at = ? WHERE sync_id = ?', [nowIso(), stopSyncId]);
+  await db.runAsync(
+    'UPDATE accommodations SET deleted = 1, updated_at = ?, dirty = CASE WHEN followed = 1 THEN 1 ELSE dirty END WHERE sync_id = ?',
+    [nowIso(), stopSyncId],
+  );
   localChanged();
 }
 
@@ -362,19 +383,46 @@ export async function getAllAccommodationsForSync(): Promise<AccommodationForSyn
 /**
  * The plans that came with a friend's trip, as the mirror has them now.
  * Written whole: a plan the owner removed is no longer in the list and is
- * tombstoned here. Nothing in the app writes to these otherwise, so there
- * is no local edit to protect and the mirror simply wins.
+ * tombstoned here, and the mirror wins. Except, where the owner lets us
+ * plan (`keepEdits`), a plan changed here that has not reached them yet:
+ * that one waits for the push.
  */
-export async function replaceFollowedPlans(journeySyncId: string, plans: (AccommodationPlan & { updated_at: string })[]): Promise<void> {
+export async function replaceFollowedPlans(journeySyncId: string, plans: (AccommodationPlan & { updated_at: string })[], keepEdits = false): Promise<void> {
   const db = await getDatabase();
   const keep = new Set(plans.map((p) => p.id));
+  const dirty = new Set(
+    keepEdits
+      ? (await db.getAllAsync<{ sync_id: string }>('SELECT sync_id FROM accommodations WHERE journey_sync_id = ? AND followed = 1 AND dirty = 1', [journeySyncId])).map((r) => r.sync_id)
+      : [],
+  );
+  if (!keepEdits) await db.runAsync('UPDATE accommodations SET dirty = 0 WHERE journey_sync_id = ? AND followed = 1', [journeySyncId]);
   const local = await db.getAllAsync<{ sync_id: string }>('SELECT sync_id FROM accommodations WHERE journey_sync_id = ? AND followed = 1 AND deleted = 0', [journeySyncId]);
   for (const row of local) {
-    if (!keep.has(row.sync_id)) {
+    if (!keep.has(row.sync_id) && !dirty.has(row.sync_id)) {
       await db.runAsync('UPDATE accommodations SET deleted = 1, updated_at = ? WHERE sync_id = ?', [nowIso(), row.sync_id]);
     }
   }
-  for (const plan of plans) await writePlan(plan, plan.updated_at, true);
+  for (const plan of plans) {
+    if (!dirty.has(plan.id)) await writePlan(plan, plan.updated_at, true);
+  }
+}
+
+/** Plans of a friend's trip changed here and not yet with the owner, tombstones included. */
+export async function getDirtyFollowedPlans(journeySyncId: string): Promise<AccommodationForSync[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<PlanRow>('SELECT * FROM accommodations WHERE journey_sync_id = ? AND followed = 1 AND dirty = 1', [journeySyncId]);
+  const out: AccommodationForSync[] = [];
+  for (const row of rows) {
+    const plan = planFromRows(row, row.deleted === 1 ? [] : await loadOptions(row.id));
+    out.push({ ...plan, deleted: row.deleted === 1 });
+  }
+  return out;
+}
+
+/** The plan reached the owner (or was refused as stale). Only if unchanged here since. */
+export async function clearPlanDirty(stopSyncId: string, updatedAt: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('UPDATE accommodations SET dirty = 0 WHERE sync_id = ? AND updated_at = ?', [stopSyncId, updatedAt]);
 }
 
 /**

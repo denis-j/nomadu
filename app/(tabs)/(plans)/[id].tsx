@@ -989,7 +989,10 @@ export default function JourneyDetailScreen() {
   const headerHeight = insets.top + BAR_H;
   const docs = useJourneyDocuments(journeyId);
   // A friend's trip: shown as they planned it, nothing here changes it.
-  const readOnly = !!journey?.shared_owner_uid;
+  // A friend's trip: followed. The owner can let us plan it too; then it
+  // edits like our own, except for who is on it and whether it exists.
+  const followed = !!journey?.shared_owner_uid;
+  const readOnly = followed && journey?.shared_can_edit !== 1;
   // The list waits for the plans (and, below, the visa and tax statuses)
   // too: a stop card that grows a chip a frame after it appeared reads as
   // a flicker.
@@ -1251,13 +1254,22 @@ export default function JourneyDetailScreen() {
   const tripActions = useCallback(() => {
     if (!journey) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (readOnly) {
+    if (followed) {
+      const options = [...(readOnly ? [] : ['Rename']), 'Leave trip', 'Cancel'];
       ActionSheetIOS.showActionSheetWithOptions(
-        { title: journey.title, options: ['Leave trip', 'Cancel'], destructiveButtonIndex: 0, cancelButtonIndex: 1 },
+        { title: journey.title, options, destructiveButtonIndex: options.length - 2, cancelButtonIndex: options.length - 1 },
         async (i) => {
-          if (i !== 0) return;
-          await leaveTrip(journey);
-          if (!(await getJourneyWithLegs(journeyId))) router.back();
+          if (options[i] === 'Rename') {
+            Alert.prompt('Rename trip', undefined, async (name) => {
+              const next = (name ?? '').trim();
+              if (!next || next === journey.title) return;
+              await updateJourneyTitle(journeyId, next);
+              refresh();
+            }, 'plain-text', journey.title);
+          } else if (options[i] === 'Leave trip') {
+            await leaveTrip(journey);
+            if (!(await getJourneyWithLegs(journeyId))) router.back();
+          }
         },
       );
       return;
@@ -1287,7 +1299,7 @@ export default function JourneyDetailScreen() {
         }
       },
     );
-  }, [journey, journeyId, readOnly, refresh, router]);
+  }, [journey, journeyId, followed, readOnly, refresh, router]);
 
   // The travellers panel unfolds from the chip rather than sliding up as a
   // sheet: the faces are in the chip, so that is where they open.
