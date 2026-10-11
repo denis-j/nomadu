@@ -6,7 +6,7 @@
       "nomady",
       "com.googleusercontent.apps.1044287572548-oiqqo1s9pqt6ot6vpa0bdv8gotakocrs"
     ],
-    "version": "1.0.4",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/app-icons/Icon-iOS-Default-1024x1024@1x.png",
     "userInterfaceStyle": "light",
@@ -37,7 +37,7 @@
         "NSCameraUsageDescription": "Nomadu uses the camera when you photograph a ticket, visa or booking to keep it with your trip."
       },
       "appleTeamId": "Y6KMGQ9398",
-      "buildNumber": "5",
+      "buildNumber": "7",
       "entitlements": {
         "com.apple.developer.devicecheck.appattest-environment": "production"
       }
@@ -126,6 +126,9 @@
             "imageWidth": 288,
             "resizeMode": "contain",
             "backgroundColor": "#8AD3FF"
+          },
+          "ios": {
+            "enableFullScreenImage_legacy": true
           }
         }
       ]

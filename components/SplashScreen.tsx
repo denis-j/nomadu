@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import * as NativeSplash from 'expo-splash-screen';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, {
@@ -18,6 +19,16 @@ const LOGO_SIZE = 280;
 const MIN_LOGO_MS = 700;
 /** The splash never waits longer than this for the logo; the app comes first. */
 const MAX_WAIT_MS = 1500;
+/** How long the system splash may cover a logo that is slow to load. */
+const NATIVE_HOLD_MS = 1200;
+
+/** Once: the system splash goes, whether the logo made it or not. */
+let nativeHidden = false;
+function hideNativeSplash() {
+  if (nativeHidden) return;
+  nativeHidden = true;
+  NativeSplash.hideAsync().catch(() => {});
+}
 
 const EASE_OUT = Easing.out(Easing.cubic);
 const EASE_IN = Easing.in(Easing.cubic);
@@ -37,13 +48,25 @@ export default function SplashScreen({ ready, onDone }: Props) {
   const mountedAt = useRef(Date.now());
   const [logoShownAt, setLogoShownAt] = useState<number | null>(null);
 
-  // The 3D logo fades in once Filament has loaded it, not before: an empty
-  // canvas fading in first would read as a blank square.
+  // The 3D logo shows once Filament has drawn it, not before: an empty canvas
+  // would read as a blank square. The system splash still covers the screen
+  // until then, so the logo is simply there when it fades away. Only when
+  // the logo is late (the system splash already gone) does it fade in.
   const onLogoReady = useCallback(() => {
     setLogoShownAt((at) => at ?? Date.now());
-    iconOpacity.value = withTiming(1, { duration: 380, easing: EASE_OUT });
-    iconScale.value = withTiming(1, { duration: 480, easing: EASE_OUT });
+    const late = nativeHidden;
+    iconOpacity.value = late ? withTiming(1, { duration: 380, easing: EASE_OUT }) : 1;
+    iconScale.value = late ? withTiming(1, { duration: 480, easing: EASE_OUT }) : 1;
+    // "Loaded" is not yet drawn: Filament renders on its own thread, a frame
+    // or two later. A short grace so the logo is on screen before the cover lifts.
+    setTimeout(hideNativeSplash, 120);
   }, [iconOpacity, iconScale]);
+
+  // A logo that never loads must not keep the system splash up.
+  useEffect(() => {
+    const timer = setTimeout(hideNativeSplash, NATIVE_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
 

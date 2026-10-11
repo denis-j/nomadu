@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   StatusBar,
   StyleSheet,
@@ -22,6 +22,8 @@ import Animated, {
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { useOnboarding } from '../../contexts/OnboardingContext';
+import { useAuth } from '../../hooks/useAuth';
+import { useSubscription } from '../../hooks/useSubscription';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -103,6 +105,14 @@ function PulsingRing({ delay, size }: { delay: number; size: number }) {
 export default function LoadingScreen() {
   const router = useRouter();
   const { markOnboardingComplete } = useOnboarding();
+  const { user } = useAuth();
+  const { isPro } = useSubscription();
+  // Read when the timer fires, not when it was set: the account and its
+  // subscription can arrive while the stages play.
+  const signedIn = useRef(false);
+  signedIn.current = !!user;
+  const pro = useRef(false);
+  pro.current = isPro;
   const [stageIndex, setStageIndex] = useState(0);
 
   const progress = useSharedValue(0);
@@ -136,7 +146,11 @@ export default function LoadingScreen() {
       // Mark steps complete (under the pending UID when there's no user yet)
       // so a re-launch picks up on /sign-up instead of restarting citizenship.
       await markOnboardingComplete();
-      router.replace('/(auth)/sign-up');
+      // Signed in already (a new phone, a reinstall): there is no account to
+      // make. Sending them to sign-up left them on this screen, as the root
+      // navigator and this redirect undid each other.
+      if (signedIn.current) router.replace(pro.current ? '/(tabs)' : '/(onboarding)/paywall');
+      else router.replace('/(auth)/sign-up');
     }, TOTAL_DURATION + 300);
     timeouts.push(exit);
 

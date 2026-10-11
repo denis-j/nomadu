@@ -109,17 +109,43 @@ async function deleteChunks(base: string): Promise<void> {
 }
 
 /**
+ * Firebase's availability probe (`_isAvailable` writes and removes this key).
+ * Answered from memory: when it touched the keychain and the keychain was
+ * locked, Firebase quietly switched to in-memory persistence for the rest of
+ * the session, and the user was signed out until the app was killed.
+ */
+const AVAILABILITY_KEY = '__sak';
+
+/**
+ * Set when the session could not be read because the keychain refused (iOS
+ * launches the app for a location update before the phone was first
+ * unlocked after a reboot). Firebase then starts signed out; the app
+ * restarts itself once it is in front again (lib/authRecovery.ts).
+ */
+export let sessionReadFailed = false;
+
+/**
  * Storage adapter in the shape Firebase's `getReactNativePersistence` expects.
  */
 export const secureAuthStorage = {
   async setItem(key: string, value: string): Promise<void> {
+    if (key === AVAILABILITY_KEY) return;
     await writeChunks(await safeKey(key), value);
+    // Written fine, so the keychain is open again: the session here is current.
+    sessionReadFailed = false;
   },
 
   async getItem(key: string): Promise<string | null> {
+    if (key === AVAILABILITY_KEY) return null;
     const base = await safeKey(key);
 
-    const stored = await readChunks(base);
+    let stored: string | null;
+    try {
+      stored = await readChunks(base);
+    } catch (err) {
+      sessionReadFailed = true;
+      throw err;
+    }
     if (stored !== null) return stored;
 
     // Nothing in the keychain yet. On an app that updated from a build using
@@ -135,6 +161,10 @@ export const secureAuthStorage = {
   },
 
   async removeItem(key: string): Promise<void> {
+    if (key === AVAILABILITY_KEY) return;
+    // Never delete what we could not read: a session that is only locked away
+    // must still be there once the keychain opens.
+    if (sessionReadFailed) return;
     const base = await safeKey(key);
     await deleteChunks(base);
     // Clear any pre-migration copy too, so signing out really removes it.

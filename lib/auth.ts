@@ -20,6 +20,7 @@ import { identifyUser, logOutUser } from './revenueCat';
 import { wipeLocalData } from './localOwner';
 import { stopRealtimeSync, syncAll } from './sync';
 import { track } from './analytics';
+import { stopBackgroundTracking } from './location';
 
 /** Apple and Google sign in and sign up through the same call; Firebase knows which it was. */
 function trackProviderAuth(result: UserCredential, method: 'apple' | 'google') {
@@ -126,6 +127,8 @@ export async function signOut() {
     ]);
   }
   stopRealtimeSync();
+  // The next account turns it back on (the map does, with permission).
+  await stopBackgroundTracking().catch(() => {});
   track({ name: 'signed_out' });
   await firebaseSignOut(auth);
   await logOutUser();
@@ -158,6 +161,7 @@ export async function deleteAccount(): Promise<void> {
   }
 
   track({ name: 'account_deleted' });
+  await stopBackgroundTracking().catch(() => {});
 
   // Past this point the account is gone server-side. Local cleanup must not
   // throw, or the user is left signed into an account that no longer exists.

@@ -1,0 +1,71 @@
+{
+  "projectId": "a9799aac-43aa-4471-873f-fc24019020e0",
+  "shape": "package",
+  "pkg": "nomadu",
+  "globalName": "Nomadu",
+  "buildCmd": "node .design-sync/web-build.mjs",
+  "entry": ".design-sync/.cache/web-pkg/dist/index.mjs",
+  "srcDir": "../../../components",
+  "cssEntry": "tokens.css",
+  "componentSrcMap": {
+    "Colors": null,
+    "Typography": null,
+    "SafeAreaProvider": null
+  },
+  "dtsPropsFor": {
+    "TripCard": "  /** A row from the trips table. Dates are YYYY-MM-DD; end_date null = the trip is ongoing (shows 'Present' and an active dot). */\n  trip: { id: number; city: string; country: string; country_code: string; latitude: number | null; longitude: number | null; start_date: string; end_date: string | null; days: number; sync_id: string | null; updated_at: string | null; deleted: number };\n  daysOverride?: number;\n  hasOverlap?: boolean;\n  /** Compact mode: no timeline dot, no country label (used inside country groups) */\n  compact?: boolean;\n  onDelete?: (id: number) => void;\n  onEdit?: (trip: TripCardProps['trip']) => void;",
+    "GuideCard": "  /** A destination guide. image is a photo URL; legs drive the 'N stops \u00b7 N days' line (days = max endOffset - min startOffset + 1). */\n  guide: { id: string; flag: string; countryCode: string; country: string; tagline: string; image: string; apps: { name: string; domain: string }[]; tips: string[]; legs: { city: string; country: string; countryCode: string; startOffset: number; endOffset: number; transport: 'flight' | 'train' | 'car' | 'bus' | 'ferry' | 'walk'; latitude: number; longitude: number }[] };\n  onPress: () => void;",
+    "YearPicker": "  /** Available years to choose from (newest first). */\n  years: number[];\n  /** Selected year, or null for 'All Time'. */\n  value: number | null;\n  onChange: (next: number | null) => void;\n  /** Hide the \"All Time\" pill when you only want concrete years (e.g. tax). */\n  includeAllTime?: boolean;",
+    "TransportPicker": "  value: 'flight' | 'train' | 'car' | 'bus' | 'ferry' | 'walk';\n  onChange: (t: 'flight' | 'train' | 'car' | 'bus' | 'ferry' | 'walk') => void;",
+    "PillRow": "  /** One pill each. Exactly one is usually active (filled black, white text). icon is an Ionicons name. */\n  options: { key: string; label: string; icon?: string; leading?: React.ReactNode; active?: boolean; onPress: () => void; onLongPress?: () => void }[];\n  /** Tabular digits, for year pills. */\n  tabular?: boolean;",
+    "TimelineBubbles": "  size?: number;\n  variant?: 'burstWobble' | 'none' | 'pop' | 'burst' | 'wobble';\n  /** Three icons to render: [left, center, right]. Center is the prominent / colored one. name is an Ionicons name. */\n  icons?: [{ name: string; color?: string }, { name: string; color?: string }, { name: string; color?: string }];",
+    "Ionicons": "  /** Ionicons glyph name, e.g. 'airplane', 'bed-outline', 'calendar-outline'. Outline variants end in -outline. */\n  name: string;\n  size?: number;\n  color?: string;\n  style?: React.CSSProperties;",
+    "Flag": "  /** ISO-3166 alpha-2 country code (case-insensitive). */\n  code: string;\n  /** Display height in pt. Width follows the flag's aspect ratio. */\n  size?: number;\n  /** Adds a subtle rounded corner + hairline border so the flag sits nicely inside cards. Set `false` for a flat raw look (e.g. inside a circular bubble). */\n  rounded?: boolean;\n  style?: object;"
+  },
+  "provider": {
+    "component": "SafeAreaProvider",
+    "props": {
+      "initialMetrics": {
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        },
+        "insets": {
+          "top": 0,
+          "left": 0,
+          "right": 0,
+          "bottom": 0
+        }
+      }
+    }
+  },
+  "overrides": {
+    "CloudyButton": {
+      "cardMode": "column"
+    },
+    "CountryPicker": {
+      "cardMode": "column"
+    },
+    "PillRow": {
+      "cardMode": "column"
+    },
+    "StatCard": {
+      "cardMode": "column"
+    },
+    "StatTile": {
+      "cardMode": "column"
+    },
+    "TransportPicker": {
+      "cardMode": "column"
+    },
+    "TripCard": {
+      "cardMode": "column"
+    },
+    "YearPicker": {
+      "cardMode": "column"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

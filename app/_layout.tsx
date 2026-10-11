@@ -2,6 +2,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { Appearance, LogBox, Platform } from 'react-native';
+import * as NativeSplash from 'expo-splash-screen';
 import SplashScreen from '../components/SplashScreen';
 import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
 import { SyncProvider } from '../contexts/SyncContext';
@@ -17,6 +18,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { Colors } from '../constants/colors';
 import { initMonitoring, reportError, setMonitoringUser } from '../lib/monitoring';
 import { setAnalyticsUser, trackScreen } from '../lib/analytics';
+import { startAuthRecovery } from '../lib/authRecovery';
 // Defines the background location task. It has to exist as soon as the JS
 // starts: when iOS wakes the app for a move, the update is handed to the task
 // right away, and the definition used to wait until the map screen or the
@@ -47,6 +49,15 @@ if (__DEV__) {
     originalError(...args);
   };
 }
+
+// The system splash stays until our own one has its 3D logo drawn
+// (components/SplashScreen.tsx hides it); gone at the first frame, it left a
+// moment of bare gradient before the logo appeared. A short fade on iOS so
+// the logo is simply there as the system splash goes.
+NativeSplash.preventAutoHideAsync().catch(() => {});
+
+startAuthRecovery();
+NativeSplash.setOptions({ fade: true, duration: 250 });
 
 // Force light mode globally
 Appearance.setColorScheme('light');

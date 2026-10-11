@@ -99,7 +99,10 @@ async function appAttestToken(app: FirebaseApp, attestService: NonNullable<typeo
  * logged for registering.
  */
 async function debugToken(app: FirebaseApp): Promise<Token> {
-  let token = process.env.EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN || (await SecureStore.getItemAsync(DEBUG_TOKEN));
+  // Development builds only: anyone holding this token gets past App Check,
+  // so a release bundle must not carry it (the minifier drops the branch).
+  const shared = __DEV__ ? process.env.EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN : undefined;
+  let token = shared || (await SecureStore.getItemAsync(DEBUG_TOKEN));
   if (!token) {
     token = Crypto.randomUUID();
     await SecureStore.setItemAsync(DEBUG_TOKEN, token, STORE_OPTIONS);

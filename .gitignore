@@ -39,3 +39,13 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# App Store demo account credentials (marketing/appstore/seed_demo.py)
+marketing/appstore/demo_accounts.json
+
+# design-sync (Claude Design)
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules

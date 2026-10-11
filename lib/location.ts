@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -6,6 +6,7 @@ import { getCurrentTrip, insertTrip, updateTripEndDate } from './database';
 import { reverseGeocode } from './geocoding';
 import { fireArrivalIfNew } from './notifications';
 import { reportError } from './monitoring';
+import { auth } from './firebase';
 import { decide, MAX_ACCURACY_M, MAX_FOREGROUND_AGE_MS, type Candidate, type Fix } from './tracking';
 import { track } from './analytics';
 
@@ -64,6 +65,12 @@ function toFix(location: Location.LocationObject): Fix {
  * task notifies, because the foreground path runs every time the app opens.
  */
 async function processFix(fix: Fix, source: 'background' | 'foreground'): Promise<void> {
+  // Signed out, nobody's timeline: the trips used to pile up in an ownerless
+  // database (wiped at the next sign-in) and announced themselves with a
+  // "Welcome to Berlin" over the welcome screen. A background launch reads
+  // the session first; a locked keychain means no user here either.
+  await auth.authStateReady().catch(() => {});
+  if (!auth.currentUser) return;
   return serialized(async () => {
     const { lastFixAt, pending } = await loadState();
 
@@ -89,6 +96,10 @@ async function processFix(fix: Fix, source: 'background' | 'foreground'): Promis
 
     const notify = () => {
       if (source !== 'background') return;
+      // Opening the app hands iOS's queued updates to the background task,
+      // with the app already in front: a banner about the city you are
+      // looking at is noise. Only when the app really is in the background.
+      if (AppState.currentState === 'active') return;
       fireArrivalIfNew(place.city, place.country, place.countryCode).catch(() => {});
     };
 
