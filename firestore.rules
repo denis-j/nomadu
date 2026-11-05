@@ -56,6 +56,16 @@ service cloud.firestore {
         allow update: if request.auth != null && request.auth.uid == userId;
         allow delete: if request.auth != null && request.auth.uid == userId;
       }
+
+      // Expenses on a trip, one document each, with who paid and how it is
+      // split. Same auth pattern; an agent and friends who plan along reach
+      // them through the Functions, like activities.
+      match /expenses/{expenseId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     // AI call budget, written only by the Cloud Functions via the Admin SDK

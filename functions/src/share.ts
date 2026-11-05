@@ -29,6 +29,7 @@ import * as logger from 'firebase-functions/logger';
 import { avatarSeed } from '../../lib/avatarSeed';
 import { ACCOMMODATION_STATUSES, AccommodationValidationError } from '../../lib/accommodationModel';
 import { MAX_ACTIVITIES_PER_JOURNEY, normalizeActivity, type ActivityFields } from '../../lib/activityModel';
+import { MAX_EXPENSES_PER_JOURNEY, normalizeExpense, type ExpenseFields } from '../../lib/expenseModel';
 import { chainDates } from '../../lib/days';
 import { withMember, withoutMember } from '../../lib/members';
 
@@ -153,6 +154,11 @@ export async function share(uid: string, data: { journeyId?: unknown; name?: unk
   const activities = Object.fromEntries(planned.docs
     .filter((d) => d.get('deleted') !== true)
     .map((d) => [d.id, activityMirrorEntry(d.id, d.data())]));
+  // Expenses the same way: paid before sharing, split with the friends now.
+  const paid = await db.collection(`users/${uid}/expenses`).where('journey_id', '==', journeyId).get();
+  const expenses = Object.fromEntries(paid.docs
+    .filter((d) => d.get('deleted') !== true)
+    .map((d) => [d.id, expenseMirrorEntry(d.id, d.data())]));
   await ref.set(
     {
       owner_uid: uid,
@@ -163,6 +169,7 @@ export async function share(uid: string, data: { journeyId?: unknown; name?: unk
       members: existing.exists ? existing.get('members') ?? {} : {},
       ...mirrorOf(journey.data()!),
       activities,
+      expenses,
     },
     { merge: true },
   );
@@ -719,6 +726,93 @@ export async function updateSharedActivityFor(uid: string, data: { journeyId?: u
   return result;
 }
 
+/**
+ * One expense as the friends see it in the mirror: the stored fields and
+ * nothing else, with the stamp as text, built from a fixed list like an
+ * activity's entry.
+ */
+export function expenseMirrorEntry(id: string, x: FirebaseFirestore.DocumentData) {
+  const updatedAt = x.updated_at instanceof Timestamp ? x.updated_at.toDate().toISOString()
+    : typeof x.updated_at === 'string' ? x.updated_at : new Date().toISOString();
+  const shares = Array.isArray(x.shares)
+    ? x.shares
+      .filter((s: any) => s && typeof s.traveller_id === 'string' && typeof s.amount === 'number')
+      .map((s: any) => ({ traveller_id: s.traveller_id, amount: s.amount }))
+    : [];
+  return {
+    id,
+    journey_id: String(x.journey_id ?? ''),
+    stop_id: typeof x.stop_id === 'string' ? x.stop_id : null,
+    title: String(x.title ?? ''),
+    amount: typeof x.amount === 'number' ? x.amount : 0,
+    currency: String(x.currency ?? ''),
+    paid_by: typeof x.paid_by === 'string' ? x.paid_by : null,
+    shares,
+    date: String(x.date ?? ''),
+    category: x.category ?? 'other',
+    notes: x.notes ?? null,
+    receipt_document_id: typeof x.receipt_document_id === 'string' ? x.receipt_document_id : null,
+    source: x.source ?? 'manual',
+    updated_at: updatedAt,
+    deleted: x.deleted === true,
+  };
+}
+
+/**
+ * A member with the right: one expense, added, changed or deleted. Same
+ * shape as an activity's edit: its own record, its own stamp, an older
+ * edit of the same one refused as stale. Who paid and who shares must be
+ * travellers of the trip as the mirror lists them.
+ */
+export async function updateSharedExpenseFor(uid: string, data: { journeyId?: unknown; expense?: unknown }) {
+  const journeyId = cleanId(data.journeyId);
+  const x = await editableBy(uid, journeyId);
+  const e = (data.expense && typeof data.expense === 'object' ? data.expense : {}) as Record<string, unknown>;
+  const id = typeof e.id === 'string' ? e.id.trim() : '';
+  if (!ACTIVITY_ID.test(id)) throw new HttpsError('invalid-argument', 'Which expense?');
+  let stopId: string | null = null;
+  if (e.stop_id !== undefined && e.stop_id !== null) {
+    stopId = typeof e.stop_id === 'string' ? e.stop_id : '';
+    if (!(x.legs ?? []).some((l: any) => l?.sync_id === stopId)) throw new HttpsError('not-found', 'That stop is not on this trip.');
+  }
+  let fields: ExpenseFields;
+  try {
+    fields = normalizeExpense(e, null, { today: new Date().toISOString().slice(0, 10) });
+  } catch (err) {
+    if (err instanceof AccommodationValidationError) throw new HttpsError('invalid-argument', err.message);
+    throw err;
+  }
+  const travellerIds = (Array.isArray(x.travellers) ? x.travellers : []).map((t: any) => String(t?.sync_id ?? '')).filter(Boolean);
+  if (fields.paid_by && !travellerIds.includes(fields.paid_by)) throw new HttpsError('invalid-argument', 'paid_by is not a traveller of this trip.');
+  if (fields.shares.some((s) => !travellerIds.includes(s.traveller_id))) throw new HttpsError('invalid-argument', 'A share names someone who is not on this trip.');
+  const deleted = e.deleted === true;
+  const updatedAt = Timestamp.fromDate(stampOf(e.updated_at));
+  const record = { journey_id: journeyId, stop_id: stopId, ...fields, deleted };
+
+  const db = getFirestore();
+  const own = db.doc(`users/${x.owner_uid}/expenses/${id}`);
+  const mirror = db.collection(SHARED).doc(journeyId);
+  const result = await db.runTransaction(async (tx) => {
+    const current = await tx.get(own);
+    const fresh = (await tx.get(mirror)).data() ?? {};
+    if (current.exists && current.get('journey_id') !== journeyId) throw new HttpsError('permission-denied', 'That expense is not on this trip.');
+    const theirs = current.exists ? current.get('updated_at') : null;
+    if (theirs instanceof Timestamp && theirs.toMillis() >= updatedAt.toMillis()) return { ok: false, stale: true };
+    const map = { ...((fresh.expenses ?? {}) as Record<string, unknown>) };
+    const isNew = !(id in map) && (!current.exists || current.get('deleted') === true);
+    if (isNew && !deleted && Object.keys(map).length >= MAX_EXPENSES_PER_JOURNEY) {
+      throw new HttpsError('resource-exhausted', `A trip can hold at most ${MAX_EXPENSES_PER_JOURNEY} expenses.`);
+    }
+    tx.set(own, { ...record, updated_at: updatedAt, synced_at: FieldValue.serverTimestamp() });
+    if (deleted) delete map[id];
+    else map[id] = expenseMirrorEntry(id, { ...record, updated_at: updatedAt });
+    tx.update(mirror, { expenses: map });
+    return { ok: true, stale: false };
+  });
+  logger.info('shared expense edited by member', { uid, journeyId, deleted, stale: result.stale });
+  return result;
+}
+
 // ─── The mirror follows the owner's trip ────────────────────────────────────
 // The owner's phone used to be the only one writing the mirror, and only
 // for edits made on it: what the agent wrote, or another of the owner's
@@ -804,6 +898,32 @@ export const mirrorAccommodation = onDocumentWritten({ document: 'users/{uid}/ac
 
 export const mirrorActivity = onDocumentWritten({ document: 'users/{uid}/activities/{activityId}', region: REGION }, (event) =>
   refreshMirrorActivity(event.params.uid, event.params.activityId, event.data?.after.data()));
+
+/** One expense of the owner's, into the mirror of its trip. */
+export async function refreshMirrorExpense(uid: string, expenseId: string, expense: FirebaseFirestore.DocumentData | undefined): Promise<void> {
+  if (!expense) return;
+  const journeyId = typeof expense.journey_id === 'string' ? expense.journey_id : '';
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(journeyId)) return;
+  const db = getFirestore();
+  const ref = db.collection(SHARED).doc(journeyId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists || snap.get('owner_uid') !== uid) return;
+    const map = { ...((snap.get('expenses') ?? {}) as Record<string, unknown>) };
+    if (expense.deleted === true) {
+      if (!(expenseId in map)) return;
+      delete map[expenseId];
+    } else {
+      const entry = expenseMirrorEntry(expenseId, expense);
+      if (JSON.stringify(map[expenseId]) === JSON.stringify(entry)) return;
+      map[expenseId] = entry;
+    }
+    tx.update(ref, { expenses: map });
+  });
+}
+
+export const mirrorExpense = onDocumentWritten({ document: 'users/{uid}/expenses/{expenseId}', region: REGION }, (event) =>
+  refreshMirrorExpense(event.params.uid, event.params.expenseId, event.data?.after.data()));
 
 /** Owner: the trip is private again. Members' phones tombstone their copy. */
 export async function unshare(uid: string, data: { journeyId?: unknown }) {
@@ -910,6 +1030,7 @@ export const setJourneyMemberCanEdit = onCall(opts, (request) => setMemberCanEdi
 export const updateSharedJourney = onCall(opts, (request) => updateShared(requireUid(request), request.data ?? {}));
 export const updateSharedAccommodation = onCall(opts, (request) => updateSharedStay(requireUid(request), request.data ?? {}));
 export const updateSharedActivity = onCall(opts, (request) => updateSharedActivityFor(requireUid(request), request.data ?? {}));
+export const updateSharedExpense = onCall(opts, (request) => updateSharedExpenseFor(requireUid(request), request.data ?? {}));
 
 // ─── The page ────────────────────────────────────────────────────────────────
 

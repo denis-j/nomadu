@@ -266,9 +266,10 @@ export default function StopInfoScreen() {
           <View style={styles.section}>
             <LinkCard
               icon="bed-outline"
-              title={stay ? planChipText(stay) : 'Where to stay'}
+              // The place by name once there is one; the badge says how far it is.
+              title={stay ? primaryOption(stay)?.name ?? planChipText(stay) : 'Where to stay'}
               sub={stay ? staySummary(stay) : 'Requirements, options, the booking'}
-              right={stay ? <StatusBadge status={stay.status} size="small" /> : undefined}
+              right={stay && stay.needed ? <StatusBadge status={stay.status} size="small" /> : undefined}
               onPress={openAccommodation}
             />
           </View>

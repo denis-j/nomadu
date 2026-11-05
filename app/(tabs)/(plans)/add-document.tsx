@@ -220,13 +220,13 @@ function AddDocumentScreenContent() {
 
         <SectionLabel>What is it</SectionLabel>
         <Card>
-          {DOCUMENT_KINDS.map((k, i) => (
+          {DOCUMENT_KINDS.filter((k) => !k.hidden).map((k, i, all) => (
             <ChoiceRow
               key={k.kind}
               title={k.label}
               selected={kind === k.kind}
               onPress={() => setKind(k.kind)}
-              last={i === DOCUMENT_KINDS.length - 1}
+              last={i === all.length - 1}
             />
           ))}
         </Card>

@@ -15,16 +15,39 @@ const DELTA = 0.012;
  * over the map rather than as a map marker: the snapshotter put a black
  * square behind the marker's picture.
  */
-export function PlaceMap({ latitude, longitude, style, lift = 0.18 }: { latitude: number; longitude: number; style?: StyleProp<ViewStyle>; lift?: number }) {
-  const key = `place2:${latitude.toFixed(5)},${longitude.toFixed(5)}:${lift}`;
+export function PlaceMap({
+  latitude,
+  longitude,
+  style,
+  lift = 0.18,
+  delta = DELTA,
+}: {
+  latitude: number;
+  longitude: number;
+  style?: StyleProp<ViewStyle>;
+  lift?: number;
+  /** The span shown; the default is a few streets, 0.4 is a city and its surroundings. */
+  delta?: number;
+}) {
+  const key = `place2:${latitude.toFixed(5)},${longitude.toFixed(5)}:${lift}:${delta}`;
   const [snapshot, setSnapshot] = useState<string | null>(() => cachedMapSnapshot(key));
   const [ready, setReady] = useState(false);
   const mapRef = useRef<RNMapView>(null);
+
+  // Another place in the same frame (the stay's map moves from the city to
+  // the address once the plan is in): the picture of the old one must not
+  // stay up. Looked up in the same render, as the trip's map does.
+  const [shownFor, setShownFor] = useState(key);
+  if (shownFor !== key) {
+    setShownFor(key);
+    setSnapshot(cachedMapSnapshot(key));
+    setReady(false);
+  }
   const region = {
-    latitude: latitude - DELTA * lift,
+    latitude: latitude - delta * lift,
     longitude,
-    latitudeDelta: DELTA,
-    longitudeDelta: DELTA,
+    latitudeDelta: delta,
+    longitudeDelta: delta,
   };
 
   useEffect(() => {
@@ -48,6 +71,8 @@ export function PlaceMap({ latitude, longitude, style, lift = 0.18 }: { latitude
         <Image source={{ uri: snapshot }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (
         <RNMapView
+          // A fresh map per place: `initialRegion` is read once.
+          key={key}
           ref={mapRef}
           style={StyleSheet.absoluteFill}
           provider={PROVIDER_DEFAULT}

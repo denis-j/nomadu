@@ -15,6 +15,9 @@ import { Flag } from '../../../components/Flag';
 import { todayStr, visaGroup, VisaStatus } from '../../../lib/visaCalculations';
 import { hasNoExpiry } from '../../../lib/userVisas';
 import { getCountryName } from '../../../utils/geography';
+import { useTranslation } from '../../../contexts/LanguageContext';
+
+type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -32,16 +35,16 @@ function isDateExpired(visa: VisaStatus): boolean {
   return visa.validUntil < todayStr();
 }
 
-function getStatusLabel(visa: VisaStatus): string {
+function getStatusLabel(visa: VisaStatus, t: TFunc): string {
   // A spent single-entry visa is 'expired' too, but "Used" is what happened.
-  if (visa.singleEntryUsed && !isDateExpired(visa)) return 'Used';
+  if (visa.singleEntryUsed && !isDateExpired(visa)) return t('visa.statusUsed');
   switch (visa.status) {
-    case 'exceeded': return 'Exceeded';
-    case 'critical': return 'Critical';
-    case 'warning': return 'Warning';
-    case 'ok': return 'OK';
-    case 'visa_needed': return 'Visa needed';
-    case 'expired': return 'Expired';
+    case 'exceeded': return t('visa.statusExceeded');
+    case 'critical': return t('visa.statusCritical');
+    case 'warning': return t('visa.statusWarning');
+    case 'ok': return t('visa.statusOk');
+    case 'visa_needed': return t('visa.statusVisaNeeded');
+    case 'expired': return t('visa.statusExpired');
   }
 }
 
@@ -57,6 +60,7 @@ function getStatusColor(status: VisaStatus['status']): string {
 }
 
 function CardHeader({ visa, interactive }: { visa: VisaStatus; interactive?: boolean }) {
+  const { t } = useTranslation();
   const statusColor = getStatusColor(visa.status);
   return (
     <View style={styles.cardHeader}>
@@ -70,7 +74,7 @@ function CardHeader({ visa, interactive }: { visa: VisaStatus; interactive?: boo
       <View style={styles.headerRight}>
         <View style={[styles.statusBadge, { backgroundColor: statusColor + '18' }]}>
           <Text style={[styles.statusText, { color: statusColor }]}>
-            {getStatusLabel(visa)}
+            {getStatusLabel(visa, t)}
           </Text>
         </View>
         {interactive && (
@@ -82,12 +86,13 @@ function CardHeader({ visa, interactive }: { visa: VisaStatus; interactive?: boo
 }
 
 function VisaNeededCard({ visa, onPress }: { visa: VisaStatus; onPress: () => void }) {
+  const { t } = useTranslation();
   return (
     <Pressable onPress={onPress}>
       <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
         <CardHeader visa={visa} interactive />
         <Text style={styles.visaNeededHint}>
-          Add your visa to track days used and expiry.
+          {t('visa.addToTrack')}
         </Text>
       </Glass>
     </Pressable>
@@ -95,16 +100,17 @@ function VisaNeededCard({ visa, onPress }: { visa: VisaStatus; onPress: () => vo
 }
 
 function ExpiredVisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void }) {
+  const { t } = useTranslation();
   return (
     <Pressable onPress={onPress}>
       <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
         <CardHeader visa={visa} interactive={!!onPress} />
         <Text style={styles.visaNeededHint}>
           {isDateExpired(visa)
-            ? `Expired on ${formatDay(visa.validUntil)}. Update or remove this visa.`
+            ? t('visa.expiredOn', { date: formatDay(visa.validUntil) })
             : visa.singleEntryUsed
-              ? `Single entry, used up when you left on ${formatDay(visa.leftOn)}. A new entry needs a new visa.`
-              : 'Expired.'}
+              ? t('visa.singleEntryUsed', { date: formatDay(visa.leftOn) })
+              : t('visa.expiredShort')}
         </Text>
       </Glass>
     </Pressable>
@@ -112,6 +118,7 @@ function ExpiredVisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => 
 }
 
 function VisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void }) {
+  const { t } = useTranslation();
   if (visa.status === 'visa_needed') {
     return <VisaNeededCard visa={visa} onPress={() => onPress?.()} />;
   }
@@ -131,8 +138,8 @@ function VisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void })
 
       {visa.daysAllowed > 0 && stayOver ? (
         <Text style={styles.visaNeededHint}>
-          Counter reset when you left on {formatDay(visa.leftOn)}.
-          {visa.lastStayDays ? ` Last stay: ${visa.lastStayDays} of ${visa.daysAllowed} days.` : ''}
+          {t('visa.counterReset', { date: formatDay(visa.leftOn) })}
+          {visa.lastStayDays ? t('visa.lastStay', { used: visa.lastStayDays, allowed: visa.daysAllowed }) : ''}
         </Text>
       ) : visa.daysAllowed > 0 ? (
         <>
@@ -150,12 +157,12 @@ function VisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void })
           <View style={styles.cardFooter}>
             <Text style={styles.daysText}>
               <Text style={styles.daysUsed}>{visa.daysUsed}</Text>
-              <Text style={styles.daysOf}> of </Text>
+              <Text style={styles.daysOf}>{t('visa.ofConnector')}</Text>
               <Text style={styles.daysAllowed}>{visa.daysAllowed}</Text>
-              <Text style={styles.daysOf}> days used</Text>
+              <Text style={styles.daysOf}>{t('visa.daysUsedSuffix')}</Text>
             </Text>
             <Text style={[styles.daysRemaining, { color: progressColor }]}>
-              {visa.daysRemaining}d left
+              {t('visa.daysLeft', { days: visa.daysRemaining })}
             </Text>
           </View>
         </>
@@ -163,15 +170,15 @@ function VisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void })
         visa.validUntil && (
           <Text style={styles.visaNeededHint}>
             {hasNoExpiry(visa.validUntil)
-              ? 'No expiry date. Only your days are counted.'
-              : `Valid until ${formatDay(visa.validUntil)}`}
+              ? t('visa.noExpiry')
+              : t('visa.validUntil', { date: formatDay(visa.validUntil) })}
           </Text>
         )
       )}
 
       {!visa.isUserVisa && <SourceFooter visa={visa} />}
       {!visa.isUserVisa && (
-        <Text style={styles.overrideHint}>Tap to add your own visa</Text>
+        <Text style={styles.overrideHint}>{t('visa.overrideHint')}</Text>
       )}
     </Glass>
   );
@@ -185,11 +192,12 @@ function VisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void })
  * obvious that the data is a reference estimate, not the destination's word.
  */
 function SourceFooter({ visa }: { visa: VisaStatus }) {
+  const { t } = useTranslation();
   if (!visa.lastVerified && !visa.source) return null;
   return (
     <View style={styles.sourceFooter}>
       {visa.lastVerified && (
-        <Text style={styles.sourceText}>Verified {formatDay(visa.lastVerified)}</Text>
+        <Text style={styles.sourceText}>{t('visa.verified', { date: formatDay(visa.lastVerified) })}</Text>
       )}
       {visa.source && (
         <Pressable
@@ -199,7 +207,7 @@ function SourceFooter({ visa }: { visa: VisaStatus }) {
             Linking.openURL(visa.source!);
           }}
         >
-          <Text style={styles.sourceLink}>Open official source ›</Text>
+          <Text style={styles.sourceLink}>{t('visa.openSource')}</Text>
         </Pressable>
       )}
     </View>
@@ -252,6 +260,7 @@ function SectionHeader({
 const VISA_DISCLAIMER_SEEN_KEY = '@visa_disclaimer_seen';
 
 export default function VisaScreen() {
+  const { t } = useTranslation();
   const { visaStatuses, loading, citizenshipCode, citizenshipCountry, refresh } = useVisaTracker();
   const [refreshing, setRefreshing] = useState(false);
   const [showFirstRunDisclaimer, setShowFirstRunDisclaimer] = useState(false);
@@ -294,12 +303,12 @@ export default function VisaScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <Pressable hitSlop={12} onPress={goToAdd} accessibilityRole="button" accessibilityLabel="Add visa">
+        <Pressable hitSlop={12} onPress={goToAdd} accessibilityRole="button" accessibilityLabel={t('visa.addVisa')}>
           <Ionicons name="add" size={26} color={Colors.text} />
         </Pressable>
       ),
     });
-  }, [navigation, goToAdd]);
+  }, [navigation, goToAdd, t]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -324,8 +333,8 @@ export default function VisaScreen() {
       >
         <View style={styles.emptyInner}>
           <SymbolView name={{ ios: 'person.text.rectangle', android: 'id_card' }} size={48} tintColor={systemColor('tertiaryLabel')} weight="regular" />
-          <Text style={styles.emptyTitle}>No citizenship set</Text>
-          <Text style={styles.emptySubtitle}>Set your citizenship in Settings to see visa tracking.</Text>
+          <Text style={styles.emptyTitle}>{t('visa.noCitizenshipTitle')}</Text>
+          <Text style={styles.emptySubtitle}>{t('visa.noCitizenshipSubtitle')}</Text>
         </View>
       </ScrollView>
     );
@@ -339,9 +348,9 @@ export default function VisaScreen() {
       >
         <View style={styles.emptyInner}>
           <SymbolView name={{ ios: 'doc.text', android: 'description' }} size={48} tintColor={systemColor('tertiaryLabel')} weight="regular" />
-          <Text style={styles.emptyTitle}>No visas tracked yet</Text>
+          <Text style={styles.emptyTitle}>{t('visa.noVisasTitle')}</Text>
           <Text style={styles.emptySubtitle}>
-            Visit a country with a known rule, or tap + to add your own visa.
+            {t('visa.noVisasSubtitle')}
           </Text>
         </View>
       </ScrollView>
@@ -377,16 +386,16 @@ export default function VisaScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
     >
       <View style={styles.subtitleRow}>
-        <Text style={styles.subtitle}>Based on </Text>
+        <Text style={styles.subtitle}>{t('visa.basedOn')}</Text>
         {citizenshipCode && <Flag code={citizenshipCode} size={14} />}
-        <Text style={styles.subtitle}> {citizenshipCountry} passport</Text>
+        <Text style={styles.subtitle}>{t('visa.passportSuffix', { country: citizenshipCountry ?? '' })}</Text>
       </View>
 
       {active.map(renderCard)}
 
       {expiredVisas.length > 0 && (
         <>
-          <SectionHeader title="Expired visas" count={expiredVisas.length} />
+          <SectionHeader title={t('visa.expiredVisas')} count={expiredVisas.length} />
           {expiredVisas.map(renderCard)}
         </>
       )}
@@ -394,7 +403,7 @@ export default function VisaScreen() {
       {pastCountries.length > 0 && (
         <>
           <SectionHeader
-            title="Countries you've left"
+            title={t('visa.countriesLeft')}
             count={pastCountries.length}
             collapsed={!showPastCountries}
             onToggle={() => {
@@ -410,18 +419,16 @@ export default function VisaScreen() {
         <View style={styles.disclaimerIconWrap}>
           <Ionicons name="information-circle" size={22} color={Colors.cloudyButtonText} />
         </View>
-        <Text style={styles.disclaimerTitle}>Reference data, not legal advice</Text>
+        <Text style={styles.disclaimerTitle}>{t('visa.disclaimerTitle')}</Text>
         <Text style={styles.disclaimer}>
-          Visa rules in Nomadu are reference estimates aggregated from public sources
-          and may be out of date or incorrect. Always verify with your destination&rsquo;s
-          embassy or consulate before you travel.
+          {t('visa.disclaimerBody')}
         </Text>
         <Pressable
           hitSlop={6}
           onPress={() => Linking.openURL('https://www.iatatravelcentre.com/')}
           style={styles.disclaimerLinkRow}
         >
-          <Text style={styles.disclaimerLink}>Open IATA Travel Centre</Text>
+          <Text style={styles.disclaimerLink}>{t('visa.openIata')}</Text>
           <Ionicons name="open-outline" size={13} color={Colors.cloudyButtonText} />
         </Pressable>
       </Glass>
@@ -435,6 +442,7 @@ export default function VisaScreen() {
 }
 
 function FirstRunDisclaimerModal({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
+  const { t } = useTranslation();
   return (
     <Modal
       visible={visible}
@@ -451,21 +459,16 @@ function FirstRunDisclaimerModal({ visible, onDismiss }: { visible: boolean; onD
           <View style={styles.modalIconWrap}>
             <Ionicons name="information-circle" size={32} color={Colors.cloudyButtonText} />
           </View>
-          <Text style={styles.modalTitle}>Before you trust this tab</Text>
+          <Text style={styles.modalTitle}>{t('visa.modalTitle')}</Text>
           <Text style={styles.modalBody}>
-            Visa rules in Nomadu are reference estimates aggregated from public sources.
-            They may be out of date, incorrect, or differ from your specific situation.
-            {'\n\n'}
-            Always verify with your destination&rsquo;s embassy or an official source before
-            you travel. Nomadu is not liable for visa overstays, denied entry, or any other
-            consequences of relying on this data.
+            {t('visa.modalBody')}
           </Text>
           <CloudyButton
             onPress={onDismiss}
             style={styles.modalButton}
             innerStyle={styles.modalButtonInner}
           >
-            <Text style={styles.modalButtonText}>I understand</Text>
+            <Text style={styles.modalButtonText}>{t('visa.understand')}</Text>
           </CloudyButton>
         </Glass>
       </View>

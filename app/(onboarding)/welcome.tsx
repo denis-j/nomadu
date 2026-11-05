@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
   FadeIn,
@@ -21,6 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { BackgroundClouds } from '../../components/BackgroundClouds';
 import { CloudyButton } from '../../components/CloudyButton';
+import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { PlaneModel3D } from '../../components/PlaneModel3D';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
@@ -28,6 +29,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { playCollectSound } from '../../lib/sound';
 import { prefetchSuggestedFaces } from '../../lib/profile';
 import { track } from '../../lib/analytics';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const PLANE_WIDTH = 240;
@@ -42,6 +44,8 @@ const FLASH_OUT_MS = 420;
 export default function WelcomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
 
   // The faces the next step offers, fetched while this one plays.
   useEffect(() => {
@@ -115,14 +119,17 @@ export default function WelcomeScreen() {
       </Animated.View>
 
       <SafeAreaView style={styles.safeArea}>
+        <View style={[styles.langSwitcher, { top: insets.top + 8 }]}>
+          <LanguageSwitcher variant="pill" />
+        </View>
         <Animated.View style={[styles.content, contentStyle]}>
           <Animated.View
             entering={FadeIn.delay(200).duration(600)}
             style={styles.header}
           >
-            <Text style={styles.title}>Welcome to Nomadu</Text>
+            <Text style={styles.title}>{t('onboarding.welcome.title')}</Text>
             <Text style={styles.subtitle}>
-              The most beautiful way to track the world
+              {t('onboarding.welcome.subtitle')}
             </Text>
           </Animated.View>
 
@@ -135,17 +142,17 @@ export default function WelcomeScreen() {
               style={styles.cta}
               innerStyle={styles.ctaInner}
             >
-              <Text style={styles.ctaText}>Get started</Text>
+              <Text style={styles.ctaText}>{t('onboarding.welcome.cta')}</Text>
             </CloudyButton>
 
             {/* A new account on its first run is signed in already: the root
                 navigator would send them straight back here. */}
             {!user && (
               <View style={styles.signInRow}>
-                <Text style={styles.signInText}>Already have an account? </Text>
+                <Text style={styles.signInText}>{t('onboarding.welcome.haveAccount')}</Text>
                 <Link href="/(auth)/sign-in" asChild>
                   <TouchableOpacity hitSlop={8}>
-                    <Text style={styles.signInLink}>Sign in</Text>
+                    <Text style={styles.signInLink}>{t('onboarding.welcome.signIn')}</Text>
                   </TouchableOpacity>
                 </Link>
               </View>
@@ -165,6 +172,11 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, overflow: 'hidden' },
   safeArea: { flex: 1 },
+  langSwitcher: {
+    position: 'absolute',
+    right: 16,
+    zIndex: 10,
+  },
   content: {
     flex: 1,
     paddingHorizontal: 24,

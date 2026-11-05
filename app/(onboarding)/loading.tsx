@@ -24,13 +24,14 @@ import { Typography } from '../../constants/typography';
 import { useOnboarding } from '../../contexts/OnboardingContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useSubscription } from '../../hooks/useSubscription';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 interface Stage {
-  text: string;
+  key: string;
   duration: number;
 }
 
@@ -38,13 +39,13 @@ interface Stage {
 // Each line says only what the app really does; "230+ tax residency rules"
 // promised something the single 183-day count does not deliver.
 const STAGES: Stage[] = [
-  { text: 'Setting up your tracking engine…', duration: 1100 },
-  { text: 'Loading country profiles…', duration: 1000 },
-  { text: 'Matching visa rules to your passport…', duration: 1100 },
-  { text: 'Setting up your 183-day counts…', duration: 1100 },
-  { text: 'Preparing your dashboard…', duration: 1000 },
-  { text: 'Almost ready…', duration: 800 },
-  { text: 'Ready.', duration: 700 },
+  { key: 'onboarding.loading.stage0', duration: 1100 },
+  { key: 'onboarding.loading.stage1', duration: 1000 },
+  { key: 'onboarding.loading.stage2', duration: 1100 },
+  { key: 'onboarding.loading.stage3', duration: 1100 },
+  { key: 'onboarding.loading.stage4', duration: 1000 },
+  { key: 'onboarding.loading.stage5', duration: 800 },
+  { key: 'onboarding.loading.stage6', duration: 700 },
 ];
 
 const TOTAL_DURATION = STAGES.reduce((a, s) => a + s.duration, 0);
@@ -107,6 +108,7 @@ export default function LoadingScreen() {
   const { markOnboardingComplete } = useOnboarding();
   const { user } = useAuth();
   const { isPro } = useSubscription();
+  const { t } = useTranslation();
   // Read when the timer fires, not when it was set: the account and its
   // subscription can arrive while the stages play.
   const signedIn = useRef(false);
@@ -194,7 +196,7 @@ export default function LoadingScreen() {
             exiting={FadeOut.duration(200)}
             style={styles.stageText}
           >
-            {currentStage.text}
+            {t(currentStage.key)}
           </Animated.Text>
 
           <View style={styles.progressTrack}>

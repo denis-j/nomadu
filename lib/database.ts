@@ -53,7 +53,8 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 // 6: journeys.shared_base and the activities table. Both were added to the
 // steps without a bump at first, so installs already at 5 never got them
 // and every pull of a journey failed on the missing column.
-const SCHEMA_VERSION = 6;
+// 7: the expenses table.
+const SCHEMA_VERSION = 7;
 
 async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
   // Per connection, so on every open.
@@ -247,6 +248,33 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
       dirty           INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_activities_journey ON activities(journey_sync_id);
+
+    -- Expenses (lib/expenseModel.ts): what someone paid on a trip and how it
+    -- is split, one row each, keyed by their own sync id like activities.
+    -- Who paid and the shares name travellers by their sync id; the receipt
+    -- is a journey document of kind "receipt". Tombstoned, followed and
+    -- dirty as on activities.
+    CREATE TABLE IF NOT EXISTS expenses (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      sync_id             TEXT NOT NULL UNIQUE,
+      journey_sync_id     TEXT NOT NULL,
+      stop_sync_id        TEXT,
+      title               TEXT NOT NULL,
+      amount              REAL NOT NULL,
+      currency            TEXT NOT NULL,
+      paid_by             TEXT,
+      shares              TEXT NOT NULL DEFAULT '[]',
+      date                TEXT NOT NULL,
+      category            TEXT NOT NULL DEFAULT 'other',
+      notes               TEXT,
+      receipt_document_id TEXT,
+      source              TEXT NOT NULL DEFAULT 'manual',
+      updated_at          TEXT NOT NULL,
+      deleted             INTEGER NOT NULL DEFAULT 0,
+      followed            INTEGER NOT NULL DEFAULT 0,
+      dirty               INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_expenses_journey ON expenses(journey_sync_id);
 
     CREATE TABLE IF NOT EXISTS app_meta (
       key   TEXT PRIMARY KEY,
@@ -870,6 +898,10 @@ export async function deleteJourney(id: number): Promise<void> {
       `UPDATE activities SET deleted = 1, updated_at = ? WHERE journey_sync_id = ? AND deleted = 0 AND followed = 0`,
       [new Date().toISOString(), journey.sync_id],
     );
+    await database.runAsync(
+      `UPDATE expenses SET deleted = 1, updated_at = ? WHERE journey_sync_id = ? AND deleted = 0 AND followed = 0`,
+      [new Date().toISOString(), journey.sync_id],
+    );
   }
   localChanged();
 }
@@ -1161,6 +1193,7 @@ export async function forgetFollowedJourney(syncId: string): Promise<string[]> {
   await database.runAsync('DELETE FROM journeys WHERE id = ?', [row.id]);
   await database.runAsync('DELETE FROM accommodations WHERE journey_sync_id = ? AND followed = 1', [syncId]);
   await database.runAsync('DELETE FROM activities WHERE journey_sync_id = ? AND followed = 1', [syncId]);
+  await database.runAsync('DELETE FROM expenses WHERE journey_sync_id = ? AND followed = 1', [syncId]);
   return files.map((f) => f.file_name);
 }
 
@@ -1709,6 +1742,7 @@ export async function wipeLocalDatabase(): Promise<void> {
       DELETE FROM accommodation_options;
       DELETE FROM accommodations;
       DELETE FROM activities;
+      DELETE FROM expenses;
       DELETE FROM journey_documents;
       DELETE FROM journey_travellers;
       DELETE FROM journey_legs;
@@ -1774,6 +1808,7 @@ export async function purgeSyncedTombstones(): Promise<number> {
     { table: 'journeys', mark: 'journeys', also: 'AND NOT EXISTS (SELECT 1 FROM journey_documents d WHERE d.journey_id = journeys.id)' },
     { table: 'accommodations', mark: 'accommodations' },
     { table: 'activities', mark: 'activities' },
+    { table: 'expenses', mark: 'expenses' },
   ];
   let purged = 0;
   for (const { table, mark, also } of tables) {

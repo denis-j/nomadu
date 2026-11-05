@@ -9,6 +9,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { deleteAccount } from '../../lib/auth';
 import { Colors } from '../../constants/colors';
 import { track } from '../../lib/analytics';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 export default function OnboardingPaywallScreen() {
   const router = useRouter();
@@ -65,16 +66,17 @@ export default function OnboardingPaywallScreen() {
 function AccountButton() {
   const { user, signOut } = useAuth();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   if (!user) return null;
 
   const confirmDelete = () => {
     Alert.alert(
-      'Delete Account',
-      'This permanently deletes your account, all trips and all data, both on this device and in the cloud. It cannot be undone.',
+      t('onboarding.paywall.deleteAccount'),
+      t('onboarding.paywall.deleteConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete Account',
+          text: t('onboarding.paywall.deleteAccount'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -82,7 +84,7 @@ function AccountButton() {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (error: any) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-              Alert.alert('Account not deleted', error?.message ?? 'Please try again.');
+              Alert.alert(t('onboarding.paywall.notDeletedTitle'), error?.message ?? t('onboarding.paywall.tryAgain'));
             }
           },
         },
@@ -92,10 +94,10 @@ function AccountButton() {
 
   const open = () => {
     Haptics.selectionAsync();
-    Alert.alert('Account', user.email ? `Signed in as ${user.email}` : undefined, [
-      { text: 'Sign Out', onPress: () => { signOut(); } },
-      { text: 'Delete Account', style: 'destructive', onPress: confirmDelete },
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('onboarding.paywall.account'), user.email ? t('onboarding.paywall.signedInAs', { email: user.email }) : undefined, [
+      { text: t('onboarding.paywall.signOut'), onPress: () => { signOut(); } },
+      { text: t('onboarding.paywall.deleteAccount'), style: 'destructive', onPress: confirmDelete },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
@@ -103,11 +105,11 @@ function AccountButton() {
     <Pressable
       onPress={open}
       accessibilityRole="button"
-      accessibilityLabel="Account"
+      accessibilityLabel={t('onboarding.paywall.account')}
       hitSlop={10}
       style={({ pressed }) => [styles.account, { top: insets.top + 8 }, pressed && { opacity: 0.6 }]}
     >
-      <Text style={styles.accountText}>Account</Text>
+      <Text style={styles.accountText}>{t('onboarding.paywall.account')}</Text>
     </Pressable>
   );
 }

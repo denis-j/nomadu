@@ -8,7 +8,7 @@ It is one Firebase project, `nomady-dcff6`, region `us-central1`:
 | --- | --- |
 | **Firebase Auth** | Sign-in with email, Apple and Google. Every other piece keys off the uid. |
 | **Firestore** | Mirror of the phone's data, one subtree per user. Also the AI budget counters and the agent token hashes. |
-| **Cloud Functions** (`functions/src`) | Fifteen functions: three Gemini proxies, account deletion, three token callables, the agent HTTP API (timeline, plans, accommodation), six sharing callables and the invite page. |
+| **Cloud Functions** (`functions/src`) | Fifteen functions: three Gemini proxies, account deletion, three token callables, the agent HTTP API (timeline, plans, accommodation, activities, expenses), the sharing callables and the invite page. |
 | **Secret Manager** | `GEMINI_API_KEY`. The only secret; read inside the functions, never by the app. |
 
 Third parties the app talks to directly, not through this backend: RevenueCat (subscriptions), Sentry (crashes), Apple Maps and Core Location (on-device), EAS (builds).
@@ -23,6 +23,8 @@ users/{uid}                         profile
   visas/{syncId}                    visas the user typed in
   journeys/{syncId}                 plans, stops and travellers embedded
   accommodations/{stopSyncId}       where to stay at one stop, options embedded
+  activities/{activityId}           things to do, one document each, tagged with journey and stop
+  expenses/{expenseId}              what was paid and how it is split, one document each, same tags
 shared_journeys/{journeySyncId}     a trip shared with friends: mirror plus members
   documents/{docSyncId}             records of the documents shared on it
 invites/{code}                      invite code -> journey         (functions only)
@@ -163,6 +165,18 @@ The full contract lives in `src/openapi.ts` (OpenAPI 3.1, every request and resp
 | `DELETE …/accommodation/booking` | forget the booking, status falls back | |
 | `PUT …/accommodation/status` | set any status by hand | |
 | `GET` or `PUT` `…/accommodation/notes` | every note on the plan in one place, or replace the plan's notes | |
+| `GET /journeys/{id}/activities?stop` | the things to do on a plan, stop by stop, the unplaced ones last; `stop` narrows it to one | |
+| `POST /journeys/{id}/activities` | add one with `stop_id` (a stop of the journey, or null for not placed yet); only `title` is required, a `price` needs a `currency`, `source` defaults to `agent` | |
+| `POST /journeys/{id}/stops/{stopId}/activities` | the same, straight onto a stop | |
+| `GET /journeys/{id}/activities/{activityId}` | one activity | |
+| `PATCH /journeys/{id}/activities/{activityId}` | change what is sent; a new `stop_id` moves it to the end of that stop | |
+| `DELETE /journeys/{id}/activities/{activityId}` | tombstone it | |
+| `GET /journeys/{id}/expenses?stop` | the expenses of a plan, newest day first, with `travellers` (the ids a split may use), `totals` per currency, `balances` per traveller and currency, and `settle_up` (the fewest payments that even out); `stop` narrows the list, the sums stay the trip's | |
+| `POST /journeys/{id}/expenses` | file one: `title, amount, currency` required; `paid_by` and the split (`split_among` ids, equal, or `shares` with amounts) must be travellers of the plan, else split among everyone; `date` defaults to today and picks the stop unless `stop_id` says; `source` defaults to `agent` | |
+| `POST /journeys/{id}/stops/{stopId}/expenses` | the same, straight onto a stop | |
+| `GET /journeys/{id}/expenses/{expenseId}` | one expense | |
+| `PATCH /journeys/{id}/expenses/{expenseId}` | change what is sent; a new amount scales the split, a new date moves it to that day's stop | |
+| `DELETE /journeys/{id}/expenses/{expenseId}` | tombstone it | |
 
 Every stop in a journey response also carries `accommodation: {status, needed, check_in, check_out, nights, options, selected, booked} | null`. Every write returns the whole plan, with `nights` and `dates_match_stop` computed. Validation is the model's: real calendar days with at least one night, prices as numbers with an ISO 4217 currency beside them, ratings against their scale (5 or 10), http(s) URLs only, and a 400 for a card number in any text field.
 

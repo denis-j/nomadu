@@ -1,20 +1,22 @@
 import { Stack } from 'expo-router/stack';
 import { sheetBackground, headerTransparent, sheetWithHeader } from '../../../constants/colors';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 export default function StatsStack() {
+  const { t } = useTranslation();
   return (
     <Stack>
       <Stack.Screen
         name="index"
         options={{
-          title: 'Tracking',
+          title: t('nav.tracking'),
           headerLargeTitle: true,
         }}
       />
       <Stack.Screen
         name="visa"
         options={{
-          title: 'Visa',
+          title: t('nav.visa'),
           headerBackButtonDisplayMode: 'minimal',
         }}
       />
@@ -48,7 +50,7 @@ export default function StatsStack() {
       <Stack.Screen
         name="tax"
         options={{
-          title: 'Tax Residence',
+          title: t('nav.taxResidence'),
           headerBackButtonDisplayMode: 'minimal',
           headerTransparent
         }}

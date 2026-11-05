@@ -25,6 +25,7 @@ import { Typography } from '../../constants/typography';
 import { googleSignInAvailable, useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { signUpWithEmail, signInWithApple } from '../../lib/auth';
 import { showToast } from '../../lib/toast';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const LOGO_SIZE = 130;
 
@@ -48,6 +49,7 @@ const gradientColorSets = [
 
 
 export default function SignUpScreen() {
+  const { t } = useTranslation();
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
@@ -58,18 +60,18 @@ export default function SignUpScreen() {
 
   const handleSignUp = async () => {
     if (!email || !password) {
-      showToast('Please enter your email and password.', 'error');
+      showToast(t('auth.enterBoth'), 'error');
       return;
     }
     if (password.length < 6) {
-      showToast('Password must be at least 6 characters.', 'error');
+      showToast(t('auth.passwordMin'), 'error');
       return;
     }
     setLoading(true);
     try {
       await signUpWithEmail(email.trim(), password);
     } catch (e: any) {
-      showToast(e.message ?? 'Something went wrong.', 'error');
+      showToast(e.message ?? t('auth.somethingWrong'), 'error');
     } finally {
       setLoading(false);
     }
@@ -80,7 +82,7 @@ export default function SignUpScreen() {
     try {
       await signInWithApple();
     } catch (e: any) {
-      if (e.code !== 'ERR_REQUEST_CANCELED') showToast(e.message ?? 'Apple sign in failed.', 'error');
+      if (e.code !== 'ERR_REQUEST_CANCELED') showToast(e.message ?? t('auth.appleFailed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -91,7 +93,7 @@ export default function SignUpScreen() {
     try {
       await googleSignIn();
     } catch (e: any) {
-      if (!e.message?.includes('cancelled')) showToast(e.message ?? 'Google sign in failed.', 'error');
+      if (!e.message?.includes('cancelled')) showToast(e.message ?? t('auth.googleFailed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -115,8 +117,8 @@ export default function SignUpScreen() {
             >
               {/* The logo in 3D: one quick turn on arrival, then it turns under a finger. */}
               <LogoModel3D size={LOGO_SIZE} motion="intro" style={styles.appIcon} />
-              <Text style={styles.title}>Create account</Text>
-              <Text style={styles.subtitle}>Sign up to start your journey</Text>
+              <Text style={styles.title}>{t('auth.createTitle')}</Text>
+              <Text style={styles.subtitle}>{t('auth.createSubtitle')}</Text>
             </Animated.View>
 
             {/* Form */}
@@ -131,7 +133,7 @@ export default function SignUpScreen() {
                     style={styles.input}
                     value={email}
                     onChangeText={setEmail}
-                    placeholder="Email"
+                    placeholder={t('auth.email')}
                     placeholderTextColor={Colors.textTertiary}
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -149,7 +151,7 @@ export default function SignUpScreen() {
                     style={[styles.input, styles.inputFlex]}
                     value={password}
                     onChangeText={setPassword}
-                    placeholder="Password"
+                    placeholder={t('auth.password')}
                     placeholderTextColor={Colors.textTertiary}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
@@ -163,7 +165,7 @@ export default function SignUpScreen() {
                     onPress={() => setShowPassword((v) => !v)}
                     hitSlop={10}
                     accessibilityRole="button"
-                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                    accessibilityLabel={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                   >
                     <Ionicons
                       name={showPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -183,15 +185,15 @@ export default function SignUpScreen() {
                 {loading ? (
                   <ActivityIndicator color={Colors.text} />
                 ) : (
-                  <Text style={styles.continueButtonText}>Create account</Text>
+                  <Text style={styles.continueButtonText}>{t('auth.createButton')}</Text>
                 )}
               </CloudyButton>
 
               <View style={styles.signInRow}>
-                <Text style={styles.signInText}>Already have an account? </Text>
+                <Text style={styles.signInText}>{t('auth.haveAccount')}</Text>
                 <Link href="/(auth)/sign-in" asChild>
                   <TouchableOpacity hitSlop={6}>
-                    <Text style={styles.signInLink}>Sign in</Text>
+                    <Text style={styles.signInLink}>{t('auth.signIn')}</Text>
                   </TouchableOpacity>
                 </Link>
               </View>
@@ -206,7 +208,7 @@ export default function SignUpScreen() {
               {(Platform.OS === 'ios' || googleSignInAvailable) && (
                 <View style={styles.orRow}>
                   <View style={styles.orLine} />
-                  <Text style={styles.orText}>or continue with</Text>
+                  <Text style={styles.orText}>{t('auth.orContinue')}</Text>
                   <View style={styles.orLine} />
                 </View>
               )}
@@ -216,7 +218,7 @@ export default function SignUpScreen() {
                   <TouchableOpacity onPress={handleAppleSignIn} disabled={loading} activeOpacity={0.85}>
                     <Glass {...glassProps} style={[styles.socialButton, !hasGlass && styles.socialButtonFallback]}>
                       <Ionicons name="logo-apple" size={20} color={Colors.text} />
-                      <Text style={styles.socialButtonText}>Continue with Apple</Text>
+                      <Text style={styles.socialButtonText}>{t('auth.continueApple')}</Text>
                     </Glass>
                   </TouchableOpacity>
                 )}
@@ -225,17 +227,17 @@ export default function SignUpScreen() {
                   <TouchableOpacity onPress={handleGoogleSignIn} disabled={loading} activeOpacity={0.85}>
                     <Glass {...glassProps} style={[styles.socialButton, !hasGlass && styles.socialButtonFallback]}>
                       <Ionicons name="logo-google" size={20} color="#EA4335" />
-                      <Text style={styles.socialButtonText}>Continue with Google</Text>
+                      <Text style={styles.socialButtonText}>{t('auth.continueGoogle')}</Text>
                     </Glass>
                   </TouchableOpacity>
                 )}
               </View>
 
               <Text style={styles.legal}>
-                By continuing you agree to the{' '}
-                <Text style={styles.legalLink} onPress={() => openLegal(TERMS_URL)} accessibilityRole="link">Terms of Use</Text>
-                {' '}and the{' '}
-                <Text style={styles.legalLink} onPress={() => openLegal(PRIVACY_URL)} accessibilityRole="link">Privacy Policy</Text>.
+                {t('auth.legalPrefix')}
+                <Text style={styles.legalLink} onPress={() => openLegal(TERMS_URL)} accessibilityRole="link">{t('auth.terms')}</Text>
+                {t('auth.legalAnd')}
+                <Text style={styles.legalLink} onPress={() => openLegal(PRIVACY_URL)} accessibilityRole="link">{t('auth.privacy')}</Text>.
               </Text>
             </Animated.View>
           </KeyboardLift>

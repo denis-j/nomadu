@@ -15,8 +15,10 @@ import { initializeApp } from 'firebase-admin/app';
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 
-import { generateFromImage, generateText, extractJsonArray, geminiKey } from './gemini';
+import { generateFromImage, generateText, extractJsonArray, extractJsonObject, geminiKey } from './gemini';
+import { EXPENSE_CATEGORIES } from '../../lib/expenseModel';
 import {
+  RECEIPT_PROMPT,
   TRIP_EXTRACTION_PROMPT,
   buildActivitySuggestionPrompt,
   buildCityTipsPrompt,
@@ -33,7 +35,7 @@ initializeApp();
 
 export { deleteAccount } from './deleteAccount';
 export { agentApi, createAgentToken, revokeAgentToken, listAgentTokens } from './agent';
-export { shareJourney, previewInvite, joinJourney, leaveJourney, removeJourneyMember, unshareJourney, setJourneyMemberCanEdit, updateSharedJourney, updateSharedAccommodation, updateSharedActivity, sharePage, sharedProfiles, mirrorJourney, mirrorAccommodation, mirrorActivity } from './share';
+export { shareJourney, previewInvite, joinJourney, leaveJourney, removeJourneyMember, unshareJourney, setJourneyMemberCanEdit, updateSharedJourney, updateSharedAccommodation, updateSharedActivity, updateSharedExpense, sharePage, sharedProfiles, mirrorJourney, mirrorAccommodation, mirrorActivity, mirrorExpense } from './share';
 export { importActivityLink } from './linkImport';
 export { sharedDocumentFiles } from './documentFiles';
 
@@ -232,4 +234,54 @@ export const extractTrips = onCall(options, async (request) => {
   });
 
   return { trips };
+});
+
+// ─── A receipt, read ─────────────────────────────────────────────────────────
+
+/**
+ * What was paid, off a photo of the receipt: the total, its currency, the
+ * merchant and the date, for the expense form to start from. The user
+ * checks and saves; an unreadable picture is an empty answer, not an error.
+ */
+export const readReceipt = onCall(options, async (request) => {
+  const uid = requireUid(request);
+  const data = request.data ?? {};
+
+  const imageBase64 = data.imageBase64;
+  if (typeof imageBase64 !== 'string' || imageBase64.length === 0) {
+    throw new HttpsError('invalid-argument', '"imageBase64" is required.');
+  }
+  if (imageBase64.length > MAX_IMAGE_BASE64_BYTES) {
+    throw new HttpsError('invalid-argument', 'That image is too large. Please pick a smaller one.');
+  }
+  const mimeType =
+    typeof data.mimeType === 'string' && ALLOWED_MIME.includes(data.mimeType)
+      ? data.mimeType
+      : 'image/jpeg';
+
+  await requireAppAccess(request, uid, 'readReceipt');
+  await consumeQuota(uid, 'readReceipt');
+
+  const raw = await generateFromImage(geminiKey.value(), RECEIPT_PROMPT, imageBase64, mimeType);
+  const parsed = extractJsonObject(raw);
+  if (!parsed) {
+    logger.warn('readReceipt: no JSON object in response', { preview: raw.slice(0, 300) });
+    return { receipt: null };
+  }
+  const amount = typeof parsed.amount === 'number' && Number.isFinite(parsed.amount) && parsed.amount > 0 ? Math.round(parsed.amount * 100) / 100 : null;
+  if (amount === null) return { receipt: null };
+  const currency = typeof parsed.currency === 'string' && /^[A-Za-z]{3}$/.test(parsed.currency.trim()) ? parsed.currency.trim().toUpperCase() : null;
+  const date = typeof parsed.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.date) ? parsed.date : null;
+  const category = typeof parsed.category === 'string' && (EXPENSE_CATEGORIES as readonly string[]).includes(parsed.category) ? parsed.category : 'other';
+  const confidence = typeof parsed.confidence === 'number' ? Math.max(0, Math.min(1, parsed.confidence)) : 0.5;
+  return {
+    receipt: {
+      title: typeof parsed.title === 'string' && parsed.title.trim() ? sanitize(parsed.title, 120) : null,
+      amount,
+      currency,
+      date,
+      category,
+      confidence,
+    },
+  };
 });

@@ -12,9 +12,11 @@ import { avatarSeed } from '../../../lib/avatarSeed';
 import { pushProfileToCloud } from '../../../lib/onboarding';
 import { localChanged } from '../../../lib/syncTrigger';
 import { showToast } from '../../../lib/toast';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 /** Name and face after onboarding: the same editor, in a sheet. */
 export default function ProfileSheet() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
   const [name, setName] = useState('');
@@ -36,7 +38,7 @@ export default function ProfileSheet() {
     // To the account now, and to shared trips with the next plans push.
     pushProfileToCloud(user.uid).catch(() => {});
     localChanged();
-    showToast('Profile updated');
+    showToast(t('settings.profileUpdated'));
     router.back();
   };
 
@@ -45,7 +47,7 @@ export default function ProfileSheet() {
   // the form sheet.
   return (
     <>
-      <Stack.Screen options={{ title: 'Your profile' }} />
+      <Stack.Screen options={{ title: t('settings.profileTitle') }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {avatar ? <ProfileEditor name={name} onNameChange={setName} avatar={avatar} onAvatarChange={setAvatar} /> : null}
         <CloudyButton
@@ -54,7 +56,7 @@ export default function ProfileSheet() {
           style={[styles.cta, !name.trim() && styles.ctaDisabled]}
           innerStyle={styles.ctaInner}
         >
-          <Text style={styles.ctaText}>Save</Text>
+          <Text style={styles.ctaText}>{t('common.save')}</Text>
         </CloudyButton>
       </ScrollView>
     </>

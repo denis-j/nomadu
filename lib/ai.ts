@@ -133,6 +133,28 @@ export async function extractTripsFromImage(
   return trips;
 }
 
+// ─── Receipts ────────────────────────────────────────────────────────────────
+
+export interface ReceiptReading {
+  /** The merchant or what was bought, as far as the picture says. */
+  title: string | null;
+  amount: number;
+  currency: string | null;
+  date: string | null;
+  category: string;
+  confidence: number;
+}
+
+/**
+ * What a photographed receipt says: the total, its currency, the merchant
+ * and the day, for the expense form to start from. Null when nothing
+ * readable is on it; the form then opens empty with the picture attached.
+ */
+export async function readReceipt(imageBase64: string, mimeType = 'image/jpeg'): Promise<ReceiptReading | null> {
+  const { receipt } = await call<{ imageBase64: string; mimeType: string }, { receipt: ReceiptReading | null }>('readReceipt', { imageBase64, mimeType });
+  return receipt;
+}
+
 // ─── Activities ──────────────────────────────────────────────────────────────
 
 export interface ActivitySuggestion {

@@ -192,6 +192,32 @@ RULES
 - Dates must be valid calendar dates
 - Do not invent dates or places that aren't on screen; lower confidence rather than guess`;
 
+// ─── Receipts ────────────────────────────────────────────────────────────────
+
+export const RECEIPT_PROMPT = `You are looking at a photo of a receipt, a bill, a ticket or a payment confirmation from a trip.
+
+TASK
+Read what was paid: the total amount, its currency, who it was paid to, and when.
+
+OUTPUT
+Return ONLY a valid JSON object, no markdown, no commentary:
+
+{
+  "title": "string (the merchant or what was bought, short, in the receipt's language; e.g. 'Café Giảng', 'Taxi', 'Grab ride')",
+  "amount": number (the final total actually paid, as a plain number, no thousands separators),
+  "currency": "ISO 4217 code, uppercase (e.g. EUR, THB, VND); infer from the symbol, the language or the country when it is not printed",
+  "date": "YYYY-MM-DD or null when no date is on it",
+  "category": "one of food, drinks, transport, stay, activity, groceries, shopping, other",
+  "confidence": 0.0-1.0
+}
+
+RULES
+- The amount is the grand total after tax, tip and discounts, not a line item, not the amount tendered, not the change
+- If several totals are printed, prefer the one marked total, sum, amount due, or the card payment amount
+- If the year is missing from the date, infer the nearest plausible year
+- If you cannot read an amount at all, return {"amount": null, "confidence": 0}
+- Do not invent what is not on the picture; lower confidence rather than guess`;
+
 // ─── Activities ──────────────────────────────────────────────────────────────
 
 export interface ActivitySuggestionInput {

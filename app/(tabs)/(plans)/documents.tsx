@@ -19,7 +19,7 @@ import {
   renameJourneyTraveller,
   travellerLabel,
 } from '../../../lib/database';
-import { DocumentKind, documentUri, isImageMime, isPdfMime, kindMeta } from '../../../lib/documents';
+import { DocumentKind, documentUri, isImageMime, isPdfMime, kindMeta, walletDocuments } from '../../../lib/documents';
 import { MissingRoute } from '../../../components/MissingRoute';
 import { useJourneyExists } from '../../../hooks/useJourneyExists';
 import { parseSyncStamp } from '../../../lib/syncTime';
@@ -55,7 +55,9 @@ function DocumentsScreenContent() {
   const nav = useNavigation();
   const params = useLocalSearchParams<{ journeyId: string; travellerId?: string }>();
   const journeyId = Number(params.journeyId);
-  const { travellers, documents, owner, uid, loaded, refresh } = useJourneyDocuments(journeyId, { ensureSelf: true });
+  const { travellers, documents: allDocuments, owner, uid, loaded, refresh } = useJourneyDocuments(journeyId, { ensureSelf: true });
+  // Receipts belong to their expenses, not to the wallet.
+  const documents = walletDocuments(allDocuments);
   const [filter, setFilter] = useState<Filter>(params.travellerId ? Number(params.travellerId) : 'all');
 
   // On one's own trip the first traveller is the user (ensureSelf creates it

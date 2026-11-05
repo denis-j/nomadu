@@ -36,6 +36,7 @@ import {
 import { Flag } from '../../components/Flag';
 import { countryCodeToFlag } from '../../lib/geocoding';
 import { track } from '../../lib/analytics';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -114,6 +115,7 @@ export default function CitizenshipScreen() {
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const mapRef = useRef<MapView>(null);
 
   // Touchdown: after the MapView has a chance to settle, zoom from the high
@@ -234,8 +236,8 @@ export default function CitizenshipScreen() {
         {/* Header + Search */}
         <View style={styles.topContent} pointerEvents="box-none">
           <Animated.View entering={FadeInUp.duration(500).springify()} style={styles.header}>
-            <Text style={styles.title}>{"Where's home?"}</Text>
-            <Text style={styles.subtitle}>Tap your country on the map</Text>
+            <Text style={styles.title}>{t('onboarding.citizenship.title')}</Text>
+            <Text style={styles.subtitle}>{t('onboarding.citizenship.subtitle')}</Text>
           </Animated.View>
 
           <Animated.View entering={FadeIn.delay(150).duration(400)} style={styles.searchWrap}>
@@ -245,12 +247,12 @@ export default function CitizenshipScreen() {
                 style={styles.searchInput}
                 value={query}
                 onChangeText={setQuery}
-                placeholder="Search countries..."
+                placeholder={t('onboarding.citizenship.searchPlaceholder')}
                 placeholderTextColor={Colors.textTertiary}
                 autoCorrect={false}
               />
               {isSearching && (
-                <TouchableOpacity onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel="Clear search">
+                <TouchableOpacity onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel={t('onboarding.citizenship.clearSearch')}>
                   <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
                 </TouchableOpacity>
               )}
@@ -268,7 +270,7 @@ export default function CitizenshipScreen() {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               ListEmptyComponent={
-                <Text style={styles.emptyText}>No countries found</Text>
+                <Text style={styles.emptyText}>{t('onboarding.citizenship.noResults')}</Text>
               }
             />
           )}
@@ -296,7 +298,7 @@ export default function CitizenshipScreen() {
                 <View style={styles.confirmTextWrap}>
                   <Text style={styles.confirmName}>{selected ?? hoveredCountry}</Text>
                   <Text style={[styles.confirmHint, selected && styles.successHint]}>
-                    {selected ? 'Added to your map' : 'Tap to confirm'}
+                    {selected ? t('onboarding.citizenship.added') : t('onboarding.citizenship.tapToConfirm')}
                   </Text>
                 </View>
                 <Animated.View

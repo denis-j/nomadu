@@ -31,8 +31,10 @@ import { useJourneyDocuments } from '../../../hooks/useJourneyDocuments';
 import { useJourneyAccommodations } from '../../../hooks/useAccommodations';
 import { consumePendingActivities, consumePendingStay } from '../../../lib/accommodationBridge';
 import { useJourneyActivities } from '../../../hooks/useActivities';
+import { useJourneyExpenses } from '../../../hooks/useExpenses';
 import { ACTIVITIES_UI } from '../../../lib/activityModel';
-import { planChipText, statusColor } from '../../../components/accommodationForm';
+import { balances, formatAmount, totals } from '../../../lib/expenseModel';
+import { planChipShort, statusColor } from '../../../components/accommodationForm';
 import type { LocalAccommodation } from '../../../lib/accommodations';
 import { DocumentsEntryCard, EntryCard } from '../../../components/JourneyDocuments';
 import { GlassDisc } from '../../../components/GlassDisc';
@@ -173,6 +175,21 @@ function legDays(start: string, end: string): number {
 // ─── Journey Map Card ─────────────────────────────────────────────────────────
 
 const MAP_HEIGHT = 360;
+/** What the list keeps free for the tab bar: with the insets off, nothing else does. */
+const IOS_TAB_BAR = Platform.OS === 'ios' ? 83 : 0;
+
+/**
+ * Sits in front of the list so react-native-screens does not find it.
+ *
+ * Under native tabs the library looks down the first child of every screen
+ * and turns a scroll view's contentInsetAdjustmentBehavior "never" into
+ * "automatic". Left to that, iOS bounced this page to a stale inset once a
+ * screen with a navigation bar had been pushed and popped: the list settled
+ * 54pt too low and then snapped up.
+ */
+function ScrollViewShield() {
+  return <View collapsable={false} pointerEvents="none" style={styles.scrollViewShield} />;
+}
 /** Breathing room under the lowest pin. */
 const MAP_CHIP_ZONE = 36;
 /** Span shown around a single stop: the city and its surroundings, not the continent. */
@@ -196,10 +213,9 @@ const MAP_PIN = require('../../../assets/icons/map-pin.png');
  * fitted into the visible window.
  */
 function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; headerHeight: number; onPress: () => void }) {
-  // iOS starts the list below the status bar, Android (edge to edge) at the
-  // very top; without this the map sat a status bar too high there.
-  const safeTop = useSafeAreaInsets().top;
-  const listTop = Platform.OS === 'android' ? safeTop : 0;
+  // The list starts at the very top of the screen on both platforms (see
+  // ScrollViewShield); the map is pulled up from there, under the bar.
+  const listTop = useSafeAreaInsets().top;
   const mapRef = useRef<RNMapView>(null);
 
   const coordLegs = useMemo(
@@ -543,11 +559,8 @@ type LegCardProps = {
   /** The stop's accommodation plan, when one was started. */
   stay: LocalAccommodation | null;
   onPress: (leg: JourneyLeg) => void;
-  /** Tap on the stay chip: straight to the accommodation page. */
-  onOpenStay: (leg: JourneyLeg) => void;
-  /** How many things to do are planned here; the chip opens them. */
+  /** How many things to do are planned here. */
   activityCount: number;
-  onOpenActivities: (leg: JourneyLeg) => void;
   onDrag?: () => void;
   visaStatuses: VisaStatus[];
   taxStatuses: TaxStatus[];
@@ -561,9 +574,7 @@ const LegCard = React.memo(function LegCard({
   firstInCountry,
   stay,
   onPress,
-  onOpenStay,
   activityCount,
-  onOpenActivities,
   onDrag,
   visaStatuses,
   taxStatuses,
@@ -602,7 +613,7 @@ const LegCard = React.memo(function LegCard({
   const plannedTaxExceeds = plannedDays >= TAX_THRESHOLD;
 
   // ── Build chips ───────────────────────────────────────────────────────────────
-  interface Chip { label: string; color: string; icon?: keyof typeof Ionicons.glyphMap; onPress?: () => void }
+  interface Chip { label: string; color: string; icon?: keyof typeof Ionicons.glyphMap }
   const chips: Chip[] = [];
 
   // A green "180d left" under every Thai stop is noise: say it once per
@@ -630,12 +641,14 @@ const LegCard = React.memo(function LegCard({
   }
 
   // Where you sleep, once that is being planned. Grey until there is a
-  // place, black from then on; no third colour.
+  // place, black from then on; no third colour. The chips only say; a chip
+  // is too small to hit on a phone, the card opens the stop's sheet and
+  // its big cards lead on from there.
   if (stay && stay.needed) {
-    chips.push({ label: planChipText(stay), color: statusColor(stay.status), icon: 'bed-outline', onPress: () => onOpenStay(leg) });
+    chips.push({ label: planChipShort(stay), color: statusColor(stay.status), icon: 'bed-outline' });
   }
   if (ACTIVITIES_UI && activityCount > 0) {
-    chips.push({ label: activityCount === 1 ? '1 thing to do' : `${activityCount} things to do`, color: Colors.text, icon: 'sparkles-outline', onPress: () => onOpenActivities(leg) });
+    chips.push({ label: activityCount === 1 ? '1 thing to do' : `${activityCount} things to do`, color: Colors.text, icon: 'sparkles-outline' });
   }
 
   const CardWrap = hasGlass ? GlassView : View;
@@ -672,43 +685,43 @@ const LegCard = React.memo(function LegCard({
             <View style={styles.dot} />
           </View>
           <CardWrap {...cardProps} style={[styles.legCard, !hasGlass && styles.legCardFallback]}>
-            {/* Flag */}
-            <Flag code={leg.country_code ?? ''} size={28} style={styles.legFlagWrap} />
+            <View style={styles.legMain}>
+              {/* Flag */}
+              <Flag code={leg.country_code ?? ''} size={28} style={styles.legFlagWrap} />
 
-            {/* Center info */}
-            <View style={styles.legCenter}>
-              <Text style={styles.legCity}>{leg.city}</Text>
-              <Text style={styles.legCountry}>{leg.country}</Text>
-              <MorphText style={styles.legDates}>
-                {fmtRange(leg.start_date, leg.end_date)}
-              </MorphText>
-              {leg.notes ? (
-                <Text style={styles.legNotes} numberOfLines={2}>{leg.notes}</Text>
-              ) : null}
-              {chips.length > 0 && (
-                <View style={styles.statusChipsRow}>
-                  {chips.map((chip, i) => (
-                    <Pressable
-                      key={i}
-                      onPress={chip.onPress}
-                      disabled={!chip.onPress}
-                      hitSlop={chip.onPress ? 6 : undefined}
-                      style={({ pressed }) => [styles.statusChip, { backgroundColor: chip.icon ? Colors.surfaceSecondary : chip.color + '14' }, pressed && { opacity: 0.6 }]}
-                    >
-                      {chip.icon && <Ionicons name={chip.icon} size={12} color={chip.color} style={styles.statusChipIcon} />}
-                      <Text style={[styles.statusChipText, { color: chip.color }]}>{chip.label}</Text>
-                    </Pressable>
-                  ))}
+              {/* Center info */}
+              <View style={styles.legCenter}>
+                <Text style={styles.legCity}>{leg.city}</Text>
+                <Text style={styles.legCountry}>{leg.country}</Text>
+                <MorphText style={styles.legDates}>
+                  {fmtRange(leg.start_date, leg.end_date)}
+                </MorphText>
+                {leg.notes ? (
+                  <Text style={styles.legNotes} numberOfLines={2}>{leg.notes}</Text>
+                ) : null}
+              </View>
+
+              {/* Right badges */}
+              <View style={styles.legRight}>
+                <View style={styles.daysBadge}>
+                  <MorphText style={styles.daysText}>{days}d</MorphText>
                 </View>
-              )}
-            </View>
-
-            {/* Right badges */}
-            <View style={styles.legRight}>
-              <View style={styles.daysBadge}>
-                <MorphText style={styles.daysText}>{days}d</MorphText>
               </View>
             </View>
+
+            {/* The chips under the whole row, in line with the city: beside
+                the days badge the text column was a few points too narrow
+                for two of them side by side. */}
+            {chips.length > 0 && (
+              <View style={[styles.statusChipsRow, styles.statusChipsInset]}>
+                {chips.map((chip, i) => (
+                  <View key={i} style={[styles.statusChip, { backgroundColor: chip.icon ? Colors.surfaceSecondary : chip.color + '14' }]}>
+                    {chip.icon && <Ionicons name={chip.icon} size={12} color={chip.color} style={styles.statusChipIcon} />}
+                    <Text style={[styles.statusChipText, { color: chip.color }]}>{chip.label}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </CardWrap>
         </View>
       </Pressable>
@@ -731,6 +744,17 @@ const LegCard = React.memo(function LegCard({
   prev.taxStatuses === next.taxStatuses &&
   prev.citizenshipCode === next.citizenshipCode
 );
+
+/** "1,240 EUR · you get back 30" under the expenses card; what it is for while empty. */
+function expensesSummary(list: { amount: number; currency: string; paid_by: string | null; shares: { traveller_id: string; amount: number }[]; deleted: boolean }[], meId: string | null, travellers: number): string {
+  if (list.length === 0) return travellers > 1 ? 'Who paid what, split with the others' : 'What you spend, split with friends';
+  const sums = totals(list);
+  const main = `${formatAmount(sums[0].total)} ${sums[0].currency}`;
+  const extra = sums.length > 1 ? ` +${sums.length - 1}` : '';
+  const net = meId ? balances(list).find((b) => b.traveller_id === meId && b.currency === sums[0].currency)?.net ?? 0 : 0;
+  const you = net > 0.004 ? `you get back ${formatAmount(net)}` : net < -0.004 ? `you owe ${formatAmount(-net)}` : 'all settled';
+  return `${main}${extra} · ${you}`;
+}
 
 /** "2 booked · 5 ideas" under the things-to-do card; what it is for while empty. */
 function activitiesSummary(list: { status: string }[]): string {
@@ -1013,6 +1037,7 @@ export default function JourneyDetailScreen() {
   const { plans: stays, loaded: staysLoaded } = useJourneyAccommodations(journeyId);
   const stopSyncIds = useMemo(() => (journey?.legs ?? []).map((l) => l.sync_id), [journey?.legs]);
   const { activities, byStop: activitiesByStop } = useJourneyActivities(journey?.sync_id, stopSyncIds);
+  const { expenses } = useJourneyExpenses(journey?.sync_id);
 
   // ─── Visa / Tax statuses ─────────────────────────────────────────────────────
 
@@ -1190,24 +1215,6 @@ export default function JourneyDetailScreen() {
     });
   }, [router, journeyId, journey?.legs]);
 
-  const openStay = useCallback((leg: JourneyLeg) => {
-    if (!leg.sync_id || !journey?.sync_id) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push({
-      pathname: '/(tabs)/(plans)/accommodation',
-      params: {
-        stopSyncId: leg.sync_id,
-        journeySyncId: journey.sync_id,
-        city: leg.city,
-        country: leg.country,
-        countryCode: leg.country_code,
-        start: leg.start_date,
-        end: leg.end_date,
-        ...(readOnly && { readOnly: '1' }),
-      },
-    });
-  }, [router, journey?.sync_id, readOnly]);
-
   const openActivities = useCallback((leg?: JourneyLeg) => {
     if (!journey?.sync_id) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1219,6 +1226,15 @@ export default function JourneyDetailScreen() {
         ...(leg?.sync_id && { stopSyncId: leg.sync_id }),
         ...(readOnly && { readOnly: '1' }),
       },
+    });
+  }, [router, journeyId, journey?.sync_id, readOnly]);
+
+  const openExpenses = useCallback(() => {
+    if (!journey?.sync_id) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({
+      pathname: '/(tabs)/(plans)/expenses',
+      params: { journeyId: String(journeyId), journeySyncId: journey.sync_id, ...(readOnly && { readOnly: '1' }) },
     });
   }, [router, journeyId, journey?.sync_id, readOnly]);
 
@@ -1403,9 +1419,7 @@ export default function JourneyDetailScreen() {
           firstInCountry={!legs.slice(0, index).some((l) => l.country_code === item.country_code)}
           stay={item.sync_id ? stays.get(item.sync_id) ?? null : null}
           onPress={openStopInfo}
-          onOpenStay={openStay}
           activityCount={item.sync_id ? activitiesByStop.get(item.sync_id)?.length ?? 0 : 0}
-          onOpenActivities={openActivities}
           onDrag={readOnly ? undefined : drag}
           visaStatuses={visaStatuses}
           taxStatuses={taxStatuses}
@@ -1414,7 +1428,7 @@ export default function JourneyDetailScreen() {
         />
       </ScaleDecorator>
     );
-  }, [legs, stays, activitiesByStop, openStopInfo, openStay, openActivities, readOnly, visaStatuses, taxStatuses, citizenshipCode]);
+  }, [legs, stays, activitiesByStop, openStopInfo, readOnly, visaStatuses, taxStatuses, citizenshipCode]);
 
   const onHeaderLayout = useCallback((e: any) => {
     setTimelineTop(e.nativeEvent.layout.height);
@@ -1423,7 +1437,7 @@ export default function JourneyDetailScreen() {
   // The line runs from the header down to the end cap. It lives inside the
   // header so it scrolls natively with the content; a first version moved it
   // by hand from scroll events, which arrive on the JS thread a frame late.
-  const lineHeight = contentSize > timelineTop ? contentSize - timelineTop - footerHeight - 70 : 0;
+  const lineHeight = contentSize > timelineTop ? contentSize - timelineTop - footerHeight - 70 - IOS_TAB_BAR : 0;
   const lineColor = Colors.primary + '20';
 
   const listHeader = useMemo(() => (
@@ -1439,6 +1453,15 @@ export default function JourneyDetailScreen() {
           onPress={() => openActivities()}
         />
       )}
+      {legs.length > 0 && (!readOnly || expenses.length > 0) && (
+        <EntryCard
+          icon="receipt-outline"
+          title="Expenses"
+          sub={expensesSummary(expenses, docs.travellers.find((t) => !!user?.uid && t.uid === user.uid)?.sync_id ?? null, docs.travellers.length)}
+          count={expenses.length}
+          onPress={openExpenses}
+        />
+      )}
       {legs.length > 0 && timelineTop > 0 && lineHeight > 0 && (
         <View pointerEvents="none" style={[styles.timelineLine, { top: timelineTop, height: lineHeight }]}>
           <LinearGradient
@@ -1449,7 +1472,7 @@ export default function JourneyDetailScreen() {
         </View>
       )}
     </View>
-  ), [legs, headerHeight, onHeaderLayout, journeyId, docs.documents, docs.travellers, timelineTop, lineHeight, openMap, activities, readOnly, openActivities]);
+  ), [legs, headerHeight, onHeaderLayout, journeyId, docs.documents, docs.travellers, timelineTop, lineHeight, openMap, activities, readOnly, openActivities, expenses, openExpenses, user?.uid]);
 
   const chainedSuggestions = useMemo(() => suggestions.map((s) => chainedSuggestion(s, legs)), [suggestions, legs]);
 
@@ -1511,6 +1534,8 @@ export default function JourneyDetailScreen() {
         </View>
       ) : (
         <GestureHandlerRootView style={{ flex: 1 }}>
+          {/* Keeps the list out of react-native-screens' reach. */}
+          <ScrollViewShield />
           <DraggableFlatList
             data={staysLoaded && visaLoaded ? legs : []}
             keyExtractor={(item) => String(item.id)}
@@ -1523,6 +1548,7 @@ export default function JourneyDetailScreen() {
             contentInsetAdjustmentBehavior="never"
             // Without a map nothing pushes the content below the transparent header.
             contentContainerStyle={styles.content}
+            scrollIndicatorInsets={{ top: insets.top, bottom: IOS_TAB_BAR }}
             activationDistance={15}
             onContentSizeChange={(_, h) => setContentSize(h)}
           />
@@ -1565,8 +1591,9 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
     paddingRight: 16,
     paddingTop: 0,
-    paddingBottom: 100,
+    paddingBottom: 100 + IOS_TAB_BAR,
   },
+  scrollViewShield: { height: 0 },
 
   emptyWrap: { flex: 1 },
   emptyCta: { paddingHorizontal: 32, paddingBottom: 140 },
@@ -1652,11 +1679,13 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 18,
     padding: 16,
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+  },
+  legMain: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
   },
   legCardFallback: {
     backgroundColor: Colors.surface,
@@ -1697,6 +1726,8 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 8,
   },
+  // Flag width plus the gap: the chips start where the city does.
+  statusChipsInset: { marginLeft: 28 + 12 },
   statusChip: {
     flexDirection: 'row',
     alignItems: 'center',

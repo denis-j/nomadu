@@ -1,29 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { Dropdown } from './Dropdown';
+import { StatusChip } from './SheetRows';
 import { currencyChoices, promptCurrency } from '../lib/currencies';
 import {
   STATUS_LABELS,
-  TYPE_LABELS,
-  amenityLabel,
-  formatMoney,
-  nightsBetween,
   primaryOption,
   type AccommodationPlan,
-  type AccommodationRequirements,
   type AccommodationStatus,
 } from '../lib/accommodationModel';
 
 /**
- * The rows the accommodation page is built from, inside the visa form's
- * `Card`. There is no save button anywhere: every row keeps a draft while
- * it is being typed in and hands the value over (`onCommit`) when the
- * field is left, so the page reads like a card that happens to be
- * editable. While a row has focus it ignores the value coming from
+ * The rows the stay's sheets and the things-to-do form are built from,
+ * inside the visa form's `Card`. Each row keeps a draft while it is being
+ * typed in and hands the value over (`onCommit`) when the field is left,
+ * or on every keystroke with `live`, for a form that saves with its own
+ * checkmark. While a row has focus it ignores the value coming from
  * outside, so a save of the previous row never wipes what is being typed.
  */
 
@@ -48,43 +43,34 @@ export function statusColor(status: AccommodationStatus): string {
 
 /** The status as the "8d" pill on the itinerary: grey capsule, short word. */
 export function StatusBadge({ status, size = 'regular', onPress }: { status: AccommodationStatus; size?: 'regular' | 'small'; onPress?: () => void }) {
-  const color = statusColor(status);
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={!onPress}
-      hitSlop={8}
-      accessibilityRole={onPress ? 'button' : undefined}
-      style={({ pressed }) => [s.badge, size === 'small' && s.badgeSmall, pressed && { opacity: 0.6 }]}
-    >
-      <Text style={[s.badgeText, { color }, size === 'small' && s.badgeTextSmall]}>{STATUS_LABELS[status]}</Text>
-      {onPress && <Ionicons name="chevron-down" size={11} color={Colors.textTertiary} />}
-    </Pressable>
-  );
+  return <StatusChip label={STATUS_LABELS[status]} muted={statusColor(status) !== Colors.text} size={size} onPress={onPress} />;
 }
 
-/** A row that adds something below it: a plus, a title, no chevron. */
-export function AddRow({ title, open, onPress, last }: { title: string; open: boolean; onPress: () => void; last?: boolean }) {
-  return (
-    <>
-      <Pressable
-        onPress={() => {
-          Haptics.selectionAsync();
-          onPress();
-        }}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]}
-      >
-        <Ionicons name={open ? 'remove-circle-outline' : 'add-circle'} size={22} color={open ? Colors.textTertiary : Colors.cloudyBlue} />
-        <Text style={[s.rowLabel, s.addTitle]}>{open ? 'Cancel' : title}</Text>
-      </Pressable>
-      {!last && <View style={s.separator} />}
-    </>
-  );
+/** "Booked", "3 options", "Needs a place": the stop card's chip, short enough for one line. */
+export function planChipShort(plan: AccommodationPlan): string {
+  if (!plan.needed) return 'No place needed';
+  switch (plan.status) {
+    case 'open':
+      return 'Needs a place';
+    case 'searching':
+      return 'Searching';
+    case 'options_available':
+    case 'deciding':
+      return plan.options.length === 1 ? '1 option' : `${plan.options.length} options`;
+    case 'selected':
+      return 'Picked';
+    case 'booked':
+      return 'Booked';
+    case 'checked_in':
+      return 'Checked in';
+    case 'completed':
+      return 'Stayed';
+    case 'cancelled':
+      return 'Cancelled';
+  }
 }
 
-/** "Booked · Loft in Tay Ho", "3 options", "Needs a place": the itinerary chip. */
+/** "Booked · Loft in Tay Ho", "3 options", "Needs a place": the same with the place's name, for the stop's sheet. */
 export function planChipText(plan: AccommodationPlan): string {
   if (!plan.needed) return 'No place needed';
   const primary = primaryOption(plan);
@@ -107,26 +93,6 @@ export function planChipText(plan: AccommodationPlan): string {
     case 'cancelled':
       return 'Cancelled';
   }
-}
-
-/** The requirements in two or three lines, for the collapsed card. */
-export function describeRequirements(req: AccommodationRequirements, plan: { check_in: string; check_out: string }): string[] {
-  const lines: string[] = [];
-  const nights = nightsBetween(plan.check_in, plan.check_out);
-  const head: string[] = [];
-  if (req.type) head.push(TYPE_LABELS[req.type]);
-  head.push(`${nights} ${nights === 1 ? 'night' : 'nights'}`);
-  const perNight = formatMoney(req.budget_per_night, req.currency);
-  const total = formatMoney(req.budget_total, req.currency);
-  if (perNight) head.push(`up to ${perNight}/night`);
-  else if (total) head.push(`up to ${total}`);
-  lines.push(head.join(' · '));
-  if (req.areas.length) lines.push(`In ${req.areas.join(', ')}`);
-  if (req.amenities.length) lines.push(req.amenities.map(amenityLabel).join(', '));
-  if (req.work_requirements) lines.push(`Work: ${req.work_requirements}`);
-  if (req.min_requirements) lines.push(req.min_requirements);
-  if (req.dates_flexible) lines.push('Dates are flexible');
-  return lines;
 }
 
 // ─── Drafts ──────────────────────────────────────────────────────────────────
@@ -350,21 +316,6 @@ export function parseRating(text: string, scale: 5 | 10): { rating: number | nul
 }
 
 const s = StyleSheet.create({
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    borderCurve: 'continuous',
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-    backgroundColor: Colors.surfaceSecondary,
-  },
-  badgeSmall: { paddingHorizontal: 8, paddingVertical: 3 },
-  badgeText: { ...Typography.label, fontWeight: '600' },
-  badgeTextSmall: { fontSize: 11 },
-
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -398,7 +349,4 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.08)',
     marginHorizontal: -20,
   },
-
-  addTitle: { flex: 1 },
-
 });

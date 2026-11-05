@@ -14,7 +14,7 @@
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 
-export type Operation = 'suggestStops' | 'cityTips' | 'extractTrips' | 'suggestActivities' | 'importActivityLink';
+export type Operation = 'suggestStops' | 'cityTips' | 'extractTrips' | 'suggestActivities' | 'importActivityLink' | 'readReceipt';
 
 /** Daily allowance per user. Vision is the expensive one, so it gets the least. */
 const DAILY_LIMIT: Record<Operation, number> = {
@@ -24,6 +24,8 @@ const DAILY_LIMIT: Record<Operation, number> = {
   suggestActivities: 40,
   // A fetch of someone else's page plus a model call, often with a picture.
   importActivityLink: 30,
+  // One picture each; a day of receipts is a few dozen at most.
+  readReceipt: 60,
 };
 
 /** Usage docs are only interesting for the day they cover. */

@@ -20,6 +20,7 @@ export type DocumentKind =
   | 'arrival'
   | 'booking'
   | 'insurance'
+  | 'receipt'
   | 'other';
 
 export const DOCUMENT_KINDS: {
@@ -32,14 +33,22 @@ export const DOCUMENT_KINDS: {
   icon: keyof typeof Ionicons.glyphMap;
   /** Accent for the kind pill on tiles, so a wallet scans by colour. */
   color: string;
+  /** Kept out of the wallet and its picker: the file belongs to something else (a receipt to its expense). */
+  hidden?: boolean;
 }[] = [
   { kind: 'ticket', label: 'Flight or train ticket', short: 'Ticket', plural: 'tickets', icon: 'airplane-outline', color: '#2F80ED' },
   { kind: 'visa', label: 'Visa or eVisa', short: 'Visa', plural: 'visas', icon: 'document-text-outline', color: '#27AE60' },
   { kind: 'arrival', label: 'Arrival card', short: 'Arrival card', plural: 'arrival cards', icon: 'card-outline', color: '#F2994A' },
   { kind: 'booking', label: 'Hotel or booking', short: 'Booking', plural: 'bookings', icon: 'bed-outline', color: '#9B51E0' },
   { kind: 'insurance', label: 'Insurance', short: 'Insurance', plural: 'insurances', icon: 'shield-checkmark-outline', color: '#0FA3B1' },
+  { kind: 'receipt', label: 'Receipt', short: 'Receipt', plural: 'receipts', icon: 'receipt-outline', color: '#8E8E93', hidden: true },
   { kind: 'other', label: 'Something else', short: 'Other', plural: 'others', icon: 'folder-outline', color: '#8E8E93' },
 ];
+
+/** The documents the wallet shows: receipts live with their expenses. */
+export function walletDocuments<T extends { kind: string }>(documents: T[]): T[] {
+  return documents.filter((d) => !kindMeta(d.kind).hidden);
+}
 
 /** "2 tickets · 1 visa · 1 booking", in the picker's order. */
 export function summarizeKinds(kinds: string[]): string {

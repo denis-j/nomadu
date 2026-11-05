@@ -1,13 +1,15 @@
 import { Stack } from 'expo-router/stack';
 import { sheetBackground, sheetWithHeader } from '../../../constants/colors';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 export default function TimelineStack() {
+  const { t } = useTranslation();
   return (
     <Stack>
       <Stack.Screen
         name="index"
         options={{
-          title: 'Timeline',
+          title: t('nav.timeline'),
           headerLargeTitle: true,
         }}
       />
@@ -24,7 +26,7 @@ export default function TimelineStack() {
         name="import"
         options={{
           presentation: sheetWithHeader,
-          title: 'Import Trips',
+          title: t('nav.importTrips'),
           sheetGrabberVisible: true,
           sheetAllowedDetents: [1.0],
           contentStyle: { backgroundColor: sheetBackground },

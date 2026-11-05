@@ -5,6 +5,7 @@ import { Appearance, LogBox, Platform } from 'react-native';
 import * as NativeSplash from 'expo-splash-screen';
 import SplashScreen from '../components/SplashScreen';
 import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
+import { LanguageProvider, useTranslation } from '../contexts/LanguageContext';
 import { SyncProvider } from '../contexts/SyncContext';
 import { useAuth } from '../hooks/useAuth';
 import { useSubscription } from '../hooks/useSubscription';
@@ -63,6 +64,7 @@ NativeSplash.setOptions({ fade: true, duration: 250 });
 Appearance.setColorScheme('light');
 
 function RootNavigator() {
+  const { t } = useTranslation();
   const { user, loading: authLoading } = useAuth();
   const { isPro, loading: subLoading, checkedFor: subCheckedFor } = useSubscription(user?.uid ?? null);
   const { onboardingDone } = useOnboarding();
@@ -168,7 +170,7 @@ function RootNavigator() {
       <Stack.Screen
         name="debug/badges"
         options={{
-          title: 'Badges (Debug)',
+          title: t('nav.badgeLibrary'),
           headerShown: true,
         }}
       />
@@ -183,7 +185,7 @@ function RootNavigator() {
       <Stack.Screen
         name="library/badges"
         options={{
-          title: 'Badge Library',
+          title: t('nav.badgeLibrary'),
           headerShown: true,
         }}
       />
@@ -243,16 +245,18 @@ export default function RootLayout() {
           while they are open; once none is left, Android fell back to white
           icons, invisible on the white tab screens (iOS defaults to dark). */}
       <StatusBar style="dark" />
-      {appReady && (
-        <OnboardingProvider>
-          <SyncProvider>
-            <RootNavigator />
-          </SyncProvider>
-        </OnboardingProvider>
-      )}
-      {showSplash && (
-        <SplashScreen ready={appReady} onDone={() => setShowSplash(false)} />
-      )}
+      <LanguageProvider>
+        {appReady && (
+          <OnboardingProvider>
+            <SyncProvider>
+              <RootNavigator />
+            </SyncProvider>
+          </OnboardingProvider>
+        )}
+        {showSplash && (
+          <SplashScreen ready={appReady} onDone={() => setShowSplash(false)} />
+        )}
+      </LanguageProvider>
       <UpdateBanner visible={isUpdatePending} onApply={applyUpdate} />
       <ToastContainer />
     </ErrorBoundary>

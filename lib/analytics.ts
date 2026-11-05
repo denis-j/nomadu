@@ -49,7 +49,8 @@ export type AnalyticsEvent =
   | { name: 'accommodation_option_added' }
   | { name: 'activity_added'; props: { source: string } }
   | { name: 'activity_link_imported'; props: { source: string; found: number } }
-  | { name: 'activity_suggestions_loaded' };
+  | { name: 'activity_suggestions_loaded' }
+  | { name: 'expense_added'; props: { source: 'quick' | 'form' | 'receipt' } };
 
 let client: PostHog | null = null;
 

@@ -24,6 +24,7 @@ import {
   OPTION_STAGGER,
 } from '../../constants/onboardingAnimation';
 import { track } from '../../lib/analytics';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -34,29 +35,18 @@ type ResidenceChoice = 'yes' | 'no' | null;
 interface Option {
   choice: 'yes' | 'no';
   icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  description: string;
 }
 
 const OPTIONS: Option[] = [
-  {
-    choice: 'yes',
-    icon: 'home',
-    title: 'Yes, I have a home base',
-    description: "You're tax resident in your home country regardless of travel.",
-  },
-  {
-    choice: 'no',
-    icon: 'airplane',
-    title: "No, I'm fully nomadic",
-    description: 'Track your home country too. 183 days could trigger tax residency.',
-  },
+  { choice: 'yes', icon: 'home' },
+  { choice: 'no', icon: 'airplane' },
 ];
 
 export default function ResidenceScreen() {
   const [selected, setSelected] = useState<ResidenceChoice>(null);
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   const handleSelect = (choice: ResidenceChoice) => {
     if (!choice) return;
@@ -78,9 +68,9 @@ export default function ResidenceScreen() {
             entering={FadeIn.delay(TITLE_DELAY).duration(ENTER_DURATION)}
             style={styles.header}
           >
-            <Text style={styles.title}>Fixed residence?</Text>
+            <Text style={styles.title}>{t('onboarding.residence.title')}</Text>
             <Text style={styles.subtitle}>
-              Whether you keep a permanent home shapes how we track your tax residence.
+              {t('onboarding.residence.subtitle')}
             </Text>
           </Animated.View>
 
@@ -103,8 +93,8 @@ export default function ResidenceScreen() {
                       <Ionicons name={opt.icon} size={24} color={Colors.cloudyButtonText} />
                     </View>
                     <View style={styles.optionTextWrap}>
-                      <Text style={styles.optionTitle}>{opt.title}</Text>
-                      <Text style={styles.optionDescription}>{opt.description}</Text>
+                      <Text style={styles.optionTitle}>{t(`onboarding.residence.${opt.choice}.title`)}</Text>
+                      <Text style={styles.optionDescription}>{t(`onboarding.residence.${opt.choice}.description`)}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
                   </Glass>
@@ -117,7 +107,7 @@ export default function ResidenceScreen() {
             entering={FadeIn.delay(OPTION_BASE_DELAY + 2 * OPTION_STAGGER + 80).duration(ENTER_DURATION)}
             style={styles.footer}
           >
-            <Text style={styles.footerText}>You can change this anytime in Settings.</Text>
+            <Text style={styles.footerText}>{t('onboarding.residence.footer')}</Text>
           </Animated.View>
         </View>
       </SafeAreaView>

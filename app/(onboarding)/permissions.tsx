@@ -25,6 +25,7 @@ import { Typography } from '../../constants/typography';
 import { requestLocationPermissions } from '../../lib/location';
 import { requestNotificationPermissions } from '../../lib/notifications';
 import { track } from '../../lib/analytics';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 
 // Minimum visible loading time on the permissions screen before we hand off
@@ -35,6 +36,7 @@ const MIN_HOLD_MS = 800;
 export default function PermissionsScreen() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { t } = useTranslation();
 
   const goNextAfterHold = async (started: number) => {
     const elapsed = Date.now() - started;
@@ -86,9 +88,9 @@ export default function PermissionsScreen() {
             entering={FadeIn.delay(TITLE_DELAY).duration(ENTER_DURATION)}
             style={styles.textContainer}
           >
-            <Text style={styles.title}>Track your journey</Text>
+            <Text style={styles.title}>{t('onboarding.permissions.title')}</Text>
             <Text style={styles.description}>
-              Nomadu quietly logs every city and country you visit. No setup, no friction.
+              {t('onboarding.permissions.description')}
             </Text>
           </Animated.View>
 
@@ -107,13 +109,13 @@ export default function PermissionsScreen() {
               ) : (
                 <View style={styles.enableInnerRow}>
                   <Ionicons name="location" size={20} color={Colors.cloudyButtonText} />
-                  <Text style={styles.enableButtonText}>Enable Location</Text>
+                  <Text style={styles.enableButtonText}>{t('onboarding.permissions.enable')}</Text>
                 </View>
               )}
             </CloudyButton>
 
             <TouchableOpacity onPress={handleSkip} disabled={loading} hitSlop={8}>
-              <Text style={styles.skipText}>{"I'll set this up later"}</Text>
+              <Text style={styles.skipText}>{t('onboarding.permissions.skip')}</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>

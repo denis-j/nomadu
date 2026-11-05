@@ -24,6 +24,7 @@ import {
   OPTION_STAGGER,
 } from '../../constants/onboardingAnimation';
 import { track } from '../../lib/analytics';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -32,35 +33,19 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 interface Option {
   goal: OnboardingGoal;
   icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  description: string;
 }
 
 const OPTIONS: Option[] = [
-  {
-    goal: 'tax',
-    icon: 'shield-checkmark',
-    title: 'Avoid tax residency traps',
-    description: 'See how close you are to 183 days in each country.',
-  },
-  {
-    goal: 'visa',
-    icon: 'airplane',
-    title: 'Track visa limits easily',
-    description: 'Keep an eye on Schengen 90/180, ESTA and visa-free days.',
-  },
-  {
-    goal: 'history',
-    icon: 'map',
-    title: 'Build a travel history',
-    description: 'A clean map of every country and city you have ever lived in.',
-  },
+  { goal: 'tax', icon: 'shield-checkmark' },
+  { goal: 'visa', icon: 'airplane' },
+  { goal: 'history', icon: 'map' },
 ];
 
 export default function GoalScreen() {
   const [selected, setSelected] = useState<OnboardingGoal | null>(null);
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   const handleSelect = (goal: OnboardingGoal) => {
     if (selected) return;
@@ -82,8 +67,8 @@ export default function GoalScreen() {
             entering={FadeIn.delay(TITLE_DELAY).duration(ENTER_DURATION)}
             style={styles.header}
           >
-            <Text style={styles.title}>What brings you here?</Text>
-            <Text style={styles.subtitle}>Pick what fits you best.</Text>
+            <Text style={styles.title}>{t('onboarding.goal.title')}</Text>
+            <Text style={styles.subtitle}>{t('onboarding.goal.subtitle')}</Text>
           </Animated.View>
 
           <View style={styles.options}>
@@ -105,8 +90,8 @@ export default function GoalScreen() {
                       <Ionicons name={opt.icon} size={24} color={Colors.cloudyButtonText} />
                     </View>
                     <View style={styles.optionTextWrap}>
-                      <Text style={styles.optionTitle}>{opt.title}</Text>
-                      <Text style={styles.optionDescription}>{opt.description}</Text>
+                      <Text style={styles.optionTitle}>{t(`onboarding.goal.${opt.goal}.title`)}</Text>
+                      <Text style={styles.optionDescription}>{t(`onboarding.goal.${opt.goal}.description`)}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
                   </Glass>
@@ -119,7 +104,7 @@ export default function GoalScreen() {
             entering={FadeIn.delay(OPTION_BASE_DELAY + 3 * OPTION_STAGGER + 80).duration(ENTER_DURATION)}
             style={styles.footer}
           >
-            <Text style={styles.footerText}>Every feature stays available, whatever you pick.</Text>
+            <Text style={styles.footerText}>{t('onboarding.goal.footer')}</Text>
           </Animated.View>
         </View>
       </SafeAreaView>

@@ -25,6 +25,7 @@ import { parseDate, type Journey } from '../../../lib/database';
 import { deleteJourneyWithDocuments } from '../../../lib/documents';
 import { inviteFriends, leaveTrip, stopSharing } from '../../../lib/shareActions';
 import { Flag } from '../../../components/Flag';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
 
@@ -71,6 +72,7 @@ function JourneyCard({
   onChanged: () => void;
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   // Parse unique country codes
   let countryCodes: string[] = [];
@@ -87,16 +89,18 @@ function JourneyCard({
   const dateRange =
     hasLegs && journey.first_start && journey.last_end
       ? fmtRange(journey.first_start, journey.last_end)
-      : 'No dates yet';
+      : t('plans.noDates');
 
   const totalDays =
     hasLegs && journey.first_start && journey.last_end
       ? computeTotalDays(journey.first_start, journey.last_end)
       : null;
 
-  const stopLabel = journey.leg_count === 1 ? 'stop' : 'stops';
+  const stopLabel = journey.leg_count === 1 ? t('plans.stopSingular') : t('plans.stopPlural');
   const followed = !!journey.shared_owner_uid;
-  const meta = totalDays !== null ? `${journey.leg_count} ${stopLabel} · ${totalDays} days` : `${journey.leg_count} ${stopLabel}`;
+  const meta = totalDays !== null
+    ? t('plans.metaWithDays', { count: journey.leg_count, label: stopLabel, days: totalDays })
+    : t('plans.metaStops', { count: journey.leg_count, label: stopLabel });
 
   // Who is on it, as faces where the word "shared" used to be. Only on a
   // trip that is actually shared: on one's own trip the single face would
@@ -110,12 +114,12 @@ function JourneyCard({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (followed) {
       ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Leave trip', 'Cancel'], destructiveButtonIndex: 0, cancelButtonIndex: 1, title: journey.title },
+        { options: [t('plans.leaveTrip'), t('common.cancel')], destructiveButtonIndex: 0, cancelButtonIndex: 1, title: journey.title },
         (i) => { if (i === 0) leaveTrip(journey).then(onChanged); },
       );
       return;
     }
-    const options = ['Invite friends', ...(journey.share_code ? ['Stop sharing'] : []), 'Delete trip', 'Cancel'];
+    const options = [t('plans.inviteFriends'), ...(journey.share_code ? [t('plans.stopSharing')] : []), t('plans.deleteTrip'), t('common.cancel')];
     ActionSheetIOS.showActionSheetWithOptions(
       { options, destructiveButtonIndex: options.length - 2, cancelButtonIndex: options.length - 1, title: journey.title },
       (i) => {
@@ -124,9 +128,9 @@ function JourneyCard({
         // Same question as on the trip screen: stops and documents go with
         // it, and there is no undo.
         else if (i === options.length - 2) {
-          Alert.alert('Delete this trip?', 'Stops and documents go with it.', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Delete', style: 'destructive', onPress: () => onDelete(journey.id) },
+          Alert.alert(t('plans.deleteTripTitle'), t('plans.deleteTripBody'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('common.delete'), style: 'destructive', onPress: () => onDelete(journey.id) },
           ]);
         }
       },
@@ -188,6 +192,7 @@ function JourneyCard({
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function JourneysScreen() {
+  const { t } = useTranslation();
   const { journeys, loading, refresh } = useJourneys();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
@@ -214,7 +219,7 @@ export default function JourneysScreen() {
 
   const headerRight = useCallback(
     () => (
-      <Pressable onPress={openNewSheet} hitSlop={8} accessibilityRole="button" accessibilityLabel="Add trip">
+      <Pressable onPress={openNewSheet} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('plans.addTrip')}>
         <Ionicons name="add" size={28} color={Colors.primary} />
       </Pressable>
     ),
@@ -227,7 +232,7 @@ export default function JourneysScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Plan Trips', headerRight }}></Stack.Screen>
+      <Stack.Screen options={{ title: t('nav.planTrips'), headerRight }}></Stack.Screen>
 
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
@@ -237,8 +242,8 @@ export default function JourneysScreen() {
         {!loading && journeys.length === 0 ? (
           <View style={styles.inlineEmpty}>
             <Text style={styles.inlineEmptyIcon}>🗺️</Text>
-            <Text style={styles.inlineEmptyTitle}>No journeys yet</Text>
-            <Text style={styles.inlineEmptySub}>Plan your next adventure. Tap + to create one.</Text>
+            <Text style={styles.inlineEmptyTitle}>{t('plans.noJourneysTitle')}</Text>
+            <Text style={styles.inlineEmptySub}>{t('plans.noJourneysSub')}</Text>
           </View>
         ) : (
           journeys.map((j) => (
@@ -260,8 +265,8 @@ export default function JourneysScreen() {
 
           {/* ── Destination guides ── */}
           <View style={styles.featSection}>
-            <Text style={styles.featSectionTitle}>Destination Guides</Text>
-            <Text style={styles.featSectionSub}>What to know before you go</Text>
+            <Text style={styles.featSectionTitle}>{t('plans.destinationGuides')}</Text>
+            <Text style={styles.featSectionSub}>{t('plans.guidesSub')}</Text>
           </View>
           <ScrollView
             horizontal

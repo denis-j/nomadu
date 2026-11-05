@@ -1,5 +1,13 @@
 import type Ionicons from '@expo/vector-icons/Ionicons';
-import { ACTIVITY_CATEGORY_ICONS, type ActivityCategory, type ActivitySource } from '../../lib/activityModel';
+import type { DropdownOption } from '../Dropdown';
+import {
+  ACTIVITY_CATEGORY_ICONS,
+  ACTIVITY_STATUSES,
+  ACTIVITY_STATUS_LABELS,
+  type ActivityCategory,
+  type ActivitySource,
+  type ActivityStatus,
+} from '../../lib/activityModel';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -8,7 +16,7 @@ export function categoryIcon(category: ActivityCategory): IconName {
   return ACTIVITY_CATEGORY_ICONS[category] as IconName;
 }
 
-/** The platform an activity was saved from, as a small mark on its card. */
+/** The platform an activity was saved from, as a small mark on its row. */
 export const SOURCE_MARK: Partial<Record<ActivitySource, { icon: IconName; label: string }>> = {
   tiktok: { icon: 'logo-tiktok', label: 'TikTok' },
   instagram: { icon: 'logo-instagram', label: 'Instagram' },
@@ -17,3 +25,17 @@ export const SOURCE_MARK: Partial<Record<ActivitySource, { icon: IconName; label
   agent: { icon: 'hardware-chip-outline', label: 'Your agent' },
   link: { icon: 'link', label: 'Link' },
 };
+
+/** The status menu, the same on the list and on the sheet. SF Symbols, for the system menu. */
+const STATUS_SYMBOL: Record<ActivityStatus, string> = {
+  idea: 'lightbulb',
+  planned: 'calendar',
+  booked: 'ticket',
+  done: 'checkmark.circle',
+};
+
+export const STATUS_OPTIONS: DropdownOption[] = ACTIVITY_STATUSES.map((s) => ({
+  id: s,
+  label: ACTIVITY_STATUS_LABELS[s],
+  icon: STATUS_SYMBOL[s],
+}));

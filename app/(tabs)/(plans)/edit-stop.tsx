@@ -19,6 +19,7 @@ import { updateJourneyLeg, parseDate, type TransportType } from '../../../lib/da
 import { cityCoords } from '../../../lib/geocoding';
 import { getCountryCode } from '../../../utils/geography';
 import { showToast } from '../../../lib/toast';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 type Params = {
   legId: string;
@@ -40,6 +41,7 @@ const RANGE_COLOR = '#000000';
 const RANGE_BG = 'rgba(0,0,0,0.08)';
 
 export default function EditStopScreen() {
+  const { t } = useTranslation();
   const nav = useNavigation();
   const params = useLocalSearchParams<Params>();
   const complete = !!params.start && !!params.end && !!params.legId;
@@ -135,22 +137,22 @@ export default function EditStopScreen() {
       );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       nav.goBack();
-      showToast('Stop updated');
+      showToast(t('plans.stopUpdated'));
     } catch (err) {
       console.error('Failed to update leg:', err);
       setSaving(false);
     }
   }, [params, startDate, endDate, transport, notes, nav]);
 
-  if (!complete) return <MissingRoute title="Edit Stop" message="This stop is no longer here." />;
+  if (!complete) return <MissingRoute title={t('nav.editStop')} message={t('plans.stopGone')} />;
 
   return (
     <>
       <Stack.Screen
         options={{
-          title: 'Edit Stop',
+          title: t('nav.editStop'),
           headerRight: () => (
-            <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel="Save stop">
+            <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel={t('plans.saveStop')}>
               <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
             </Pressable>
           ),
@@ -164,11 +166,11 @@ export default function EditStopScreen() {
         <StopSummary city={params.city} country={params.country} start={startDate} end={endDate} />
 
         {/* Calendar */}
-        <Text style={styles.sectionTitle}>Dates</Text>
+        <Text style={styles.sectionTitle}>{t('plans.dates')}</Text>
         <Text style={styles.hint}>
           {lockStart
-            ? 'Start is set by the previous stop. Tap the last day.'
-            : pickingEnd ? 'Tap end date' : 'Tap start date'}
+            ? t('plans.startSetByPrev')
+            : pickingEnd ? t('plans.tapEndDate') : t('plans.tapStartDate')}
         </Text>
         <View style={styles.calendarCard}>
           <Calendar
@@ -189,15 +191,15 @@ export default function EditStopScreen() {
         </View>
 
         {/* Transport */}
-        <Text style={styles.sectionTitle}>Transport</Text>
+        <Text style={styles.sectionTitle}>{t('plans.transport')}</Text>
         <TransportPicker value={transport} onChange={setTransport} />
 
         {/* Notes */}
-        <Text style={styles.sectionTitle}>Notes</Text>
+        <Text style={styles.sectionTitle}>{t('plans.notes')}</Text>
         <View style={styles.inputCard}>
           <TextInput
             style={styles.notesInput}
-            placeholder="Add notes about this stop…"
+            placeholder={t('plans.stopNotesPlaceholder')}
             placeholderTextColor={systemColor('tertiaryLabel') as any}
             value={notes}
             onChangeText={setNotes}

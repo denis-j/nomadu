@@ -10,6 +10,7 @@ import { Typography } from '../../../constants/typography';
 import { guideById, guideDays } from '../../../constants/guides';
 import { parseDate } from '../../../lib/database';
 import { createTripFromGuide } from '../../../lib/guides';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const human = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -25,6 +26,7 @@ const RANGE_BG = 'rgba(0,0,0,0.08)';
  * is created.
  */
 export default function GuideStartScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const guide = guideById(id);
@@ -72,15 +74,15 @@ export default function GuideStartScreen() {
     }
   };
 
-  if (!guide) return <Stack.Screen options={{ title: 'Start date' }} />;
+  if (!guide) return <Stack.Screen options={{ title: t('nav.startDate') }} />;
 
   return (
     <>
       <Stack.Screen
         options={{
-          title: 'Start date',
+          title: t('nav.startDate'),
           headerRight: () => (
-            <Pressable onPress={create} disabled={busy} hitSlop={8} style={{ opacity: busy ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel="Create trip">
+            <Pressable onPress={create} disabled={busy} hitSlop={8} style={{ opacity: busy ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel={t('plans.createTrip')}>
               <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
             </Pressable>
           ),
@@ -90,11 +92,11 @@ export default function GuideStartScreen() {
         <View style={styles.head}>
           <Text style={styles.place}>{guide.country}</Text>
           <Text style={styles.span}>
-            {human(start)} – {human(end)} · {days} {days === 1 ? 'day' : 'days'}
+            {human(start)} – {human(end)} · {days} {days === 1 ? t('plans.day') : t('plans.days')}
           </Text>
         </View>
 
-        <SectionLabel>First day</SectionLabel>
+        <SectionLabel>{t('plans.firstDay')}</SectionLabel>
         <Card>
           <Calendar
             current={fmt(start)}

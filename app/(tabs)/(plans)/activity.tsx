@@ -5,17 +5,16 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { PlaceMap } from '../../../components/activities/PlaceMap';
-import { SOURCE_MARK, categoryIcon } from '../../../components/activities/visuals';
-import { TextArea, TextRow } from '../../../components/accommodationForm';
-import { Card, SectionLabel } from '../../../components/visaForm';
-import { DetailCard, DetailRow, DetailSeparator, LinkCard } from '../../../components/SheetRows';
+import { SOURCE_MARK, STATUS_OPTIONS, categoryIcon } from '../../../components/activities/visuals';
+import { SectionLabel } from '../../../components/visaForm';
+import { DetailCard, DetailNotes, DetailRow, DetailSeparator, LinkCard } from '../../../components/SheetRows';
+import { StatRow, StatTile } from '../../../components/StatTile';
 import { Dropdown } from '../../../components/Dropdown';
 import { MissingRoute } from '../../../components/MissingRoute';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
-import { deleteActivity, getActivity, moveActivity, updateActivity, type LocalActivity } from '../../../lib/activities';
-import { ACTIVITY_CATEGORIES, ACTIVITY_CATEGORY_LABELS, type ActivityCategory } from '../../../lib/activityModel';
-import { formatMoney } from '../../../lib/accommodationModel';
+import { deleteActivity, getActivity, moveActivity, setActivityStatus, type LocalActivity } from '../../../lib/activities';
+import { ACTIVITY_CATEGORY_LABELS, ACTIVITY_STATUS_LABELS, type ActivityStatus } from '../../../lib/activityModel';
 import { getJourneyWithLegs, parseDate, type JourneyLeg } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
 
@@ -38,10 +37,10 @@ function mapsUrl(a: LocalActivity, city: string | undefined): string {
 }
 
 /**
- * One thing to do, built like a stop's sheet: the picture or the map on
- * top with a glass plate, the name centred under it, a card of facts, the
- * ways out as the same cards that lead to a stop's stay, and the plain
- * words at the end.
+ * One thing to do, built exactly like a stop's sheet: the picture or the
+ * map on top with a glass plate, the name centred under it, three tiles
+ * (the status is a menu), a card of facts, the ways out, and the plain
+ * words at the end. Nothing is edited here; "Edit" opens the form.
  */
 export default function ActivitySheet() {
   const params = useLocalSearchParams<Params>();
@@ -49,7 +48,6 @@ export default function ActivitySheet() {
   const readOnly = params.readOnly === '1';
   const [a, setA] = useState<LocalActivity | null | undefined>(undefined);
   const [legs, setLegs] = useState<JourneyLeg[]>([]);
-  const [editing, setEditing] = useState(false);
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(() => {
@@ -72,11 +70,20 @@ export default function ActivitySheet() {
 
   const mark = SOURCE_MARK[a.source];
   const stop = legs.find((l) => l.sync_id === a.stop_id) ?? null;
-  const price = formatMoney(a.price, a.currency);
   const picture = !!a.image_url && !failed;
   const located = a.latitude !== null && a.longitude !== null;
-  const set = (patch: Record<string, unknown>) => apply(() => updateActivity(a.id, patch));
   const where = [a.place && a.place !== a.title ? a.place : null, stop?.city].filter(Boolean).join(', ');
+  const stopValue = stop ? `${stop.city}, ${fmtShort(stop.start_date)} – ${fmtShort(stop.end_date)}` : 'Not placed yet';
+  const website = a.url ? a.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '') : null;
+
+  const edit = () => {
+    // Swap the sheet for the form in one go, as the stop sheet does: a
+    // sheet pushed over a sheet that is still dismissing gets reshuffled.
+    router.replace({
+      pathname: '/(tabs)/(plans)/activity-add',
+      params: { mode: 'manual', id: a.id, journeyId: params.journeyId, journeySyncId: a.journey_id },
+    });
+  };
 
   const remove = () => {
     Alert.alert(`Delete ${a.title}?`, undefined, [
@@ -94,12 +101,10 @@ export default function ActivitySheet() {
     ]);
   };
 
-  const stopValue = stop ? `${stop.city}, ${fmtShort(stop.start_date)} – ${fmtShort(stop.end_date)}` : 'Not placed yet';
-
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+      <ScrollView contentContainerStyle={styles.content}>
         {/* Hero, as on a stop: the post's picture or the place on the map. */}
         {picture || located ? (
           <View style={[styles.hero, picture && styles.heroTall]}>
@@ -119,11 +124,26 @@ export default function ActivitySheet() {
           {where ? <Text style={styles.where}>{where}</Text> : null}
         </View>
 
+        {/* Three facts, the status one a menu. */}
+        <StatRow style={styles.statsRow}>
+          <StatTile
+            label="Status"
+            value={ACTIVITY_STATUS_LABELS[a.status]}
+            options={readOnly ? undefined : STATUS_OPTIONS}
+            menuValue={a.status}
+            onPick={readOnly ? undefined : (id) => apply(() => setActivityStatus(a.id, id as ActivityStatus))}
+          />
+          <StatTile label="Kind" value={ACTIVITY_CATEGORY_LABELS[a.category]} icon={categoryIcon(a.category)} />
+          {a.price !== null && a.currency ? (
+            <StatTile label="Price" value={a.price === 0 ? 'Free' : String(a.price)} unit={a.price === 0 ? undefined : a.currency} />
+          ) : (
+            <StatTile label="Stop" value={stop?.city ?? 'Not placed'} />
+          )}
+        </StatRow>
+
         <View style={styles.section}>
           <SectionLabel>Details</SectionLabel>
           <DetailCard>
-            <DetailRow icon={categoryIcon(a.category)} label="Kind" value={ACTIVITY_CATEGORY_LABELS[a.category]} />
-            <DetailSeparator />
             {readOnly ? (
               <DetailRow icon="location-outline" label="Stop" value={stopValue} />
             ) : (
@@ -155,22 +175,16 @@ export default function ActivitySheet() {
                 <DetailRow icon="map-outline" label="Address" value={a.address} />
               </>
             ) : null}
-            {price ? (
+            {mark ? (
               <>
                 <DetailSeparator />
-                <DetailRow icon="cash-outline" label="Price" value={price} />
+                <DetailRow icon={mark.icon} label="From" value={mark.label} />
               </>
             ) : null}
             {a.notes ? (
               <>
                 <DetailSeparator />
-                <View style={styles.notesRow}>
-                  <View style={styles.notesLabel}>
-                    <Ionicons name="create-outline" size={18} color={Colors.textTertiary} />
-                    <Text style={styles.notesLabelText}>Notes</Text>
-                  </View>
-                  <Text selectable style={styles.notesText}>{a.notes}</Text>
-                </View>
+                <DetailNotes text={a.notes} />
               </>
             ) : null}
           </DetailCard>
@@ -179,50 +193,19 @@ export default function ActivitySheet() {
         {/* Ways out, the same cards a stop leads to its stay with. */}
         <View style={styles.section}>
           <LinkCard icon="navigate-outline" title="Directions" sub={a.place ?? a.address ?? stop?.city ?? 'Open in Maps'} onPress={() => Linking.openURL(mapsUrl(a, stop?.city))} />
-        </View>
-        {a.source_url && mark ? (
-          <View style={styles.section}>
+          {a.source_url && mark ? (
             <LinkCard icon={mark.icon} title={`Open on ${mark.label}`} sub="The post it came from" onPress={() => Linking.openURL(a.source_url!)} />
-          </View>
-        ) : null}
-        {a.url ? (
-          <View style={styles.section}>
-            <LinkCard icon="globe-outline" title="Website" sub={a.url.replace(/^https?:\/\/(www\.)?/, '')} onPress={() => Linking.openURL(a.url!)} />
-          </View>
-        ) : null}
-
-        {!readOnly && editing ? (
-          <View style={styles.section}>
-            <SectionLabel>Edit</SectionLabel>
-            <Card>
-              <TextRow label="Title" value={a.title} onCommit={(v) => set({ title: v })} autoCapitalize="sentences" />
-              <View style={styles.kindRow}>
-                <Text style={styles.kindLabel}>Kind</Text>
-                <Dropdown
-                  right
-                  value={a.category}
-                  options={ACTIVITY_CATEGORIES.map((c) => ({ id: c, label: ACTIVITY_CATEGORY_LABELS[c] }))}
-                  onPick={(id) => set({ category: id as ActivityCategory })}
-                >
-                  <View style={styles.pick}>
-                    <Text style={styles.pickText}>{ACTIVITY_CATEGORY_LABELS[a.category]}</Text>
-                    <Ionicons name="chevron-expand" size={14} color={Colors.textTertiary} />
-                  </View>
-                </Dropdown>
-              </View>
-              <TextRow label="Place" value={a.place ?? ''} onCommit={(v) => set({ place: v || null, latitude: null, longitude: null })} autoCapitalize="words" />
-              <TextRow label="Address" value={a.address ?? ''} onCommit={(v) => set({ address: v || null, latitude: null, longitude: null })} />
-              <TextRow label="Website" value={a.url ?? ''} onCommit={(v) => set({ url: v || null })} placeholder="https://" keyboardType="url" autoCapitalize="none" />
-              <TextArea value={a.notes ?? ''} onCommit={(v) => set({ notes: v.trim() || null })} placeholder="Notes" last />
-            </Card>
-          </View>
-        ) : null}
+          ) : null}
+          {a.url ? (
+            <LinkCard icon="globe-outline" title="Website" sub={website ?? undefined} onPress={() => Linking.openURL(a.url!)} />
+          ) : null}
+        </View>
 
         {/* Actions, as on a stop: plain words at the end. */}
         {!readOnly && (
           <View style={styles.actions}>
-            <TouchableOpacity onPress={() => setEditing(!editing)} activeOpacity={0.5}>
-              <Text style={styles.editText}>{editing ? 'Done' : 'Edit'}</Text>
+            <TouchableOpacity onPress={edit} activeOpacity={0.5}>
+              <Text style={styles.editText}>Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={remove} activeOpacity={0.5}>
               <Text style={styles.deleteText}>Delete</Text>
@@ -246,7 +229,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     backgroundColor: Colors.surfaceSecondary,
   },
-  heroTall: { height: 320 },
+  heroTall: { height: 300 },
   heroPlate: {
     position: 'absolute',
     bottom: 12,
@@ -261,15 +244,10 @@ const styles = StyleSheet.create({
   headerAlone: { paddingTop: 32 },
   title: { ...Typography.displayMedium, fontSize: 26, fontWeight: '700', textAlign: 'center' },
   where: { ...Typography.titleSmall, fontWeight: '400', color: Colors.textSecondary, marginTop: 2, textAlign: 'center' },
+  statsRow: { marginHorizontal: 16, marginTop: 20 },
   section: { marginHorizontal: 16, marginTop: 16, gap: 10 },
   pick: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
   pickText: { ...Typography.bodySmall, fontSize: 14, fontWeight: '500', flexShrink: 1 },
-  notesRow: { gap: 8 },
-  notesLabel: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  notesLabelText: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary },
-  notesText: { ...Typography.bodySmall, fontSize: 14, lineHeight: 20 },
-  kindRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
-  kindLabel: { ...Typography.titleSmall, fontWeight: '500' },
   actions: { flexDirection: 'row', justifyContent: 'center', gap: 32, marginHorizontal: 16, marginTop: 24, paddingVertical: 14 },
   editText: { ...Typography.bodyMedium, fontWeight: '600' },
   deleteText: { ...Typography.bodyMedium, color: Colors.error },

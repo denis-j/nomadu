@@ -132,7 +132,7 @@ export default function AgentAccessScreen() {
         <View style={styles.separator} />
         <Can icon="shield-checkmark-outline" title="Check visa and tax standing" text="Days allowed, used and left per destination, and your tax exposure per country." />
         <View style={styles.separator} />
-        <Can icon="map-outline" title="Plan trips" text="Read, create, change and delete your plans. They show up in Plan after the next sync." />
+        <Can icon="map-outline" title="Plan trips" text="Read, create, change and delete your plans, the places to stay at each stop, the things to do there, and the trip's expenses. They show up in Plan after the next sync." />
         <View style={styles.separator} />
         <Can icon="create-outline" title="Fix your timeline, if you allow it" text="Add a stay the tracker missed, correct dates, remove a wrong one. You choose this when connecting." />
         <View style={styles.separator} />

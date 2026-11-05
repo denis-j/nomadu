@@ -130,3 +130,16 @@ export function extractJsonArray(raw: string): unknown[] | null {
     return null;
   }
 }
+
+/** The same for a single JSON object, for prompts that ask for one record. */
+export function extractJsonObject(raw: string): Record<string, unknown> | null {
+  const cleaned = raw.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '').trim();
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[0]);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}

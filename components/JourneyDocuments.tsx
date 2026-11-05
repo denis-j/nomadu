@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import type { JourneyDocument, JourneyTraveller } from '../lib/database';
-import { summarizeKinds } from '../lib/documents';
+import { summarizeKinds, walletDocuments } from '../lib/documents';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -23,13 +23,14 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
  */
 export function DocumentsEntryCard({
   journeyId,
-  documents,
+  documents: allDocuments,
   travellers,
 }: {
   journeyId: number;
   documents: JourneyDocument[];
   travellers: JourneyTraveller[];
 }) {
+  const documents = walletDocuments(allDocuments);
   const open = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push({ pathname: '/(tabs)/(plans)/documents', params: { journeyId: String(journeyId) } });

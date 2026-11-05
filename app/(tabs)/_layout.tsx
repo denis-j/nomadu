@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNotificationCheck } from '../../hooks/useNotificationCheck';
 import { requestNotificationPermissions } from '../../lib/notifications';
 import { consumePendingInvite } from '../../lib/sharing';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const { Trigger } = NativeTabs;
 
@@ -13,6 +14,7 @@ const NOTIF_ASKED_KEY = 'notif_permission_asked';
 export default function TabLayout() {
   useNotificationCheck();
   const router = useRouter();
+  const { t } = useTranslation();
 
   // An invite link opened while signed out was parked; now that the tabs
   // are up, the user is signed in, so bring the invite back.
@@ -49,23 +51,23 @@ export default function TabLayout() {
     <NativeTabs minimizeBehavior="onScrollDown" iconColor={{ default: '#00000066', selected: '#000000' }} tintColor="#000000">
       <Trigger name="(map)">
         <Trigger.Icon sf={{ default: 'map', selected: 'map.fill' }} md="map" />
-        <Trigger.Label>Map</Trigger.Label>
+        <Trigger.Label>{t('tabs.map')}</Trigger.Label>
       </Trigger>
       <Trigger name="(timeline)">
         <Trigger.Icon sf={{ default: 'clock', selected: 'clock.fill' }} md="schedule" />
-        <Trigger.Label>Timeline</Trigger.Label>
+        <Trigger.Label>{t('tabs.timeline')}</Trigger.Label>
       </Trigger>
       <Trigger name="(plans)">
         <Trigger.Icon sf={{ default: '1.calendar', selected: '31.calendar' }} md="calendar_month" />
-        <Trigger.Label>Plan</Trigger.Label>
+        <Trigger.Label>{t('tabs.plan')}</Trigger.Label>
       </Trigger>
       <Trigger name="(stats)">
         <Trigger.Icon sf={{ default: 'chart.bar', selected: 'chart.bar.fill' }} md="bar_chart" />
-        <Trigger.Label>Tracking</Trigger.Label>
+        <Trigger.Label>{t('tabs.tracking')}</Trigger.Label>
       </Trigger>
       <Trigger name="(settings)">
         <Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill'}} md="settings" />
-        <Trigger.Label>Settings</Trigger.Label>
+        <Trigger.Label>{t('tabs.settings')}</Trigger.Label>
       </Trigger>
     </NativeTabs>
   );
