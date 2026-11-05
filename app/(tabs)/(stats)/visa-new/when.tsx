@@ -82,8 +82,8 @@ export default function AddVisaWhenScreen() {
       >
         <VisaSummary
           country={{ name: params.name, code: params.code }}
-          ruleSummary={describeStaySummary(stay)}
-          span={expiryBadge(validTo)}
+          ruleSummary={describeStaySummary(stay, t)}
+          span={expiryBadge(validTo, t)}
         />
 
         <ValidityPicker

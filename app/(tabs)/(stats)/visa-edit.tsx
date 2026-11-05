@@ -179,8 +179,8 @@ export default function EditVisaScreen() {
       >
         <VisaSummary
           country={country}
-          ruleSummary={stay ? stayRuleLabel(label, stay) : label.trim() || t('visaForm.visa')}
-          span={expiryBadge(validTo)}
+          ruleSummary={stay ? stayRuleLabel(label, stay, t) : label.trim() || t('visaForm.visa')}
+          span={expiryBadge(validTo, t)}
         />
 
         <SectionLabel>{t('visaForm.visa')}</SectionLabel>

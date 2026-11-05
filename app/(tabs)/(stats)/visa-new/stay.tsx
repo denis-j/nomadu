@@ -115,7 +115,7 @@ export default function AddVisaStayScreen() {
             <Text style={styles.ctaText}>{t('common.continue')}</Text>
           </CloudyButton>
           <Text style={styles.echo}>
-            {choice ? describeStay(choice) : t('visaForm.pickHowLong')}
+            {choice ? describeStay(choice, t) : t('visaForm.pickHowLong')}
           </Text>
         </View>
       </ScrollView>

@@ -10,6 +10,9 @@ import { Colors, systemColor } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { NO_EXPIRY, hasNoExpiry, type EntriesAllowed } from '../lib/userVisas';
 import { formatDay } from '../lib/days';
+import { useTranslation } from '../contexts/LanguageContext';
+
+type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
 /**
  * The pieces the visa form is built from.
@@ -47,10 +50,7 @@ const formatHuman = formatDay;
  * "Valid" matters: next to "max 30d/stay" a bare "1 year" reads as a
  * contradiction, when the two answer different questions.
  */
-const ENTRY_HINT: Record<EntriesAllowed, string> = {
-  multiple: 'You can leave and come back as often as you like while the visa is valid.',
-  single: 'Used up as soon as you leave the country. A new entry needs a new visa.',
-};
+
 
 // ─── Stay rules, in sentences ───────────────────────────────────────────────
 
@@ -66,10 +66,10 @@ export type StayChoice =
   | { kind: 'per_stay'; days: number }
   | { kind: 'rolling'; days: number; window: number };
 
-export function describeStay(choice: StayChoice): string {
-  if (choice.kind === 'none') return 'No day limit';
-  if (choice.kind === 'per_stay') return `${choice.days} days each time you enter`;
-  return `${choice.days} days in any ${choice.window}`;
+export function describeStay(choice: StayChoice, t: TFunc): string {
+  if (choice.kind === 'none') return t('visaForm.noDayLimit');
+  if (choice.kind === 'per_stay') return t('visaForm.daysEachEntry', { days: choice.days });
+  return t('visaForm.daysInWindow', { days: choice.days, window: choice.window });
 }
 
 export function stayEquals(a: StayChoice, b: StayChoice): boolean {
@@ -82,9 +82,9 @@ export function stayEquals(a: StayChoice, b: StayChoice): boolean {
 }
 
 /** The stay rule as the visa card will label it. */
-export function stayRuleLabel(name: string, choice: StayChoice): string {
-  const base = name.trim() || 'Visa';
-  if (choice.kind === 'per_stay') return `${base} · max ${choice.days}d/stay`;
+export function stayRuleLabel(name: string, choice: StayChoice, t: TFunc): string {
+  const base = name.trim() || t('visaForm.visa');
+  if (choice.kind === 'per_stay') return t('visaForm.maxPerStay', { base, days: choice.days });
   if (choice.kind === 'rolling') return `${base} · ${choice.days}/${choice.window}`;
   return base;
 }
@@ -157,6 +157,7 @@ export function VisaSummary({
   ruleSummary: string;
   span: string;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={s.summaryRow}>
       <View style={s.summaryLeft}>
@@ -168,7 +169,7 @@ export function VisaSummary({
           </View>
         )}
         <View style={s.summaryText}>
-          <Text style={s.summaryTitle} numberOfLines={1}>{country?.name ?? 'New visa'}</Text>
+          <Text style={s.summaryTitle} numberOfLines={1}>{country?.name ?? t('visaForm.newVisa')}</Text>
           <Text style={s.summarySub} numberOfLines={1}>{ruleSummary}</Text>
         </View>
       </View>
@@ -199,12 +200,13 @@ export function IdentityFields({
   label: string;
   setLabel: (v: string) => void;
 }) {
+  const { t } = useTranslation();
   const labelRef = useRef<TextInput>(null);
   return (
     <>
       <Glass {...glassProps} style={[s.section, !hasGlass && s.sectionFallback]}>
         <Pressable style={s.inputRowSplit} onPress={onPickCountry}>
-          <Text style={s.inputRowLabel}>Country</Text>
+          <Text style={s.inputRowLabel}>{t('visaForm.country')}</Text>
           <View style={s.disclosureRight}>
             {country ? (
               <>
@@ -212,7 +214,7 @@ export function IdentityFields({
                 <Text style={s.disclosureValue}>{country.name}</Text>
               </>
             ) : (
-              <Text style={s.disclosurePlaceholder}>Choose</Text>
+              <Text style={s.disclosurePlaceholder}>{t('visaForm.choose')}</Text>
             )}
             <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
           </View>
@@ -222,7 +224,7 @@ export function IdentityFields({
           <TextInput
             ref={labelRef}
             style={s.input}
-            placeholder="Visa type (B1/B2, Digital Nomad, …)"
+            placeholder={t('visaForm.visaTypePlaceholder')}
             placeholderTextColor={Colors.textTertiary}
             value={label}
             onChangeText={setLabel}
@@ -257,6 +259,7 @@ export function StayPicker({
   value: StayChoice | null;
   onChange: (choice: StayChoice | null) => void;
 }) {
+  const { t } = useTranslation();
   const PRESETS: StayChoice[] = [
     { kind: 'per_stay', days: 30 },
     { kind: 'per_stay', days: 60 },
@@ -302,10 +305,10 @@ export function StayPicker({
     <>
       {suggestion && (
         <>
-          <SectionLabel>{`Usually for ${countryName ?? 'this country'}`}</SectionLabel>
+          <SectionLabel>{t('visaForm.usuallyFor', { country: countryName ?? t('visaForm.thisCountry') })}</SectionLabel>
           <Card>
             <ChoiceRow
-              title={describeStay(suggestion.choice)}
+              title={describeStay(suggestion.choice, t)}
               subtitle={suggestion.note}
               selected={!customOpen && !!value && stayEquals(value, suggestion.choice)}
               onPress={() => pick(suggestion.choice)}
@@ -313,23 +316,23 @@ export function StayPicker({
             />
           </Card>
           <Text style={s.caption}>
-            What your passport normally gets. If your visa says something else, pick it below.
+            {t('visaForm.passportNormally')}
           </Text>
         </>
       )}
 
-      <SectionLabel>{suggestion ? 'Or' : 'What your visa allows'}</SectionLabel>
+      <SectionLabel>{suggestion ? t('visaForm.or') : t('visaForm.whatAllows')}</SectionLabel>
       <Card>
         {alternatives.map((alt) => (
           <ChoiceRow
             key={`${alt.kind}-${alt.kind === 'none' ? 0 : alt.days}-${alt.kind === 'rolling' ? alt.window : 0}`}
-            title={describeStay(alt)}
+            title={describeStay(alt, t)}
             selected={!customOpen && !!value && stayEquals(value, alt)}
             onPress={() => pick(alt)}
           />
         ))}
         <ChoiceRow
-          title="Something else"
+          title={t('visaForm.somethingElse')}
           selected={customOpen}
           onPress={() => {
             setCustomOpen(true);
@@ -342,7 +345,7 @@ export function StayPicker({
       {customOpen && (
         <Card>
           <View style={s.customRow}>
-            <Text style={s.inputRowLabel}>Days</Text>
+            <Text style={s.inputRowLabel}>{t('visaForm.daysLabel')}</Text>
             <TextInput
               style={s.customInput}
               value={customDays}
@@ -351,7 +354,7 @@ export function StayPicker({
                 pushCustom(v, customPeriodic, customWindow);
               }}
               keyboardType="number-pad"
-              placeholder="45"
+              placeholder={t('visaForm.daysNumPlaceholder')}
               placeholderTextColor={Colors.textTertiary}
             />
           </View>
@@ -364,7 +367,7 @@ export function StayPicker({
                 pushCustom(customDays, false, customWindow);
               }}
             >
-              <Text style={[s.pillLabel, !customPeriodic && s.pillLabelActive]}>each entry</Text>
+              <Text style={[s.pillLabel, !customPeriodic && s.pillLabelActive]}>{t('visaForm.eachEntry')}</Text>
             </GlassPill>
             <GlassPill
               active={customPeriodic}
@@ -374,7 +377,7 @@ export function StayPicker({
                 pushCustom(customDays, true, customWindow);
               }}
             >
-              <Text style={[s.pillLabel, customPeriodic && s.pillLabelActive]}>in a period</Text>
+              <Text style={[s.pillLabel, customPeriodic && s.pillLabelActive]}>{t('visaForm.inPeriod')}</Text>
             </GlassPill>
             {customPeriodic && (
               <TextInput
@@ -385,7 +388,7 @@ export function StayPicker({
                   pushCustom(customDays, true, v);
                 }}
                 keyboardType="number-pad"
-                placeholder="180 days"
+                placeholder={t('visaForm.windowPlaceholder')}
                 placeholderTextColor={Colors.textTertiary}
               />
             )}
@@ -397,15 +400,15 @@ export function StayPicker({
 }
 
 /** How the stay rule reads in the summary row, in plain words. */
-export function describeStaySummary(stay: StayChoice): string {
-  if (stay.kind === 'per_stay') return `Stay up to ${stay.days} days per entry`;
-  if (stay.kind === 'rolling') return `Stay up to ${stay.days} days in any ${stay.window}`;
-  return 'No day limit';
+export function describeStaySummary(stay: StayChoice, t: TFunc): string {
+  if (stay.kind === 'per_stay') return t('visaForm.stayUpToEntry', { days: stay.days });
+  if (stay.kind === 'rolling') return t('visaForm.stayUpToWindow', { days: stay.days, window: stay.window });
+  return t('visaForm.noDayLimit');
 }
 
 /** The badge: the date the document runs out, which is the fact people want. */
-export function expiryBadge(validTo: string): string {
-  return hasNoExpiry(validTo) ? 'No expiry' : `Until ${formatHuman(validTo)}`;
+export function expiryBadge(validTo: string, t: TFunc): string {
+  return hasNoExpiry(validTo) ? t('visaForm.noExpiry') : t('visaForm.until', { date: formatHuman(validTo) });
 }
 
 const VALIDITY_PRESETS: { label: string; months: number }[] = [
@@ -436,6 +439,8 @@ export function ValidityPicker({
   setValidFrom: (v: string) => void;
   setValidTo: (v: string) => void;
 }) {
+  const { t } = useTranslation();
+  const validityLabel = (months: number) => months === 3 ? t('visaForm.months3') : months === 6 ? t('visaForm.months6') : months === 12 ? t('visaForm.year1') : t('visaForm.years2');
   const noExpiry = hasNoExpiry(validTo);
   const matchedPreset = VALIDITY_PRESETS.find((p) => validTo === addMonths(validFrom, p.months));
   const isCustomDate = !noExpiry && !matchedPreset;
@@ -467,13 +472,13 @@ export function ValidityPicker({
 
   return (
     <>
-      <SectionLabel>Issued</SectionLabel>
+      <SectionLabel>{t('visaForm.issued')}</SectionLabel>
       <Card>
         <Pressable
           style={[s.inputRowSplit, picking === 'from' && s.dateRowActive]}
           onPress={() => openCalendar('from')}
         >
-          <Text style={s.inputRowLabel}>Issued on</Text>
+          <Text style={s.inputRowLabel}>{t('visaForm.issuedOn')}</Text>
           <View style={s.disclosureRight}>
             <Text style={s.dateValue}>{formatHuman(validFrom)}</Text>
             <Ionicons
@@ -498,12 +503,12 @@ export function ValidityPicker({
         )}
       </Card>
 
-      <SectionLabel>Valid for</SectionLabel>
+      <SectionLabel>{t('visaForm.validFor')}</SectionLabel>
       <Card>
         {VALIDITY_PRESETS.map((preset) => (
           <ChoiceRow
             key={preset.label}
-            title={preset.label}
+            title={validityLabel(preset.months)}
             selected={matchedPreset?.label === preset.label}
             onPress={() => {
               setPicking(null);
@@ -512,7 +517,7 @@ export function ValidityPicker({
           />
         ))}
         <ChoiceRow
-          title="No expiry date"
+          title={t('visaForm.noExpiryDate')}
           selected={noExpiry}
           onPress={() => {
             setPicking(null);
@@ -520,7 +525,7 @@ export function ValidityPicker({
           }}
         />
         <ChoiceRow
-          title="Until a specific date"
+          title={t('visaForm.untilSpecific')}
           subtitle={isCustomDate ? formatHuman(validTo) : undefined}
           selected={isCustomDate}
           onPress={() => {
@@ -565,6 +570,7 @@ export function EntriesFields({
   entries: EntriesAllowed;
   setEntries: (v: EntriesAllowed) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <View style={s.pillRow}>
@@ -580,18 +586,19 @@ export function EntriesFields({
               }}
             >
               <Text style={[s.pillLabel, active && s.pillLabelActive]}>
-                {e === 'multiple' ? 'Multiple' : 'Single'}
+                {e === 'multiple' ? t('visaForm.multiple') : t('visaForm.single')}
               </Text>
             </GlassPill>
           );
         })}
       </View>
-      <Hint>{ENTRY_HINT[entries]}</Hint>
+      <Hint>{entries === 'multiple' ? t('visaForm.entryHintMultiple') : t('visaForm.entryHintSingle')}</Hint>
     </>
   );
 }
 
 export function NotesField({ notes, setNotes }: { notes: string; setNotes: (v: string) => void }) {
+  const { t } = useTranslation();
   const notesRef = useRef<TextInput>(null);
   return (
     <Glass {...glassProps} style={[s.section, !hasGlass && s.sectionFallback]}>
@@ -599,7 +606,7 @@ export function NotesField({ notes, setNotes }: { notes: string; setNotes: (v: s
         <TextInput
           ref={notesRef}
           style={s.notesInput}
-          placeholder="Optional notes"
+          placeholder={t('visaForm.optionalNotes')}
           placeholderTextColor={Colors.textTertiary}
           value={notes}
           onChangeText={setNotes}
