@@ -15,6 +15,7 @@ import { getCitizenship } from '../../../../lib/onboarding';
 import { getRuleForCitizen } from '../../../../constants/visaRules';
 import { Colors } from '../../../../constants/colors';
 import { Typography } from '../../../../constants/typography';
+import { useTranslation } from '../../../../contexts/LanguageContext';
 
 /**
  * Step 2 of 3: how long the visa lets you stay.
@@ -25,6 +26,7 @@ import { Typography } from '../../../../constants/typography';
  * "yes, that one".
  */
 export default function AddVisaStayScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
   const params = useLocalSearchParams<{ code: string; name: string }>();
@@ -46,20 +48,20 @@ export default function AddVisaStayScreen() {
     // The rule's own label starts with the day count, which the sentence above
     // already says. What it adds is how you get in, so name only that.
     const note = rule.ruleType === 'visa_on_arrival'
-      ? 'Visa on arrival'
+      ? t('visaForm.visaOnArrival')
       : rule.ruleType === 'rolling_window'
-        ? 'Standard short-stay rule'
-        : 'Visa-free';
+        ? t('visaForm.standardShortStay')
+        : t('visaForm.visaFree');
     // Carried to the last step as the default name. Taking the suggestion and
     // ending up with a card that just says "Visa" throws away the one thing
     // the app knew: how you actually get in.
     const name = rule.ruleType === 'visa_on_arrival'
-      ? 'Visa on arrival'
+      ? t('visaForm.visaOnArrival')
       : rule.ruleType === 'rolling_window'
-        ? 'Short stay'
-        : 'Visa exemption';
+        ? t('visaForm.shortStay')
+        : t('visaForm.visaExemption');
     return { choice, note, name };
-  }, [citizenship, params.code]);
+  }, [citizenship, params.code, t]);
 
   // Nothing is selected until either the rule engine suggests something or the
   // user picks. A made-up default would sit here with a checkmark next to it,
@@ -92,7 +94,7 @@ export default function AddVisaStayScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'How long can you stay?' }} />
+      <Stack.Screen options={{ title: t('nav.howLongStay') }} />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={visaFormStyles.content}
@@ -110,10 +112,10 @@ export default function AddVisaStayScreen() {
 
         <View style={styles.footer}>
           <CloudyButton onPress={goNext} style={styles.cta} innerStyle={styles.ctaInner}>
-            <Text style={styles.ctaText}>Continue</Text>
+            <Text style={styles.ctaText}>{t('common.continue')}</Text>
           </CloudyButton>
           <Text style={styles.echo}>
-            {choice ? describeStay(choice) : 'Pick how long you can stay'}
+            {choice ? describeStay(choice) : t('visaForm.pickHowLong')}
           </Text>
         </View>
       </ScrollView>

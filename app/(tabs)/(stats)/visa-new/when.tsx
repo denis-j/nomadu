@@ -20,9 +20,11 @@ import { showToast } from '../../../../lib/toast';
 import { Colors } from '../../../../constants/colors';
 import { Typography } from '../../../../constants/typography';
 import { track } from '../../../../lib/analytics';
+import { useTranslation } from '../../../../contexts/LanguageContext';
 
 /** Step 3 of 3: the dates, and a name if you want one. */
 export default function AddVisaWhenScreen() {
+  const { t } = useTranslation();
   const nav = useNavigation();
   const params = useLocalSearchParams<{
     code: string; name: string; kind: string; days: string;
@@ -48,7 +50,7 @@ export default function AddVisaWhenScreen() {
         country_code: params.code,
         // Naming a visa is optional. "Visa" reads fine under the country name
         // on the card, and it can be renamed later.
-        label: label.trim() || 'Visa',
+        label: label.trim() || t('visaForm.visa'),
         valid_from: validFrom,
         valid_to: validTo,
         max_days_per_stay: stay.kind === 'per_stay' ? stay.days : null,
@@ -62,17 +64,17 @@ export default function AddVisaWhenScreen() {
       track({ name: 'visa_added' });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       nav.getParent()?.goBack();
-      showToast('Visa added');
+      showToast(t('visaForm.visaAdded'));
     } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      showToast('Could not save visa', 'error');
+      showToast(t('visaForm.couldNotSaveVisa'), 'error');
       setSaving(false);
     }
   };
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Until when is it valid?' }} />
+      <Stack.Screen options={{ title: t('nav.untilWhenValid') }} />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={visaFormStyles.content}
@@ -91,12 +93,12 @@ export default function AddVisaWhenScreen() {
           setValidTo={setValidTo}
         />
 
-        <SectionLabel>Name (optional)</SectionLabel>
+        <SectionLabel>{t('visaForm.nameOptional')}</SectionLabel>
         <Card>
           <Pressable style={styles.nameRow}>
             <TextInput
               style={styles.nameInput}
-              placeholder="DTV, D7, B1/B2 …"
+              placeholder={t('visaForm.labelPlaceholder')}
               placeholderTextColor={Colors.textTertiary}
               value={label}
               onChangeText={setLabel}
@@ -107,7 +109,7 @@ export default function AddVisaWhenScreen() {
 
         <View style={styles.footer}>
           <CloudyButton onPress={handleSave} style={styles.cta} innerStyle={styles.ctaInner}>
-            <Text style={styles.ctaText}>{saving ? 'Adding…' : 'Add visa'}</Text>
+            <Text style={styles.ctaText}>{saving ? t('visaForm.adding') : t('visaForm.addVisa')}</Text>
           </CloudyButton>
         </View>
       </ScrollView>

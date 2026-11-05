@@ -32,6 +32,7 @@ import {
 import { consumePendingCountry } from '../../../lib/countryPickerBridge';
 import { showToast } from '../../../lib/toast';
 import { getCountryName } from '../../../utils/geography';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 /**
  * Editing one visa, everything on a single screen.
@@ -42,6 +43,7 @@ import { getCountryName } from '../../../utils/geography';
  * came here to change a single date.
  */
 export default function EditVisaScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const nav = useNavigation();
   const params = useLocalSearchParams<{ id?: string; country?: string }>();
@@ -94,10 +96,10 @@ export default function EditVisaScreen() {
   // First missing or invalid field as a user-facing message, or null when the
   // form is ready. Gates the save and renders as a hint above the button.
   const missing = (() => {
-    if (!country) return 'Pick a country';
-    if (!label.trim()) return 'Add a visa type (e.g. B1/B2, Digital Nomad)';
-    if (validTo < validFrom) return 'Valid-to must be on or after valid-from';
-    if (!stay) return 'Say how long you can stay';
+    if (!country) return t('visaForm.pickCountry');
+    if (!label.trim()) return t('visaForm.addVisaType');
+    if (validTo < validFrom) return t('visaForm.validToAfter');
+    if (!stay) return t('visaForm.sayHowLong');
     return null;
   })();
   const canSave = missing === null;
@@ -105,7 +107,7 @@ export default function EditVisaScreen() {
   const handleSave = useCallback(async () => {
     if (missing || !country) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      showToast(missing ?? 'Form is incomplete', 'error');
+      showToast(missing ?? t('visaForm.formIncomplete'), 'error');
       return;
     }
     setSaving(true);
@@ -124,26 +126,26 @@ export default function EditVisaScreen() {
       if (editId) await updateUserVisa(editId, payload);
       else await insertUserVisa(payload);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast(editId ? 'Visa updated' : 'Visa added');
+      showToast(editId ? t('visaForm.visaUpdated') : t('visaForm.visaAdded'));
       nav.goBack();
     } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      showToast('Could not save visa', 'error');
+      showToast(t('visaForm.couldNotSaveVisa'), 'error');
       setSaving(false);
     }
   }, [missing, country, label, validFrom, validTo, stay, entries, notes, editId, nav]);
 
   const handleDelete = () => {
     if (!editId) return;
-    Alert.alert('Delete visa', 'This visa will be removed from your tracker.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('visaForm.deleteVisaTitle'), t('visaForm.deleteVisaBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           await markUserVisaDeleted(editId);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          showToast('Visa deleted');
+          showToast(t('visaForm.visaDeleted'));
           router.back();
         },
       },
@@ -154,14 +156,14 @@ export default function EditVisaScreen() {
     <>
       <Stack.Screen
         options={{
-          title: editId ? 'Edit visa' : 'Add visa',
+          title: editId ? t('visaForm.editVisa') : t('visaForm.addVisa'),
           headerRight: () => (
             <Pressable
               onPress={handleSave}
               disabled={saving}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Save visa"
+              accessibilityLabel={t('visaForm.saveVisa')}
               style={{ opacity: saving ? 0.3 : canSave ? 1 : 0.5 }}
             >
               <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
@@ -177,11 +179,11 @@ export default function EditVisaScreen() {
       >
         <VisaSummary
           country={country}
-          ruleSummary={stay ? stayRuleLabel(label, stay) : label.trim() || 'Visa'}
+          ruleSummary={stay ? stayRuleLabel(label, stay) : label.trim() || t('visaForm.visa')}
           span={expiryBadge(validTo)}
         />
 
-        <SectionLabel>Visa</SectionLabel>
+        <SectionLabel>{t('visaForm.visa')}</SectionLabel>
         <IdentityFields
           country={country}
           onPickCountry={() => {
@@ -201,10 +203,10 @@ export default function EditVisaScreen() {
 
         <StayPicker value={stay} onChange={setStay} />
 
-        <SectionLabel>Entries allowed</SectionLabel>
+        <SectionLabel>{t('visaForm.entriesAllowed')}</SectionLabel>
         <EntriesFields entries={entries} setEntries={setEntries} />
 
-        <SectionLabel>Notes</SectionLabel>
+        <SectionLabel>{t('plans.notes')}</SectionLabel>
         <NotesField notes={notes} setNotes={setNotes} />
 
         {missing && (
@@ -217,7 +219,7 @@ export default function EditVisaScreen() {
         {editId && (
           <Pressable style={styles.deleteRow} onPress={handleDelete}>
             <Ionicons name="trash-outline" size={18} color={Colors.error} />
-            <Text style={styles.deleteText}>Delete visa</Text>
+            <Text style={styles.deleteText}>{t('visaForm.deleteVisa')}</Text>
           </Pressable>
         )}
       </ScrollView>

@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { CountryPicker } from '../../../../components/CountryPicker';
+import { useTranslation } from '../../../../contexts/LanguageContext';
 
 /** Step 1 of 3. One tap, then straight on. */
 export default function AddVisaCountryScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [query, setQuery] = useState('');
 
@@ -12,9 +14,9 @@ export default function AddVisaCountryScreen() {
     <>
       <Stack.Screen
         options={{
-          title: 'Which country?',
+          title: t('nav.whichCountry'),
           headerSearchBarOptions: {
-            placeholder: 'Search countries…',
+            placeholder: t('common.searchCountries'),
             onChangeText: (e: any) => setQuery(e.nativeEvent.text),
           },
         }}
