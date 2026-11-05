@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { updateProfile } from 'firebase/auth';
+import { updateProfile, type User } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { PROFILE_AVATAR_KEY, PROFILE_NAME_KEY, getProfile, resetProfileCache, setProfile } from './profile';
 
@@ -147,6 +147,54 @@ export async function pushProfileToCloud(uid: string): Promise<void> {
     },
     { merge: true },
   );
+}
+
+/** A first sign-in this close to the account's creation is the sign-up itself. */
+const NEW_ACCOUNT_WINDOW_MS = 60 * 1000;
+
+/**
+ * Whether this account was only just made, the one case that onboarding is
+ * for. Anyone who signs in to an account they already had goes to the app,
+ * whatever this phone or the cloud knows about their answers; what is missing
+ * can be set in Settings. Without usable dates it counts as existing.
+ */
+export function isNewAccount(user: User): boolean {
+  const created = Date.parse(user.metadata.creationTime ?? '');
+  const lastSignIn = Date.parse(user.metadata.lastSignInTime ?? '');
+  return lastSignIn - created < NEW_ACCOUNT_WINDOW_MS;
+}
+
+/** How long a sign-in waits for the account's answers before asking again. */
+const RESTORE_TIMEOUT_MS = 5000;
+
+async function readOnboardingFromCloud(uid: string): Promise<boolean> {
+  const data = (await getDoc(doc(db, 'users', uid))).data();
+  const citizenship = data?.citizenship;
+  if (typeof citizenship?.country !== 'string' || typeof citizenship?.countryCode !== 'string') return false;
+  await AsyncStorage.setItem(
+    CITIZENSHIP_KEY(uid),
+    JSON.stringify({ country: citizenship.country, countryCode: citizenship.countryCode }),
+  );
+  if (typeof data?.hasFixedResidence === 'boolean') {
+    await AsyncStorage.setItem(FIXED_RESIDENCE_KEY(uid), String(data.hasFixedResidence));
+  }
+  await completeOnboarding(uid);
+  return true;
+}
+
+/**
+ * Onboarding answers from the account, for a phone that has none: a new
+ * device, or a reinstall (the session survives one in the keychain, this
+ * storage does not). The flag is local, so an account that was long set up
+ * was sent to the welcome screen, where "Sign in" only led back to welcome.
+ * Returns whether the account had finished it; no answer in time counts as
+ * no, and the next launch asks again.
+ */
+export async function restoreOnboardingFromCloud(uid: string): Promise<boolean> {
+  return Promise.race([
+    readOnboardingFromCloud(uid).catch(() => false),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), RESTORE_TIMEOUT_MS)),
+  ]);
 }
 
 /**

@@ -27,7 +27,10 @@ import { HttpsError, onCall, onRequest, type CallableRequest } from 'firebase-fu
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import * as logger from 'firebase-functions/logger';
 import { avatarSeed } from '../../lib/avatarSeed';
-import { ACCOMMODATION_STATUSES } from '../../lib/accommodationModel';
+import { ACCOMMODATION_STATUSES, AccommodationValidationError } from '../../lib/accommodationModel';
+import { MAX_ACTIVITIES_PER_JOURNEY, normalizeActivity, type ActivityFields } from '../../lib/activityModel';
+import { chainDates } from '../../lib/days';
+import { withMember, withoutMember } from '../../lib/members';
 
 const REGION = 'us-central1';
 export const SHARED = 'shared_journeys';
@@ -143,6 +146,13 @@ export async function share(uid: string, data: { journeyId?: unknown; name?: unk
   const code = existing.exists && typeof existing.get('invite_code') === 'string' ? (existing.get('invite_code') as string) : newCode();
   const name = await ownerName(uid, data.name);
   const avatar = await profileAvatar(uid);
+  // Activities reach the mirror only through the Functions (the owner's
+  // phone may not write that field), so the ones planned before sharing are
+  // copied in here; from now on the trigger keeps them current.
+  const planned = await db.collection(`users/${uid}/activities`).where('journey_id', '==', journeyId).get();
+  const activities = Object.fromEntries(planned.docs
+    .filter((d) => d.get('deleted') !== true)
+    .map((d) => [d.id, activityMirrorEntry(d.id, d.data())]));
   await ref.set(
     {
       owner_uid: uid,
@@ -152,6 +162,7 @@ export async function share(uid: string, data: { journeyId?: unknown; name?: unk
       member_uids: existing.exists ? existing.get('member_uids') ?? [] : [],
       members: existing.exists ? existing.get('members') ?? {} : {},
       ...mirrorOf(journey.data()!),
+      activities,
     },
     { merge: true },
   );
@@ -214,6 +225,7 @@ export async function join(uid: string, data: { code?: unknown; name?: unknown }
   if (x.owner_uid === uid) throw new HttpsError('failed-precondition', 'This is your own trip.');
   const profile = await getFirestore().doc(`users/${uid}`).get();
   const avatar = await profileAvatar(uid);
+  const name = cleanName(data.name, cleanName(profile.get('displayName'), 'Friend'));
   // Read and write in one transaction: two people joining at the same moment
   // each wrote the member list they had read, and one of them vanished from
   // it; parallel joins could also go past MAX_MEMBERS.
@@ -227,7 +239,7 @@ export async function join(uid: string, data: { code?: unknown; name?: unknown }
       uids.push(uid);
     }
     members[uid] = {
-      name: cleanName(data.name, cleanName(profile.get('displayName'), 'Friend')),
+      name,
       joined_at: members[uid]?.joined_at ?? Timestamp.now(),
       ...(avatar && { avatar }),
       // Opening the link again must not take away what the owner granted.
@@ -235,6 +247,7 @@ export async function join(uid: string, data: { code?: unknown; name?: unknown }
     };
     tx.update(shared.ref, { member_uids: uids, members });
   });
+  await changeOwnTravellers(x.owner_uid, journeyId, (t) => withMember(t, journeyId, { uid, name, avatar }));
   logger.info('journey joined', { uid, journeyId });
   return { journey_id: journeyId, title: x.title, owner_name: x.owner_name };
 }
@@ -250,7 +263,26 @@ export async function leave(uid: string, data: { journeyId?: unknown }) {
   const members = { ...(x.members ?? {}) };
   delete members[uid];
   await ref.update({ member_uids: (x.member_uids ?? []).filter((m) => m !== uid), members });
+  await changeOwnTravellers(x.owner_uid, journeyId, (t) => withoutMember(t, uid));
   return { ok: true };
+}
+
+/**
+ * The travellers on the owner's own journey, changed here when someone
+ * joins, leaves or is removed, so the trip lists them on every phone even
+ * while the owner's is off; the mirror follows (refreshMirror). The stamp
+ * stays as it is: an edit the owner made offline must still win over this
+ * when it comes in, and the owner's phone adds or drops the same member on
+ * its own (syncJourneyMembers), under the same traveller id.
+ */
+async function changeOwnTravellers(ownerUid: string, journeyId: string, change: (travellers: any[]) => any[]): Promise<void> {
+  const ref = getFirestore().doc(`users/${ownerUid}/journeys/${journeyId}`);
+  const snap = await ref.get();
+  if (!snap.exists || snap.get('deleted') === true) return;
+  const before = Array.isArray(snap.get('travellers')) ? (snap.get('travellers') as any[]) : [];
+  const after = change(before);
+  if (after === before) return;
+  await ref.update({ travellers: after, synced_at: FieldValue.serverTimestamp() });
 }
 
 /**
@@ -314,7 +346,10 @@ export async function removeMember(uid: string, data: { journeyId?: unknown; mem
   const code = newCode();
   await db.collection(INVITES).doc(code).set({ journey_id: journeyId, owner_uid: uid, created_at: Timestamp.now() });
   await ref.update({ member_uids: (x.member_uids ?? []).filter((m) => m !== memberUid), members, invite_code: code });
-  if (typeof x.invite_code === 'string') await db.collection(INVITES).doc(x.invite_code).delete();
+  await Promise.all([
+    typeof x.invite_code === 'string' ? db.collection(INVITES).doc(x.invite_code).delete() : null,
+    changeOwnTravellers(uid, journeyId, (t) => withoutMember(t, memberUid)),
+  ]);
   logger.info('member removed', { uid, journeyId });
   return { ok: true, code, url: inviteUrl(code) };
 }
@@ -408,14 +443,22 @@ function stampOf(value: unknown): Date {
 
 /**
  * A member with the right: the title and the stops, as their phone has them
- * now. Older than what the owner has is refused as stale; the phone then
- * takes the newer version from the mirror. The travellers stay the owner's.
+ * now, and the version of the trip their edit started from (`base`). Only
+ * what they changed against that base goes into the owner's trip, stop by
+ * stop, so a phone that had not seen the owner's or the agent's latest
+ * changes cannot replace them with its own older list. The travellers stay
+ * the owner's.
+ *
+ * App versions from before `base` send the whole list only; for those an
+ * edit older than the owner's is still refused as stale and the phone takes
+ * the newer version from the mirror.
  */
-export async function updateShared(uid: string, data: { journeyId?: unknown; title?: unknown; legs?: unknown; updatedAt?: unknown }) {
+export async function updateShared(uid: string, data: { journeyId?: unknown; title?: unknown; legs?: unknown; updatedAt?: unknown; base?: unknown }) {
   const journeyId = cleanId(data.journeyId);
   const x = await editableBy(uid, journeyId);
   const title = cleanName(data.title, x.title).slice(0, 80);
   const legs = cleanLegs(data.legs);
+  const base = baseOf(data.base);
   const updatedAt = Timestamp.fromDate(stampOf(data.updatedAt));
   const db = getFirestore();
   const own = db.doc(`users/${x.owner_uid}/journeys/${journeyId}`);
@@ -423,14 +466,118 @@ export async function updateShared(uid: string, data: { journeyId?: unknown; tit
   const result = await db.runTransaction(async (tx) => {
     const current = await tx.get(own);
     if (!current.exists || current.get('deleted') === true) throw new HttpsError('not-found', 'This trip is gone.');
+    if (base) {
+      const now = Timestamp.now();
+      const currentLegs = Array.isArray(current.get('legs')) ? (current.get('legs') as any[]) : [];
+      const currentTitle = String(current.get('title') ?? x.title);
+      const merged = {
+        title: title !== base.title ? title : currentTitle,
+        legs: mergeLegs(base.legs, legs, currentLegs),
+      };
+      tx.update(own, { ...merged, updated_at: now, synced_at: FieldValue.serverTimestamp() });
+      tx.update(mirror, { ...merged, updated_at: now });
+      return { ok: true, stale: false };
+    }
     const theirs = current.get('updated_at');
     if (theirs instanceof Timestamp && theirs.toMillis() >= updatedAt.toMillis()) return { ok: false, stale: true };
     tx.update(own, { title, legs, updated_at: updatedAt, synced_at: FieldValue.serverTimestamp() });
     tx.update(mirror, { title, legs, updated_at: updatedAt });
     return { ok: true, stale: false };
   });
-  logger.info('shared trip edited by member', { uid, journeyId, stale: result.stale });
+  logger.info('shared trip edited by member', { uid, journeyId, merged: !!base, stale: result.stale });
   return result;
+}
+
+/** The version a member's edit started from, as their phone sends it; null from older app versions. */
+function baseOf(value: unknown): { title: string; legs: any[] } | null {
+  if (!value || typeof value !== 'object') return null;
+  const b = value as { title?: unknown; legs?: unknown };
+  // A base that does not hold up is no reason to lose the edit: the whole
+  // list then goes in the old way, guarded by the clock.
+  try {
+    return { title: typeof b.title === 'string' ? b.title.slice(0, 80) : '', legs: cleanLegs(b.legs) };
+  } catch {
+    return null;
+  }
+}
+
+/** Fields of a stop that change together: a new place is a new city, country and pin. */
+const LEG_GROUPS = [
+  ['city', 'country', 'country_code', 'latitude', 'longitude'],
+  ['start_date', 'end_date'],
+  ['transport'],
+  ['notes'],
+] as const;
+
+function sameGroup(a: any, b: any, group: readonly string[]): boolean {
+  return group.every((k) => (a?.[k] ?? null) === (b?.[k] ?? null));
+}
+
+function sameOrder(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i]);
+}
+
+/**
+ * `extra` woven into `primary`: each id of `extra` that `primary` lacks
+ * goes right after the closest id before it in `extra` that is already
+ * placed, or to the front.
+ */
+function weave(primary: string[], extra: string[]): string[] {
+  const out = [...primary];
+  let front = 0;
+  extra.forEach((id, i) => {
+    if (out.includes(id)) return;
+    let at = -1;
+    for (let j = i - 1; j >= 0 && at < 0; j--) at = out.indexOf(extra[j]);
+    if (at < 0) out.splice(front++, 0, id);
+    else out.splice(at + 1, 0, id);
+  });
+  return out;
+}
+
+/**
+ * Three-way merge of the stops: what the member changed against `base`,
+ * applied to what the owner's trip holds now. Per stop and per group of
+ * fields, so the member's edit of one stop leaves the owner's edit of
+ * another (or of a different field of the same one) alone. A stop removed
+ * on either side stays removed; a stop added on either side is kept. If the
+ * member reordered, their order leads and the owner's new stops are woven
+ * in; otherwise the owner's order leads. The dates are chained again
+ * afterwards, as every edit on a phone does (lib/days.ts, chainDates).
+ */
+export function mergeLegs(base: any[], mine: any[], current: any[]): any[] {
+  const baseById = new Map(base.map((l) => [l.sync_id, l]));
+  const mineById = new Map(mine.map((l) => [l.sync_id, l]));
+  const currentById = new Map(current.map((l) => [l.sync_id, l]));
+  const result = new Map<string, any>();
+
+  for (const l of current) {
+    const was = baseById.get(l.sync_id);
+    const now = mineById.get(l.sync_id);
+    if (was && !now) continue; // the member removed it
+    if (!was || !now) {
+      result.set(l.sync_id, l);
+      continue;
+    }
+    const next = { ...l };
+    for (const group of LEG_GROUPS) {
+      if (!sameGroup(was, now, group)) for (const k of group) next[k] = now[k];
+    }
+    result.set(l.sync_id, next);
+  }
+  for (const l of mine) {
+    if (!baseById.has(l.sync_id) && !currentById.has(l.sync_id)) result.set(l.sync_id, l);
+  }
+
+  const common = (ids: string[]) => ids.filter((id) => baseById.has(id) && mineById.has(id));
+  const reordered = !sameOrder(common(base.map((l) => l.sync_id)), common(mine.map((l) => l.sync_id)));
+  const currentIds = current.map((l) => l.sync_id);
+  const mineIds = mine.map((l) => l.sync_id);
+  const order = (reordered ? weave(mineIds, currentIds) : weave(currentIds, mineIds)).filter((id) => result.has(id));
+
+  const legs = order.map((id) => result.get(id));
+  const dates = chainDates(legs);
+  return legs.map((l, i) => ({ ...l, ...dates[i], sort_order: i }));
 }
 
 /** A member with the right: one stop's accommodation plan, the same way. */
@@ -479,6 +626,185 @@ export async function updateSharedStay(uid: string, data: { journeyId?: unknown;
   return result;
 }
 
+const ACTIVITY_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * One activity as the friends see it in the mirror: the stored fields and
+ * nothing else, with the stamp as text. Built from a fixed list rather than
+ * by spreading the document, so whatever else a phone wrote (a local id)
+ * stays with the owner. The member's write and the owner's trigger both go
+ * through here, so the trigger finds its own entry unchanged and skips.
+ */
+export function activityMirrorEntry(id: string, x: FirebaseFirestore.DocumentData) {
+  const updatedAt = x.updated_at instanceof Timestamp ? x.updated_at.toDate().toISOString()
+    : typeof x.updated_at === 'string' ? x.updated_at : new Date().toISOString();
+  return {
+    id,
+    journey_id: String(x.journey_id ?? ''),
+    stop_id: typeof x.stop_id === 'string' ? x.stop_id : null,
+    title: String(x.title ?? ''),
+    category: x.category ?? 'other',
+    status: x.status ?? 'idea',
+    place: x.place ?? null,
+    address: x.address ?? null,
+    latitude: x.latitude ?? null,
+    longitude: x.longitude ?? null,
+    url: x.url ?? null,
+    price: x.price ?? null,
+    currency: x.currency ?? null,
+    notes: x.notes ?? null,
+    source: x.source ?? 'manual',
+    source_url: x.source_url ?? null,
+    image_url: x.image_url ?? null,
+    sort_order: typeof x.sort_order === 'number' && Number.isFinite(x.sort_order) ? x.sort_order : 0,
+    updated_at: updatedAt,
+    deleted: x.deleted === true,
+  };
+}
+
+/**
+ * A member with the right: one activity, added, changed or deleted. Each
+ * activity is its own record with its own stamp, so two friends adding
+ * ideas to the same city never clash, and only an edit to the same
+ * activity can lose to a newer one (refused as stale; the phone then takes
+ * the newer version from the mirror).
+ */
+export async function updateSharedActivityFor(uid: string, data: { journeyId?: unknown; activity?: unknown }) {
+  const journeyId = cleanId(data.journeyId);
+  const x = await editableBy(uid, journeyId);
+  const a = (data.activity && typeof data.activity === 'object' ? data.activity : {}) as Record<string, unknown>;
+  const id = typeof a.id === 'string' ? a.id.trim() : '';
+  if (!ACTIVITY_ID.test(id)) throw new HttpsError('invalid-argument', 'Which activity?');
+  let stopId: string | null = null;
+  if (a.stop_id !== undefined && a.stop_id !== null) {
+    stopId = typeof a.stop_id === 'string' ? a.stop_id : '';
+    if (!(x.legs ?? []).some((l: any) => l?.sync_id === stopId)) throw new HttpsError('not-found', 'That stop is not on this trip.');
+  }
+  let fields: ActivityFields;
+  try {
+    fields = normalizeActivity(a);
+  } catch (err) {
+    if (err instanceof AccommodationValidationError) throw new HttpsError('invalid-argument', err.message);
+    throw err;
+  }
+  const deleted = a.deleted === true;
+  const sortOrder = typeof a.sort_order === 'number' && Number.isFinite(a.sort_order) ? a.sort_order : 0;
+  const updatedAt = Timestamp.fromDate(stampOf(a.updated_at));
+  const record = { journey_id: journeyId, stop_id: stopId, ...fields, sort_order: sortOrder, deleted };
+
+  const db = getFirestore();
+  const own = db.doc(`users/${x.owner_uid}/activities/${id}`);
+  const mirror = db.collection(SHARED).doc(journeyId);
+  const result = await db.runTransaction(async (tx) => {
+    // Firestore wants every read of a transaction before its first write.
+    const current = await tx.get(own);
+    const fresh = (await tx.get(mirror)).data() ?? {};
+    // An id is only good for this trip: a guessed or reused one must not
+    // reach into another journey of the owner's.
+    if (current.exists && current.get('journey_id') !== journeyId) throw new HttpsError('permission-denied', 'That activity is not on this trip.');
+    const theirs = current.exists ? current.get('updated_at') : null;
+    if (theirs instanceof Timestamp && theirs.toMillis() >= updatedAt.toMillis()) return { ok: false, stale: true };
+    const map = { ...((fresh.activities ?? {}) as Record<string, unknown>) };
+    const isNew = !(id in map) && (!current.exists || current.get('deleted') === true);
+    if (isNew && !deleted && Object.keys(map).length >= MAX_ACTIVITIES_PER_JOURNEY) {
+      throw new HttpsError('resource-exhausted', `A trip can hold at most ${MAX_ACTIVITIES_PER_JOURNEY} activities.`);
+    }
+    tx.set(own, { ...record, updated_at: updatedAt, synced_at: FieldValue.serverTimestamp() });
+    if (deleted) delete map[id];
+    else map[id] = activityMirrorEntry(id, { ...record, updated_at: updatedAt });
+    tx.update(mirror, { activities: map });
+    return { ok: true, stale: false };
+  });
+  logger.info('shared activity edited by member', { uid, journeyId, deleted, stale: result.stale });
+  return result;
+}
+
+// ─── The mirror follows the owner's trip ────────────────────────────────────
+// The owner's phone used to be the only one writing the mirror, and only
+// for edits made on it: what the agent wrote, or another of the owner's
+// devices, reached the owner's trip but never the friends, who then planned
+// on (and wrote back) a version days old. Now every write to the owner's
+// trip or its plans is copied here, whoever made it.
+
+/** The owner's journey, as it is now, into its mirror if it has one. */
+export async function refreshMirror(uid: string, journeyId: string, journey: FirebaseFirestore.DocumentData | undefined): Promise<void> {
+  // A removed document is not a trip that changed: the phones tombstone, and
+  // unsharing takes the mirror down on its own.
+  if (!journey) return;
+  const db = getFirestore();
+  const ref = db.collection(SHARED).doc(journeyId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists || snap.get('owner_uid') !== uid) return;
+    const next = mirrorOf(journey);
+    const fresh = snap.data() ?? {};
+    const same = JSON.stringify([next.title, next.legs, next.travellers, next.deleted])
+      === JSON.stringify([fresh.title, fresh.legs, fresh.travellers, fresh.deleted === true]);
+    if (same) return;
+    tx.update(ref, next);
+  });
+}
+
+/** One accommodation plan of the owner's, into the mirror of its trip. */
+export async function refreshMirrorStay(uid: string, stopId: string, plan: FirebaseFirestore.DocumentData | undefined): Promise<void> {
+  if (!plan) return;
+  const journeyId = typeof plan.journey_id === 'string' ? plan.journey_id : '';
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(journeyId)) return;
+  const db = getFirestore();
+  const ref = db.collection(SHARED).doc(journeyId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists || snap.get('owner_uid') !== uid) return;
+    const map = { ...((snap.get('accommodations') ?? {}) as Record<string, unknown>) };
+    if (plan.deleted === true) {
+      if (!(stopId in map)) return;
+      delete map[stopId];
+    } else {
+      const { local_id: _l, synced_at: _s, updated_at, ...rest } = plan;
+      const entry = {
+        ...rest,
+        id: stopId,
+        updated_at: updated_at instanceof Timestamp ? updated_at.toDate().toISOString() : new Date().toISOString(),
+      };
+      if (JSON.stringify(map[stopId]) === JSON.stringify(entry)) return;
+      map[stopId] = entry;
+    }
+    tx.update(ref, { accommodations: map });
+  });
+}
+
+/** One activity of the owner's, into the mirror of its trip. */
+export async function refreshMirrorActivity(uid: string, activityId: string, activity: FirebaseFirestore.DocumentData | undefined): Promise<void> {
+  if (!activity) return;
+  const journeyId = typeof activity.journey_id === 'string' ? activity.journey_id : '';
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(journeyId)) return;
+  const db = getFirestore();
+  const ref = db.collection(SHARED).doc(journeyId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists || snap.get('owner_uid') !== uid) return;
+    const map = { ...((snap.get('activities') ?? {}) as Record<string, unknown>) };
+    if (activity.deleted === true) {
+      if (!(activityId in map)) return;
+      delete map[activityId];
+    } else {
+      const entry = activityMirrorEntry(activityId, activity);
+      if (JSON.stringify(map[activityId]) === JSON.stringify(entry)) return;
+      map[activityId] = entry;
+    }
+    tx.update(ref, { activities: map });
+  });
+}
+
+export const mirrorJourney = onDocumentWritten({ document: 'users/{uid}/journeys/{journeyId}', region: REGION }, (event) =>
+  refreshMirror(event.params.uid, event.params.journeyId, event.data?.after.data()));
+
+export const mirrorAccommodation = onDocumentWritten({ document: 'users/{uid}/accommodations/{stopId}', region: REGION }, (event) =>
+  refreshMirrorStay(event.params.uid, event.params.stopId, event.data?.after.data()));
+
+export const mirrorActivity = onDocumentWritten({ document: 'users/{uid}/activities/{activityId}', region: REGION }, (event) =>
+  refreshMirrorActivity(event.params.uid, event.params.activityId, event.data?.after.data()));
+
 /** Owner: the trip is private again. Members' phones tombstone their copy. */
 export async function unshare(uid: string, data: { journeyId?: unknown }) {
   const journeyId = cleanId(data.journeyId);
@@ -514,14 +840,14 @@ export async function forgetUser(uid: string): Promise<void> {
     const members = { ...(d.get('members') ?? {}) };
     delete members[uid];
     await d.ref.update({ member_uids: (d.get('member_uids') as string[]).filter((m) => m !== uid), members });
+    await changeOwnTravellers(String(d.get('owner_uid')), d.id, (t) => withoutMember(t, uid));
   }
 }
 
 /**
  * Someone changed their name or face: every shared trip shows the new one.
- * As a member, their entry in the member list and their traveller row in
- * the mirror the others follow (the owner's phone takes the list over on
- * its next sync, the mirror covers the time until then). As an owner, the
+ * As a member, their entry in the member list and their traveller row,
+ * in the mirror the others follow and in the owner's trip. As an owner, the
  * name and face the invite shows. Only what changed is written, so the
  * name someone gave when joining stays until they change it.
  */
@@ -553,6 +879,10 @@ export async function spreadProfile(uid: string, before: FirebaseFirestore.Docum
         : t));
       tx.update(d.ref, { members, travellers });
     });
+    // The owner's trip too, or the next copy into the mirror would bring the old name back.
+    await changeOwnTravellers(String(d.get('owner_uid')), d.id, (list) => (list.some((t) => t?.uid === uid)
+      ? list.map((t) => (t?.uid === uid ? { ...t, ...(nameChanged && { name }), ...(avatarChanged && { avatar: avatar ?? null }) } : t))
+      : list));
   }
 
   const owned = await db.collection(SHARED).where('owner_uid', '==', uid).get();
@@ -579,6 +909,7 @@ export const unshareJourney = onCall(opts, (request) => unshare(requireUid(reque
 export const setJourneyMemberCanEdit = onCall(opts, (request) => setMemberCanEdit(requireUid(request), request.data ?? {}));
 export const updateSharedJourney = onCall(opts, (request) => updateShared(requireUid(request), request.data ?? {}));
 export const updateSharedAccommodation = onCall(opts, (request) => updateSharedStay(requireUid(request), request.data ?? {}));
+export const updateSharedActivity = onCall(opts, (request) => updateSharedActivityFor(requireUid(request), request.data ?? {}));
 
 // ─── The page ────────────────────────────────────────────────────────────────
 

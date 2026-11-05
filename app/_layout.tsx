@@ -108,8 +108,8 @@ function RootNavigator() {
         router.replace('/(onboarding)/welcome');
       }
     } else if (!onboardingDone) {
-      // Signed-in user whose onboarding flag isn't set for this UID
-      // (typically a brand-new account or a fresh device).
+      // An account made just now, without going through the funnel first.
+      // Existing accounts never get here (see OnboardingContext).
       if (!inOnboardingGroup) {
         router.replace('/(onboarding)/welcome');
       }

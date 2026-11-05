@@ -29,10 +29,13 @@ import * as Haptics from 'expo-haptics';
 import { useJourney } from '../../../hooks/useJourney';
 import { useJourneyDocuments } from '../../../hooks/useJourneyDocuments';
 import { useJourneyAccommodations } from '../../../hooks/useAccommodations';
-import { consumePendingStay } from '../../../lib/accommodationBridge';
+import { consumePendingActivities, consumePendingStay } from '../../../lib/accommodationBridge';
+import { useJourneyActivities } from '../../../hooks/useActivities';
+import { ACTIVITIES_UI } from '../../../lib/activityModel';
 import { planChipText, statusColor } from '../../../components/accommodationForm';
 import type { LocalAccommodation } from '../../../lib/accommodations';
-import { DocumentsEntryCard } from '../../../components/JourneyDocuments';
+import { DocumentsEntryCard, EntryCard } from '../../../components/JourneyDocuments';
+import { GlassDisc } from '../../../components/GlassDisc';
 import { AvatarStack, avatarPeople, avatarStackWidth, type AvatarPerson } from '../../../components/TravellerAvatars';
 import { TravellersContent } from '../../../components/TravellersContent';
 import { useAuth } from '../../../hooks/useAuth';
@@ -365,17 +368,6 @@ const FACE = 22;
 const MORPH_OPEN = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
 const MORPH_CLOSE = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
 
-/** A 44pt glass disc with one symbol: the back and add buttons of the bar. */
-function GlassDisc({ icon, size, onPress, label }: { icon: keyof typeof Ionicons.glyphMap; size: number; onPress: () => void; label: string }) {
-  return (
-    <Pressable onPress={onPress} hitSlop={6} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => pressed && { opacity: 0.7 }}>
-      <ChipShell {...chipGlassProps} {...(hasGlass ? { isInteractive: true } : {})} style={[styles.disc, !hasGlass && styles.titleChipFallback]}>
-        <Ionicons name={icon} size={size} color={Colors.text} />
-      </ChipShell>
-    </Pressable>
-  );
-}
-
 /**
  * The header title as the Map tab's glass chip, and like the Map tab's chip
  * it morphs: a tap and the capsule widens and grows downward into the
@@ -553,6 +545,9 @@ type LegCardProps = {
   onPress: (leg: JourneyLeg) => void;
   /** Tap on the stay chip: straight to the accommodation page. */
   onOpenStay: (leg: JourneyLeg) => void;
+  /** How many things to do are planned here; the chip opens them. */
+  activityCount: number;
+  onOpenActivities: (leg: JourneyLeg) => void;
   onDrag?: () => void;
   visaStatuses: VisaStatus[];
   taxStatuses: TaxStatus[];
@@ -567,6 +562,8 @@ const LegCard = React.memo(function LegCard({
   stay,
   onPress,
   onOpenStay,
+  activityCount,
+  onOpenActivities,
   onDrag,
   visaStatuses,
   taxStatuses,
@@ -636,6 +633,9 @@ const LegCard = React.memo(function LegCard({
   // place, black from then on; no third colour.
   if (stay && stay.needed) {
     chips.push({ label: planChipText(stay), color: statusColor(stay.status), icon: 'bed-outline', onPress: () => onOpenStay(leg) });
+  }
+  if (ACTIVITIES_UI && activityCount > 0) {
+    chips.push({ label: activityCount === 1 ? '1 thing to do' : `${activityCount} things to do`, color: Colors.text, icon: 'sparkles-outline', onPress: () => onOpenActivities(leg) });
   }
 
   const CardWrap = hasGlass ? GlassView : View;
@@ -724,12 +724,26 @@ const LegCard = React.memo(function LegCard({
   prev.leg.country === next.leg.country &&
   prev.firstInCountry === next.firstInCountry &&
   prev.stay?.updated_at === next.stay?.updated_at &&
+  prev.activityCount === next.activityCount &&
   // The visa and tax chips arrive a moment after the first render; the
   // card must not sit on its first, chipless frame when they do.
   prev.visaStatuses === next.visaStatuses &&
   prev.taxStatuses === next.taxStatuses &&
   prev.citizenshipCode === next.citizenshipCode
 );
+
+/** "2 booked · 5 ideas" under the things-to-do card; what it is for while empty. */
+function activitiesSummary(list: { status: string }[]): string {
+  if (list.length === 0) return 'Places, ideas, TikToks you saved';
+  const n = (st: string) => list.filter((a) => a.status === st).length;
+  const parts = [
+    n('booked') ? `${n('booked')} booked` : null,
+    n('planned') ? `${n('planned')} planned` : null,
+    n('idea') ? `${n('idea')} ${n('idea') === 1 ? 'idea' : 'ideas'}` : null,
+    n('done') ? `${n('done')} done` : null,
+  ];
+  return parts.filter(Boolean).join(' · ');
+}
 
 // ─── Suggestion Leg Card ──────────────────────────────────────────────────────
 
@@ -997,6 +1011,8 @@ export default function JourneyDetailScreen() {
   // too: a stop card that grows a chip a frame after it appeared reads as
   // a flicker.
   const { plans: stays, loaded: staysLoaded } = useJourneyAccommodations(journeyId);
+  const stopSyncIds = useMemo(() => (journey?.legs ?? []).map((l) => l.sync_id), [journey?.legs]);
+  const { activities, byStop: activitiesByStop } = useJourneyActivities(journey?.sync_id, stopSyncIds);
 
   // ─── Visa / Tax statuses ─────────────────────────────────────────────────────
 
@@ -1192,6 +1208,20 @@ export default function JourneyDetailScreen() {
     });
   }, [router, journey?.sync_id, readOnly]);
 
+  const openActivities = useCallback((leg?: JourneyLeg) => {
+    if (!journey?.sync_id) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({
+      pathname: '/(tabs)/(plans)/activities',
+      params: {
+        journeyId: String(journeyId),
+        journeySyncId: journey.sync_id,
+        ...(leg?.sync_id && { stopSyncId: leg.sync_id }),
+        ...(readOnly && { readOnly: '1' }),
+      },
+    });
+  }, [router, journeyId, journey?.sync_id, readOnly]);
+
   const openStopInfo = useCallback((leg: JourneyLeg) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push({
@@ -1219,12 +1249,18 @@ export default function JourneyDetailScreen() {
   // full size (see accommodationBridge).
   useFocusEffect(
     useCallback(() => {
+      const things = consumePendingActivities();
+      if (things) {
+        const { readOnly: roThings, ...restThings } = things;
+        const t = setTimeout(() => router.push({ pathname: '/(tabs)/(plans)/activities', params: { journeyId: String(journeyId), ...restThings, ...(roThings && { readOnly: '1' }) } }), 350);
+        return () => clearTimeout(t);
+      }
       const stay = consumePendingStay();
       if (!stay) return;
       const { readOnly: ro, ...rest } = stay;
       const t = setTimeout(() => router.push({ pathname: '/(tabs)/(plans)/accommodation', params: { ...rest, ...(ro && { readOnly: '1' }) } }), 350);
       return () => clearTimeout(t);
-    }, [router]),
+    }, [router, journeyId]),
   );
 
   const handleAddSuggestion = useCallback((s: StopSuggestion) => {
@@ -1368,6 +1404,8 @@ export default function JourneyDetailScreen() {
           stay={item.sync_id ? stays.get(item.sync_id) ?? null : null}
           onPress={openStopInfo}
           onOpenStay={openStay}
+          activityCount={item.sync_id ? activitiesByStop.get(item.sync_id)?.length ?? 0 : 0}
+          onOpenActivities={openActivities}
           onDrag={readOnly ? undefined : drag}
           visaStatuses={visaStatuses}
           taxStatuses={taxStatuses}
@@ -1376,7 +1414,7 @@ export default function JourneyDetailScreen() {
         />
       </ScaleDecorator>
     );
-  }, [legs, stays, openStopInfo, openStay, readOnly, visaStatuses, taxStatuses, citizenshipCode]);
+  }, [legs, stays, activitiesByStop, openStopInfo, openStay, openActivities, readOnly, visaStatuses, taxStatuses, citizenshipCode]);
 
   const onHeaderLayout = useCallback((e: any) => {
     setTimelineTop(e.nativeEvent.layout.height);
@@ -1392,6 +1430,15 @@ export default function JourneyDetailScreen() {
     <View onLayout={onHeaderLayout}>
       <JourneyMapCard legs={legs} headerHeight={headerHeight} onPress={openMap} />
       <DocumentsEntryCard journeyId={journeyId} documents={docs.documents} travellers={docs.travellers} />
+      {ACTIVITIES_UI && legs.length > 0 && (!readOnly || activities.length > 0) && (
+        <EntryCard
+          icon="sparkles-outline"
+          title="Things to do"
+          sub={activitiesSummary(activities)}
+          count={activities.length}
+          onPress={() => openActivities()}
+        />
+      )}
       {legs.length > 0 && timelineTop > 0 && lineHeight > 0 && (
         <View pointerEvents="none" style={[styles.timelineLine, { top: timelineTop, height: lineHeight }]}>
           <LinearGradient
@@ -1402,7 +1449,7 @@ export default function JourneyDetailScreen() {
         </View>
       )}
     </View>
-  ), [legs, headerHeight, onHeaderLayout, journeyId, docs.documents, docs.travellers, timelineTop, lineHeight, openMap]);
+  ), [legs, headerHeight, onHeaderLayout, journeyId, docs.documents, docs.travellers, timelineTop, lineHeight, openMap, activities, readOnly, openActivities]);
 
   const chainedSuggestions = useMemo(() => suggestions.map((s) => chainedSuggestion(s, legs)), [suggestions, legs]);
 

@@ -13,6 +13,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FunctionsError, httpsCallable } from 'firebase/functions';
 import { functions } from './firebase';
+import type { ActivityCategory, ActivitySource } from './activityModel';
 
 /**
  * Turn a Functions error into something worth showing a user.
@@ -130,4 +131,63 @@ export async function extractTripsFromImage(
   >('extractTrips', { imageBase64, mimeType });
 
   return trips;
+}
+
+// ─── Activities ──────────────────────────────────────────────────────────────
+
+export interface ActivitySuggestion {
+  title: string;
+  category: ActivityCategory;
+  place: string | null;
+  /** One short sentence: why this, here. */
+  why: string;
+  price_hint: string | null;
+}
+
+/** Things to do in a city on these dates, skipping what is already planned. */
+export async function suggestActivities(
+  stop: { city: string; country: string; startDate: string; endDate: string },
+  existing: string[],
+  interests?: string,
+): Promise<ActivitySuggestion[]> {
+  const { suggestions } = await call<
+    { city: string; country: string; startDate: string; endDate: string; existing: string[]; interests?: string },
+    { suggestions: ActivitySuggestion[] }
+  >('suggestActivities', {
+    ...stop,
+    existing: existing.slice(0, 50),
+    interests: interests?.trim() || undefined,
+  });
+  return suggestions;
+}
+
+export interface ImportedActivity {
+  title: string;
+  category: ActivityCategory;
+  place: string | null;
+  address: string | null;
+  /** The stop it belongs to, or null when none of the trip's stops fits. */
+  stop_id: string | null;
+  notes: string | null;
+}
+
+export interface LinkImport {
+  source: ActivitySource;
+  source_url: string;
+  image_url: string | null;
+  author: string | null;
+  caption: string | null;
+  activities: ImportedActivity[];
+}
+
+/**
+ * A TikTok, Instagram or YouTube post (or any page), read on the server:
+ * its caption and cover picture, and the places in them, matched to the
+ * trip's stops. The video itself is never fetched.
+ */
+export async function importActivityLink(
+  url: string,
+  stops: { id: string; city: string; country: string; start_date: string; end_date: string }[],
+): Promise<LinkImport> {
+  return call<{ url: string; stops: typeof stops }, LinkImport>('importActivityLink', { url, stops: stops.slice(0, 80) });
 }

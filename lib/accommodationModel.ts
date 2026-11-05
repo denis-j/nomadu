@@ -223,6 +223,9 @@ const fail = (field: string, message: string): never => {
   throw new AccommodationValidationError(field, message);
 };
 
+/** The same refusal for the other planning models (lib/activityModel.ts), so the API answers them alike. */
+export const invalid = fail;
+
 // ─── Dates ───────────────────────────────────────────────────────────────────
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
@@ -288,7 +291,7 @@ export function isValidCurrency(value: unknown): value is string {
 }
 
 /** Money is a number with two decimals and a currency beside it, never a string. */
-function pickAmount(value: unknown, fallback: number | null, field: string): number | null {
+export function pickAmount(value: unknown, fallback: number | null, field: string): number | null {
   if (value === undefined) return fallback;
   if (value === null) return null;
   if (typeof value !== 'number' || !Number.isFinite(value)) return fail(field, `${field} must be a number.`);
@@ -297,7 +300,7 @@ function pickAmount(value: unknown, fallback: number | null, field: string): num
   return Math.round(value * 100) / 100;
 }
 
-function pickCurrency(value: unknown, fallback: string | null, field: string): string | null {
+export function pickCurrency(value: unknown, fallback: string | null, field: string): string | null {
   if (value === undefined) return fallback;
   if (value === null) return null;
   if (typeof value !== 'string') return fail(field, `${field} must be an ISO 4217 code like "THB".`);
@@ -306,7 +309,7 @@ function pickCurrency(value: unknown, fallback: string | null, field: string): s
   return code;
 }
 
-function pickText(value: unknown, fallback: string | null, field: string, max: number): string | null {
+export function pickText(value: unknown, fallback: string | null, field: string, max: number): string | null {
   if (value === undefined) return fallback;
   if (value === null) return null;
   if (typeof value !== 'string') return fail(field, `${field} must be text.`);
@@ -316,7 +319,7 @@ function pickText(value: unknown, fallback: string | null, field: string, max: n
   return text;
 }
 
-function pickUrl(value: unknown, fallback: string | null, field: string): string | null {
+export function pickUrl(value: unknown, fallback: string | null, field: string): string | null {
   if (value === undefined) return fallback;
   if (value === null) return null;
   if (typeof value !== 'string') return fail(field, `${field} must be a URL.`);

@@ -65,6 +65,14 @@ import {
   type AccommodationRequirements,
   type AccommodationStatus,
 } from './accommodationModel';
+import {
+  clearActivityDirty,
+  getAllActivitiesForSync,
+  getDirtyFollowedActivities,
+  replaceFollowedActivities,
+  upsertActivityFromCloud,
+} from './activities';
+import { normalizeActivity, type Activity } from './activityModel';
 import { pullDocumentsFromCloud, pushDocumentsToCloud, watchDocuments } from './documentSync';
 import { forgetFollowedJourneyWithDocuments } from './documents';
 import { localIsNewer, parseSyncStamp } from './syncTime';
@@ -117,6 +125,10 @@ function accommodationsCollection(uid: string) {
   return collection(db, 'users', uid, 'accommodations');
 }
 
+function activitiesCollection(uid: string) {
+  return collection(db, 'users', uid, 'activities');
+}
+
 /** Trips shared with friends: one mirror per journey, see functions/src/share.ts. */
 function sharedJourneysCollection() {
   return collection(db, 'shared_journeys');
@@ -151,7 +163,7 @@ const BATCH_LIMIT = 500;
 // such field and are invisible to the query otherwise. The cursors live in
 // `app_meta`, which is wiped with the data when another account signs in.
 
-export type SyncedCollection = 'trips' | 'visas' | 'journeys' | 'accommodations';
+export type SyncedCollection = 'trips' | 'visas' | 'journeys' | 'accommodations' | 'activities';
 
 /** How often a pull reads the whole collection regardless of cursors. */
 const FULL_PULL_EVERY_MS = 24 * 60 * 60 * 1000;
@@ -611,7 +623,10 @@ async function takeFollowedJourney(id: string, data: DocumentData, uid: string, 
   const canEdit = canEditOf(data, uid);
   // Without the right (any more), the mirror is the truth, edits here or not.
   await upsertJourneyFromCloud(journeyFromDoc(id, data), { ...sharedOwnerOf(data), canEdit, force: force || !canEdit });
-  if (data.deleted !== true) await replaceFollowedPlans(id, followedPlansOf(data), canEdit && !force);
+  if (data.deleted !== true) {
+    await replaceFollowedPlans(id, followedPlansOf(data), canEdit && !force);
+    await replaceFollowedActivities(id, followedActivitiesOf(id, data), canEdit && !force);
+  }
 }
 
 export async function pullSharedJourneysFromCloud(uid: string): Promise<void> {
@@ -630,28 +645,39 @@ export async function pullSharedJourneysFromCloud(uid: string): Promise<void> {
 /**
  * Friends' trips we may plan, changed here: each edit goes to the owner
  * through the server (functions/src/share.ts, updateShared), which checks
- * the right and writes the owner's trip and the mirror. An edit older than
- * the owner's is refused as stale; then the mirror wins here, as it does
- * when the right was taken away meanwhile.
+ * the right and writes the owner's trip and the mirror. The stops go with
+ * the version they were edited from (`base`), and the server merges only
+ * what changed against it into the owner's trip, so a phone that missed
+ * the owner's latest changes cannot replace them with its older list.
+ * Afterwards the mirror, merged result included, is taken over here. When
+ * an edit is refused (stale, or the right was taken away meanwhile), the
+ * mirror wins over the edit.
  */
 export async function pushSharedEdits(uid: string): Promise<void> {
   const followed = (await getAllJourneysForSync()).filter((j) => j.shared_owner_uid && !j.deleted);
   const sendJourney = httpsCallable<unknown, { ok: boolean; stale: boolean }>(functions, 'updateSharedJourney');
   const sendStay = httpsCallable<unknown, { ok: boolean; stale: boolean }>(functions, 'updateSharedAccommodation');
+  const sendActivity = httpsCallable<unknown, { ok: boolean; stale: boolean }>(functions, 'updateSharedActivity');
   for (const journey of followed) {
     const plans = journey.shared_can_edit ? await getDirtyFollowedPlans(journey.sync_id) : [];
-    if (!journey.shared_dirty && plans.length === 0) continue;
+    const activities = journey.shared_can_edit ? await getDirtyFollowedActivities(journey.sync_id) : [];
+    if (!journey.shared_dirty && plans.length === 0 && activities.length === 0) continue;
     let refused = false;
+    let merged = false;
     try {
       if (journey.shared_dirty) {
         const res = await sendJourney({
           journeyId: journey.sync_id,
           title: journey.title,
           legs: journey.legs,
+          ...(journey.shared_base && { base: journey.shared_base }),
           updatedAt: parseSyncStamp(journey.updated_at).toISOString(),
         });
         if (res.data.stale) refused = true;
-        else await clearSharedDirty(journey.sync_id, journey.updated_at);
+        else {
+          await clearSharedDirty(journey.sync_id, journey.updated_at);
+          merged = true;
+        }
       }
       for (const plan of plans) {
         const { local_id: _l, followed: _f, ...rest } = plan as typeof plan & { followed?: boolean };
@@ -662,14 +688,29 @@ export async function pushSharedEdits(uid: string): Promise<void> {
         if (res.data.stale) refused = true;
         await clearPlanDirty(plan.id, plan.updated_at);
       }
+      // One at a time, each its own last-write-wins: two friends adding
+      // ideas to the same stop never meet.
+      for (const activity of activities) {
+        const { local_id: _l, followed: _f, ...rest } = activity as typeof activity & { followed?: boolean };
+        const res = await sendActivity({
+          journeyId: journey.sync_id,
+          activity: { ...rest, updated_at: parseSyncStamp(activity.updated_at).toISOString() },
+        });
+        if (res.data.stale) refused = true;
+        await clearActivityDirty(activity.id, activity.updated_at);
+      }
     } catch (err: any) {
       // The right is gone, or the trip: the mirror decides what stays here.
       if (err?.code === 'functions/permission-denied' || err?.code === 'functions/not-found') refused = true;
       else throw err;
     }
-    if (refused) {
+    // After a merge the mirror holds more than this phone sent. Its
+    // snapshot may have arrived while the edit was still marked as unsent
+    // and been skipped, so it is read once more; an edit made here in the
+    // meantime is still kept (not forced).
+    if (refused || merged) {
       const mirror = await getDoc(doc(sharedJourneysCollection(), journey.sync_id));
-      if (mirror.exists()) await takeFollowedJourney(mirror.id, mirror.data(), uid, true);
+      if (mirror.exists()) await takeFollowedJourney(mirror.id, mirror.data(), uid, refused);
     }
   }
 }
@@ -818,6 +859,90 @@ export async function pullAccommodationsFromCloud(uid: string): Promise<void> {
   await changed.done();
 }
 
+// ─── Activities ───
+// One document per activity, compared by updated_at. The agent writes them
+// too, and the mirror for friends follows on the server (mirrorActivity in
+// functions/src/share.ts), so there is nothing to mirror from here.
+
+function activityFromDoc(id: string, data: DocumentData): Activity | null {
+  try {
+    const fields = normalizeActivity(data);
+    const updatedAt = data.updated_at instanceof Timestamp
+      ? data.updated_at.toDate().toISOString()
+      : typeof data.updated_at === 'string' ? data.updated_at : new Date().toISOString();
+    return {
+      ...fields,
+      id,
+      journey_id: String(data.journey_id ?? ''),
+      stop_id: typeof data.stop_id === 'string' && data.stop_id ? data.stop_id : null,
+      sort_order: typeof data.sort_order === 'number' ? data.sort_order : 0,
+      updated_at: updatedAt,
+      deleted: data.deleted === true,
+    };
+  } catch (err) {
+    // A document this version cannot read must not stop the rest.
+    if (data.deleted === true) {
+      return {
+        ...normalizeActivity({ title: 'Removed' }),
+        id,
+        journey_id: String(data.journey_id ?? ''),
+        stop_id: null,
+        sort_order: 0,
+        updated_at: data.updated_at instanceof Timestamp ? data.updated_at.toDate().toISOString() : new Date().toISOString(),
+        deleted: true,
+      };
+    }
+    reportError(err, 'sync:activity-read');
+    return null;
+  }
+}
+
+/** The activities in a shared trip's mirror, as the friend's phone stores them. */
+function followedActivitiesOf(journeyId: string, data: DocumentData): Activity[] {
+  const map = (data.activities ?? {}) as Record<string, DocumentData>;
+  return Object.entries(map)
+    .map(([id, x]) => activityFromDoc(id, { ...x, journey_id: journeyId }))
+    .filter((a): a is Activity => !!a && !a.deleted);
+}
+
+export async function pushActivitiesToCloud(uid: string): Promise<void> {
+  const all = await getAllActivitiesForSync();
+  if (all.length === 0) return;
+  const coll = activitiesCollection(uid);
+  const scope = await pushScope('activities', coll, all, (a) => a.id, (a) => a.updated_at);
+  let batch = writeBatch(db);
+  let ops = 0;
+  const commit = async () => {
+    if (ops === 0) return;
+    await batch.commit();
+    batch = writeBatch(db);
+    ops = 0;
+  };
+  for (const a of scope.rows) {
+    const localUpdatedAt = parseSyncStamp(a.updated_at);
+    const cloudData = scope.cloud.get(a.id);
+    if (cloudData) {
+      const cloudUpdatedAt = cloudData.updated_at instanceof Timestamp ? cloudData.updated_at.toDate() : new Date(0);
+      if (cloudUpdatedAt >= localUpdatedAt) continue;
+    }
+    const { local_id: _l, followed: _f, id, updated_at: _u, ...rest } = a as typeof a & { followed?: boolean };
+    batch.set(doc(coll, id), { ...rest, updated_at: Timestamp.fromDate(localUpdatedAt), synced_at: serverTimestamp() });
+    ops++;
+    if (ops >= BATCH_LIMIT) await commit();
+  }
+  await commit();
+  await scope.done();
+}
+
+export async function pullActivitiesFromCloud(uid: string): Promise<void> {
+  const changed = await changedDocs('activities', activitiesCollection(uid));
+  for (const docSnap of changed.docs) {
+    const a = activityFromDoc(docSnap.id, docSnap.data());
+    if (a && a.journey_id) await upsertActivityFromCloud(a);
+  }
+  await changed.done();
+}
+
 // ─── Bidirectional Sync ───
 
 /**
@@ -845,6 +970,8 @@ export async function syncAll(uid: string): Promise<void> {
     ['shared:push', () => pushSharedEdits(uid)],
     ['accommodations:pull', () => pullAccommodationsFromCloud(uid)],
     ['accommodations:push', () => pushAccommodationsToCloud(uid)],
+    ['activities:pull', () => pullActivitiesFromCloud(uid)],
+    ['activities:push', () => pushActivitiesToCloud(uid)],
     ['documents:pull', () => pullDocumentsFromCloud(uid)],
     ['documents:push', () => pushDocumentsToCloud(uid)],
     ['profile:push', () => pushProfileToCloud(uid)],
@@ -877,6 +1004,7 @@ export async function pushPlans(uid: string): Promise<void> {
   await pushJourneysToCloud(uid);
   await pushSharedEdits(uid);
   await pushAccommodationsToCloud(uid);
+  await pushActivitiesToCloud(uid);
   await pushDocumentsToCloud(uid);
 }
 
@@ -956,6 +1084,21 @@ export function startRealtimeSync(uid: string): Unsubscribe {
           await upsertAccommodationFromCloud(plan);
         } catch (err) {
           reportError(err, 'sync:accommodations-realtime');
+        }
+      }
+    }
+    if (snapshot.docChanges().length > 0) cloudChanged();
+  });
+
+  // Activities: what the agent adds shows up while the trip is open.
+  listenFrom('activities', activitiesCollection(uid), async (snapshot) => {
+    for (const change of snapshot.docChanges()) {
+      if (change.type === 'added' || change.type === 'modified') {
+        try {
+          const a = activityFromDoc(change.doc.id, change.doc.data());
+          if (a && a.journey_id) await upsertActivityFromCloud(a);
+        } catch (err) {
+          reportError(err, 'sync:activities-realtime');
         }
       }
     }

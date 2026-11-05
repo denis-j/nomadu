@@ -182,7 +182,15 @@ export async function checkProEntitlement(): Promise<Entitlement> {
   }
 
   try {
-    const customerInfo = await Purchases.getCustomerInfo();
+    let customerInfo = await Purchases.getCustomerInfo();
+    if (!customerInfo.entitlements.active[ENTITLEMENT_ID]) {
+      // The SDK answers from its cache and refreshes behind it, so a
+      // subscription that renewed since looks expired: the paywall opened at
+      // launch, then "welcome to Pro" once the refresh arrived. A no sends
+      // someone to the paywall, so it has to come from RevenueCat itself.
+      await Purchases.invalidateCustomerInfoCache();
+      customerInfo = await Purchases.getCustomerInfo();
+    }
     const entitlement = customerInfo.entitlements.active[ENTITLEMENT_ID];
 
     const fresh = {

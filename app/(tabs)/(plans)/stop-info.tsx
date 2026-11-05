@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,7 +27,10 @@ import { useAccommodation } from '../../../hooks/useAccommodations';
 import { useAuth } from '../../../hooks/useAuth';
 import { countDays, toYmd } from '../../../lib/days';
 import { getCitizenship } from '../../../lib/onboarding';
-import { setPendingStay } from '../../../lib/accommodationBridge';
+import { setPendingActivities, setPendingStay } from '../../../lib/accommodationBridge';
+import { useJourneyActivities } from '../../../hooks/useActivities';
+import { DetailCard, DetailRow, DetailSeparator, LinkCard } from '../../../components/SheetRows';
+import { ACTIVITIES_UI } from '../../../lib/activityModel';
 import { formatMoney, nightsBetween, primaryOption } from '../../../lib/accommodationModel';
 import { showToast } from '../../../lib/toast';
 
@@ -108,6 +110,9 @@ export default function StopInfoScreen() {
   const transport = transportInfo(params.transport);
 
   const { plan: stay } = useAccommodation(params.stopSyncId);
+  const stopIds = useMemo(() => [params.stopSyncId ?? null], [params.stopSyncId]);
+  const { byStop: activitiesByStop } = useJourneyActivities(params.journeySyncId, stopIds);
+  const things = params.stopSyncId ? activitiesByStop.get(params.stopSyncId) ?? [] : [];
   const readOnly = params.readOnly === '1';
 
   // The visa rule for this passport in this country, the same one the
@@ -159,6 +164,13 @@ export default function StopInfoScreen() {
       end: params.end,
       readOnly,
     });
+    nav.goBack();
+  };
+
+  const openActivities = () => {
+    if (!params.stopSyncId || !params.journeySyncId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPendingActivities({ stopSyncId: params.stopSyncId, journeySyncId: params.journeySyncId, readOnly });
     nav.goBack();
   };
 
@@ -224,19 +236,19 @@ export default function StopInfoScreen() {
         {/* Details */}
         <View style={styles.section}>
           <SectionLabel>Stop details</SectionLabel>
-          <GlassCard {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
+          <DetailCard>
             <DetailRow icon="log-in-outline" label="Arrival" value={fmtLong(startDate)} />
-            <View style={styles.separator} />
+            <DetailSeparator />
             <DetailRow icon="log-out-outline" label="Departure" value={fmtLong(endDate)} />
             {visa ? (
               <>
-                <View style={styles.separator} />
+                <DetailSeparator />
                 <DetailRow icon="document-text-outline" label="Visa" value={visa} />
               </>
             ) : null}
             {params.notes ? (
               <>
-                <View style={styles.separator} />
+                <DetailSeparator />
                 <View style={styles.notesRow}>
                   <View style={styles.detailLeft}>
                     <Ionicons name="create-outline" size={18} color={Colors.textTertiary} />
@@ -246,33 +258,32 @@ export default function StopInfoScreen() {
                 </View>
               </>
             ) : null}
-          </GlassCard>
+          </DetailCard>
         </View>
 
         {/* Where to stay. On a friend's trip only once they planned something. */}
         {params.stopSyncId && params.journeySyncId && (!readOnly || stay) ? (
-          <Pressable onPress={openAccommodation} style={({ pressed }) => [styles.section, pressed && { opacity: 0.7 }]}>
-            <GlassCard {...glassProps} style={[styles.card, styles.stayCard, !hasGlass && styles.cardFallback]}>
-              <View style={styles.stayIcon}>
-                <Ionicons name="bed-outline" size={20} color={Colors.text} />
-              </View>
-              <View style={styles.stayText}>
-                {stay ? (
-                  <>
-                    <Text style={styles.stayTitle} numberOfLines={1}>{planChipText(stay)}</Text>
-                    <Text style={styles.staySub} numberOfLines={1}>{staySummary(stay)}</Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.stayTitle}>Where to stay</Text>
-                    <Text style={styles.staySub}>Requirements, options, the booking</Text>
-                  </>
-                )}
-              </View>
-              {stay ? <StatusBadge status={stay.status} size="small" /> : null}
-              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-            </GlassCard>
-          </Pressable>
+          <View style={styles.section}>
+            <LinkCard
+              icon="bed-outline"
+              title={stay ? planChipText(stay) : 'Where to stay'}
+              sub={stay ? staySummary(stay) : 'Requirements, options, the booking'}
+              right={stay ? <StatusBadge status={stay.status} size="small" /> : undefined}
+              onPress={openAccommodation}
+            />
+          </View>
+        ) : null}
+
+        {/* Things to do, the same way in. */}
+        {ACTIVITIES_UI && params.stopSyncId && params.journeySyncId && (!readOnly || things.length > 0) ? (
+          <View style={styles.section}>
+            <LinkCard
+              icon="sparkles-outline"
+              title={things.length === 0 ? 'Things to do' : things.length === 1 ? '1 thing to do' : `${things.length} things to do`}
+              sub={things.length === 0 ? 'Ideas, suggestions, posts you saved' : things.slice(0, 3).map((a) => a.title).join(', ')}
+              onPress={openActivities}
+            />
+          </View>
         ) : null}
 
         {/* Tips */}
@@ -296,18 +307,6 @@ export default function StopInfoScreen() {
         )}
       </ScrollView>
     </>
-  );
-}
-
-function DetailRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <View style={styles.detailLeft}>
-        <Ionicons name={icon} size={18} color={Colors.textTertiary} />
-        <Text style={styles.detailLabel}>{label}</Text>
-      </View>
-      <Text selectable style={styles.detailValue}>{value}</Text>
-    </View>
   );
 }
 
@@ -344,27 +343,10 @@ const styles = StyleSheet.create({
   section: { marginHorizontal: 16, marginTop: 16, gap: 10 },
   card: { borderRadius: 16, padding: 18, overflow: 'hidden' },
   cardFallback: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
-  separator: { height: 1, backgroundColor: Colors.border, marginVertical: 12 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   detailLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   detailLabel: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary },
-  detailValue: { ...Typography.bodySmall, fontSize: 14, fontWeight: '500', flexShrink: 1, textAlign: 'right' },
   notesRow: { gap: 8 },
   notesText: { ...Typography.bodySmall, fontSize: 14, lineHeight: 20 },
-  // ─── Where to stay ───
-  stayCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  stayIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    borderCurve: 'continuous',
-    backgroundColor: Colors.surfaceSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stayText: { flex: 1, gap: 2 },
-  stayTitle: { ...Typography.titleSmall, fontWeight: '600' },
-  staySub: { ...Typography.bodySmall, color: Colors.textSecondary },
   // ─── Actions ───
   actions: { flexDirection: 'row', justifyContent: 'center', gap: 32, marginHorizontal: 16, marginTop: 24, paddingVertical: 14 },
   actionButton: { alignItems: 'center' },

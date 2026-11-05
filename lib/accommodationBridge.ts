@@ -34,3 +34,22 @@ export function consumePendingStay(): PendingStay | null {
   pending = null;
   return v;
 }
+
+/** The same handover for a stop's things to do (app/(tabs)/(plans)/activities.tsx). */
+export interface PendingActivities {
+  stopSyncId: string;
+  journeySyncId: string;
+  readOnly?: boolean;
+}
+
+let pendingActivities: PendingActivities | null = null;
+
+export function setPendingActivities(value: PendingActivities | null): void {
+  pendingActivities = value;
+}
+
+export function consumePendingActivities(): PendingActivities | null {
+  const v = pendingActivities;
+  pendingActivities = null;
+  return v;
+}

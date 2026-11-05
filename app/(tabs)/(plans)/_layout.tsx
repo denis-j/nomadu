@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router/stack';
-import { Colors, sheetBackground, sheetWithHeader } from '../../../constants/colors';
+import { Colors, headerTransparent, sheetBackground, sheetWithHeader } from '../../../constants/colors';
 
 export default function PlansStack() {
   return (
@@ -80,6 +80,36 @@ export default function PlansStack() {
         options={{
           headerBackButtonDisplayMode: 'minimal',
           headerLargeTitle: false,
+        }}
+      />
+      <Stack.Screen
+        name="activities"
+        options={{
+          // Draws its own header with glass discs, like the trip.
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="activity"
+        options={{
+          presentation: 'formSheet',
+          headerShown: false,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.9, 1.0],
+          // A solid sheet: the glass let the covers behind show through.
+          contentStyle: { backgroundColor: Colors.background },
+        }}
+      />
+      <Stack.Screen
+        name="activity-add"
+        options={{
+          presentation: sheetWithHeader,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.9, 1.0],
+          headerShadowVisible: false,
+          headerTransparent,
+          // A solid sheet: the glass let the covers behind show through.
+          contentStyle: { backgroundColor: Colors.background },
         }}
       />
       <Stack.Screen

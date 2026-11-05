@@ -2,9 +2,11 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { useAuth } from '../hooks/useAuth';
 import {
   completeOnboarding as completeOnboardingStorage,
+  isNewAccount,
   isOnboardingComplete,
   LOCAL_ONBOARDING_UID,
   migrateLocalOnboardingData,
+  restoreOnboardingFromCloud,
 } from '../lib/onboarding';
 
 interface OnboardingContextValue {
@@ -45,7 +47,11 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         return;
       }
       await migrateLocalOnboardingData(user.uid);
-      const done = await isOnboardingComplete(user.uid);
+      let done = (await isOnboardingComplete(user.uid)) || (await restoreOnboardingFromCloud(user.uid));
+      if (!done && !isNewAccount(user)) {
+        await completeOnboardingStorage(user.uid);
+        done = true;
+      }
       if (!cancelled) setState({ uid: user.uid, done });
     })();
     return () => {

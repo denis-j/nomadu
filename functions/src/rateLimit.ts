@@ -14,13 +14,16 @@
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 
-export type Operation = 'suggestStops' | 'cityTips' | 'extractTrips';
+export type Operation = 'suggestStops' | 'cityTips' | 'extractTrips' | 'suggestActivities' | 'importActivityLink';
 
 /** Daily allowance per user. Vision is the expensive one, so it gets the least. */
 const DAILY_LIMIT: Record<Operation, number> = {
   suggestStops: 40,
   cityTips: 60,
   extractTrips: 30,
+  suggestActivities: 40,
+  // A fetch of someone else's page plus a model call, often with a picture.
+  importActivityLink: 30,
 };
 
 /** Usage docs are only interesting for the day they cover. */

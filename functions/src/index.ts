@@ -12,15 +12,16 @@
  */
 
 import { initializeApp } from 'firebase-admin/app';
-import { defineSecret } from 'firebase-functions/params';
 import { CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 
-import { generateFromImage, generateText, extractJsonArray } from './gemini';
+import { generateFromImage, generateText, extractJsonArray, geminiKey } from './gemini';
 import {
   TRIP_EXTRACTION_PROMPT,
+  buildActivitySuggestionPrompt,
   buildCityTipsPrompt,
   buildStopSuggestionPrompt,
+  coerceActivitySuggestions,
   sanitize,
   type Leg,
 } from './prompts';
@@ -32,10 +33,9 @@ initializeApp();
 
 export { deleteAccount } from './deleteAccount';
 export { agentApi, createAgentToken, revokeAgentToken, listAgentTokens } from './agent';
-export { shareJourney, previewInvite, joinJourney, leaveJourney, removeJourneyMember, unshareJourney, setJourneyMemberCanEdit, updateSharedJourney, updateSharedAccommodation, sharePage, sharedProfiles } from './share';
+export { shareJourney, previewInvite, joinJourney, leaveJourney, removeJourneyMember, unshareJourney, setJourneyMemberCanEdit, updateSharedJourney, updateSharedAccommodation, updateSharedActivity, sharePage, sharedProfiles, mirrorJourney, mirrorAccommodation, mirrorActivity } from './share';
+export { importActivityLink } from './linkImport';
 export { sharedDocumentFiles } from './documentFiles';
-
-const geminiKey = defineSecret('GEMINI_API_KEY');
 
 /** Shared deployment options. Adjust `region` if your Firestore lives elsewhere. */
 const options = {
@@ -136,6 +136,44 @@ export const cityTips = onCall(options, async (request) => {
     return text;
   });
   return { tips };
+});
+
+// ─── Activity suggestions ────────────────────────────────────────────────────
+
+const MAX_EXISTING_TITLES = 50;
+
+export const suggestActivities = onCall(options, async (request) => {
+  const uid = requireUid(request);
+  const data = request.data ?? {};
+
+  const city = requireString(data.city, 'city', 80);
+  const country = requireString(data.country, 'country', 80);
+  const startDate = requireString(data.startDate, 'startDate', 10);
+  const endDate = requireString(data.endDate, 'endDate', 10);
+  if (data.existing !== undefined && !Array.isArray(data.existing)) {
+    throw new HttpsError('invalid-argument', '"existing" must be a list of titles.');
+  }
+  // What is already planned, so the model offers something new. A longer
+  // list is cut rather than refused: the newest ideas matter least here.
+  const existing: string[] = (Array.isArray(data.existing) ? data.existing : [])
+    .filter((t: unknown): t is string => typeof t === 'string' && t.trim().length > 0)
+    .slice(0, MAX_EXISTING_TITLES)
+    .map((t: string) => sanitize(t, 120));
+  const interests =
+    typeof data.interests === 'string' && data.interests.trim() ? sanitize(data.interests, 300) : undefined;
+
+  await requireAppAccess(request, uid, 'suggestActivities');
+  await consumeQuota(uid, 'suggestActivities');
+
+  const prompt = buildActivitySuggestionPrompt({ city, country, startDate, endDate, existing, interests });
+  const raw = await generateText(geminiKey.value(), prompt, 2048, 0.8);
+
+  const parsed = extractJsonArray(raw);
+  if (!parsed) {
+    logger.warn('suggestActivities: no JSON array in response', { preview: raw.slice(0, 300) });
+    throw new HttpsError('internal', 'Could not read the AI response. Please try again.');
+  }
+  return { suggestions: coerceActivitySuggestions(parsed, existing) };
 });
 
 // ─── Trip extraction from a screenshot ───────────────────────────────────────

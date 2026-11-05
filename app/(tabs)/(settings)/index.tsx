@@ -218,7 +218,7 @@ export default function SettingsScreen() {
         <View style={styles.separator} />
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Email</Text>
-          <Text style={styles.rowValue}>{user?.email ?? 'Not set'}</Text>
+          <Text style={[styles.rowValue, styles.emailValue]} numberOfLines={1} ellipsizeMode="middle">{user?.email ?? 'Not set'}</Text>
         </View>
         <View style={styles.separator} />
         <Pressable
@@ -653,6 +653,10 @@ const styles = StyleSheet.create({
   rowValue: {
     ...Typography.body,
     color: Colors.textSecondary,
+  },
+  emailValue: {
+    flexShrink: 1,
+    marginLeft: 16,
   },
   passportValue: {
     flexDirection: 'row',

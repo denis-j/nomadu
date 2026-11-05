@@ -40,17 +40,37 @@ export function DocumentsEntryCard({
     : summarizeKinds(documents.map((d) => d.kind))
       + (travellers.length > 1 ? ` · ${travellers.length} travellers` : '');
 
+  return <EntryCard icon="documents-outline" title="Documents" sub={sub} count={documents.length} onPress={open} />;
+}
+
+/**
+ * A one-line way from the top of the itinerary into one of the trip's
+ * pages (documents, things to do): icon, title, a grey line, a count.
+ */
+export function EntryCard({
+  icon,
+  title,
+  sub,
+  count,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  sub: string;
+  count: number;
+  onPress: () => void;
+}) {
   return (
-    <Pressable onPress={open} style={({ pressed }) => pressed && { opacity: 0.7 }}>
+    <Pressable onPress={onPress} style={({ pressed }) => pressed && { opacity: 0.7 }}>
       <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
         <View style={styles.icon}>
-          <Ionicons name="documents-outline" size={20} color={Colors.text} />
+          <Ionicons name={icon} size={20} color={Colors.text} />
         </View>
         <View style={styles.text}>
-          <Text style={styles.title}>Documents</Text>
+          <Text style={styles.title}>{title}</Text>
           <Text style={styles.sub} numberOfLines={1}>{sub}</Text>
         </View>
-        {documents.length > 0 && <Text style={styles.count}>{documents.length}</Text>}
+        {count > 0 && <Text style={styles.count}>{count}</Text>}
         <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
       </Glass>
     </Pressable>

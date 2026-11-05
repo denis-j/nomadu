@@ -3,8 +3,12 @@
  * function; it is passed in by the caller from `geminiKey.value()`.
  */
 
+import { defineSecret } from 'firebase-functions/params';
 import { HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
+
+/** The key, in Secret Manager. One definition for every module that calls Gemini. */
+export const geminiKey = defineSecret('GEMINI_API_KEY');
 
 const MODEL = 'gemini-3.1-flash-lite';
 const ENDPOINT =

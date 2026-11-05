@@ -26,6 +26,9 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
   // Who may plan along, as the shared trip says. Read live, not stored: the
   // owner changes it here, and it is only ever needed while this is open.
   const [editors, setEditors] = useState<Set<string>>(new Set());
+  // Friends being removed: gone from the row at once, while the server
+  // (which can take a few seconds to wake up) does the actual removal.
+  const [removing, setRemoving] = useState<Set<string>>(new Set());
   const syncId = journey?.sync_id ?? null;
   const sharedTrip = !!journey?.share_code || !!journey?.shared_owner_uid;
 
@@ -54,7 +57,7 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
   }, [loadEditors]);
 
   const isOwner = !owner;
-  const people = avatarPeople(travellers, uid, owner);
+  const people = avatarPeople(travellers, uid, owner).filter((p) => !removing.has(p.key));
   const byKey = new Map(travellers.map((t) => [String(t.id), t]));
   const shared = !!journey?.share_code;
   const url = journey?.share_code ? `${SHARE_BASE}/${journey.share_code}` : null;
@@ -90,15 +93,28 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
+            const hide = (on: boolean) => setRemoving((prev) => {
+              const next = new Set(prev);
+              if (on) next.add(p.key);
+              else next.delete(p.key);
+              return next;
+            });
+            hide(true);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            showToast(`${p.label} removed`);
             try {
-              if (isMember && journey?.sync_id) await removeMember(journey.sync_id, t.uid!);
-              else await deleteJourneyTraveller(t.id);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              showToast(`${p.label} removed`);
+              if (isMember && journey?.sync_id) {
+                await removeMember(journey.sync_id, t.uid!);
+                // Off the list here too, without waiting for the mirror's snapshot.
+                await deleteJourneyTraveller(t.id);
+              } else {
+                await deleteJourneyTraveller(t.id);
+              }
             } catch (err: any) {
-              showToast(err?.message ?? 'Could not remove', 'error');
+              showToast(err?.message ?? `Could not remove ${p.label}`, 'error');
             }
-            reload();
+            await reload();
+            hide(false);
           },
         },
       ],

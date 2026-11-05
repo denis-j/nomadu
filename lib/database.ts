@@ -8,6 +8,7 @@ import { getCountryName } from '../utils/geography';
 // ─── Stats Queries ───
 
 import type { Stats } from './stats';
+import { memberTravellerId } from './members';
 
 let db: SQLite.SQLiteDatabase | null = null;
 let opening: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -49,7 +50,10 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
  * over every journey's stops) on each launch, background location wakes
  * included, was work before the first screen for nothing.
  */
-const SCHEMA_VERSION = 5;
+// 6: journeys.shared_base and the activities table. Both were added to the
+// steps without a bump at first, so installs already at 5 never got them
+// and every pull of a journey failed on the missing column.
+const SCHEMA_VERSION = 6;
 
 async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
   // Per connection, so on every open.
@@ -211,6 +215,39 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_accommodation_options_plan ON accommodation_options(accommodation_id);
 
+    -- Things to do (lib/activityModel.ts): many per stop, one row each, so
+    -- two people adding ideas never write over each other. Keyed by their
+    -- own sync id, which is the cloud document id. The stop is referenced by
+    -- its sync id and may be empty (not placed yet) or point at a stop that
+    -- is gone, which the app shows as not placed. Tombstoned like the rest;
+    -- followed and dirty work as on accommodations.
+    CREATE TABLE IF NOT EXISTS activities (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      sync_id         TEXT NOT NULL UNIQUE,
+      journey_sync_id TEXT NOT NULL,
+      stop_sync_id    TEXT,
+      title           TEXT NOT NULL,
+      category        TEXT NOT NULL DEFAULT 'other',
+      status          TEXT NOT NULL DEFAULT 'idea',
+      place           TEXT,
+      address         TEXT,
+      latitude        REAL,
+      longitude       REAL,
+      url             TEXT,
+      price           REAL,
+      currency        TEXT,
+      notes           TEXT,
+      source          TEXT NOT NULL DEFAULT 'manual',
+      source_url      TEXT,
+      image_url       TEXT,
+      sort_order      INTEGER NOT NULL DEFAULT 0,
+      updated_at      TEXT NOT NULL,
+      deleted         INTEGER NOT NULL DEFAULT 0,
+      followed        INTEGER NOT NULL DEFAULT 0,
+      dirty           INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_activities_journey ON activities(journey_sync_id);
+
     CREATE TABLE IF NOT EXISTS app_meta (
       key   TEXT PRIMARY KEY,
       value TEXT
@@ -295,6 +332,10 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
     // reached the owner yet, so the next look at the mirror does not undo it.
     ['journeys', 'shared_can_edit INTEGER NOT NULL DEFAULT 0'],
     ['journeys', 'shared_dirty INTEGER NOT NULL DEFAULT 0'],
+    // The friend's trip as the mirror last had it (title and stops, JSON):
+    // what an edit made here started from, so the owner's side takes only
+    // the change and not this phone's whole, possibly older, list.
+    ['journeys', 'shared_base TEXT'],
     ['accommodations', 'dirty INTEGER NOT NULL DEFAULT 0'],
     // Documents of a shared trip travel through Storage: a stable id for
     // the cloud record, who uploaded it, where the file is, and a clock.
@@ -714,6 +755,8 @@ export interface Journey {
   shared_can_edit: number;
   /** 1 while an edit made here to a followed trip has not reached the owner. */
   shared_dirty: number;
+  /** A followed trip as its mirror last had it, JSON `{ title, legs }`: the base of an edit made here. */
+  shared_base: string | null;
   // computed fields from getAllJourneys()
   leg_count?: number;
   first_start?: string | null;
@@ -823,6 +866,10 @@ export async function deleteJourney(id: number): Promise<void> {
       `UPDATE accommodations SET deleted = 1, updated_at = ? WHERE journey_sync_id = ? AND deleted = 0`,
       [new Date().toISOString(), journey.sync_id],
     );
+    await database.runAsync(
+      `UPDATE activities SET deleted = 1, updated_at = ? WHERE journey_sync_id = ? AND deleted = 0 AND followed = 0`,
+      [new Date().toISOString(), journey.sync_id],
+    );
   }
   localChanged();
 }
@@ -883,6 +930,7 @@ export interface JourneyForSync {
   shared_owner_uid: string | null;
   shared_can_edit: boolean;
   shared_dirty: boolean;
+  shared_base: { title: string; legs: JourneySyncLeg[] } | null;
 }
 
 export async function getAllJourneysForSync(): Promise<JourneyForSync[]> {
@@ -918,7 +966,18 @@ export async function getAllJourneysForSync(): Promise<JourneyForSync[]> {
     shared_owner_uid: j.shared_owner_uid ?? null,
     shared_can_edit: j.shared_can_edit === 1,
     shared_dirty: j.shared_dirty === 1,
+    shared_base: parseSharedBase(j.shared_base),
   }));
+}
+
+function parseSharedBase(value: string | null | undefined): JourneyForSync['shared_base'] {
+  if (!value) return null;
+  try {
+    const base = JSON.parse(value);
+    return base && Array.isArray(base.legs) ? base : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -927,7 +986,7 @@ export async function getAllJourneysForSync(): Promise<JourneyForSync[]> {
  * in place, extra local ones go, missing ones are inserted.
  */
 export async function upsertJourneyFromCloud(
-  remote: Omit<JourneyForSync, 'id' | 'share_code' | 'shared_owner_uid' | 'shared_can_edit' | 'shared_dirty'>,
+  remote: Omit<JourneyForSync, 'id' | 'share_code' | 'shared_owner_uid' | 'shared_can_edit' | 'shared_dirty' | 'shared_base'>,
   /** Given for a friend's trip pulled from `shared_journeys`; absent for this account's own. */
   sharedOwner: SharedOwner | null = null,
 ): Promise<void> {
@@ -952,7 +1011,7 @@ export interface SharedOwner {
 
 async function applyJourneyFromCloud(
   database: SQLite.SQLiteDatabase,
-  remote: Omit<JourneyForSync, 'id' | 'share_code' | 'shared_owner_uid' | 'shared_can_edit' | 'shared_dirty'>,
+  remote: Omit<JourneyForSync, 'id' | 'share_code' | 'shared_owner_uid' | 'shared_can_edit' | 'shared_dirty' | 'shared_base'>,
   sharedOwner: SharedOwner | null,
 ): Promise<void> {
   remote = { ...remote, legs: remote.legs.map((l) => ({ ...l, country: countryNameFor(l.country_code, l.country) })) };
@@ -968,15 +1027,16 @@ async function applyJourneyFromCloud(
     return;
   }
 
+  const base = sharedOwner ? JSON.stringify({ title: remote.title, legs: remote.legs }) : null;
   let journeyId: number;
   if (existing) {
     await database.runAsync(
       `UPDATE journeys SET title = ?, updated_at = ?, deleted = ?, shared_owner_uid = ?, shared_owner_name = ?,
-         shared_can_edit = ?, shared_dirty = 0 WHERE id = ?`,
+         shared_can_edit = ?, shared_dirty = 0, shared_base = ? WHERE id = ?`,
       [
         remote.title, remote.updated_at, remote.deleted ? 1 : 0,
         sharedOwner?.uid ?? existing.shared_owner_uid, sharedOwner?.name ?? existing.shared_owner_name,
-        sharedOwner ? (sharedOwner.canEdit ? 1 : 0) : existing.shared_can_edit, existing.id,
+        sharedOwner ? (sharedOwner.canEdit ? 1 : 0) : existing.shared_can_edit, base ?? existing.shared_base, existing.id,
       ],
     );
     journeyId = existing.id;
@@ -985,8 +1045,8 @@ async function applyJourneyFromCloud(
     // OR IGNORE: the unique index on sync_id makes a concurrent second insert
     // of the same document (snapshot listener racing the pull) a no-op.
     await database.runAsync(
-      'INSERT OR IGNORE INTO journeys (title, sync_id, updated_at, deleted, shared_owner_uid, shared_owner_name, shared_can_edit) VALUES (?, ?, ?, 0, ?, ?, ?)',
-      [remote.title, remote.sync_id, remote.updated_at, sharedOwner?.uid ?? null, sharedOwner?.name ?? null, sharedOwner?.canEdit ? 1 : 0],
+      'INSERT OR IGNORE INTO journeys (title, sync_id, updated_at, deleted, shared_owner_uid, shared_owner_name, shared_can_edit, shared_base) VALUES (?, ?, ?, 0, ?, ?, ?, ?)',
+      [remote.title, remote.sync_id, remote.updated_at, sharedOwner?.uid ?? null, sharedOwner?.name ?? null, sharedOwner?.canEdit ? 1 : 0, base],
     );
     const row = await database.getFirstAsync<{ id: number }>('SELECT id FROM journeys WHERE sync_id = ?', [remote.sync_id]);
     if (!row) return;
@@ -1100,14 +1160,17 @@ export async function forgetFollowedJourney(syncId: string): Promise<string[]> {
   const files = await database.getAllAsync<{ file_name: string }>('SELECT file_name FROM journey_documents WHERE journey_id = ?', [row.id]);
   await database.runAsync('DELETE FROM journeys WHERE id = ?', [row.id]);
   await database.runAsync('DELETE FROM accommodations WHERE journey_sync_id = ? AND followed = 1', [syncId]);
+  await database.runAsync('DELETE FROM activities WHERE journey_sync_id = ? AND followed = 1', [syncId]);
   return files.map((f) => f.file_name);
 }
 
 /**
  * The friends who joined a trip this phone owns, as travellers. One row per
  * account, named as they named themselves; a friend who was already listed
- * by hand under that exact name takes over that row. Returns whether
- * anything changed, so the caller can push the new list to the mirror.
+ * by hand under that exact name takes over that row. The server does the
+ * same on the owner's trip in the cloud (functions/src/share.ts), under the
+ * same traveller id (lib/members.ts). Returns whether anything changed, so
+ * the caller can push the new list to the mirror.
  */
 export async function syncJourneyMembers(syncId: string, members: { uid: string; name: string; avatar?: string | null }[], ownerUid: string): Promise<boolean> {
   const database = await getDatabase();
@@ -1115,11 +1178,12 @@ export async function syncJourneyMembers(syncId: string, members: { uid: string;
   if (!journey) return false;
   const travellers = await getJourneyTravellers(journey.id);
   let changed = false;
-  // A friend who left or was removed stays as a name (their documents keep
-  // their tab), just no longer as an account.
+  // A friend who left or was removed is off the trip. Kept as a bare name,
+  // they looked as if the removal had not worked. Their documents stay,
+  // just without a name on them, as when a traveller is deleted by hand.
   for (const t of travellers) {
     if (t.uid && t.uid !== ownerUid && !members.some((m) => m.uid === t.uid)) {
-      await database.runAsync('UPDATE journey_travellers SET uid = NULL WHERE id = ?', [t.id]);
+      await database.runAsync('DELETE FROM journey_travellers WHERE id = ?', [t.id]);
       changed = true;
     }
   }
@@ -1138,9 +1202,9 @@ export async function syncJourneyMembers(syncId: string, members: { uid: string;
       await database.runAsync('UPDATE journey_travellers SET uid = ?, avatar = ? WHERE id = ?', [m.uid, avatar, byName.id]);
     } else {
       await database.runAsync(
-        `INSERT INTO journey_travellers (journey_id, name, sort_order, sync_id, uid, avatar)
+        `INSERT OR IGNORE INTO journey_travellers (journey_id, name, sort_order, sync_id, uid, avatar)
          VALUES (?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM journey_travellers WHERE journey_id = ?), ?, ?, ?)`,
-        [journey.id, m.name, journey.id, Crypto.randomUUID(), m.uid, avatar],
+        [journey.id, m.name, journey.id, memberTravellerId(syncId, m.uid), m.uid, avatar],
       );
     }
     changed = true;
@@ -1644,6 +1708,7 @@ export async function wipeLocalDatabase(): Promise<void> {
     await tx.execAsync(`
       DELETE FROM accommodation_options;
       DELETE FROM accommodations;
+      DELETE FROM activities;
       DELETE FROM journey_documents;
       DELETE FROM journey_travellers;
       DELETE FROM journey_legs;
@@ -1708,6 +1773,7 @@ export async function purgeSyncedTombstones(): Promise<number> {
     { table: 'user_visas', mark: 'visas' },
     { table: 'journeys', mark: 'journeys', also: 'AND NOT EXISTS (SELECT 1 FROM journey_documents d WHERE d.journey_id = journeys.id)' },
     { table: 'accommodations', mark: 'accommodations' },
+    { table: 'activities', mark: 'activities' },
   ];
   let purged = 0;
   for (const { table, mark, also } of tables) {

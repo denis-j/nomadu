@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 
 import { Timestamp, __get, __reset, __seed } from './fakeFirestore';
 import { __storageDeleted, __storageReset } from './fakeStorage';
-import { forgetUser, join, leave, mirrorOf, newCode, preview, removeMember, setMemberCanEdit, share, sharePageHtml, spreadProfile, unshare, updateShared, updateSharedStay } from '../src/share';
+import { memberTravellerId } from '../../lib/members';
+import { forgetUser, join, leave, mergeLegs, mirrorOf, newCode, refreshMirror, refreshMirrorStay, preview, removeMember, setMemberCanEdit, share, sharePageHtml, spreadProfile, unshare, updateShared, updateSharedStay } from '../src/share';
 import { isTripFile, staleFile } from '../src/documentFiles';
 
 const LEGS = [
@@ -337,13 +338,14 @@ describe('friends who plan along', () => {
   test('a member with the right changes the stops in the owner\'s trip and in the mirror', async () => {
     await sharedWithAnna();
     await setMemberCanEdit('owner', { journeyId: 'j1', memberUid: 'anna', canEdit: true });
+    const travellersBefore = (__get('users/owner/journeys/j1')! as any).travellers;
     const res = await updateShared('anna', { journeyId: 'j1', title: 'Vietnam 2026', legs: moved, ...later('2026-09-02T10:00:00Z') });
     assert.deepEqual(res, { ok: true, stale: false });
     const own = __get('users/owner/journeys/j1')! as any;
     assert.equal(own.title, 'Vietnam 2026');
     assert.deepEqual(own.legs.map((l: any) => l.city), ['Hanoi', 'Hoi An', 'Da Nang']);
     assert.ok(own.synced_at, 'the owner\'s pull must see the change');
-    assert.equal(own.travellers.length, 1, 'travellers stay the owner\'s');
+    assert.deepEqual(own.travellers, travellersBefore, 'travellers stay the owner\'s');
     const mirror = __get('shared_journeys/j1')! as any;
     assert.deepEqual(mirror.legs.map((l: any) => l.city), ['Hanoi', 'Hoi An', 'Da Nang']);
   });
@@ -387,5 +389,157 @@ describe('friends who plan along', () => {
     assert.ok(own.synced_at);
     assert.equal((__get('shared_journeys/j1')! as any).accommodations.s1.options[0].name, 'Hanoi Loft');
     assert.deepEqual(await updateSharedStay('anna', { journeyId: 'j1', plan: { ...plan, updated_at: '2026-09-01T10:00:00Z' } }), { ok: false, stale: true });
+  });
+});
+
+describe('a member\'s edit, merged into the owner\'s trip', () => {
+  const H = LEGS[0];
+  const U = LEGS[1];
+  const DN = { ...LEGS[1], sync_id: 's3', city: 'Da Nang', start_date: '2026-11-08', end_date: '2026-11-10', sort_order: 2 };
+  const SG = { ...LEGS[1], sync_id: 's4', city: 'Saigon', country_code: 'VN', start_date: '2026-11-08', end_date: '2026-11-09', sort_order: 2 };
+  const cities = (legs: any[]) => legs.map((l) => l.city);
+
+  async function editor() {
+    const { code } = await share('owner', { journeyId: 'j1' });
+    await join('anna', { code });
+    await setMemberCanEdit('owner', { journeyId: 'j1', memberUid: 'anna', canEdit: true });
+  }
+
+  test('a stale phone adding one stop does not undo what the owner added meanwhile', () => {
+    // Anna last saw Hanoi, Hue; the owner (or the agent) added Saigon since.
+    // Both went in after Hue; the member's lands right after it, the owner's follows.
+    const merged = mergeLegs([H, U], [H, U, DN], [H, U, SG]);
+    assert.deepEqual(cities(merged), ['Hanoi', 'Hue', 'Da Nang', 'Saigon']);
+  });
+
+  test('changes to different fields of the same stop both stay', () => {
+    const merged = mergeLegs([H, U], [H, { ...U, notes: 'night train' }], [H, { ...U, transport: 'bus' }]);
+    assert.equal(merged[1].notes, 'night train');
+    assert.equal(merged[1].transport, 'bus');
+  });
+
+  test('a stop removed on either side stays removed', () => {
+    assert.deepEqual(cities(mergeLegs([H, U], [H], [H, U, SG])), ['Hanoi', 'Saigon']);
+    assert.deepEqual(cities(mergeLegs([H, U], [H, { ...U, notes: 'x' }], [H])), ['Hanoi']);
+  });
+
+  test('a member\'s reorder leads, the owner\'s new stops are woven in', () => {
+    // Saigon was added after Hue, so it stays right after Hue.
+    const merged = mergeLegs([H, U], [U, H], [H, U, SG]);
+    assert.deepEqual(cities(merged), ['Hue', 'Saigon', 'Hanoi']);
+  });
+
+  test('the dates are chained again from the first stop', () => {
+    const merged = mergeLegs([H, U], [H, { ...U, start_date: '2026-11-05', end_date: '2026-11-10' }], [H, U, SG]);
+    assert.deepEqual(merged.map((l) => [l.start_date, l.end_date]), [
+      ['2026-11-01', '2026-11-04'],
+      ['2026-11-05', '2026-11-10'],
+      ['2026-11-11', '2026-11-12'],
+    ]);
+    assert.deepEqual(merged.map((l) => l.sort_order), [0, 1, 2]);
+  });
+
+  test('with a base, an old phone clock no longer decides: only the change goes in', async () => {
+    await editor();
+    // The agent added Saigon to the owner's trip after Anna's phone last looked.
+    __seed('users/owner/journeys/j1', { ...__get('users/owner/journeys/j1')!, legs: [H, U, SG], updated_at: Timestamp.fromDate(new Date('2026-09-05T10:00:00Z')) });
+    const res = await updateShared('anna', {
+      journeyId: 'j1',
+      title: 'Vietnam',
+      legs: [H, { ...U, notes: 'night train' }],
+      base: { title: 'Vietnam', legs: [H, U] },
+      updatedAt: '2026-09-02T10:00:00Z',
+    });
+    assert.deepEqual(res, { ok: true, stale: false });
+    const own = __get('users/owner/journeys/j1')! as any;
+    assert.deepEqual(cities(own.legs), ['Hanoi', 'Hue', 'Saigon']);
+    assert.equal(own.legs[1].notes, 'night train');
+    assert.equal(own.title, 'Vietnam');
+    assert.deepEqual(cities((__get('shared_journeys/j1')! as any).legs), ['Hanoi', 'Hue', 'Saigon']);
+  });
+
+  test('the title changes only if the member changed it', async () => {
+    await editor();
+    __seed('users/owner/journeys/j1', { ...__get('users/owner/journeys/j1')!, title: 'Vietnam 2026' });
+    await updateShared('anna', { journeyId: 'j1', title: 'Vietnam', legs: [H, U], base: { title: 'Vietnam', legs: [H, U] }, updatedAt: '2026-09-02T10:00:00Z' });
+    assert.equal((__get('users/owner/journeys/j1')! as any).title, 'Vietnam 2026');
+    await updateShared('anna', { journeyId: 'j1', title: 'Nord nach Süd', legs: [H, U], base: { title: 'Vietnam', legs: [H, U] }, updatedAt: '2026-09-02T10:00:00Z' });
+    assert.equal((__get('users/owner/journeys/j1')! as any).title, 'Nord nach Süd');
+  });
+});
+
+describe('the mirror follows the owner\'s trip', () => {
+  test('whoever wrote the owner\'s trip, the mirror gets it', async () => {
+    await share('owner', { journeyId: 'j1' });
+    const own = { ...__get('users/owner/journeys/j1')!, title: 'By the agent', legs: [LEGS[0]] };
+    await refreshMirror('owner', 'j1', own);
+    const mirror = __get('shared_journeys/j1')! as any;
+    assert.equal(mirror.title, 'By the agent');
+    assert.equal(mirror.legs.length, 1);
+    assert.equal(mirror.owner_uid, 'owner', 'sharing itself is untouched');
+  });
+
+  test('not a trip that is not shared, and not someone else\'s mirror', async () => {
+    await refreshMirror('owner', 'j1', __get('users/owner/journeys/j1'));
+    assert.equal(__get('shared_journeys/j1'), undefined);
+    await share('owner', { journeyId: 'j1' });
+    await refreshMirror('anna', 'j1', { title: 'Hijack', legs: [], travellers: [] });
+    assert.equal((__get('shared_journeys/j1')! as any).title, 'Vietnam');
+  });
+
+  test('a plan of the owner\'s reaches the mirror, and leaves it when deleted', async () => {
+    await share('owner', { journeyId: 'j1' });
+    const plan = { journey_id: 'j1', stop_id: 's1', status: 'options', check_in: '2026-11-01', check_out: '2026-11-04', options: [{ id: 'o1', name: 'Loft' }], local_id: 7, updated_at: Timestamp.fromDate(new Date('2026-09-02T10:00:00Z')), deleted: false };
+    await refreshMirrorStay('owner', 's1', plan);
+    const entry = (__get('shared_journeys/j1')! as any).accommodations.s1;
+    assert.equal(entry.options[0].name, 'Loft');
+    assert.equal(entry.id, 's1');
+    assert.equal(entry.local_id, undefined);
+    assert.equal(entry.updated_at, '2026-09-02T10:00:00.000Z');
+    await refreshMirrorStay('owner', 's1', { ...plan, deleted: true });
+    assert.deepEqual((__get('shared_journeys/j1')! as any).accommodations, {});
+  });
+});
+
+describe('members on the owner\'s trip', () => {
+  const travellers = () => (__get('users/owner/journeys/j1')! as any).travellers as any[];
+  const stamp = () => (__get('users/owner/journeys/j1')! as any).updated_at.toMillis();
+
+  test('joining puts the friend on the owner\'s trip and in the mirror, under an id every phone agrees on', async () => {
+    const { code } = await share('owner', { journeyId: 'j1' });
+    const before = stamp();
+    await join('anna', { code, name: 'Anna' });
+    const anna = travellers().find((t) => t.uid === 'anna');
+    assert.equal(anna.name, 'Anna');
+    assert.equal(anna.sync_id, memberTravellerId('j1', 'anna'));
+    assert.equal(stamp(), before, 'an edit the owner made offline still wins');
+    await refreshMirror('owner', 'j1', __get('users/owner/journeys/j1'));
+    assert.ok((__get('shared_journeys/j1')! as any).travellers.some((t: any) => t.uid === 'anna'));
+    await join('anna', { code, name: 'Anna' });
+    assert.equal(travellers().filter((t) => t.uid === 'anna').length, 1, 'once');
+  });
+
+  test('a name the owner typed in is taken over, not doubled', async () => {
+    __seed('users/owner/journeys/j1', { ...__get('users/owner/journeys/j1')!, travellers: [{ sync_id: 't1', name: 'You', sort_order: 0 }, { sync_id: 't2', name: 'anna', sort_order: 1 }] });
+    const { code } = await share('owner', { journeyId: 'j1' });
+    await join('anna', { code, name: 'Anna' });
+    assert.deepEqual(travellers().map((t) => [t.sync_id, t.uid ?? null]), [['t1', null], ['t2', 'anna']]);
+  });
+
+  test('removed or gone, the friend is off the trip, not left behind as a name', async () => {
+    const { code } = await share('owner', { journeyId: 'j1' });
+    await join('anna', { code });
+    await join('bob', { code, name: 'Bob' });
+    await removeMember('owner', { journeyId: 'j1', memberUid: 'anna' });
+    assert.deepEqual(travellers().map((t) => t.uid ?? null), [null, 'bob']);
+    await leave('bob', { journeyId: 'j1' });
+    assert.deepEqual(travellers().map((t) => t.name), ['You']);
+  });
+
+  test('a new name reaches the owner\'s trip as well', async () => {
+    const { code } = await share('owner', { journeyId: 'j1' });
+    await join('anna', { code, name: 'Anna' });
+    await spreadProfile('anna', { displayName: 'Anna' }, { displayName: 'Anna K.' });
+    assert.equal(travellers().find((t) => t.uid === 'anna').name, 'Anna K.');
   });
 });

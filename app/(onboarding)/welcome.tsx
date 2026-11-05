@@ -24,6 +24,7 @@ import { CloudyButton } from '../../components/CloudyButton';
 import { PlaneModel3D } from '../../components/PlaneModel3D';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
+import { useAuth } from '../../hooks/useAuth';
 import { playCollectSound } from '../../lib/sound';
 import { prefetchSuggestedFaces } from '../../lib/profile';
 import { track } from '../../lib/analytics';
@@ -40,6 +41,7 @@ const FLASH_OUT_MS = 420;
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { user } = useAuth();
 
   // The faces the next step offers, fetched while this one plays.
   useEffect(() => {
@@ -136,14 +138,18 @@ export default function WelcomeScreen() {
               <Text style={styles.ctaText}>Get started</Text>
             </CloudyButton>
 
-            <View style={styles.signInRow}>
-              <Text style={styles.signInText}>Already have an account? </Text>
-              <Link href="/(auth)/sign-in" asChild>
-                <TouchableOpacity hitSlop={8}>
-                  <Text style={styles.signInLink}>Sign in</Text>
-                </TouchableOpacity>
-              </Link>
-            </View>
+            {/* A new account on its first run is signed in already: the root
+                navigator would send them straight back here. */}
+            {!user && (
+              <View style={styles.signInRow}>
+                <Text style={styles.signInText}>Already have an account? </Text>
+                <Link href="/(auth)/sign-in" asChild>
+                  <TouchableOpacity hitSlop={8}>
+                    <Text style={styles.signInLink}>Sign in</Text>
+                  </TouchableOpacity>
+                </Link>
+              </View>
+            )}
           </Animated.View>
         </Animated.View>
       </SafeAreaView>
