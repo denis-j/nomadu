@@ -6,6 +6,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { getMergedTripContaining, markTripGroupDeleted, parseDate, Trip } from '../../lib/database';
 import { MissingRoute } from '../../components/MissingRoute';
+import { useTranslation } from '../../contexts/LanguageContext';
 import { reportError } from '../../lib/monitoring';
 import { showToast } from '../../lib/toast';
 import { Flag } from '../../components/Flag';
@@ -18,6 +19,7 @@ const hasGlass = isLiquidGlassAvailable();
 const GlassCard = hasGlass ? GlassView : View;
 
 export default function TripDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   // undefined while loading, null when there is no such trip (deleted, or a
   // link with a made-up id), which used to leave "Loading..." up for good.
@@ -34,13 +36,13 @@ export default function TripDetailScreen() {
   }, [id]);
 
   if (trip === null) {
-    return <MissingRoute title="Trip" message="This trip is no longer here." />;
+    return <MissingRoute title={t('tripEntry.trip')} message={t('tripEntry.gone')} />;
   }
 
   if (!trip) {
     return (
       <View style={styles.loading}>
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={styles.loadingText}>{t('common.loading')}</Text>
       </View>
     );
   }
@@ -116,34 +118,34 @@ export default function TripDetailScreen() {
           {isActive && (
             <View style={styles.activeBadge}>
               <View style={styles.activeDot} />
-              <Text style={styles.activeText}>Currently here</Text>
+              <Text style={styles.activeText}>{t('tripEntry.currentlyHere')}</Text>
             </View>
           )}
         </View>
 
         {/* Stats Row */}
         <StatRow style={styles.statsRow}>
-          <StatTile label="Duration" value={`${trip.days}`} unit={trip.days === 1 ? 'day' : 'days'} />
-          <StatTile label="Arrived" value={formatDate(trip.start_date)} />
-          <StatTile label={isActive ? 'Status' : 'Departed'} value={isActive ? 'Active' : formatDate(trip.end_date!)} />
+          <StatTile label={t('tripEntry.duration')} value={`${trip.days}`} unit={trip.days === 1 ? t('tripEntry.day') : t('tripEntry.days')} />
+          <StatTile label={t('tripEntry.arrived')} value={formatDate(trip.start_date)} />
+          <StatTile label={isActive ? t('tripEntry.status') : t('tripEntry.departed')} value={isActive ? t('tripEntry.active') : formatDate(trip.end_date!)} />
         </StatRow>
 
         {/* Details Card, its label above it as on the stop sheet */}
         <View style={styles.section}>
-          <SectionLabel>Trip details</SectionLabel>
+          <SectionLabel>{t('tripEntry.tripDetails')}</SectionLabel>
           <GlassCard
             {...glassProps}
             style={[styles.detailsCard, !hasGlass && styles.detailsCardFallback]}
           >
-            <DetailRow icon="log-in-outline" label="Arrival" value={formatDateLong(trip.start_date)} />
+            <DetailRow icon="log-in-outline" label={t('tripEntry.arrival')} value={formatDateLong(trip.start_date)} />
             <View style={styles.separator} />
-            <DetailRow icon="log-out-outline" label="Departure" value={trip.end_date ? formatDateLong(trip.end_date) : 'Ongoing'} />
+            <DetailRow icon="log-out-outline" label={t('tripEntry.departure')} value={trip.end_date ? formatDateLong(trip.end_date) : t('tripEntry.ongoing')} />
             <View style={styles.separator} />
-            <DetailRow icon="time-outline" label="Total Days" value={`${trip.days} day${trip.days !== 1 ? 's' : ''}`} />
+            <DetailRow icon="time-outline" label={t('tripEntry.totalDays')} value={trip.days === 1 ? t('tripEntry.daysOne', { count: trip.days }) : t('tripEntry.daysMany', { count: trip.days })} />
             {trip.latitude && trip.longitude && (
               <>
                 <View style={styles.separator} />
-                <DetailRow icon="navigate-outline" label="Coordinates" value={`${trip.latitude.toFixed(4)}, ${trip.longitude.toFixed(4)}`} />
+                <DetailRow icon="navigate-outline" label={t('tripEntry.coordinates')} value={`${trip.latitude.toFixed(4)}, ${trip.longitude.toFixed(4)}`} />
               </>
             )}
           </GlassCard>
@@ -153,10 +155,10 @@ export default function TripDetailScreen() {
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={() =>
-            Alert.alert('Delete entry', `Remove ${trip.city}, ${trip.country}?`, [
-              { text: 'Cancel', style: 'cancel' },
+            Alert.alert(t('tripEntry.deleteEntry'), t('tripEntry.removeTitle', { city: trip.city, country: trip.country }), [
+              { text: t('common.cancel'), style: 'cancel' },
               {
-                text: 'Delete',
+                text: t('common.delete'),
                 style: 'destructive',
                 onPress: async () => {
                   // A tombstone for every merged row: removing the row outright
@@ -166,7 +168,7 @@ export default function TripDetailScreen() {
                     router.back();
                   } catch (err) {
                     reportError(err, 'trip:delete');
-                    showToast('Could not delete this trip. Please try again.', 'error');
+                    showToast(t('tripEntry.couldNotDelete'), 'error');
                   }
                 },
               },
@@ -174,7 +176,7 @@ export default function TripDetailScreen() {
           }
           activeOpacity={0.5}
         >
-          <Text style={styles.deleteText}>Delete entry</Text>
+          <Text style={styles.deleteText}>{t('tripEntry.deleteEntry')}</Text>
         </TouchableOpacity>
       </View>
     </>

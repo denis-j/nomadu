@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from '../../contexts/LanguageContext';
 import { Stack, useRouter } from 'expo-router';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -15,6 +16,7 @@ const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 export default function BadgeLibraryScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [earned, setEarned] = useState<Set<string>>(new Set());
 
@@ -47,7 +49,7 @@ export default function BadgeLibraryScreen() {
     <>
       <Stack.Screen
         options={{
-          title: 'Badge Library',
+          title: t('nav.badgeLibrary'),
           headerBackButtonDisplayMode: 'minimal',
           headerTransparent: true,
         }}
@@ -64,10 +66,10 @@ export default function BadgeLibraryScreen() {
         >
           <View style={styles.heroRow}>
             <View style={styles.heroText}>
-              <Text style={styles.heroEyebrow}>Collected</Text>
+              <Text style={styles.heroEyebrow}>{t('badge.collected')}</Text>
               <View style={styles.heroValueRow}>
                 <Text style={styles.heroValue}>{earnedCount}</Text>
-                <Text style={styles.heroUnit}>of {total}</Text>
+                <Text style={styles.heroUnit}>{t('badge.ofTotal', { total })}</Text>
               </View>
             </View>
             <View style={styles.heroIconBubble}>

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from '../../contexts/LanguageContext';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
@@ -25,6 +26,7 @@ function formatTodayShort(): string {
 }
 
 export default function BadgeFullscreenScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { countryCode, unlock } = useLocalSearchParams<{ countryCode: string; unlock?: string }>();
   const code = (countryCode ?? '').toUpperCase();
@@ -56,9 +58,9 @@ export default function BadgeFullscreenScreen() {
       <>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>No badge for &quot;{code}&quot;</Text>
+          <Text style={styles.errorText}>{t('badge.noBadge', { code })}</Text>
           <Pressable onPress={handleClose} style={styles.errorClose}>
-            <Text style={styles.errorCloseText}>Close</Text>
+            <Text style={styles.errorCloseText}>{t('badge.close')}</Text>
           </Pressable>
         </View>
       </>
@@ -80,7 +82,7 @@ export default function BadgeFullscreenScreen() {
                   onPress={handleClose}
                   hitSlop={12}
                   accessibilityRole="button"
-                  accessibilityLabel="Close"
+                  accessibilityLabel={t('badge.close')}
                   style={({ pressed }) => [styles.closeInner, pressed && { opacity: 0.6 }]}
                 >
                   <Ionicons name="close" size={20} color={Colors.white} />
@@ -91,7 +93,7 @@ export default function BadgeFullscreenScreen() {
                 onPress={handleClose}
                 hitSlop={12}
                 accessibilityRole="button"
-                accessibilityLabel="Close"
+                accessibilityLabel={t('badge.close')}
                 style={({ pressed }) => [styles.closeBtnFallback, pressed && { opacity: 0.6 }]}
               >
                 <Ionicons name="close" size={20} color={Colors.white} />
@@ -101,10 +103,10 @@ export default function BadgeFullscreenScreen() {
 
           {/* Title block, same trio as unlock overlay */}
           <View pointerEvents="none" style={styles.topBlock}>
-            <Text style={styles.eyebrow}>Reward</Text>
+            <Text style={styles.eyebrow}>{t('badge.reward')}</Text>
             <Text style={styles.title}>{info.name}</Text>
             <View style={styles.metaRow}>
-              <Text style={styles.metaText}>Earned {formatTodayShort()}</Text>
+              <Text style={styles.metaText}>{t('badge.earned', { date: formatTodayShort() })}</Text>
             </View>
           </View>
 
@@ -114,7 +116,7 @@ export default function BadgeFullscreenScreen() {
               <CloudyButton onPress={handleCollect} haptic={Haptics.ImpactFeedbackStyle.Medium}>
                 <View style={styles.ctaContent}>
                   <Ionicons name="sparkles" size={20} color={Colors.cloudyButtonText} />
-                  <Text style={styles.ctaText}>Collect</Text>
+                  <Text style={styles.ctaText}>{t('badge.collect')}</Text>
                 </View>
               </CloudyButton>
             </View>

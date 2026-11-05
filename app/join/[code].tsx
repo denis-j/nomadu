@@ -16,6 +16,9 @@ import { toYmd } from '../../lib/days';
 import { joinJourney, myName, previewInvite, setPendingInvite, type InvitePreview } from '../../lib/sharing';
 import { pullSharedJourneysFromCloud } from '../../lib/sync';
 import { showToast } from '../../lib/toast';
+import { useTranslation } from '../../contexts/LanguageContext';
+
+type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -32,13 +35,13 @@ function fmtRange(start: string, end: string): string {
 }
 
 /** "in 49 days", "Tomorrow", "Under way": when the trip starts, from today. */
-function startsIn(start: string | null): { label: string; value: string; unit?: string } {
-  if (!start) return { label: 'Starts', value: 'No dates' };
+function startsIn(start: string | null, t: TFunc): { label: string; value: string; unit?: string } {
+  if (!start) return { label: t('join.starts'), value: t('join.noDates') };
   const days = Math.round((parseDate(start).getTime() - parseDate(toYmd(new Date())).getTime()) / 86_400_000);
-  if (days < 0) return { label: 'Trip', value: 'Under way' };
-  if (days === 0) return { label: 'Starts', value: 'Today' };
-  if (days === 1) return { label: 'Starts', value: 'Tomorrow' };
-  return { label: 'Starts', value: `in ${days}`, unit: 'days' };
+  if (days < 0) return { label: t('join.trip'), value: t('join.underWay') };
+  if (days === 0) return { label: t('join.starts'), value: t('join.today') };
+  if (days === 1) return { label: t('join.starts'), value: t('join.tomorrow') };
+  return { label: t('join.starts'), value: t('join.inDays', { days }), unit: t('join.days') };
 }
 
 /**
@@ -50,6 +53,7 @@ function startsIn(start: string | null): { label: string; value: string; unit?: 
  * sheet comes back once the tabs are up (see the tabs layout).
  */
 export default function JoinTripScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { code } = useLocalSearchParams<{ code: string }>();
   const { user, loading: authLoading } = useAuth();
@@ -68,7 +72,7 @@ export default function JoinTripScreen() {
     if (!code) return;
     previewInvite(code)
       .then(setPreview)
-      .catch((err: any) => setError(err?.message ?? 'This invite is no longer valid.'));
+      .catch((err: any) => setError(err?.message ?? t('join.inviteInvalid')));
   }, [code, user, authLoading]);
 
   // Close this sheet first and push once it is gone: a page pushed while
@@ -82,7 +86,7 @@ export default function JoinTripScreen() {
   const join = async () => {
     if (!user || !preview || busy) return;
     if (!name.trim()) {
-      showToast('Tell the others your name', 'error');
+      showToast(t('join.tellName'), 'error');
       return;
     }
     setBusy(true);
@@ -91,15 +95,15 @@ export default function JoinTripScreen() {
       const joined = await joinJourney(code!, name.trim());
       await pullSharedJourneysFromCloud(user.uid);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast(`You are on ${preview.title}`);
+      showToast(t('join.youAreOn', { title: preview.title }));
       await openTrip(joined.journey_id);
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not join', 'error');
+      showToast(err?.message ?? t('join.couldNotJoin'), 'error');
       setBusy(false);
     }
   };
 
-  const starts = startsIn(preview?.start_date ?? null);
+  const starts = startsIn(preview?.start_date ?? null, t);
   const nights = preview?.start_date && preview.end_date
     ? Math.round((parseDate(preview.end_date).getTime() - parseDate(preview.start_date).getTime()) / 86_400_000) + 1
     : 0;
@@ -109,7 +113,7 @@ export default function JoinTripScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={styles.content}>
         {!user && !authLoading && (
-          <Text style={styles.hint}>Sign in to come along.</Text>
+          <Text style={styles.hint}>{t('join.signInToCome')}</Text>
         )}
         {error && (
           <View style={styles.center}>
@@ -128,14 +132,14 @@ export default function JoinTripScreen() {
             <View style={styles.whoRow}>
               <Avatar person={{ label: preview.owner_name, account: true, owner: true, seed: preview.owner_avatar }} size={44} animated />
               <View style={styles.whoText}>
-                <Text style={styles.who}>{preview.owner_name} invites you along</Text>
+                <Text style={styles.who}>{t('join.invitesYou', { name: preview.owner_name })}</Text>
                 <Text style={styles.title}>{preview.title}</Text>
               </View>
             </View>
             {/* The trip in three numbers, as on a stop's sheet */}
             <StatRow style={styles.stats}>
-              <StatTile label="Duration" value={`${nights}`} unit={nights === 1 ? 'day' : 'days'} />
-              <StatTile label="Stops" value={`${preview.stops.length}`} />
+              <StatTile label={t('join.duration')} value={`${nights}`} unit={nights === 1 ? t('join.day') : t('join.days')} />
+              <StatTile label={t('join.stops')} value={`${preview.stops.length}`} />
               <StatTile {...starts} />
             </StatRow>
 
@@ -155,25 +159,25 @@ export default function JoinTripScreen() {
               {preview.stops.length > 6 && (
                 <>
                   <View style={styles.separator} />
-                  <Text style={styles.more}>and {preview.stops.length - 6} more</Text>
+                  <Text style={styles.more}>{t('join.andMore', { count: preview.stops.length - 6 })}</Text>
                 </>
               )}
             </Glass>
 
             {preview.is_owner || preview.is_member ? (
               <CloudyButton onPress={() => openTrip(preview.journey_id)} style={styles.cta} innerStyle={styles.ctaInner}>
-                <Text style={styles.ctaText}>{preview.is_owner ? 'This is your trip' : 'Open the trip'}</Text>
+                <Text style={styles.ctaText}>{preview.is_owner ? t('join.thisIsYourTrip') : t('join.openTrip')}</Text>
               </CloudyButton>
             ) : (
               <>
                 <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
                   <View style={styles.nameRow}>
-                    <Text style={styles.nameLabel}>Your name</Text>
+                    <Text style={styles.nameLabel}>{t('join.yourName')}</Text>
                     <TextInput
                       style={styles.nameInput}
                       value={name}
                       onChangeText={setName}
-                      placeholder="For the others"
+                      placeholder={t('join.namePlaceholder')}
                       placeholderTextColor={Colors.textTertiary}
                       autoCapitalize="words"
                       autoCorrect={false}
@@ -183,16 +187,16 @@ export default function JoinTripScreen() {
                   </View>
                 </Glass>
                 <CloudyButton onPress={join} style={styles.cta} innerStyle={styles.ctaInner}>
-                  <Text style={styles.ctaText}>{busy ? 'Joining…' : 'Come along'}</Text>
+                  <Text style={styles.ctaText}>{busy ? t('join.joining') : t('join.comeAlong')}</Text>
                 </CloudyButton>
                 <Text style={styles.foot}>
-                  The trip shows up under Plans, on your phone, and follows what {preview.owner_name} changes.
+                  {t('join.foot', { name: preview.owner_name })}
                 </Text>
               </>
             )}
           </>
         )}
-        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.close} accessibilityLabel="Close">
+        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.close} accessibilityLabel={t('join.close')}>
           <Ionicons name="close" size={22} color={Colors.textSecondary} />
         </Pressable>
       </ScrollView>
