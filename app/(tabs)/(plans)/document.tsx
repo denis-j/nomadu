@@ -15,6 +15,7 @@ import { reportError } from '../../../lib/monitoring';
 import { showToast } from '../../../lib/toast';
 import { MissingRoute } from '../../../components/MissingRoute';
 import { parseSyncStamp } from '../../../lib/syncTime';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 /**
  * One document, full screen.
@@ -24,6 +25,7 @@ import { parseSyncStamp } from '../../../lib/syncTime';
  * is also how it gets to a companion's phone or a printer at the hotel desk.
  */
 export default function DocumentScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
   const [doc, setDoc] = useState<JourneyDocument | null>(null);
@@ -43,7 +45,7 @@ export default function DocumentScreen() {
       }
       if (!documentExists(d.file_name)) setMissing(true);
       const travellers = await getJourneyTravellers(d.journey_id);
-      setOwner(travellers.find((t) => t.id === d.traveller_id)?.name ?? (travellers.length > 1 ? 'Everyone' : null));
+      setOwner(travellers.find((tv) => tv.id === d.traveller_id)?.name ?? (travellers.length > 1 ? t('documents.everyone') : null));
     });
   }, [params.id]);
 
@@ -51,7 +53,7 @@ export default function DocumentScreen() {
     if (!doc) return;
     Haptics.selectionAsync();
     if (!(await Sharing.isAvailableAsync())) {
-      showToast('Sharing is not available here', 'error');
+      showToast(t('document.sharingUnavailable'), 'error');
       return;
     }
     await Sharing.shareAsync(documentUri(doc.file_name), { mimeType: doc.mime ?? undefined });
@@ -60,10 +62,10 @@ export default function DocumentScreen() {
   const remove = () => {
     if (!doc) return;
     Haptics.selectionAsync();
-    Alert.alert('Delete document?', `"${doc.title}" will be removed from this trip and from your phone.`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('document.deleteTitle'), t('document.deleteBody', { title: doc.title }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           // A shared document goes from the cloud too, so the others lose it as well.
@@ -73,12 +75,12 @@ export default function DocumentScreen() {
             await deleteDocumentEverywhere(doc, journey?.sync_id ?? null);
           } catch (err) {
             reportError(err, 'documents:delete');
-            showToast('Could not delete the document', 'error');
+            showToast(t('document.couldNotDelete'), 'error');
             return;
           }
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           router.back();
-          showToast('Document deleted');
+          showToast(t('document.deleted'));
         },
       },
     ]);
@@ -87,7 +89,7 @@ export default function DocumentScreen() {
   const uri = doc ? documentUri(doc.file_name) : null;
   const meta = doc ? kindMeta(doc.kind) : null;
 
-  if (gone) return <MissingRoute title="Document" message="This document is no longer here." />;
+  if (gone) return <MissingRoute title={t('document.title')} message={t('document.gone')} />;
 
   return (
     <>
@@ -96,10 +98,10 @@ export default function DocumentScreen() {
           title: doc?.title ?? '',
           headerRight: () => (
             <View style={styles.headerActions}>
-              <Pressable onPress={share} hitSlop={8} disabled={!doc || missing} accessibilityRole="button" accessibilityLabel="Share document">
+              <Pressable onPress={share} hitSlop={8} disabled={!doc || missing} accessibilityRole="button" accessibilityLabel={t('document.shareDocument')}>
                 <Ionicons name="share-outline" size={22} color={Colors.text} />
               </Pressable>
-              <Pressable onPress={remove} hitSlop={8} disabled={!doc} accessibilityRole="button" accessibilityLabel="Delete document">
+              <Pressable onPress={remove} hitSlop={8} disabled={!doc} accessibilityRole="button" accessibilityLabel={t('document.deleteDocument')}>
                 <Ionicons name="trash-outline" size={21} color={Colors.error} />
               </Pressable>
             </View>
@@ -110,9 +112,9 @@ export default function DocumentScreen() {
         {!doc ? null : missing ? (
           <View style={styles.centered}>
             <Ionicons name="alert-circle-outline" size={36} color={Colors.textTertiary} />
-            <Text style={styles.missingTitle}>File is gone</Text>
+            <Text style={styles.missingTitle}>{t('document.fileGone')}</Text>
             <Text style={styles.missingSub}>
-              The entry is still here but the file is not on this phone anymore. Delete it and add it again.
+              {t('document.fileGoneSub')}
             </Text>
           </View>
         ) : isImageMime(doc.mime) ? (
@@ -146,7 +148,7 @@ export default function DocumentScreen() {
               <Text style={styles.kindPillText}>{meta.short}</Text>
             </View>
             <Text style={styles.captionText} numberOfLines={1}>
-              {owner ? `${owner} · ` : ''}Added {parseSyncStamp(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {owner ? `${owner} · ` : ''}{t('document.addedCaption', { date: parseSyncStamp(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) })}
             </Text>
           </View>
         )}

@@ -21,6 +21,7 @@ import {
 } from '../../../lib/database';
 import { DocumentKind, documentUri, isImageMime, isPdfMime, kindMeta, walletDocuments } from '../../../lib/documents';
 import { MissingRoute } from '../../../components/MissingRoute';
+import { useTranslation } from '../../../contexts/LanguageContext';
 import { useJourneyExists } from '../../../hooks/useJourneyExists';
 import { parseSyncStamp } from '../../../lib/syncTime';
 
@@ -44,13 +45,15 @@ type Filter = 'all' | number;
  */
 /** Reachable by link: without a real trip there is nothing to show or add to. */
 export default function DocumentsScreen() {
+  const { t } = useTranslation();
   const { journeyId } = useLocalSearchParams<{ journeyId: string }>();
   const exists = useJourneyExists(Number(journeyId));
-  if (exists === false) return <MissingRoute title="Documents" message="This trip is no longer here." />;
+  if (exists === false) return <MissingRoute title={t('nav.documents')} message={t('documents.tripGone')} />;
   return <DocumentsScreenContent />;
 }
 
 function DocumentsScreenContent() {
+  const { t: tr } = useTranslation();
   const router = useRouter();
   const nav = useNavigation();
   const params = useLocalSearchParams<{ journeyId: string; travellerId?: string }>();
@@ -87,7 +90,7 @@ function DocumentsScreenContent() {
   useLayoutEffect(() => {
     nav.setOptions({
       headerRight: () => (
-        <Pressable hitSlop={12} onPress={() => addDocument()} accessibilityRole="button" accessibilityLabel="Add document">
+        <Pressable hitSlop={12} onPress={() => addDocument()} accessibilityRole="button" accessibilityLabel={tr('documents.addDocument')}>
           <Ionicons name="add" size={26} color={Colors.text} />
         </Pressable>
       ),
@@ -96,8 +99,8 @@ function DocumentsScreenContent() {
 
   const addTraveller = () => {
     Alert.prompt(
-      'Who else is travelling?',
-      'Their tickets and visas get their own tab.',
+      tr('documents.whoTravelling'),
+      tr('documents.theirTickets'),
       async (name) => {
         const trimmed = (name ?? '').trim();
         if (!trimmed) return;
@@ -114,7 +117,7 @@ function DocumentsScreenContent() {
 
   const renameTraveller = (t: JourneyTraveller) => {
     Alert.prompt(
-      'Rename',
+      tr('documents.rename'),
       undefined,
       async (name) => {
         const trimmed = (name ?? '').trim();
@@ -129,10 +132,10 @@ function DocumentsScreenContent() {
   };
 
   const removeTraveller = (t: JourneyTraveller) => {
-    Alert.alert(`Remove ${t.name}?`, 'Their documents stay, just without a name on them.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(tr('documents.removeTitle', { name: t.name }), tr('documents.theirDocsStay'), [
+      { text: tr('common.cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: tr('common.remove'),
         style: 'destructive',
         onPress: async () => {
           await deleteJourneyTraveller(t.id);
@@ -153,7 +156,7 @@ function DocumentsScreenContent() {
     ActionSheetIOS.showActionSheetWithOptions(
       {
         title: t.name,
-        options: removable ? ['Rename', 'Remove from trip', 'Cancel'] : ['Rename', 'Cancel'],
+        options: removable ? [tr('documents.rename'), tr('documents.removeFromTrip'), tr('common.cancel')] : [tr('documents.rename'), tr('common.cancel')],
         destructiveButtonIndex: removable ? 1 : undefined,
         cancelButtonIndex: removable ? 2 : 1,
       },
@@ -187,17 +190,17 @@ function DocumentsScreenContent() {
       if (docs.length) groups.push({ key: `t${t.id}`, title: label(t), docs, traveller: t });
     }
     const shared = documents.filter(isShared);
-    if (shared.length) groups.push({ key: 'shared', title: 'Everyone', docs: shared, traveller: null });
+    if (shared.length) groups.push({ key: 'shared', title: tr('documents.everyone'), docs: shared, traveller: null });
   }
   const empty = loaded && groups.length === 0;
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Documents' }} />
+      <Stack.Screen options={{ title: tr('nav.documents') }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
         <PillRow
           options={[
-            { key: 'all', label: 'All', active: filter === 'all', onPress: () => setFilter('all') },
+            { key: 'all', label: tr('documents.all'), active: filter === 'all', onPress: () => setFilter('all') },
             ...shown.map((t) => {
               const person = faceOf(t);
               return {
@@ -209,7 +212,7 @@ function DocumentsScreenContent() {
                 onLongPress: () => travellerMenu(t),
               };
             }),
-            ...(owner ? [] : [{ key: 'add', label: 'Add', icon: 'person-add-outline' as const, onPress: addTraveller }]),
+            ...(owner ? [] : [{ key: 'add', label: tr('documents.add'), icon: 'person-add-outline' as const, onPress: addTraveller }]),
           ]}
         />
 
@@ -239,7 +242,7 @@ function DocumentsScreenContent() {
                     // the heading already says it, so only where it is mixed.
                     face={current && !isShared(d) ? null : d.traveller_id === null ? null : faces.get(String(d.traveller_id)) ?? null}
                     // In a traveller's tab a group booking needs saying so.
-                    note={current && isShared(d) ? 'Everyone' : null}
+                    note={current && isShared(d) ? tr('documents.everyone') : null}
                     // Live PDF previews are web views; a handful is fine, a wall is not.
                     preview={i < 8}
                     onPress={() => openDocument(d)}
@@ -268,6 +271,7 @@ function DocumentTile({
   preview: boolean;
   onPress: () => void;
 }) {
+  const { t } = useTranslation();
   const meta = kindMeta(doc.kind);
   const uri = documentUri(doc.file_name);
   const image = isImageMime(doc.mime);
@@ -306,7 +310,7 @@ function DocumentTile({
         </View>
         <View style={styles.tileText}>
           <Text style={styles.tileTitle} numberOfLines={1}>{doc.title}</Text>
-          <Text style={styles.tileSub} numberOfLines={1}>{note ? `${note} · ` : ''}Added {added}</Text>
+          <Text style={styles.tileSub} numberOfLines={1}>{note ? `${note} · ` : ''}{t('documents.added', { date: added })}</Text>
         </View>
       </Glass>
     </Pressable>
@@ -334,13 +338,14 @@ function Paper({ icon, color }: { icon: keyof typeof Ionicons.glyphMap; color: s
  * asks for. Tapping one opens the add sheet with that kind already chosen.
  */
 function Starter({ traveller, onPick }: { traveller: JourneyTraveller | null; onPick: (kind: DocumentKind) => void }) {
-  const who = traveller && traveller.name !== 'You' ? `What ${traveller.name} needs` : 'What you need';
+  const { t } = useTranslation();
+  const who = traveller && traveller.name !== 'You' ? t('documents.whatNeeds', { name: traveller.name }) : t('documents.whatYouNeed');
   return (
     <View style={styles.starter}>
       <View style={styles.starterHead}>
         <Text style={styles.starterTitle}>{who}</Text>
         <Text style={styles.starterSub}>
-          Tap a slot to fill it. Photos, screenshots and PDFs all work.
+          {t('documents.tapSlot')}
         </Text>
       </View>
       <View style={styles.grid}>
@@ -358,7 +363,7 @@ function Starter({ traveller, onPick }: { traveller: JourneyTraveller | null; on
               <Text style={styles.slotTitle}>{meta.label}</Text>
               <View style={styles.slotAdd}>
                 <Ionicons name="add" size={14} color={Colors.textSecondary} />
-                <Text style={styles.slotAddText}>Add</Text>
+                <Text style={styles.slotAddText}>{t('documents.add')}</Text>
               </View>
             </Pressable>
           );
