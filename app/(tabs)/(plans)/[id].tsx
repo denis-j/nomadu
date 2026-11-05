@@ -62,6 +62,9 @@ import { calculateAllTaxStatuses, TaxStatus } from '../../../lib/taxCalculations
 import { SCHENGEN_COUNTRIES, getRuleForCitizen } from '../../../constants/visaRules';
 import { chainDates, countDays, fromYmd, toYmd } from '../../../lib/days';
 import { getCountryCode } from '../../../utils/geography';
+import { useTranslation } from '../../../contexts/LanguageContext';
+
+type TFunc = (key: string, params?: Record<string, string | number>) => string;
 import { Flag } from '../../../components/Flag';
 import { suggestNextStops, StopSuggestion } from '../../../lib/ai';
 import { cachedMapSnapshot, storeMapSnapshot } from '../../../lib/mapSnapshot';
@@ -213,6 +216,7 @@ const MAP_PIN = require('../../../assets/icons/map-pin.png');
  * fitted into the visible window.
  */
 function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; headerHeight: number; onPress: () => void }) {
+  const { t } = useTranslation();
   // The list starts at the very top of the screen on both platforms (see
   // ScrollViewShield); the map is pulled up from there, under the bar.
   const listTop = useSafeAreaInsets().top;
@@ -318,7 +322,7 @@ function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; h
   if (coords.length === 0 || !initialRegion) return null;
 
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Open the route on a map" style={[styles.mapCard, { marginTop: listTop - headerHeight }]}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={t('trip.openRouteMap')} style={[styles.mapCard, { marginTop: listTop - headerHeight }]}>
       {snapshot ? (
         <Image source={{ uri: snapshot }} style={styles.map} contentFit="cover" transition={fresh ? 180 : 0} />
       ) : (
@@ -425,6 +429,7 @@ function TripMorphChip({
   /** Room between the two discs when closed; the screen's width minus 32 when open. */
   maxWidth: { closed: number; open: number };
 }) {
+  const { t } = useTranslation();
   const span = tripSpan(legs);
   const [chipWidth, setChipWidth] = useState(0);
   const [panelHeight, setPanelHeight] = useState(0);
@@ -491,7 +496,7 @@ function TripMorphChip({
             <View style={styles.titleChipText}>
               <Text style={styles.titleChipTitle} numberOfLines={1}>{title}</Text>
               <Text style={styles.titleChipSub} numberOfLines={1}>
-                {owner ? `with ${owner}` : span ? span.status : 'No stops yet'}
+                {owner ? t('trip.withOwner', { owner }) : span ? span.status : t('trip.noStopsYet')}
               </Text>
             </View>
             {people.length > 0 && (
@@ -581,6 +586,7 @@ const LegCard = React.memo(function LegCard({
   citizenshipCode,
   enter = true,
 }: LegCardProps) {
+  const { t } = useTranslation();
   const days = legDays(leg.start_date, leg.end_date);
 
   const isSchengen = !!leg.country_code && (SCHENGEN_COUNTRIES as readonly string[]).includes(leg.country_code);
@@ -621,23 +627,23 @@ const LegCard = React.memo(function LegCard({
   if (trackedVisa && (trackedVisa.status !== 'ok' || firstInCountry)) {
     const color = visaChipColor(trackedVisa.status);
     const label = isSchengen
-      ? `${trackedVisa.daysRemaining}d Schengen left`
-      : `${trackedVisa.daysRemaining}d visa left`;
+      ? t('trip.schengenLeft', { days: trackedVisa.daysRemaining })
+      : t('trip.visaLeft', { days: trackedVisa.daysRemaining });
     chips.push({ label, color });
   } else if (!trackedVisa && plannedVisaExceeds) {
     // No tracked data but this leg alone exceeds the limit
     const label = isSchengen
-      ? `${plannedDays}d > ${visaLimit}d Schengen`
-      : `${plannedDays}d > ${visaLimit}d visa`;
+      ? t('trip.schengenExceeds', { days: plannedDays, limit: visaLimit! })
+      : t('trip.visaExceeds', { days: plannedDays, limit: visaLimit! });
     chips.push({ label, color: Colors.error });
   }
 
   if (trackedTax) {
     const color = taxChipColor(trackedTax.status);
-    chips.push({ label: `⚠︎ ${trackedTax.daysPresent}/${trackedTax.thresholdDays}d tax`, color });
+    chips.push({ label: t('trip.taxChip', { present: trackedTax.daysPresent, threshold: trackedTax.thresholdDays }), color });
   } else if (plannedTaxExceeds && !trackedVisa) {
     // Only show projected tax if not already covered by tracked data
-    chips.push({ label: `⚠︎ ${plannedDays}d > ${TAX_THRESHOLD}d tax risk`, color: Colors.error });
+    chips.push({ label: t('trip.taxRiskChip', { days: plannedDays, threshold: TAX_THRESHOLD }), color: Colors.error });
   }
 
   // Where you sleep, once that is being planned. Grey until there is a
@@ -648,7 +654,7 @@ const LegCard = React.memo(function LegCard({
     chips.push({ label: planChipShort(stay), color: statusColor(stay.status), icon: 'bed-outline' });
   }
   if (ACTIVITIES_UI && activityCount > 0) {
-    chips.push({ label: activityCount === 1 ? '1 thing to do' : `${activityCount} things to do`, color: Colors.text, icon: 'sparkles-outline' });
+    chips.push({ label: activityCount === 1 ? t('trip.oneThing') : t('trip.manyThings', { count: activityCount }), color: Colors.text, icon: 'sparkles-outline' });
   }
 
   const CardWrap = hasGlass ? GlassView : View;
@@ -657,7 +663,8 @@ const LegCard = React.memo(function LegCard({
   // How you get there sits on the line before the stop, for the first one
   // too: a trip starts with a flight. Stops chain, so there is nothing else
   // for the connector to say.
-  const transport = TRANSPORTS.find((t) => t.type === leg.transport) ?? TRANSPORTS[0];
+  const transport = TRANSPORTS.find((tr) => tr.type === leg.transport) ?? TRANSPORTS[0];
+  const transportLabel = t(`transport.${transport.type}`);
 
   return (
     <View style={styles.legWrapper}>
@@ -669,7 +676,7 @@ const LegCard = React.memo(function LegCard({
         <View style={styles.dotCol} />
         <View style={styles.connectorBadge}>
           <Ionicons name={transport.icon as any} size={13} color={Colors.textSecondary} />
-          <MorphText style={styles.connectorText}>{transport.label}</MorphText>
+          <MorphText style={styles.connectorText}>{transportLabel}</MorphText>
         </View>
       </Animated.View>
 
@@ -746,25 +753,25 @@ const LegCard = React.memo(function LegCard({
 );
 
 /** "1,240 EUR · you get back 30" under the expenses card; what it is for while empty. */
-function expensesSummary(list: { amount: number; currency: string; paid_by: string | null; shares: { traveller_id: string; amount: number }[]; deleted: boolean }[], meId: string | null, travellers: number): string {
-  if (list.length === 0) return travellers > 1 ? 'Who paid what, split with the others' : 'What you spend, split with friends';
+function expensesSummary(list: { amount: number; currency: string; paid_by: string | null; shares: { traveller_id: string; amount: number }[]; deleted: boolean }[], meId: string | null, travellers: number, t: TFunc): string {
+  if (list.length === 0) return travellers > 1 ? t('trip.expensesEmptyShared') : t('trip.expensesEmptySolo');
   const sums = totals(list);
   const main = `${formatAmount(sums[0].total)} ${sums[0].currency}`;
   const extra = sums.length > 1 ? ` +${sums.length - 1}` : '';
   const net = meId ? balances(list).find((b) => b.traveller_id === meId && b.currency === sums[0].currency)?.net ?? 0 : 0;
-  const you = net > 0.004 ? `you get back ${formatAmount(net)}` : net < -0.004 ? `you owe ${formatAmount(-net)}` : 'all settled';
+  const you = net > 0.004 ? t('trip.youGetBack', { amount: formatAmount(net) }) : net < -0.004 ? t('trip.youOwe', { amount: formatAmount(-net) }) : t('trip.allSettled');
   return `${main}${extra} · ${you}`;
 }
 
 /** "2 booked · 5 ideas" under the things-to-do card; what it is for while empty. */
-function activitiesSummary(list: { status: string }[]): string {
-  if (list.length === 0) return 'Places, ideas, TikToks you saved';
+function activitiesSummary(list: { status: string }[], t: TFunc): string {
+  if (list.length === 0) return t('trip.activitiesEmpty');
   const n = (st: string) => list.filter((a) => a.status === st).length;
   const parts = [
-    n('booked') ? `${n('booked')} booked` : null,
-    n('planned') ? `${n('planned')} planned` : null,
-    n('idea') ? `${n('idea')} ${n('idea') === 1 ? 'idea' : 'ideas'}` : null,
-    n('done') ? `${n('done')} done` : null,
+    n('booked') ? t('trip.booked', { count: n('booked') }) : null,
+    n('planned') ? t('trip.planned', { count: n('planned') }) : null,
+    n('idea') ? (n('idea') === 1 ? t('trip.ideaOne', { count: n('idea') }) : t('trip.ideaMany', { count: n('idea') })) : null,
+    n('done') ? t('trip.done', { count: n('done') }) : null,
   ];
   return parts.filter(Boolean).join(' · ');
 }
@@ -785,6 +792,7 @@ function SuggestionLegCard({
   onAdd: () => void;
   disabled?: boolean;
 }) {
+  const { t: tt } = useTranslation();
   const countryCode = getCountryCode(suggestion.country);
   const days = legDays(suggestion.startDate, suggestion.endDate);
 
@@ -797,7 +805,7 @@ function SuggestionLegCard({
         onPress={onAdd}
         disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel={`Add ${suggestion.city}, ${suggestion.country}`}
+        accessibilityLabel={tt('trip.addNamed', { city: suggestion.city, country: suggestion.country })}
         style={({ pressed }) => [styles.suggCard, pressed && { opacity: 0.6 }, disabled && { opacity: 0.5 }]}
       >
         <Flag code={countryCode} size={28} style={styles.legFlagWrap} />
@@ -810,7 +818,7 @@ function SuggestionLegCard({
           <Text style={styles.suggReason}>{suggestion.reason}</Text>
           <View style={styles.suggAdd}>
             <Ionicons name="add" size={14} color={Colors.text} />
-            <Text style={styles.suggAddText}>Add this stop</Text>
+            <Text style={styles.suggAddText}>{tt('trip.addThisStop')}</Text>
           </View>
         </View>
         <View style={styles.legRight}>
@@ -864,6 +872,11 @@ function AISuggestionsSection({
   /** Reload with a new wish ('' clears it). */
   onRefine: (preference: string) => void;
 }) {
+  const { t } = useTranslation();
+  const PREF_LABELS: Record<string, string> = {
+    Beaches: t('trip.prefBeaches'), Islands: t('trip.prefIslands'), Mountains: t('trip.prefMountains'),
+    'Cheap cities': t('trip.prefCheapCities'), Nightlife: t('trip.prefNightlife'), Culture: t('trip.prefCulture'),
+  };
   const PillShell = hasGlass ? GlassView : View;
   const custom = preference.trim() !== '' && !PREFERENCE_CHIPS.includes(preference);
   const [showInput, setShowInput] = useState(custom);
@@ -908,7 +921,7 @@ function AISuggestionsSection({
             )}
           >
             <Ionicons name="sparkles" size={12} color={Colors.text} />
-            <Text style={styles.aiPillText}>AI suggestions</Text>
+            <Text style={styles.aiPillText}>{t('trip.aiSuggestions')}</Text>
             <Animated.View style={chevronStyle}>
               <Ionicons name="chevron-down" size={13} color={Colors.textSecondary} />
             </Animated.View>
@@ -917,9 +930,9 @@ function AISuggestionsSection({
         {!collapsed && (
         <View style={styles.aiHeaderRight}>
           {loading ? (
-            <Text style={styles.aiStatus}>Finding stops…</Text>
+            <Text style={styles.aiStatus}>{t('trip.findingStops')}</Text>
           ) : (
-            <TouchableOpacity onPress={onRefresh} hitSlop={10} accessibilityRole="button" accessibilityLabel="New suggestions">
+            <TouchableOpacity onPress={onRefresh} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('trip.newSuggestions')}>
               <Ionicons name="refresh" size={16} color={Colors.textSecondary} />
             </TouchableOpacity>
           )}
@@ -940,7 +953,7 @@ function AISuggestionsSection({
                   disabled={loading}
                   style={[styles.aiChip, active && styles.aiChipActive]}
                 >
-                  <Text style={[styles.aiChipText, active && styles.aiChipTextActive]}>{chip}</Text>
+                  <Text style={[styles.aiChipText, active && styles.aiChipTextActive]}>{PREF_LABELS[chip] ?? chip}</Text>
                 </Pressable>
               );
             })}
@@ -954,7 +967,7 @@ function AISuggestionsSection({
             >
               <Ionicons name="create-outline" size={12} color={custom || showInput ? Colors.white : Colors.text} />
               <Text style={[styles.aiChipText, (custom || showInput) && styles.aiChipTextActive]}>
-                {custom ? preference : 'Something else'}
+                {custom ? preference : t('trip.somethingElse')}
               </Text>
             </Pressable>
           </ScrollView>
@@ -965,7 +978,7 @@ function AISuggestionsSection({
                 style={styles.aiInput}
                 value={draft}
                 onChangeText={setDraft}
-                placeholder="Somewhere quiet by the sea, good coffee…"
+                placeholder={t('trip.suggestionPlaceholder')}
                 placeholderTextColor={systemColor('placeholderText')}
                 returnKeyType="search"
                 onSubmitEditing={submitDraft}
@@ -977,7 +990,7 @@ function AISuggestionsSection({
                 onPress={submitDraft}
                 disabled={loading || !draft.trim()}
                 accessibilityRole="button"
-                accessibilityLabel="Get suggestions"
+                accessibilityLabel={t('trip.getSuggestions')}
                 style={{ opacity: !draft.trim() || loading ? 0.3 : 1 }}
                 hitSlop={8}
               >
@@ -993,7 +1006,7 @@ function AISuggestionsSection({
               </View>
               <View style={[styles.suggCard, styles.aiErrorCard]}>
                 <Ionicons name="cloud-offline-outline" size={18} color={Colors.textSecondary} />
-                <Text style={styles.aiErrorText}>Could not reach the AI. Tap to try again.</Text>
+                <Text style={styles.aiErrorText}>{t('trip.cannotReachAI')}</Text>
               </View>
             </Pressable>
           )}
@@ -1017,6 +1030,7 @@ function AISuggestionsSection({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function JourneyDetailScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { id, travellers: openTravellersParam } = useLocalSearchParams<{ id: string; travellers?: string }>();
   const journeyId = Number(id);
@@ -1307,18 +1321,18 @@ export default function JourneyDetailScreen() {
     if (!journey) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (followed) {
-      const options = [...(readOnly ? [] : ['Rename']), 'Leave trip', 'Cancel'];
+      const options = [...(readOnly ? [] : [t('trip.rename')]), t('plans.leaveTrip'), t('common.cancel')];
       ActionSheetIOS.showActionSheetWithOptions(
         { title: journey.title, options, destructiveButtonIndex: options.length - 2, cancelButtonIndex: options.length - 1 },
         async (i) => {
-          if (options[i] === 'Rename') {
-            Alert.prompt('Rename trip', undefined, async (name) => {
+          if (options[i] === t('trip.rename')) {
+            Alert.prompt(t('trip.renameTrip'), undefined, async (name) => {
               const next = (name ?? '').trim();
               if (!next || next === journey.title) return;
               await updateJourneyTitle(journeyId, next);
               refresh();
             }, 'plain-text', journey.title);
-          } else if (options[i] === 'Leave trip') {
+          } else if (options[i] === t('plans.leaveTrip')) {
             await leaveTrip(journey);
             if (!(await getJourneyWithLegs(journeyId))) router.back();
           }
@@ -1327,7 +1341,7 @@ export default function JourneyDetailScreen() {
       return;
     }
     const shared = !!journey.share_code;
-    const options = ['Invite friends', ...(shared ? ['Stop sharing'] : []), 'Rename', 'Delete trip', 'Cancel'];
+    const options = [t('plans.inviteFriends'), ...(shared ? [t('plans.stopSharing')] : []), t('trip.rename'), t('plans.deleteTrip'), t('common.cancel')];
     ActionSheetIOS.showActionSheetWithOptions(
       { title: journey.title, options, destructiveButtonIndex: options.length - 2, cancelButtonIndex: options.length - 1 },
       (i) => {
@@ -1337,21 +1351,21 @@ export default function JourneyDetailScreen() {
         } else if (shared && i === 1) {
           stopSharing(journey).then(refresh);
         } else if (i === rename) {
-          Alert.prompt('Rename trip', undefined, async (name) => {
+          Alert.prompt(t('trip.renameTrip'), undefined, async (name) => {
             const next = (name ?? '').trim();
             if (!next || next === journey.title) return;
             await updateJourneyTitle(journeyId, next);
             refresh();
           }, 'plain-text', journey.title);
         } else if (i === rename + 1) {
-          Alert.alert('Delete this trip?', 'Stops and documents go with it.', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Delete', style: 'destructive', onPress: async () => { await deleteJourneyWithDocuments(journeyId); router.back(); } },
+          Alert.alert(t('plans.deleteTripTitle'), t('plans.deleteTripBody'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('common.delete'), style: 'destructive', onPress: async () => { await deleteJourneyWithDocuments(journeyId); router.back(); } },
           ]);
         }
       },
     );
-  }, [journey, journeyId, followed, readOnly, refresh, router]);
+  }, [journey, journeyId, followed, readOnly, refresh, router, t]);
 
   // The travellers panel unfolds from the chip rather than sliding up as a
   // sheet: the faces are in the chip, so that is where they open.
@@ -1447,8 +1461,8 @@ export default function JourneyDetailScreen() {
       {ACTIVITIES_UI && legs.length > 0 && (!readOnly || activities.length > 0) && (
         <EntryCard
           icon="sparkles-outline"
-          title="Things to do"
-          sub={activitiesSummary(activities)}
+          title={t('nav.thingsToDo')}
+          sub={activitiesSummary(activities, t)}
           count={activities.length}
           onPress={() => openActivities()}
         />
@@ -1456,8 +1470,8 @@ export default function JourneyDetailScreen() {
       {legs.length > 0 && (!readOnly || expenses.length > 0) && (
         <EntryCard
           icon="receipt-outline"
-          title="Expenses"
-          sub={expensesSummary(expenses, docs.travellers.find((t) => !!user?.uid && t.uid === user.uid)?.sync_id ?? null, docs.travellers.length)}
+          title={t('nav.expenses')}
+          sub={expensesSummary(expenses, docs.travellers.find((tv) => !!user?.uid && tv.uid === user.uid)?.sync_id ?? null, docs.travellers.length, t)}
           count={expenses.length}
           onPress={openExpenses}
         />
@@ -1510,7 +1524,7 @@ export default function JourneyDetailScreen() {
   // A made-up or deleted trip id showed an empty trip with "Add your first
   // stop", which added stops to a trip that does not exist.
   if (!loading && (!journey || journey.deleted)) {
-    return <MissingRoute title="Trip" message="This trip is no longer here." />;
+    return <MissingRoute title={t('trip.title')} message={t('documents.tripGone')} />;
   }
 
   return (
@@ -1521,13 +1535,13 @@ export default function JourneyDetailScreen() {
         <View style={styles.emptyWrap}>
           <EmptyState
             icon="✈️"
-            title="No stops yet"
-            subtitle={readOnly ? `${journey?.shared_owner_name ?? 'Your friend'} has not planned any stops yet.` : "City, dates, and how you'll get there. The rest builds from that."}
+            title={t('trip.noStopsTitle')}
+            subtitle={readOnly ? t('trip.friendNoStops', { owner: journey?.shared_owner_name ?? t('activities.yourFriend') }) : t('trip.noStopsSubtitle')}
           />
           {!readOnly && (
             <View style={styles.emptyCta}>
               <CloudyButton onPress={openAddSheet} style={{ width: '100%' }} innerStyle={{ justifyContent: 'center' }}>
-                <Text style={styles.emptyCtaText}>Add your first stop</Text>
+                <Text style={styles.emptyCtaText}>{t('trip.addFirstStop')}</Text>
               </CloudyButton>
             </View>
           )}
@@ -1555,13 +1569,13 @@ export default function JourneyDetailScreen() {
         </GestureHandlerRootView>
       )}
       {/* Behind the open chip: a touch anywhere else folds it back. */}
-      {travellersOpen && <Pressable style={StyleSheet.absoluteFill} onPress={closeTravellers} accessibilityLabel="Close" />}
+      {travellersOpen && <Pressable style={StyleSheet.absoluteFill} onPress={closeTravellers} accessibilityLabel={t('trip.close')} />}
 
       {/* The bar: two discs and the chip between them, over the map. */}
       <View style={[styles.bar, { top: insets.top }]} pointerEvents="box-none">
-        <GlassDisc icon="chevron-back" size={24} onPress={() => router.back()} label="Back" />
+        <GlassDisc icon="chevron-back" size={24} onPress={() => router.back()} label={t('trip.back')} />
         <View style={styles.barSpacer} pointerEvents="none" />
-        {!readOnly && <GlassDisc icon="add" size={28} onPress={openAddSheet} label="Add a stop" />}
+        {!readOnly && <GlassDisc icon="add" size={28} onPress={openAddSheet} label={t('trip.addStop')} />}
       </View>
       <View style={[styles.morphSlot, { top: insets.top }]} pointerEvents="box-none">
         <TripMorphChip
