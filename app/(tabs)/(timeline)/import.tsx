@@ -18,6 +18,7 @@ import { Typography } from '../../../constants/typography';
 import { FloatingBubbles } from '../../../components/FloatingBubbles';
 import { Flag } from '../../../components/Flag';
 import { showToast } from '../../../lib/toast';
+import { useTranslation } from '../../../contexts/LanguageContext';
 import {
   commitImport,
   getExistingTripsForDedup,
@@ -45,6 +46,7 @@ interface ParseProgress {
 }
 
 export default function ImportScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [step, setStep] = useState<Step>('parsing');
   const [images, setImages] = useState<PickedImage[]>([]);
@@ -71,9 +73,9 @@ export default function ImportScreen() {
 
   const handleClose = useCallback(() => {
     if (step === 'parsing' || step === 'committing') {
-      Alert.alert('Cancel import?', 'Your in-progress import will be discarded.', [
-        { text: 'Keep going', style: 'cancel' },
-        { text: 'Cancel', style: 'destructive', onPress: cancelAndClose },
+      Alert.alert(t('tlImport.cancelImportTitle'), t('tlImport.cancelImportBody'), [
+        { text: t('tlImport.keepGoing'), style: 'cancel' },
+        { text: t('common.cancel'), style: 'destructive', onPress: cancelAndClose },
       ]);
       return;
     }
@@ -141,7 +143,7 @@ export default function ImportScreen() {
   const handleConfirm = useCallback(async () => {
     const toInsert = candidates.filter((c) => c.selected);
     if (toInsert.length === 0) {
-      showToast('Pick at least one trip to import', 'error');
+      showToast(t('tlImport.pickAtLeastOne'), 'error');
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -184,7 +186,7 @@ export default function ImportScreen() {
       <Stack.Screen
         options={{
           headerLeft: () => (
-            <Pressable onPress={handleClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
+            <Pressable onPress={handleClose} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('tlImport.close')}>
               <Ionicons name="close" size={22} color={Colors.text} />
             </Pressable>
           ),
@@ -206,7 +208,7 @@ export default function ImportScreen() {
       {step === 'committing' && (
         <View style={styles.centerFill}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.committingText}>Saving to your timeline…</Text>
+          <Text style={styles.committingText}>{t('tlImport.savingTimeline')}</Text>
         </View>
       )}
 
@@ -219,7 +221,7 @@ export default function ImportScreen() {
           <View style={styles.bottomInfo}>
             <Text style={styles.bottomCount}>{selectedCount}</Text>
             <Text style={styles.bottomLabel}>
-              {selectedCount === 1 ? 'trip selected' : 'trips selected'}
+              {selectedCount === 1 ? t('tlImport.tripSelected') : t('tlImport.tripsSelected')}
             </Text>
           </View>
           <Pressable
@@ -231,7 +233,7 @@ export default function ImportScreen() {
               pressed && styles.confirmBtnPressed,
             ]}
           >
-            <Text style={styles.confirmBtnText}>Add to Timeline</Text>
+            <Text style={styles.confirmBtnText}>{t('tlImport.addToTimeline')}</Text>
             <Ionicons name="arrow-forward" size={18} color={Colors.white} />
           </Pressable>
         </Glass>
@@ -243,6 +245,7 @@ export default function ImportScreen() {
 // ─── Step 1: Parsing ──────────────────────────────────────────────────────────
 
 function ParsingStep({ images, progress }: { images: PickedImage[]; progress: ParseProgress[] }) {
+  const { t } = useTranslation();
   const doneCount = progress.filter((p) => p.status !== 'pending').length;
   const [size, setSize] = useState({ w: 0, h: 0 });
 
@@ -256,11 +259,11 @@ function ParsingStep({ images, progress }: { images: PickedImage[]; progress: Pa
     >
       {size.w > 0 && <FloatingBubbles width={size.w} height={size.h} />}
       <View style={parsingStyles.foreground} pointerEvents="none">
-        <Text style={parsingStyles.title}>Reading your screenshots…</Text>
+        <Text style={parsingStyles.title}>{t('tlImport.readingScreenshots')}</Text>
         <View style={parsingStyles.progressRow}>
           <ActivityIndicator size="small" color={Colors.textSecondary} />
           <Text style={parsingStyles.subtitle}>
-            {doneCount} of {images.length} processed
+            {t('tlImport.processed', { done: doneCount, total: images.length })}
           </Text>
         </View>
       </View>
@@ -310,6 +313,7 @@ function ReviewStep({
   onRemove: (id: string) => void;
   onToggleAll: (selected: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const errored = results.filter((r) => r.status === 'error').length;
   const empty = results.filter((r) => r.status === 'empty').length;
   const allSelected = candidates.length > 0 && candidates.every((c) => c.selected);
@@ -347,10 +351,9 @@ function ReviewStep({
         <View style={reviewStyles.emptyIconWrap}>
           <Ionicons name="search" size={36} color={Colors.textTertiary} />
         </View>
-        <Text style={reviewStyles.emptyTitle}>No trips found</Text>
+        <Text style={reviewStyles.emptyTitle}>{t('tlImport.noTripsFound')}</Text>
         <Text style={reviewStyles.emptyText}>
-          We couldn&apos;t read any trip information from {imageCount === 1 ? 'that screenshot' : 'those screenshots'}.
-          Try clearer images, or add a trip manually.
+          {imageCount === 1 ? t('tlImport.noTripsBodyOne') : t('tlImport.noTripsBodyMany')}
         </Text>
       </ScrollView>
     );
@@ -365,10 +368,10 @@ function ReviewStep({
       <View style={reviewStyles.headerRow}>
         <View style={{ flex: 1 }}>
           <Text style={reviewStyles.headerTitle}>
-            {candidates.length} {candidates.length === 1 ? 'trip' : 'trips'} found
+            {candidates.length === 1 ? t('tlImport.tripsFoundOne', { count: candidates.length }) : t('tlImport.tripsFoundMany', { count: candidates.length })}
           </Text>
           <Text style={reviewStyles.headerSub}>
-            across {imageCount} {imageCount === 1 ? 'screenshot' : 'screenshots'}
+            {imageCount === 1 ? t('tlImport.acrossOne') : t('tlImport.acrossMany', { count: imageCount })}
           </Text>
         </View>
         <Pressable
@@ -377,7 +380,7 @@ function ReviewStep({
           style={({ pressed }) => [reviewStyles.toggleAllBtn, pressed && { opacity: 0.6 }]}
         >
           <Text style={reviewStyles.toggleAllText}>
-            {allSelected ? 'Deselect all' : 'Select all'}
+            {allSelected ? t('tlImport.deselectAll') : t('tlImport.selectAll')}
           </Text>
         </Pressable>
       </View>
@@ -386,8 +389,8 @@ function ReviewStep({
         <View style={reviewStyles.warnBanner}>
           <Ionicons name="information-circle-outline" size={16} color={Colors.warning} />
           <Text style={reviewStyles.warnText}>
-            {errored > 0 && `${errored} couldn't be read. `}
-            {empty > 0 && `${empty} had no trip info.`}
+            {errored > 0 && t('tlImport.erroredCount', { count: errored })}
+            {empty > 0 && t('tlImport.emptyCount', { count: empty })}
           </Text>
         </View>
       )}
@@ -429,10 +432,11 @@ function CandidateRow({
   onToggle: () => void;
   onRemove: () => void;
 }) {
+  const { t } = useTranslation();
   const start = new Date(candidate.startDate);
   const end = candidate.endDate ? new Date(candidate.endDate) : null;
   const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const dateRange = end ? `${fmtShort(start)} – ${fmtShort(end)}` : `${fmtShort(start)} – Present`;
+  const dateRange = end ? `${fmtShort(start)} – ${fmtShort(end)}` : `${fmtShort(start)} – ${t('tlImport.present')}`;
   const days = end
     ? Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1)
     : null;
@@ -459,13 +463,13 @@ function CandidateRow({
           </Text>
           {isActive && (
             <View style={rowStyles.nowPill}>
-              <Text style={rowStyles.nowPillText}>Now</Text>
+              <Text style={rowStyles.nowPillText}>{t('tlImport.now')}</Text>
             </View>
           )}
         </View>
         <Text style={[rowStyles.meta, dup && rowStyles.dimmed]} numberOfLines={1}>
           {candidate.country} · {dateRange}
-          {dup && ' · Already in timeline'}
+          {dup && t('tlImport.alreadyInTimeline')}
         </Text>
       </View>
       {days !== null && (
@@ -474,7 +478,7 @@ function CandidateRow({
           <Text style={[rowStyles.daysUnit, dup && rowStyles.dimmed]}>d</Text>
         </View>
       )}
-      <Pressable onPress={onRemove} hitSlop={10} style={rowStyles.removeBtn} accessibilityRole="button" accessibilityLabel="Remove trip">
+      <Pressable onPress={onRemove} hitSlop={10} style={rowStyles.removeBtn} accessibilityRole="button" accessibilityLabel={t('tlImport.removeTrip')}>
         <Ionicons name="close" size={18} color={Colors.textTertiary} />
       </Pressable>
     </Pressable>
