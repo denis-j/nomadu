@@ -246,6 +246,7 @@ export default function RootLayout() {
           icons, invisible on the white tab screens (iOS defaults to dark). */}
       <StatusBar style="dark" />
       <LanguageProvider>
+        {/* everything that may show text lives under the provider */}
         {appReady && (
           <OnboardingProvider>
             <SyncProvider>
@@ -256,9 +257,9 @@ export default function RootLayout() {
         {showSplash && (
           <SplashScreen ready={appReady} onDone={() => setShowSplash(false)} />
         )}
+        <UpdateBanner visible={isUpdatePending} onApply={applyUpdate} />
+        <ToastContainer />
       </LanguageProvider>
-      <UpdateBanner visible={isUpdatePending} onApply={applyUpdate} />
-      <ToastContainer />
     </ErrorBoundary>
   );
 }

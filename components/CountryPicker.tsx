@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { systemColor } from '../constants/colors';
 import { Flag } from './Flag';
 import { getCountryCode, getCountryNames, getPopularCountries, searchCountries } from '../utils/geography';
+import { useTranslation } from '../contexts/LanguageContext';
 
 const popularCountries = getPopularCountries();
 
@@ -35,8 +36,9 @@ export function CountryPicker({
   query,
   onSelect,
   showPopularWhenEmpty = true,
-  popularLabel = 'Popular',
+  popularLabel,
 }: CountryPickerProps) {
+  const { t } = useTranslation();
   const trimmed = query.trim();
   const isSearching = trimmed.length > 0;
 
@@ -75,18 +77,18 @@ export function CountryPicker({
         <>
           {searchCountries(trimmed).map(renderRow)}
           {searchCountries(trimmed).length === 0 && (
-            <Text style={styles.empty}>No countries found</Text>
+            <Text style={styles.empty}>{t('passport.noResults')}</Text>
           )}
         </>
       ) : (
         <>
           {showPopularWhenEmpty && (
             <>
-              <Text style={styles.sectionLabel}>{popularLabel}</Text>
+              <Text style={styles.sectionLabel}>{popularLabel ?? t('passport.popular')}</Text>
               {popularCountries.map(renderRow)}
             </>
           )}
-          <Text style={styles.sectionLabel}>All countries</Text>
+          <Text style={styles.sectionLabel}>{t('passport.allCountries')}</Text>
           {allCountriesSorted.map(renderRow)}
         </>
       )}

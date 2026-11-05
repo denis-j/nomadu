@@ -7,6 +7,7 @@ import { Typography } from '../constants/typography';
 import { Trip, parseDate } from '../lib/database';
 import { countryCodeToFlag } from '../lib/geocoding';
 import { Flag } from './Flag';
+import { useTranslation } from '../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
 
@@ -21,6 +22,7 @@ interface TripCardProps {
 }
 
 export function TripCard({ trip, daysOverride, hasOverlap, compact, onDelete, onEdit }: TripCardProps) {
+  const { t } = useTranslation();
   // ActionSheet title still uses the emoji string, native iOS handles it well there.
   const emojiFlag = countryCodeToFlag(trip.country_code);
   const startDate = parseDate(trip.start_date);
@@ -45,7 +47,7 @@ export function TripCard({ trip, daysOverride, hasOverlap, compact, onDelete, on
     ActionSheetIOS.showActionSheetWithOptions(
       {
         title: `${emojiFlag} ${trip.city}`,
-        options: ['Edit', 'Open', 'Delete', 'Cancel'],
+        options: [t('common.edit'), t('comp.open'), t('common.delete'), t('common.cancel')],
         destructiveButtonIndex: 2,
         cancelButtonIndex: 3,
       },

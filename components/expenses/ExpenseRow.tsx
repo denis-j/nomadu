@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { EXPENSE_CATEGORY_ICONS, formatAmount, shareOf, type Expense } from '../../lib/expenseModel';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -33,12 +34,13 @@ export function ExpenseRow({
   meId: string | null;
   onPress: () => void;
 }) {
-  const payer = e.paid_by ? nameOf(e.paid_by) : 'Someone';
+  const { t } = useTranslation();
+  const payer = e.paid_by ? nameOf(e.paid_by) : t('comp.someone');
   const split = e.shares.length === 0
-    ? 'not split'
+    ? t('expenses.notSplitLower')
     : e.shares.length === 1
-      ? (e.shares[0].traveller_id === e.paid_by ? (payer === 'You' ? 'your own' : 'their own') : `for ${nameOf(e.shares[0].traveller_id)}`)
-      : `split ${e.shares.length} ways`;
+      ? (e.shares[0].traveller_id === e.paid_by ? (payer === 'You' ? t('comp.yourOwn') : t('expenses.theirOwn')) : t('expenses.forName', { name: nameOf(e.shares[0].traveller_id) }))
+      : t('expenses.splitWays', { count: e.shares.length });
   const mine = shareOf(e, meId);
   const showMine = e.shares.length > 1 && mine > 0;
 
@@ -59,11 +61,11 @@ export function ExpenseRow({
         )}
         <View style={styles.text}>
           <Text style={styles.title} numberOfLines={1}>{e.title}</Text>
-          <Text style={styles.sub} numberOfLines={1}>{payer === 'You' ? 'You paid' : `${payer} paid`} · {split}</Text>
+          <Text style={styles.sub} numberOfLines={1}>{payer === 'You' ? t('expenses.youPaid') : t('expenses.paidByName', { name: payer })} · {split}</Text>
         </View>
         <View style={styles.right}>
           <Text style={styles.amount}>{formatAmount(e.amount)} <Text style={styles.currency}>{e.currency}</Text></Text>
-          {showMine && <Text style={styles.mine}>your part {formatAmount(mine)}</Text>}
+          {showMine && <Text style={styles.mine}>{t('expenses.yourPartAmount', { amount: formatAmount(mine) })}</Text>}
         </View>
       </Glass>
     </Pressable>
