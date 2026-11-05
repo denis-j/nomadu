@@ -119,6 +119,7 @@ function Form({
   lastCurrency: string | null;
   people: ReturnType<typeof useTravellerPeople>;
 }) {
+  const { t } = useTranslation();
   const nav = useNavigation();
   const { travellers, documents, uid, owner, meId, travellerIds, nameOf } = people;
   const today = toYmd(new Date());
