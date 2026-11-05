@@ -18,6 +18,9 @@ import { getJourneyWithLegs, type JourneyLeg, type JourneyWithLegs } from '../..
 import { fromYmd, toYmd } from '../../../lib/days';
 import { addExpense, type LocalExpense } from '../../../lib/expenses';
 import { balances, formatAmount, guessCategory, parseQuickEntry, settleUp, shareOf, stopIdForDate, totals, type Transfer } from '../../../lib/expenseModel';
+import { useTranslation } from '../../../contexts/LanguageContext';
+
+type TFunc = (key: string, params?: Record<string, string | number>) => string;
 import { pickReceipt, receiptImageUri, setPendingReceipt } from '../../../lib/receipts';
 import { showToast } from '../../../lib/toast';
 import { track } from '../../../lib/analytics';
@@ -34,12 +37,12 @@ const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 /** "Today", "Yesterday", "Nov 6", "Nov 6, 2025": the heading over a day's expenses. */
-function dayLabel(ymd: string): string {
+function dayLabel(ymd: string, t: TFunc): string {
   const today = toYmd(new Date());
-  if (ymd === today) return 'Today';
+  if (ymd === today) return t('expenses.today');
   const y = new Date();
   y.setDate(y.getDate() - 1);
-  if (ymd === toYmd(y)) return 'Yesterday';
+  if (ymd === toYmd(y)) return t('expenses.yesterday');
   const d = fromYmd(ymd);
   const sameYear = d.getFullYear() === new Date().getFullYear();
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
@@ -61,6 +64,7 @@ function defaultCurrency(expenses: LocalExpense[], legs: JourneyLeg[]): string {
  * its own sheet.
  */
 export default function ExpensesScreen() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams<Params>();
   const router = useRouter();
   const nav = useNavigation();
@@ -115,7 +119,7 @@ export default function ExpensesScreen() {
     setBusy(true);
     try {
       const today = toYmd(new Date());
-      const title = parsed.title || 'Expense';
+      const title = parsed.title || t('expenses.expense');
       await addExpense(params.journeySyncId, stopIdForDate(stops, today), {
         title,
         amount: parsed.amount,
@@ -129,10 +133,10 @@ export default function ExpensesScreen() {
       track({ name: 'expense_added', props: { source: 'quick' } });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setDraft('');
-      showToast(`${formatAmount(parsed.amount)} ${parsed.currency} added`);
+      showToast(t('expenses.amountAdded', { amount: formatAmount(parsed.amount), currency: parsed.currency }));
       await refresh();
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not add', 'error');
+      showToast(err?.message ?? t('expenses.couldNotAdd'), 'error');
     } finally {
       setBusy(false);
     }
@@ -146,7 +150,7 @@ export default function ExpensesScreen() {
       setPendingReceipt(picked);
       openForm({ receipt: '1' });
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not open the camera', 'error');
+      showToast(err?.message ?? t('expenses.couldNotOpenCamera'), 'error');
     }
   }, [openForm]);
 
@@ -157,7 +161,7 @@ export default function ExpensesScreen() {
       return;
     }
     ActionSheetIOS.showActionSheetWithOptions(
-      { options: ['Take a photo', 'From Photos', 'Cancel'], cancelButtonIndex: 2 },
+      { options: [t('expenses.takePhoto'), t('expenses.fromPhotos'), t('common.cancel')], cancelButtonIndex: 2 },
       (i) => { if (i === 0) snap('camera'); else if (i === 1) snap('library'); },
     );
   }, [snap]);
@@ -167,15 +171,15 @@ export default function ExpensesScreen() {
       headerRight: readOnly
         ? undefined
         : () => (
-            <Pressable hitSlop={12} onPress={() => openForm()} accessibilityRole="button" accessibilityLabel="Add an expense">
+            <Pressable hitSlop={12} onPress={() => openForm()} accessibilityRole="button" accessibilityLabel={t('expenses.addExpense')}>
               <Ionicons name="add" size={26} color={Colors.text} />
             </Pressable>
           ),
     });
   }, [nav, readOnly, openForm]);
 
-  if (!params.journeySyncId || !journeyId || journey === null) return <MissingRoute title="Expenses" message="This trip is no longer here." />;
-  if (journey === undefined || !loaded || !peopleLoaded) return <Stack.Screen options={{ title: 'Expenses' }} />;
+  if (!params.journeySyncId || !journeyId || journey === null) return <MissingRoute title={t('nav.expenses')} message={t('documents.tripGone')} />;
+  if (journey === undefined || !loaded || !peopleLoaded) return <Stack.Screen options={{ title: t('nav.expenses') }} />;
 
   // By day, newest first; the list is already in that order.
   const days: { date: string; items: LocalExpense[] }[] = [];
@@ -185,18 +189,18 @@ export default function ExpensesScreen() {
     else days.push({ date: e.date, items: [e] });
   }
   const others = sums.slice(1);
-  const settledWord = myNet > 0.004 ? 'You get back' : myNet < -0.004 ? 'You owe' : 'Balance';
+  const settledWord = myNet > 0.004 ? t('expenses.youGetBack') : myNet < -0.004 ? t('expenses.youOwe') : t('expenses.balance');
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Expenses' }} />
+      <Stack.Screen options={{ title: t('nav.expenses') }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {!readOnly && (
           <Glass {...glassProps} style={[styles.quick, !hasGlass && styles.quickFallback]}>
             <TextInput
               value={draft}
               onChangeText={setDraft}
-              placeholder={`Dinner 42, Taxi 12.50 ${currency}…`}
+              placeholder={t('expenses.quickPlaceholder', { currency })}
               placeholderTextColor={Colors.textTertiary}
               style={styles.quickInput}
               returnKeyType="done"
@@ -208,11 +212,11 @@ export default function ExpensesScreen() {
             {busy ? (
               <ActivityIndicator size="small" color={Colors.textSecondary} style={styles.quickButton} />
             ) : draft.trim() ? (
-              <Pressable onPress={quickAdd} hitSlop={8} accessibilityRole="button" accessibilityLabel="Add" style={({ pressed }) => [styles.quickButton, pressed && { opacity: 0.6 }]}>
+              <Pressable onPress={quickAdd} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('expenses.add')} style={({ pressed }) => [styles.quickButton, pressed && { opacity: 0.6 }]}>
                 <Ionicons name="arrow-up-circle" size={30} color={Colors.text} />
               </Pressable>
             ) : (
-              <Pressable onPress={chooseReceipt} hitSlop={8} accessibilityRole="button" accessibilityLabel="Add a receipt" style={({ pressed }) => [styles.quickButton, styles.quickCamera, pressed && { opacity: 0.6 }]}>
+              <Pressable onPress={chooseReceipt} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('expenses.addReceipt')} style={({ pressed }) => [styles.quickButton, styles.quickCamera, pressed && { opacity: 0.6 }]}>
                 <Ionicons name="camera-outline" size={20} color={Colors.text} />
               </Pressable>
             )}
@@ -224,17 +228,17 @@ export default function ExpensesScreen() {
         ) : (
           <>
             <StatRow>
-              <StatTile label="Total" value={formatAmount(sums[0].total)} unit={main} />
-              <StatTile label="Your part" value={formatAmount(myPart)} unit={main} />
-              <StatTile label={settledWord} value={settledWord === 'Balance' ? 'Settled' : formatAmount(Math.abs(myNet))} unit={settledWord === 'Balance' ? undefined : main} />
+              <StatTile label={t('expenses.total')} value={formatAmount(sums[0].total)} unit={main} />
+              <StatTile label={t('expenses.yourPart')} value={formatAmount(myPart)} unit={main} />
+              <StatTile label={settledWord} value={settledWord === t('expenses.balance') ? t('expenses.settled') : formatAmount(Math.abs(myNet))} unit={settledWord === t('expenses.balance') ? undefined : main} />
             </StatRow>
             {others.length > 0 && (
-              <Text style={styles.note}>Also {others.map((s) => `${formatAmount(s.total)} ${s.currency}`).join(' · ')}</Text>
+              <Text style={styles.note}>{t('expenses.also', { list: others.map((s) => `${formatAmount(s.total)} ${s.currency}`).join(' · ') })}</Text>
             )}
 
             {transfers.length > 0 && (
               <View style={styles.section}>
-                <SectionHead title="Settle up" />
+                <SectionHead title={t('expenses.settleUp')} />
                 <DetailCard>
                   {transfers.map((t, i) => (
                     <View key={`${t.from}-${t.to}-${t.currency}`}>
@@ -248,7 +252,7 @@ export default function ExpensesScreen() {
 
             {days.map((day) => (
               <View key={day.date} style={styles.section}>
-                <SectionHead title={dayLabel(day.date)} />
+                <SectionHead title={dayLabel(day.date, t)} />
                 <View style={styles.list}>
                   {day.items.map((e) => (
                     <ExpenseRow
@@ -272,7 +276,8 @@ export default function ExpensesScreen() {
 
 /** "Anna owes you 30 EUR": one payment that settles part of the trip. */
 function TransferRow({ transfer: t, meId, nameOf, person }: { transfer: Transfer; meId: string | null; nameOf: (id: string | null) => string; person: { label: string; account: boolean; owner: boolean; seed: string | null } | null }) {
-  const text = t.from === meId ? `You owe ${nameOf(t.to)}` : t.to === meId ? `${nameOf(t.from)} owes you` : `${nameOf(t.from)} owes ${nameOf(t.to)}`;
+  const { t: tr } = useTranslation();
+  const text = t.from === meId ? tr('expenses.youOweName', { name: nameOf(t.to) }) : t.to === meId ? tr('expenses.nameOwesYou', { name: nameOf(t.from) }) : tr('expenses.nameOwesName', { from: nameOf(t.from), to: nameOf(t.to) });
   return (
     <View style={styles.transfer}>
       {person ? <Avatar person={person} size={26} /> : <View style={styles.transferBlank} />}
@@ -284,26 +289,27 @@ function TransferRow({ transfer: t, meId, nameOf, person }: { transfer: Transfer
 
 /** Nothing paid yet: what the page is for, and the two ways in. */
 function Empty({ readOnly, owner, onSnap, onManual }: { readOnly: boolean; owner: string | null; onSnap: () => void; onManual: () => void }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIcon}>
         <Ionicons name="receipt-outline" size={26} color={Colors.text} />
       </View>
-      <Text style={styles.emptyTitle}>Nothing paid yet</Text>
+      <Text style={styles.emptyTitle}>{t('expenses.nothingPaid')}</Text>
       <Text style={styles.emptyText}>
         {readOnly
-          ? `${owner ?? 'Your friend'} has not added any expenses yet.`
-          : 'Type what and how much above, like Dinner 42. It is split among everyone on the trip, and you can change that on the expense.'}
+          ? t('expenses.friendNoExpenses', { owner: owner ?? t('expenses.yourFriend') })
+          : t('expenses.typeHint')}
       </Text>
       {!readOnly && (
         <>
           <CloudyButton onPress={onSnap} style={styles.emptyCta} innerStyle={styles.emptyCtaInner}>
             <Ionicons name="camera-outline" size={20} color={Colors.cloudyButtonText} />
-            <Text style={styles.emptyCtaText}>Snap a receipt</Text>
+            <Text style={styles.emptyCtaText}>{t('expenses.snapReceipt')}</Text>
           </CloudyButton>
           <Pressable onPress={onManual} style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.55 }]}>
             <Ionicons name="add-circle-outline" size={20} color={Colors.text} />
-            <Text style={styles.secondaryText}>Add manually</Text>
+            <Text style={styles.secondaryText}>{t('expenses.addManually')}</Text>
           </Pressable>
         </>
       )}

@@ -31,6 +31,7 @@ import {
 import { consumePendingReceipt, fileReceipt, receiptImageUri, removeReceipt, type PickedReceipt, pickReceipt } from '../../../lib/receipts';
 import { showToast } from '../../../lib/toast';
 import { track } from '../../../lib/analytics';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 type Params = {
   journeyId: string;
@@ -61,6 +62,7 @@ const CALENDAR_THEME = {
  * filled in before the form shows.
  */
 export default function ExpenseAddSheet() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams<Params>();
   const journeyId = Number(params.journeyId);
   const [legs, setLegs] = useState<JourneyLeg[] | null>(null);
@@ -151,7 +153,7 @@ function Form({
       .then((r) => {
         if (cancelled) return;
         if (!r) {
-          showToast('Could not read the receipt, fill it in');
+          showToast(t('expenses.couldNotReadReceiptFill'));
           return;
         }
         setAmount((v) => v.trim() || amountText(r.amount));
@@ -163,7 +165,7 @@ function Form({
           setKindTouched(true);
         }
       })
-      .catch((err: any) => { if (!cancelled) showToast(err?.message ?? 'Could not read the receipt', 'error'); })
+      .catch((err: any) => { if (!cancelled) showToast(err?.message ?? t('expenses.couldNotReadReceipt'), 'error'); })
       .finally(() => { if (!cancelled) setReading(false); });
     return () => { cancelled = true; };
     // once, for the picture that came with the form
@@ -198,7 +200,7 @@ function Form({
         setDropReceipt(false);
       }
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not open the camera', 'error');
+      showToast(err?.message ?? t('expenses.couldNotOpenCamera'), 'error');
     }
   };
 
@@ -237,9 +239,9 @@ function Form({
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       nav.goBack();
-      showToast('Saved');
+      showToast(t('plans.saved'));
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not save', 'error');
+      showToast(err?.message ?? t('plans.couldNotSave'), 'error');
       setSaving(false);
     }
   };
@@ -251,52 +253,52 @@ function Form({
     <>
       <Stack.Screen
         options={{
-          title: existing ? 'Edit expense' : 'Add an expense',
+          title: existing ? t('expenses.editExpense') : t('expenses.addExpense'),
           headerRight: () => (
-            <Pressable onPress={save} disabled={saving || !amountOk} hitSlop={8} style={{ opacity: saving || !amountOk ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel="Save">
+            <Pressable onPress={save} disabled={saving || !amountOk} hitSlop={8} style={{ opacity: saving || !amountOk ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel={t('common.save')}>
               <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
             </Pressable>
           ),
         }}
       />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={visaFormStyles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        <SectionLabel>How much</SectionLabel>
+        <SectionLabel>{t('expenses.howMuch')}</SectionLabel>
         <Card>
-          <MoneyRow label="Amount" amount={amount} currency={currency} suggested={suggested} onCommit={(a, c) => { setAmount(a); setCurrency(c); }} live />
-          <TextRow label="For" value={title} onCommit={setTitle} live placeholder="Dinner, taxi, tickets" autoCapitalize="sentences" last />
+          <MoneyRow label={t('expenses.amount')} amount={amount} currency={currency} suggested={suggested} onCommit={(a, c) => { setAmount(a); setCurrency(c); }} live />
+          <TextRow label={t('expenses.forLabel')} value={title} onCommit={setTitle} live placeholder={t('expenses.forPlaceholder')} autoCapitalize="sentences" last />
         </Card>
         {reading && (
           <View style={styles.reading}>
             <ActivityIndicator size="small" color={Colors.textSecondary} />
-            <Text style={styles.readingText}>Reading the receipt…</Text>
+            <Text style={styles.readingText}>{t('expenses.readingReceipt')}</Text>
           </View>
         )}
 
         {listed.length > 0 && (
           <>
-            <SectionLabel>Paid by</SectionLabel>
+            <SectionLabel>{t('expenses.paidBy')}</SectionLabel>
             <Card>
               {listed.map((t, i) => (
                 <ChoiceRow key={t.sync_id} title={label(t)} selected={paidBy === t.sync_id} onPress={() => setPaidBy(t.sync_id)} last={i === listed.length - 1} />
               ))}
             </Card>
 
-            <SectionLabel>Split among</SectionLabel>
+            <SectionLabel>{t('expenses.splitAmong')}</SectionLabel>
             <Card>
               {listed.map((t, i) => (
                 <ChoiceRow key={t.sync_id} title={label(t)} selected={among.has(t.sync_id!)} onPress={() => toggle(t.sync_id!)} last={i === listed.length - 1} />
               ))}
             </Card>
-            <Hint>{among.size === 0 ? `Not split: ${nameOf(paidBy) === 'You' ? 'your' : `${nameOf(paidBy)}'s`} own.` : each !== null ? `${formatAmount(each)} ${effectiveCurrency} each.` : 'Equal parts.'}</Hint>
+            <Hint>{among.size === 0 ? (nameOf(paidBy) === 'You' ? t('expenses.notSplitYours') : t('expenses.notSplitName', { name: nameOf(paidBy) })) : each !== null ? t('expenses.eachShare', { amount: formatAmount(each), currency: effectiveCurrency }) : t('expenses.equalParts')}</Hint>
           </>
         )}
 
-        <SectionLabel>When</SectionLabel>
+        <SectionLabel>{t('expenses.when')}</SectionLabel>
         <Card>
           <Pressable style={styles.dateRow} onPress={() => { Haptics.selectionAsync(); setPickingDate((v) => !v); }}>
-            <Text style={styles.dateLabel}>Date</Text>
+            <Text style={styles.dateLabel}>{t('expenses.date')}</Text>
             <View style={styles.dateRight}>
-              <Text style={styles.dateValue}>{date === today ? 'Today' : formatDay(date)}</Text>
+              <Text style={styles.dateValue}>{date === today ? t('expenses.today') : formatDay(date)}</Text>
               <Ionicons name={pickingDate ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.textTertiary} />
             </View>
           </Pressable>
@@ -316,7 +318,7 @@ function Form({
           )}
         </Card>
 
-        <SectionLabel>What kind</SectionLabel>
+        <SectionLabel>{t('expenses.whatKind')}</SectionLabel>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.kindsScroll} contentContainerStyle={styles.kinds} keyboardShouldPersistTaps="handled">
           {EXPENSE_CATEGORIES.map((c) => {
             const on = c === category;
@@ -337,25 +339,25 @@ function Form({
             <View style={styles.pickedRow}>
               <Image source={{ uri: receiptUri }} style={styles.thumb} contentFit="cover" />
               <View style={styles.pickedText}>
-                <Text style={styles.pickedName}>{picked ? 'New photo' : 'Receipt'}</Text>
-                <Text style={styles.pickedMime}>{picked ? 'Saved with the expense' : 'Already on it'}</Text>
+                <Text style={styles.pickedName}>{picked ? t('expenses.newPhoto') : t('expenses.receipt')}</Text>
+                <Text style={styles.pickedMime}>{picked ? t('expenses.savedWithExpense') : t('expenses.alreadyOnIt')}</Text>
               </View>
-              <Pressable onPress={() => { setPicked(null); setDropReceipt(true); }} hitSlop={8} accessibilityRole="button" accessibilityLabel="Remove receipt">
+              <Pressable onPress={() => { setPicked(null); setDropReceipt(true); }} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('expenses.removeReceipt')}>
                 <Ionicons name="close-circle" size={22} color={Colors.textTertiary} />
               </Pressable>
             </View>
           </Card>
         ) : (
           <Card>
-            <SourceRow icon="camera-outline" title="Take a photo" subtitle="The bill, the ticket, the card slip" onPress={() => addReceipt('camera')} />
+            <SourceRow icon="camera-outline" title={t('expenses.takePhoto')} subtitle={t('expenses.billTicket')} onPress={() => addReceipt('camera')} />
             <View style={styles.separator} />
-            <SourceRow icon="images-outline" title="From Photos" subtitle="A screenshot or a photo you already have" onPress={() => addReceipt('library')} />
+            <SourceRow icon="images-outline" title={t('expenses.fromPhotos')} subtitle={t('expenses.screenshotPhoto')} onPress={() => addReceipt('library')} />
           </Card>
         )}
 
-        <SectionLabel>Notes</SectionLabel>
+        <SectionLabel>{t('expenses.notes')}</SectionLabel>
         <Card>
-          <TextArea value={notes} onCommit={setNotes} live placeholder="Who ordered what, what to claim back" last />
+          <TextArea value={notes} onCommit={setNotes} live placeholder={t('expenses.notesPlaceholder')} last />
         </Card>
       </ScrollView>
     </>

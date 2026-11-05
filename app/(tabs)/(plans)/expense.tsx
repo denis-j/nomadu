@@ -19,6 +19,7 @@ import { deleteExpense, getExpense, updateExpense, type LocalExpense } from '../
 import { EXPENSE_CATEGORY_ICONS, EXPENSE_CATEGORY_LABELS, formatAmount } from '../../../lib/expenseModel';
 import { receiptImageUri, removeReceipt } from '../../../lib/receipts';
 import { showToast } from '../../../lib/toast';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 type Params = { id: string; journeyId: string; readOnly?: string };
 
@@ -36,6 +37,7 @@ const fmtShort = (ymd: string) => parseDate(ymd).toLocaleDateString('en-US', { m
  * "Edit" opens the form.
  */
 export default function ExpenseSheet() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams<Params>();
   const router = useRouter();
   const readOnly = params.readOnly === '1';
@@ -54,20 +56,20 @@ export default function ExpenseSheet() {
   const receipt = useMemo(() => (e?.receipt_document_id ? documents.find((d) => d.sync_id === e.receipt_document_id) ?? null : null), [documents, e?.receipt_document_id]);
 
   if (e === undefined) return <Stack.Screen options={{ headerShown: false }} />;
-  if (e === null) return <MissingRoute title="Expense" message="This expense is no longer here." />;
+  if (e === null) return <MissingRoute title={t('expenses.expense')} message={t('expenses.expenseGone')} />;
 
   const picture = receiptImageUri(receipt);
   const stop = legs.find((l) => l.sync_id === e.stop_id) ?? null;
   const icon = EXPENSE_CATEGORY_ICONS[e.category] as keyof typeof Ionicons.glyphMap;
   const payer = nameOf(e.paid_by);
-  const stopValue = stop ? `${stop.city}, ${fmtShort(stop.start_date)} – ${fmtShort(stop.end_date)}` : 'No stop';
+  const stopValue = stop ? `${stop.city}, ${fmtShort(stop.start_date)} – ${fmtShort(stop.end_date)}` : t('expenses.noStop');
 
   const move = async (id: string) => {
     try {
       setE(await updateExpense(e.id, {}, id === NO_STOP ? null : id));
-      showToast('Moved');
+      showToast(t('expenses.moved'));
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not save', 'error');
+      showToast(err?.message ?? t('plans.couldNotSave'), 'error');
     }
   };
 
@@ -77,22 +79,22 @@ export default function ExpenseSheet() {
   };
 
   const remove = () => {
-    Alert.alert(`Delete ${e.title}?`, receipt ? 'The receipt goes with it.' : undefined, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('activities.deleteTitle', { title: e.title }), receipt ? t('expenses.receiptGoesWith') : undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             await deleteExpense(e.id);
             if (receipt) await removeReceipt(receipt, e.journey_id);
           } catch (err: any) {
-            showToast(err?.message ?? 'Could not delete', 'error');
+            showToast(err?.message ?? t('expenses.couldNotDelete'), 'error');
             return;
           }
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           router.back();
-          showToast('Deleted');
+          showToast(t('expenses.deleted'));
         },
       },
     ]);
@@ -113,34 +115,34 @@ export default function ExpenseSheet() {
 
         <View style={[styles.header, !picture && styles.headerAlone]}>
           <Text style={styles.title}>{e.title}</Text>
-          <Text style={styles.where}>{payer === 'You' ? 'You paid' : `${payer} paid`} · {formatDay(e.date)}</Text>
+          <Text style={styles.where}>{payer === 'You' ? t('expenses.youPaid') : t('expenses.paidByName', { name: payer })} · {formatDay(e.date)}</Text>
         </View>
 
         <StatRow style={styles.statsRow}>
-          <StatTile label="Amount" value={formatAmount(e.amount)} unit={e.currency} />
-          <StatTile label="Paid by" value={payer} />
-          <StatTile label="Split" value={e.shares.length === 0 ? 'Not split' : `${e.shares.length}`} unit={e.shares.length === 0 ? undefined : e.shares.length === 1 ? 'person' : 'people'} />
+          <StatTile label={t('expenses.amount')} value={formatAmount(e.amount)} unit={e.currency} />
+          <StatTile label={t('expenses.paidBy')} value={payer} />
+          <StatTile label={t('expenses.split')} value={e.shares.length === 0 ? t('expenses.notSplit') : `${e.shares.length}`} unit={e.shares.length === 0 ? undefined : e.shares.length === 1 ? t('expenses.person') : t('expenses.people')} />
         </StatRow>
 
         <View style={styles.section}>
-          <SectionLabel>Details</SectionLabel>
+          <SectionLabel>{t('expenses.details')}</SectionLabel>
           <DetailCard>
-            <DetailRow icon="calendar-outline" label="Date" value={formatDay(e.date)} />
+            <DetailRow icon="calendar-outline" label={t('expenses.date')} value={formatDay(e.date)} />
             <DetailSeparator />
             {readOnly || legs.length === 0 ? (
-              <DetailRow icon="location-outline" label="Stop" value={stopValue} />
+              <DetailRow icon="location-outline" label={t('expenses.stop')} value={stopValue} />
             ) : (
               <DetailRow
                 icon="location-outline"
-                label="Stop"
+                label={t('expenses.stop')}
                 right={(
                   <Dropdown
                     right
-                    title="Move to"
+                    title={t('expenses.moveTo')}
                     value={e.stop_id ?? NO_STOP}
                     options={[
                       ...legs.filter((l) => l.sync_id).map((l) => ({ id: l.sync_id!, label: l.city, subtitle: `${fmtShort(l.start_date)} – ${fmtShort(l.end_date)}` })),
-                      { id: NO_STOP, label: 'No stop' },
+                      { id: NO_STOP, label: t('expenses.noStop') },
                     ]}
                     onPick={move}
                   >
@@ -153,7 +155,7 @@ export default function ExpenseSheet() {
               />
             )}
             <DetailSeparator />
-            <DetailRow icon={icon} label="Kind" value={EXPENSE_CATEGORY_LABELS[e.category]} />
+            <DetailRow icon={icon} label={t('expenses.kind')} value={EXPENSE_CATEGORY_LABELS[e.category]} />
             {e.notes ? (
               <>
                 <DetailSeparator />
@@ -165,7 +167,7 @@ export default function ExpenseSheet() {
 
         {e.shares.length > 0 && (
           <View style={styles.section}>
-            <SectionLabel>Who pays what</SectionLabel>
+            <SectionLabel>{t('expenses.whoPaysWhat')}</SectionLabel>
             <DetailCard>
               {e.shares.map((s, i) => {
                 const person = people.get(s.traveller_id) ?? null;
@@ -175,7 +177,7 @@ export default function ExpenseSheet() {
                     <View style={styles.shareRow}>
                       {person ? <Avatar person={person} size={26} /> : <View style={styles.shareBlank} />}
                       <Text style={[styles.shareName, s.traveller_id === meId && styles.shareMine]} numberOfLines={1}>
-                        {nameOf(s.traveller_id)}{s.traveller_id === e.paid_by ? ' · paid' : ''}
+                        {nameOf(s.traveller_id)}{s.traveller_id === e.paid_by ? t('expenses.paidSuffix') : ''}
                       </Text>
                       <Text style={styles.shareAmount}>{formatAmount(s.amount)} <Text style={styles.shareCurrency}>{e.currency}</Text></Text>
                     </View>
@@ -188,17 +190,17 @@ export default function ExpenseSheet() {
 
         {receipt ? (
           <View style={styles.section}>
-            <LinkCard icon="receipt-outline" title="Receipt" sub={picture ? 'The photo, full size' : 'The file'} onPress={() => router.push({ pathname: '/(tabs)/(plans)/document', params: { id: String(receipt.id) } })} />
+            <LinkCard icon="receipt-outline" title={t('expenses.receipt')} sub={picture ? t('expenses.photoFullSize') : t('expenses.theFile')} onPress={() => router.push({ pathname: '/(tabs)/(plans)/document', params: { id: String(receipt.id) } })} />
           </View>
         ) : null}
 
         {!readOnly && (
           <View style={styles.actions}>
             <TouchableOpacity onPress={edit} activeOpacity={0.5}>
-              <Text style={styles.editText}>Edit</Text>
+              <Text style={styles.editText}>{t('common.edit')}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={remove} activeOpacity={0.5}>
-              <Text style={styles.deleteText}>Delete</Text>
+              <Text style={styles.deleteText}>{t('common.delete')}</Text>
             </TouchableOpacity>
           </View>
         )}
