@@ -13,6 +13,7 @@ import { removeAccommodationOption, selectAccommodationOption, type LocalAccommo
 import { amenityLabel, formatMoney, nightsBetween, optionNightlyPrice } from '../../../lib/accommodationModel';
 import { parseDate } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 type Params = {
   stopSyncId: string;
@@ -46,15 +47,16 @@ function mapsUrl(address: string): string {
  * are the plain words at the end.
  */
 export default function StayOptionSheet() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams<Params>();
   const router = useRouter();
   const readOnly = params.readOnly === '1';
   const { plan, loaded, setPlan } = useAccommodation(params.stopSyncId);
 
-  if (!params.stopSyncId || !params.optionId) return <MissingRoute title="Place" message="This place is no longer here." />;
+  if (!params.stopSyncId || !params.optionId) return <MissingRoute title={t('plans.place')} message={t('plans.placeGone')} />;
   if (!loaded) return <Stack.Screen options={{ headerShown: false }} />;
   const o = plan?.options.find((x) => x.id === params.optionId) ?? null;
-  if (!plan || !o) return <MissingRoute title="Place" message="This place is no longer here." />;
+  if (!plan || !o) return <MissingRoute title={t('plans.place')} message={t('plans.placeGone')} />;
 
   const picked = plan.selected_option_id === o.id;
   const booked = plan.booking?.option_id === o.id;
@@ -68,11 +70,11 @@ export default function StayOptionSheet() {
       setPlan(await work());
       if (toast) showToast(toast);
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not save', 'error');
+      showToast(err?.message ?? t('plans.couldNotSave'), 'error');
     }
   };
 
-  const pick = () => apply(() => selectAccommodationOption(params.stopSyncId, o.id), `${o.name} picked`);
+  const pick = () => apply(() => selectAccommodationOption(params.stopSyncId, o.id), t('stayOption.picked', { name: o.name }));
   const unpick = () => apply(() => selectAccommodationOption(params.stopSyncId, null));
   const sheet = { stopSyncId: params.stopSyncId, journeySyncId: params.journeySyncId, start: params.start, end: params.end, countryCode: params.countryCode, city: params.city };
   // Swap this sheet for the form in one go, as the stop sheet does. The
@@ -80,19 +82,19 @@ export default function StayOptionSheet() {
   const toBooking = () => router.replace({ pathname: '/(tabs)/(plans)/stay-booking', params: { ...sheet, optionId: o.id } } as any);
   const edit = () => router.replace({ pathname: '/(tabs)/(plans)/stay-option-edit', params: { ...sheet, optionId: o.id } } as any);
   const remove = () => {
-    Alert.alert(`Remove ${o.name}?`, booked ? 'The booking details stay, only the place goes from the list.' : undefined, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('stayOption.removeTitle', { name: o.name }), booked ? t('stayOption.removeBookedBody') : undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('common.remove'),
         style: 'destructive',
         onPress: async () => {
           try {
             await removeAccommodationOption(params.stopSyncId, o.id);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             router.back();
-            showToast('Place removed');
+            showToast(t('stayOption.placeRemoved'));
           } catch (err: any) {
-            showToast(err?.message ?? 'Could not remove', 'error');
+            showToast(err?.message ?? t('stayOption.couldNotRemove'), 'error');
           }
         },
       },
@@ -109,47 +111,47 @@ export default function StayOptionSheet() {
         </View>
 
         <StatRow style={styles.statsRow}>
-          <StatTile label="Per night" value={nightly !== null && o.currency ? String(nightly) : '—'} unit={nightly !== null && o.currency ? o.currency : undefined} />
-          <StatTile label={`${nights} ${nights === 1 ? 'night' : 'nights'}`} value={o.total_price !== null && o.currency ? String(o.total_price) : '—'} unit={o.total_price !== null && o.currency ? o.currency : undefined} />
-          <StatTile label="Rating" value={o.rating !== null ? `★ ${o.rating}` : '—'} unit={o.rating !== null && o.rating_scale === 10 ? '/10' : undefined} />
+          <StatTile label={t('plans.perNight')} value={nightly !== null && o.currency ? String(nightly) : '—'} unit={nightly !== null && o.currency ? o.currency : undefined} />
+          <StatTile label={`${nights} ${nights === 1 ? t('stayOption.nightSingular') : t('stayOption.nightPlural')}`} value={o.total_price !== null && o.currency ? String(o.total_price) : '—'} unit={o.total_price !== null && o.currency ? o.currency : undefined} />
+          <StatTile label={t('plans.rating')} value={o.rating !== null ? `★ ${o.rating}` : '—'} unit={o.rating !== null && o.rating_scale === 10 ? '/10' : undefined} />
         </StatRow>
 
         <View style={styles.section}>
-          <SectionLabel>Details</SectionLabel>
+          <SectionLabel>{t('stayOption.details')}</SectionLabel>
           <DetailCard>
             {datesDiffer && (
               <>
-                <DetailRow icon="calendar-outline" label="Dates" value={fmtRange(o.check_in, o.check_out)} />
+                <DetailRow icon="calendar-outline" label={t('plans.dates')} value={fmtRange(o.check_in, o.check_out)} />
                 <DetailSeparator />
               </>
             )}
             {o.fees !== null && o.fees > 0 && o.currency ? (
               <>
-                <DetailRow icon="cash-outline" label="Fees" value={formatMoney(o.fees, o.currency)!} />
+                <DetailRow icon="cash-outline" label={t('stayOption.fees')} value={formatMoney(o.fees, o.currency)!} />
                 <DetailSeparator />
               </>
             ) : null}
             {o.cancellation_policy ? (
               <>
-                <DetailRow icon="refresh-outline" label="Cancellation" value={o.cancellation_policy} />
+                <DetailRow icon="refresh-outline" label={t('stayOption.cancellation')} value={o.cancellation_policy} />
                 <DetailSeparator />
               </>
             ) : null}
             {o.review_count !== null ? (
               <>
-                <DetailRow icon="chatbubble-outline" label="Reviews" value={`${o.review_count.toLocaleString('en-US')}`} />
+                <DetailRow icon="chatbubble-outline" label={t('stayOption.reviews')} value={`${o.review_count.toLocaleString('en-US')}`} />
                 <DetailSeparator />
               </>
             ) : null}
             {o.amenities.length > 0 ? (
               <>
-                <DetailRow icon="checkmark-circle-outline" label="Has" value={o.amenities.map(amenityLabel).join(', ')} />
+                <DetailRow icon="checkmark-circle-outline" label={t('stayOption.has')} value={o.amenities.map(amenityLabel).join(', ')} />
                 <DetailSeparator />
               </>
             ) : null}
             {o.risks ? (
               <>
-                <DetailNotes icon="warning-outline" label="Risks" text={o.risks} />
+                <DetailNotes icon="warning-outline" label={t('plans.risks')} text={o.risks} />
                 <DetailSeparator />
               </>
             ) : null}
@@ -161,13 +163,13 @@ export default function StayOptionSheet() {
             ) : null}
             <DetailRow
               icon="ribbon-outline"
-              label="Your score"
-              value={o.score !== null ? `${o.score} of 10` : 'Not scored'}
+              label={t('plans.yourScore')}
+              value={o.score !== null ? t('stayOption.yourScoreValue', { score: o.score }) : t('stayOption.notScored')}
             />
             {o.last_checked_at ? (
               <>
                 <DetailSeparator />
-                <DetailRow icon="time-outline" label="Checked" value={new Date(o.last_checked_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
+                <DetailRow icon="time-outline" label={t('stayOption.checked')} value={new Date(o.last_checked_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
               </>
             ) : null}
           </DetailCard>
@@ -175,19 +177,19 @@ export default function StayOptionSheet() {
 
         <View style={styles.section}>
           {o.url ? (
-            <LinkCard icon="open-outline" title={o.platform ? `Open on ${o.platform}` : 'Open the listing'} sub={o.url.replace(/^https?:\/\/(www\.)?/, '')} onPress={() => Linking.openURL(o.url!)} />
+            <LinkCard icon="open-outline" title={o.platform ? t('stayOption.openOn', { platform: o.platform }) : t('stayOption.openListing')} sub={o.url.replace(/^https?:\/\/(www\.)?/, '')} onPress={() => Linking.openURL(o.url!)} />
           ) : null}
           {o.address ? (
-            <LinkCard icon="navigate-outline" title="Directions" sub={o.address} onPress={() => Linking.openURL(mapsUrl(o.address!))} />
+            <LinkCard icon="navigate-outline" title={t('stayOption.directions')} sub={o.address} onPress={() => Linking.openURL(mapsUrl(o.address!))} />
           ) : null}
         </View>
 
         {!readOnly && !booked && (
           <View style={styles.cta}>
             <CloudyButton onPress={toBooking} style={styles.ctaButton} innerStyle={styles.ctaInner}>
-              <Text style={styles.ctaText}>Book this place</Text>
+              <Text style={styles.ctaText}>{t('plans.bookThisPlace')}</Text>
             </CloudyButton>
-            <Text style={styles.ctaFoot}>{picked ? 'Picked. Book it once it is confirmed.' : 'Or mark it as picked while you decide.'}</Text>
+            <Text style={styles.ctaFoot}>{picked ? t('stayOption.pickedFoot') : t('stayOption.orPickFoot')}</Text>
           </View>
         )}
 
@@ -195,14 +197,14 @@ export default function StayOptionSheet() {
           <View style={styles.actions}>
             {!booked && (
               <TouchableOpacity onPress={picked ? unpick : pick} activeOpacity={0.5}>
-                <Text style={styles.actionText}>{picked ? 'Unpick' : 'Pick'}</Text>
+                <Text style={styles.actionText}>{picked ? t('stayOption.unpick') : t('stayOption.pick')}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity onPress={edit} activeOpacity={0.5}>
-              <Text style={styles.actionText}>Edit</Text>
+              <Text style={styles.actionText}>{t('common.edit')}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={remove} activeOpacity={0.5}>
-              <Text style={styles.deleteText}>Remove</Text>
+              <Text style={styles.deleteText}>{t('common.remove')}</Text>
             </TouchableOpacity>
           </View>
         )}
