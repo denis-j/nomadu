@@ -11,7 +11,7 @@ import { Colors, systemColor } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { useAccommodation } from '../../../hooks/useAccommodations';
 import { startAccommodation, updateAccommodation, type LocalAccommodation } from '../../../lib/accommodations';
-import { ACCOMMODATION_TYPES, EMPTY_REQUIREMENTS, KNOWN_AMENITIES, TYPE_LABELS, type AccommodationType } from '../../../lib/accommodationModel';
+import { ACCOMMODATION_TYPES, EMPTY_REQUIREMENTS, KNOWN_AMENITIES, type AccommodationType } from '../../../lib/accommodationModel';
 import { currencyForCountry } from '../../../lib/currencies';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
@@ -103,9 +103,9 @@ function Form({ plan, params }: { plan: LocalAccommodation | null; params: Param
           <GlassPill active={type === null} onPress={() => { Haptics.selectionAsync(); setType(null); }}>
             <Text style={[styles.pillLabel, type === null && styles.pillLabelActive]}>{t('plans.anything')}</Text>
           </GlassPill>
-          {ACCOMMODATION_TYPES.map((t) => (
-            <GlassPill key={t} active={type === t} onPress={() => { Haptics.selectionAsync(); setType(t); }}>
-              <Text style={[styles.pillLabel, type === t && styles.pillLabelActive]}>{TYPE_LABELS[t]}</Text>
+          {ACCOMMODATION_TYPES.map((ty) => (
+            <GlassPill key={ty} active={type === ty} onPress={() => { Haptics.selectionAsync(); setType(ty); }}>
+              <Text style={[styles.pillLabel, type === ty && styles.pillLabelActive]}>{t(`accType.${ty}`)}</Text>
             </GlassPill>
           ))}
         </View>

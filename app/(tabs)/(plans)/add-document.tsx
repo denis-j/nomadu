@@ -226,7 +226,7 @@ function AddDocumentScreenContent() {
           {DOCUMENT_KINDS.filter((k) => !k.hidden).map((k, i, all) => (
             <ChoiceRow
               key={k.kind}
-              title={k.label}
+              title={t(`docKind.${k.kind}`)}
               selected={kind === k.kind}
               onPress={() => setKind(k.kind)}
               last={i === all.length - 1}

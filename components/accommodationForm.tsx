@@ -6,8 +6,11 @@ import { Typography } from '../constants/typography';
 import { Dropdown } from './Dropdown';
 import { StatusChip } from './SheetRows';
 import { currencyChoices, promptCurrency } from '../lib/currencies';
+import { useTranslation } from '../contexts/LanguageContext';
+
+type TFunc = (key: string, params?: Record<string, string | number>) => string;
 import {
-  STATUS_LABELS,
+
   primaryOption,
   type AccommodationPlan,
   type AccommodationStatus,
@@ -43,55 +46,56 @@ export function statusColor(status: AccommodationStatus): string {
 
 /** The status as the "8d" pill on the itinerary: grey capsule, short word. */
 export function StatusBadge({ status, size = 'regular', onPress }: { status: AccommodationStatus; size?: 'regular' | 'small'; onPress?: () => void }) {
-  return <StatusChip label={STATUS_LABELS[status]} muted={statusColor(status) !== Colors.text} size={size} onPress={onPress} />;
+  const { t } = useTranslation();
+  return <StatusChip label={t(`accStatus.${status}`)} muted={statusColor(status) !== Colors.text} size={size} onPress={onPress} />;
 }
 
 /** "Booked", "3 options", "Needs a place": the stop card's chip, short enough for one line. */
-export function planChipShort(plan: AccommodationPlan): string {
-  if (!plan.needed) return 'No place needed';
+export function planChipShort(plan: AccommodationPlan, t: TFunc): string {
+  if (!plan.needed) return t('accommodation.noPlaceNeeded');
   switch (plan.status) {
     case 'open':
-      return 'Needs a place';
+      return t('accommodation.needsPlace');
     case 'searching':
-      return 'Searching';
+      return t('accommodation.searching');
     case 'options_available':
     case 'deciding':
-      return plan.options.length === 1 ? '1 option' : `${plan.options.length} options`;
+      return plan.options.length === 1 ? t('accommodation.oneOption') : t('accommodation.manyOptions', { count: plan.options.length });
     case 'selected':
-      return 'Picked';
+      return t('accommodation.pickedChip');
     case 'booked':
-      return 'Booked';
+      return t('accommodation.bookedChip');
     case 'checked_in':
-      return 'Checked in';
+      return t('accommodation.checkedInChip');
     case 'completed':
-      return 'Stayed';
+      return t('accommodation.stayedChip');
     case 'cancelled':
-      return 'Cancelled';
+      return t('accommodation.cancelledChip');
   }
 }
 
 /** "Booked · Loft in Tay Ho", "3 options", "Needs a place": the same with the place's name, for the stop's sheet. */
-export function planChipText(plan: AccommodationPlan): string {
-  if (!plan.needed) return 'No place needed';
+export function planChipText(plan: AccommodationPlan, t: TFunc): string {
+  if (!plan.needed) return t('accommodation.noPlaceNeeded');
   const primary = primaryOption(plan);
   switch (plan.status) {
     case 'open':
-      return 'Needs a place';
+      return t('accommodation.needsPlace');
     case 'searching':
-      return 'Searching';
+      return t('accommodation.searching');
     case 'options_available':
     case 'deciding':
-      return plan.options.length === 1 ? '1 option' : `${plan.options.length} options`;
+      return plan.options.length === 1 ? t('accommodation.oneOption') : t('accommodation.manyOptions', { count: plan.options.length });
     case 'selected':
-      return primary ? `Picked · ${primary.name}` : 'Picked';
+      return primary ? t('accommodation.pickedName', { name: primary.name }) : t('accommodation.pickedChip');
     case 'booked':
-      return primary ? `Booked · ${primary.name}` : 'Booked';
+      return primary ? t('accommodation.bookedName', { name: primary.name }) : t('accommodation.bookedChip');
     case 'checked_in':
-      return 'Checked in';
+      return t('accommodation.checkedInChip');
     case 'completed':
-      return 'Stayed';
+      return t('accommodation.stayedChip');
     case 'cancelled':
-      return 'Cancelled';
+      return t('accommodation.cancelledChip');
   }
 }
 

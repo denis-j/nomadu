@@ -7,9 +7,10 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { StatusChip } from '../SheetRows';
-import { ACTIVITY_CATEGORY_LABELS, ACTIVITY_STATUS_LABELS, type Activity } from '../../lib/activityModel';
+import { type Activity } from '../../lib/activityModel';
 import { formatMoney } from '../../lib/accommodationModel';
 import { SOURCE_MARK, categoryIcon } from './visuals';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -25,12 +26,13 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
  * finished stop does.
  */
 export function ActivityRow({ activity: a, onPress }: { activity: Activity; onPress: () => void }) {
+  const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
   const mark = SOURCE_MARK[a.source];
   const picture = !!a.image_url && !failed;
   const done = a.status === 'done';
-  const price = a.price === 0 ? 'Free' : formatMoney(a.price, a.currency);
-  const sub = [a.place && a.place !== a.title ? a.place : null, ACTIVITY_CATEGORY_LABELS[a.category], price].filter(Boolean).join(' · ');
+  const price = a.price === 0 ? t('activities.free') : formatMoney(a.price, a.currency);
+  const sub = [a.place && a.place !== a.title ? a.place : null, t(`activityCat.${a.category}`), price].filter(Boolean).join(' · ');
 
   return (
     <Pressable
@@ -56,7 +58,7 @@ export function ActivityRow({ activity: a, onPress }: { activity: Activity; onPr
         </View>
         {/* An idea is the default and says nothing; the others earn a capsule. */}
         {a.status !== 'idea' && (
-          <StatusChip label={ACTIVITY_STATUS_LABELS[a.status]} muted={done} icon={done ? 'checkmark' : undefined} />
+          <StatusChip label={t(`activityStatus.${a.status}`)} muted={done} icon={done ? 'checkmark' : undefined} />
         )}
       </Glass>
     </Pressable>

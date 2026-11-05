@@ -3,7 +3,6 @@ import type { DropdownOption } from '../Dropdown';
 import {
   ACTIVITY_CATEGORY_ICONS,
   ACTIVITY_STATUSES,
-  ACTIVITY_STATUS_LABELS,
   type ActivityCategory,
   type ActivitySource,
   type ActivityStatus,
@@ -34,8 +33,10 @@ const STATUS_SYMBOL: Record<ActivityStatus, string> = {
   done: 'checkmark.circle',
 };
 
-export const STATUS_OPTIONS: DropdownOption[] = ACTIVITY_STATUSES.map((s) => ({
-  id: s,
-  label: ACTIVITY_STATUS_LABELS[s],
-  icon: STATUS_SYMBOL[s],
-}));
+export function statusOptions(t: (key: string) => string): DropdownOption[] {
+  return ACTIVITY_STATUSES.map((s) => ({
+    id: s,
+    label: t(`activityStatus.${s}`),
+    icon: STATUS_SYMBOL[s],
+  }));
+}

@@ -271,7 +271,7 @@ export default function StopInfoScreen() {
             <LinkCard
               icon="bed-outline"
               // The place by name once there is one; the badge says how far it is.
-              title={stay ? primaryOption(stay)?.name ?? planChipText(stay) : t('stopInfo.whereToStay')}
+              title={stay ? primaryOption(stay)?.name ?? planChipText(stay, t) : t('stopInfo.whereToStay')}
               sub={stay ? staySummary(stay, t) : t('stopInfo.reqOptionsBooking')}
               right={stay && stay.needed ? <StatusBadge status={stay.status} size="small" /> : undefined}
               onPress={openAccommodation}

@@ -15,7 +15,7 @@ import { Card, ChoiceRow, Hint, SectionLabel, visaFormStyles } from '../../../co
 import { Colors, systemColor } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { addActivity, getActivity, moveActivity, updateActivity, type LocalActivity } from '../../../lib/activities';
-import { ACTIVITY_CATEGORIES, ACTIVITY_CATEGORY_LABELS, firstUrl, type ActivityCategory } from '../../../lib/activityModel';
+import { ACTIVITY_CATEGORIES, firstUrl, type ActivityCategory } from '../../../lib/activityModel';
 import { importActivityLink, type ImportedActivity, type LinkImport } from '../../../lib/ai';
 import { getJourneyWithLegs, parseDate, type JourneyLeg } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
@@ -179,7 +179,7 @@ function ManualForm({ journeySyncId, legs, defaultStop, existing }: { journeySyn
               <GlassPill key={c} active={on} onPress={() => { Haptics.selectionAsync(); setCategory(c); }}>
                 <View style={styles.pillInner}>
                   <Ionicons name={categoryIcon(c)} size={14} color={on ? Colors.white : Colors.text} />
-                  <Text style={[styles.pillLabel, on && styles.pillLabelActive]}>{ACTIVITY_CATEGORY_LABELS[c]}</Text>
+                  <Text style={[styles.pillLabel, on && styles.pillLabelActive]}>{t(`activityCat.${c}`)}</Text>
                 </View>
               </GlassPill>
             );
@@ -376,7 +376,7 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
                     <ChoiceRow
                       key={`${p.item.title}-${i}`}
                       title={p.item.title}
-                      subtitle={[ACTIVITY_CATEGORY_LABELS[p.item.category], p.item.place && p.item.place !== p.item.title ? p.item.place : null].filter(Boolean).join(' · ')}
+                      subtitle={[t(`activityCat.${p.item.category}`), p.item.place && p.item.place !== p.item.title ? p.item.place : null].filter(Boolean).join(' · ')}
                       selected={p.on}
                       onPress={() => setPicks((prev) => prev.map((x, j) => (j === i ? { ...x, on: !x.on } : x)))}
                       last={i === picks.length - 1}

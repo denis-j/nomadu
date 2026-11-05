@@ -22,8 +22,6 @@ import {
 } from '../../../lib/accommodations';
 import {
   STATUS_LABELS,
-  TYPE_LABELS,
-  amenityLabel,
   createPlan,
   defaultStay,
   formatMoney,
@@ -58,10 +56,8 @@ type Params = {
 };
 
 type SortKey = 'score' | 'price' | 'rating';
-const SORT_LABELS: Record<SortKey, string> = { score: 'Score', price: 'Price', rating: 'Rating' };
 
 /** The status in a third of the width: the two long names shortened, the rest as they are. */
-const TILE_STATUS: Record<AccommodationStatus, string> = { ...STATUS_LABELS, options_available: 'Options', checked_in: 'Checked in' };
 
 /** Every write on this page: run it, keep the result, say when it failed. */
 type Apply = (work: () => Promise<LocalAccommodation>, toast?: string) => Promise<void>;
@@ -107,13 +103,13 @@ function optionLine(o: AccommodationOption, t: TFunc): string {
 /** What was asked for, in two or three lines: the head line, then one line each for the rest. */
 function describeRequirements(req: AccommodationRequirements, t: TFunc): string[] {
   const head = [
-    req.type ? TYPE_LABELS[req.type] : null,
+    req.type ? t(`accType.${req.type}`) : null,
     req.budget_per_night !== null && req.currency ? t('accommodation.upToNight', { amount: formatMoney(req.budget_per_night, req.currency)! }) : req.budget_total !== null && req.currency ? t('accommodation.upToTotal', { amount: formatMoney(req.budget_total, req.currency)! }) : null,
     req.areas.length ? t('accommodation.inAreas', { areas: req.areas.join(', ') }) : null,
   ].filter(Boolean).join(' · ');
   return [
     head,
-    req.amenities.length ? req.amenities.map(amenityLabel).join(', ') : null,
+    req.amenities.length ? req.amenities.map((a) => t(`amenities.${a}`)).join(', ') : null,
     req.work_requirements ? t('accommodation.forWork', { text: req.work_requirements }) : null,
     req.min_requirements ? t('accommodation.mustHave', { text: req.min_requirements }) : null,
     req.dates_flexible ? t('accommodation.datesFlexible') : null,
@@ -199,7 +195,11 @@ function useHeroPoint(address: string | null, city: string, country: string, cou
 export default function AccommodationScreen() {
   const { t } = useTranslation();
   const SORT_LABELS_L: Record<SortKey, string> = { score: t('accommodation.sortScore'), price: t('accommodation.sortPrice'), rating: t('accommodation.sortRating') };
-  const TILE_STATUS_L: Record<string, string> = { ...STATUS_LABELS, options_available: t('accommodation.statusOptions'), checked_in: t('accommodation.statusCheckedIn') };
+  const TILE_STATUS_L: Record<string, string> = {
+    ...Object.fromEntries(Object.keys(STATUS_LABELS).map((k) => [k, t(`accStatus.${k}`)])),
+    options_available: t('accommodation.statusOptions'),
+    checked_in: t('accommodation.statusCheckedIn'),
+  };
   const router = useRouter();
   const params = useLocalSearchParams<Params>();
   // A link from outside can be missing any of these; the hooks below run

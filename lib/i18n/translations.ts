@@ -430,6 +430,36 @@ const en = {
     entryHintSingle: 'Used up as soon as you leave the country. A new entry needs a new visa.',
     optionalNotes: 'Optional notes',
   },
+  activityCat: {
+    food: 'Food', cafe: 'Café', nightlife: 'Nightlife', sight: 'Sightseeing', culture: 'Culture', nature: 'Nature', beach: 'Beach', tour: 'Tour', sport: 'Sport', wellness: 'Wellness', shopping: 'Shopping', other: 'Other',
+  },
+  activityStatus: {
+    idea: 'Idea', planned: 'Planned', booked: 'Booked', done: 'Done',
+  },
+  source: {
+    tiktok: 'TikTok', instagram: 'Instagram', youtube: 'YouTube', ai: 'Suggested', agent: 'Your agent', link: 'Link',
+  },
+  expenseCat: {
+    food: 'Food', drinks: 'Drinks', transport: 'Transport', stay: 'Stay', activity: 'Activity', groceries: 'Groceries', shopping: 'Shopping', other: 'Other',
+  },
+  accType: {
+    hotel: 'Hotel', apartment: 'Apartment', airbnb: 'Airbnb', condo: 'Condo', hostel: 'Hostel', guesthouse: 'Guesthouse', coliving: 'Coliving', other: 'Something else',
+  },
+  accStatus: {
+    open: 'Open', searching: 'Searching', options_available: 'Options found', deciding: 'Deciding', selected: 'Selected', booked: 'Booked', checked_in: 'Checked in', completed: 'Completed', cancelled: 'Cancelled',
+  },
+  amenities: {
+    wifi: 'Fast Wi-Fi', desk: 'Desk', quiet: 'Quiet', ac: 'Air conditioning', kitchen: 'Kitchen', washer: 'Washing machine', gym: 'Gym', pool: 'Pool', balcony: 'Balcony', parking: 'Parking', breakfast: 'Breakfast',
+  },
+  docKind: {
+    ticket: 'Flight or train ticket', ticketShort: 'Ticket',
+    visa: 'Visa or eVisa', visaShort: 'Visa',
+    arrival: 'Arrival card', arrivalShort: 'Arrival card',
+    booking: 'Hotel or booking', bookingShort: 'Booking',
+    insurance: 'Insurance', insuranceShort: 'Insurance',
+    receipt: 'Receipt', receiptShort: 'Receipt',
+    other: 'Something else', otherShort: 'Other',
+  },
   transport: {
     flight: 'Flight',
     train: 'Train',
@@ -581,6 +611,18 @@ const en = {
     sayWhatNeed: 'Say what you need',
     budgetAreaDesk: 'Budget, area, a desk, quiet at night',
     subtitleCountryNights: '{country} · {nights} {nightsWord}',
+    noPlaceNeeded: 'No place needed',
+    needsPlace: 'Needs a place',
+    searching: 'Searching',
+    pickedChip: 'Picked',
+    bookedChip: 'Booked',
+    checkedInChip: 'Checked in',
+    stayedChip: 'Stayed',
+    cancelledChip: 'Cancelled',
+    pickedName: 'Picked · {name}',
+    bookedName: 'Booked · {name}',
+    oneOption: '1 option',
+    manyOptions: '{count} options',
   },
   expenses: {
     expense: 'Expense',
@@ -1595,6 +1637,36 @@ const de: TranslationTree = {
     entryHintSingle: 'Aufgebraucht, sobald du das Land verlässt. Eine neue Einreise braucht ein neues Visum.',
     optionalNotes: 'Optionale Notizen',
   },
+  activityCat: {
+    food: 'Essen', cafe: 'Café', nightlife: 'Nachtleben', sight: 'Sehenswürdigkeit', culture: 'Kultur', nature: 'Natur', beach: 'Strand', tour: 'Tour', sport: 'Sport', wellness: 'Wellness', shopping: 'Shopping', other: 'Sonstiges',
+  },
+  activityStatus: {
+    idea: 'Idee', planned: 'Geplant', booked: 'Gebucht', done: 'Erledigt',
+  },
+  source: {
+    tiktok: 'TikTok', instagram: 'Instagram', youtube: 'YouTube', ai: 'Vorgeschlagen', agent: 'Dein Agent', link: 'Link',
+  },
+  expenseCat: {
+    food: 'Essen', drinks: 'Getränke', transport: 'Transport', stay: 'Unterkunft', activity: 'Aktivität', groceries: 'Lebensmittel', shopping: 'Shopping', other: 'Sonstiges',
+  },
+  accType: {
+    hotel: 'Hotel', apartment: 'Apartment', airbnb: 'Airbnb', condo: 'Eigentumswohnung', hostel: 'Hostel', guesthouse: 'Gästehaus', coliving: 'Coliving', other: 'Etwas anderes',
+  },
+  accStatus: {
+    open: 'Offen', searching: 'Auf der Suche', options_available: 'Optionen gefunden', deciding: 'Entscheidung', selected: 'Ausgewählt', booked: 'Gebucht', checked_in: 'Eingecheckt', completed: 'Abgeschlossen', cancelled: 'Storniert',
+  },
+  amenities: {
+    wifi: 'Schnelles WLAN', desk: 'Schreibtisch', quiet: 'Ruhig', ac: 'Klimaanlage', kitchen: 'Küche', washer: 'Waschmaschine', gym: 'Fitnessraum', pool: 'Pool', balcony: 'Balkon', parking: 'Parkplatz', breakfast: 'Frühstück',
+  },
+  docKind: {
+    ticket: 'Flug- oder Zugticket', ticketShort: 'Ticket',
+    visa: 'Visum oder eVisum', visaShort: 'Visum',
+    arrival: 'Einreisekarte', arrivalShort: 'Einreisekarte',
+    booking: 'Hotel oder Buchung', bookingShort: 'Buchung',
+    insurance: 'Versicherung', insuranceShort: 'Versicherung',
+    receipt: 'Beleg', receiptShort: 'Beleg',
+    other: 'Etwas anderes', otherShort: 'Sonstiges',
+  },
   transport: {
     flight: 'Flug',
     train: 'Zug',
@@ -1746,6 +1818,18 @@ const de: TranslationTree = {
     sayWhatNeed: 'Sag, was du brauchst',
     budgetAreaDesk: 'Budget, Gegend, ein Schreibtisch, nachts ruhig',
     subtitleCountryNights: '{country} · {nights} {nightsWord}',
+    noPlaceNeeded: 'Keine Unterkunft nötig',
+    needsPlace: 'Unterkunft nötig',
+    searching: 'Auf der Suche',
+    pickedChip: 'Ausgewählt',
+    bookedChip: 'Gebucht',
+    checkedInChip: 'Eingecheckt',
+    stayedChip: 'Gewohnt',
+    cancelledChip: 'Storniert',
+    pickedName: 'Ausgewählt · {name}',
+    bookedName: 'Gebucht · {name}',
+    oneOption: '1 Option',
+    manyOptions: '{count} Optionen',
   },
   expenses: {
     expense: 'Ausgabe',

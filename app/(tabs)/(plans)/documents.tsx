@@ -300,7 +300,7 @@ function DocumentTile({
           )}
           <View style={[styles.kindPill, { backgroundColor: meta.color }]}>
             <Ionicons name={meta.icon} size={11} color="#fff" />
-            <Text style={styles.kindPillText}>{meta.short}</Text>
+            <Text style={styles.kindPillText}>{t(`docKind.${doc.kind}Short`)}</Text>
           </View>
           {face && (
             <View style={styles.tileFace}>
@@ -360,7 +360,7 @@ function Starter({ traveller, onPick }: { traveller: JourneyTraveller | null; on
               <View style={styles.slotIcon}>
                 <Ionicons name={meta.icon} size={22} color={Colors.text} />
               </View>
-              <Text style={styles.slotTitle}>{meta.label}</Text>
+              <Text style={styles.slotTitle}>{t(`docKind.${kind}`)}</Text>
               <View style={styles.slotAdd}>
                 <Ionicons name="add" size={14} color={Colors.textSecondary} />
                 <Text style={styles.slotAddText}>{t('documents.add')}</Text>

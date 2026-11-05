@@ -21,7 +21,6 @@ import { addExpense, getExpense, getExpensesForJourney, updateExpense, type Loca
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_ICONS,
-  EXPENSE_CATEGORY_LABELS,
   equalShares,
   formatAmount,
   guessCategory,
@@ -62,7 +61,6 @@ const CALENDAR_THEME = {
  * filled in before the form shows.
  */
 export default function ExpenseAddSheet() {
-  const { t } = useTranslation();
   const params = useLocalSearchParams<Params>();
   const journeyId = Number(params.journeyId);
   const [legs, setLegs] = useState<JourneyLeg[] | null>(null);
@@ -209,7 +207,7 @@ function Form({
     if (saving || !amountOk) return;
     setSaving(true);
     try {
-      const name = title.trim() || EXPENSE_CATEGORY_LABELS[category];
+      const name = title.trim() || t(`expenseCat.${category}`);
       const order = travellerIds.filter((id) => among.has(id));
       let receiptId = existing?.receipt_document_id ?? null;
       if (picked) {
@@ -327,7 +325,7 @@ function Form({
               <GlassPill key={c} active={on} onPress={() => { Haptics.selectionAsync(); setCategory(c); setKindTouched(true); }}>
                 <View style={styles.pillInner}>
                   <Ionicons name={EXPENSE_CATEGORY_ICONS[c] as keyof typeof Ionicons.glyphMap} size={14} color={on ? Colors.white : Colors.text} />
-                  <Text style={[styles.pillLabel, on && styles.pillLabelActive]}>{EXPENSE_CATEGORY_LABELS[c]}</Text>
+                  <Text style={[styles.pillLabel, on && styles.pillLabelActive]}>{t(`expenseCat.${c}`)}</Text>
                 </View>
               </GlassPill>
             );

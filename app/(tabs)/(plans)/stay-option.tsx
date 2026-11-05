@@ -10,7 +10,7 @@ import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { useAccommodation } from '../../../hooks/useAccommodations';
 import { removeAccommodationOption, selectAccommodationOption, type LocalAccommodation } from '../../../lib/accommodations';
-import { amenityLabel, formatMoney, nightsBetween, optionNightlyPrice } from '../../../lib/accommodationModel';
+import { formatMoney, nightsBetween, optionNightlyPrice } from '../../../lib/accommodationModel';
 import { parseDate } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
@@ -145,7 +145,7 @@ export default function StayOptionSheet() {
             ) : null}
             {o.amenities.length > 0 ? (
               <>
-                <DetailRow icon="checkmark-circle-outline" label={t('stayOption.has')} value={o.amenities.map(amenityLabel).join(', ')} />
+                <DetailRow icon="checkmark-circle-outline" label={t('stayOption.has')} value={o.amenities.map((a) => t(`amenities.${a}`)).join(', ')} />
                 <DetailSeparator />
               </>
             ) : null}

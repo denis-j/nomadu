@@ -651,7 +651,7 @@ const LegCard = React.memo(function LegCard({
   // is too small to hit on a phone, the card opens the stop's sheet and
   // its big cards lead on from there.
   if (stay && stay.needed) {
-    chips.push({ label: planChipShort(stay), color: statusColor(stay.status), icon: 'bed-outline' });
+    chips.push({ label: planChipShort(stay, t), color: statusColor(stay.status), icon: 'bed-outline' });
   }
   if (ACTIVITIES_UI && activityCount > 0) {
     chips.push({ label: activityCount === 1 ? t('trip.oneThing') : t('trip.manyThings', { count: activityCount }), color: Colors.text, icon: 'sparkles-outline' });

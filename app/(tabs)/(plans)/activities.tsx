@@ -17,7 +17,6 @@ import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { useJourneyActivities } from '../../../hooks/useActivities';
 import { addActivity, type LocalActivity } from '../../../lib/activities';
-import { ACTIVITY_CATEGORY_LABELS } from '../../../lib/activityModel';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { locateActivities } from '../../../lib/activityPlaces';
 import { suggestActivities, type ActivitySuggestion } from '../../../lib/ai';
@@ -389,7 +388,7 @@ function Ideas({ leg, existing, journeySyncId, onAdded }: { leg: JourneyLeg; exi
               </View>
               <View style={styles.ideaText}>
                 <Text style={styles.ideaTitle}>{s.title}</Text>
-                <Text style={styles.ideaMeta}>{[ACTIVITY_CATEGORY_LABELS[s.category], s.place, s.price_hint].filter(Boolean).join(' · ')}</Text>
+                <Text style={styles.ideaMeta}>{[t(`activityCat.${s.category}`), s.place, s.price_hint].filter(Boolean).join(' · ')}</Text>
                 <Text style={styles.ideaWhy}>{s.why}</Text>
                 <View style={styles.ideaAdd}>
                   <Ionicons name="add" size={14} color={Colors.text} />

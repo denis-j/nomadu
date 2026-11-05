@@ -5,7 +5,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { PlaceMap } from '../../../components/activities/PlaceMap';
-import { SOURCE_MARK, STATUS_OPTIONS, categoryIcon } from '../../../components/activities/visuals';
+import { SOURCE_MARK, statusOptions, categoryIcon } from '../../../components/activities/visuals';
 import { SectionLabel } from '../../../components/visaForm';
 import { DetailCard, DetailNotes, DetailRow, DetailSeparator, LinkCard } from '../../../components/SheetRows';
 import { StatRow, StatTile } from '../../../components/StatTile';
@@ -14,7 +14,7 @@ import { MissingRoute } from '../../../components/MissingRoute';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { deleteActivity, getActivity, moveActivity, setActivityStatus, type LocalActivity } from '../../../lib/activities';
-import { ACTIVITY_CATEGORY_LABELS, ACTIVITY_STATUS_LABELS, type ActivityStatus } from '../../../lib/activityModel';
+import { type ActivityStatus } from '../../../lib/activityModel';
 import { getJourneyWithLegs, parseDate, type JourneyLeg } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
@@ -130,12 +130,12 @@ export default function ActivitySheet() {
         <StatRow style={styles.statsRow}>
           <StatTile
             label={t('activities.status')}
-            value={ACTIVITY_STATUS_LABELS[a.status]}
-            options={readOnly ? undefined : STATUS_OPTIONS}
+            value={t(`activityStatus.${a.status}`)}
+            options={readOnly ? undefined : statusOptions(t)}
             menuValue={a.status}
             onPick={readOnly ? undefined : (id) => apply(() => setActivityStatus(a.id, id as ActivityStatus))}
           />
-          <StatTile label={t('activities.kind')} value={ACTIVITY_CATEGORY_LABELS[a.category]} icon={categoryIcon(a.category)} />
+          <StatTile label={t('activities.kind')} value={t(`activityCat.${a.category}`)} icon={categoryIcon(a.category)} />
           {a.price !== null && a.currency ? (
             <StatTile label={t('activities.price')} value={a.price === 0 ? t('activities.free') : String(a.price)} unit={a.price === 0 ? undefined : a.currency} />
           ) : (
@@ -180,7 +180,7 @@ export default function ActivitySheet() {
             {mark ? (
               <>
                 <DetailSeparator />
-                <DetailRow icon={mark.icon} label={t('activities.from')} value={mark.label} />
+                <DetailRow icon={mark.icon} label={t('activities.from')} value={t(`source.${a.source}`)} />
               </>
             ) : null}
             {a.notes ? (
@@ -196,7 +196,7 @@ export default function ActivitySheet() {
         <View style={styles.section}>
           <LinkCard icon="navigate-outline" title={t('activities.directions')} sub={a.place ?? a.address ?? stop?.city ?? t('activities.openInMaps')} onPress={() => Linking.openURL(mapsUrl(a, stop?.city))} />
           {a.source_url && mark ? (
-            <LinkCard icon={mark.icon} title={t('activities.openOnSource', { label: mark.label })} sub={t('activities.postItCameFrom')} onPress={() => Linking.openURL(a.source_url!)} />
+            <LinkCard icon={mark.icon} title={t('activities.openOnSource', { label: t(`source.${a.source}`) })} sub={t('activities.postItCameFrom')} onPress={() => Linking.openURL(a.source_url!)} />
           ) : null}
           {a.url ? (
             <LinkCard icon="globe-outline" title={t('activities.website')} sub={website ?? undefined} onPress={() => Linking.openURL(a.url!)} />

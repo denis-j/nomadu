@@ -16,7 +16,7 @@ import { useTravellerPeople } from '../../../hooks/useExpenses';
 import { getJourneyWithLegs, parseDate, type JourneyLeg } from '../../../lib/database';
 import { formatDay } from '../../../lib/days';
 import { deleteExpense, getExpense, updateExpense, type LocalExpense } from '../../../lib/expenses';
-import { EXPENSE_CATEGORY_ICONS, EXPENSE_CATEGORY_LABELS, formatAmount } from '../../../lib/expenseModel';
+import { EXPENSE_CATEGORY_ICONS, formatAmount } from '../../../lib/expenseModel';
 import { receiptImageUri, removeReceipt } from '../../../lib/receipts';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
@@ -155,7 +155,7 @@ export default function ExpenseSheet() {
               />
             )}
             <DetailSeparator />
-            <DetailRow icon={icon} label={t('expenses.kind')} value={EXPENSE_CATEGORY_LABELS[e.category]} />
+            <DetailRow icon={icon} label={t('expenses.kind')} value={t(`expenseCat.${e.category}`)} />
             {e.notes ? (
               <>
                 <DetailSeparator />

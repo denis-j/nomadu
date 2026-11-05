@@ -145,7 +145,7 @@ export default function DocumentScreen() {
           <View style={styles.caption}>
             <View style={[styles.kindPill, { backgroundColor: meta.color }]}>
               <Ionicons name={meta.icon} size={12} color="#fff" />
-              <Text style={styles.kindPillText}>{meta.short}</Text>
+              <Text style={styles.kindPillText}>{t(`docKind.${doc.kind}Short`)}</Text>
             </View>
             <Text style={styles.captionText} numberOfLines={1}>
               {owner ? `${owner} · ` : ''}{t('document.addedCaption', { date: parseSyncStamp(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) })}
