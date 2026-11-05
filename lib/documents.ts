@@ -51,13 +51,14 @@ export function walletDocuments<T extends { kind: string }>(documents: T[]): T[]
 }
 
 /** "2 tickets · 1 visa · 1 booking", in the picker's order. */
-export function summarizeKinds(kinds: string[]): string {
+export function summarizeKinds(kinds: string[], t?: (key: string) => string): string {
   const counts = new Map<string, number>();
   for (const k of kinds) counts.set(k, (counts.get(k) ?? 0) + 1);
   return DOCUMENT_KINDS
     .filter((k) => counts.has(k.kind))
     .map((k) => {
       const n = counts.get(k.kind)!;
+      if (t) return `${n} ${t(`docKind.${k.kind}${n === 1 ? 'One' : 'Plural'}`)}`;
       return `${n} ${n === 1 ? k.short.toLowerCase() : k.plural}`;
     })
     .join(' · ');

@@ -7,6 +7,7 @@ import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import type { JourneyDocument, JourneyTraveller } from '../lib/database';
 import { summarizeKinds, walletDocuments } from '../lib/documents';
+import { useTranslation } from '../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -30,6 +31,7 @@ export function DocumentsEntryCard({
   documents: JourneyDocument[];
   travellers: JourneyTraveller[];
 }) {
+  const { t } = useTranslation();
   const documents = walletDocuments(allDocuments);
   const open = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -37,11 +39,11 @@ export function DocumentsEntryCard({
   };
 
   const sub = documents.length === 0
-    ? 'Tickets, visas, arrival cards'
-    : summarizeKinds(documents.map((d) => d.kind))
-      + (travellers.length > 1 ? ` · ${travellers.length} travellers` : '');
+    ? t('addStop.documentsSub')
+    : summarizeKinds(documents.map((d) => d.kind), t)
+      + (travellers.length > 1 ? ` · ${t('docKind.travellers', { count: travellers.length })}` : '');
 
-  return <EntryCard icon="documents-outline" title="Documents" sub={sub} count={documents.length} onPress={open} />;
+  return <EntryCard icon="documents-outline" title={t('nav.documents')} sub={sub} count={documents.length} onPress={open} />;
 }
 
 /**

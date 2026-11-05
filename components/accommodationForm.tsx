@@ -234,6 +234,7 @@ export function MoneyRow({
   live?: boolean;
   last?: boolean;
 }) {
+  const { t } = useTranslation();
   const ref = useRef<TextInput>(null);
   const a = useDraft(amount);
   const c = useDraft(currency);
@@ -247,7 +248,7 @@ export function MoneyRow({
     c.setDraft(code);
     onCommit(a.draft, code);
   };
-  const choices = [...currencyChoices(c.draft, suggested).map((code) => ({ id: code, label: code })), { id: 'other', label: 'Other', icon: 'ellipsis.circle' }];
+  const choices = [...currencyChoices(c.draft, suggested).map((code) => ({ id: code, label: code })), { id: 'other', label: t('comp.otherCurrency'), icon: 'ellipsis.circle' }];
   return (
     <>
       <Pressable onPress={() => ref.current?.focus()} style={s.row}>
@@ -266,7 +267,7 @@ export function MoneyRow({
             returnKeyType="done"
           />
           <Dropdown
-            title="Currency"
+            title={t('comp.currency')}
             options={choices}
             value={shown || suggested || null}
             right

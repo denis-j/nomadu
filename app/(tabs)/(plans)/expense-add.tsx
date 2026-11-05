@@ -61,6 +61,7 @@ const CALENDAR_THEME = {
  * filled in before the form shows.
  */
 export default function ExpenseAddSheet() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams<Params>();
   const journeyId = Number(params.journeyId);
   const [legs, setLegs] = useState<JourneyLeg[] | null>(null);
@@ -78,10 +79,10 @@ export default function ExpenseAddSheet() {
     if (params.journeySyncId) getExpensesForJourney(params.journeySyncId).then((list) => setLastCurrency(list[0]?.currency ?? null));
   }, [params.journeySyncId]);
 
-  if (!params.journeySyncId || !journeyId) return <MissingRoute title="Expense" message="This trip is no longer here." />;
-  if (params.id && existing === null) return <MissingRoute title="Expense" message="This expense is no longer here." />;
+  if (!params.journeySyncId || !journeyId) return <MissingRoute title={t('expenses.expense')} message={t('documents.tripGone')} />;
+  if (params.id && existing === null) return <MissingRoute title={t('expenses.expense')} message={t('expenses.expenseGone')} />;
   if (existing === undefined || legs === null || lastCurrency === undefined || !people.loaded) {
-    return <Stack.Screen options={{ title: params.id ? 'Edit expense' : 'Add an expense' }} />;
+    return <Stack.Screen options={{ title: params.id ? t('expenses.editExpense') : t('expenses.addExpense') }} />;
   }
   return (
     <Form

@@ -15,6 +15,7 @@ import { cityCoords } from '../../../../lib/geocoding';
 import { getCountryCode } from '../../../../utils/geography';
 import { showToast } from '../../../../lib/toast';
 import { track } from '../../../../lib/analytics';
+import { useTranslation } from '../../../../contexts/LanguageContext';
 
 type Params = {
   journeyId: string;
@@ -33,6 +34,7 @@ type Params = {
  * the tips at the end are the same ones the stop's sheet shows later.
  */
 export default function AddStopDetailsScreen() {
+  const { t } = useTranslation();
   const parentNav = useNavigation();
   const params = useLocalSearchParams<Params>();
   const { country, city } = params;
@@ -67,7 +69,7 @@ export default function AddStopDetailsScreen() {
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       parentNav.getParent()?.goBack();
-      showToast(isEditing ? 'Stop updated' : 'Stop added');
+      showToast(isEditing ? t('plans.stopUpdated') : t('addStop.stopAdded'));
     } catch (err) {
       console.error('Failed to save leg:', err);
       savingRef.current = false;
@@ -75,15 +77,15 @@ export default function AddStopDetailsScreen() {
     }
   };
 
-  if (!complete) return <MissingRoute title="Stop" message="This stop is no longer here." />;
+  if (!complete) return <MissingRoute title={t('addStop.stop')} message={t('plans.stopGone')} />;
 
   return (
     <>
       <Stack.Screen
         options={{
-          title: isEditing ? 'Edit Stop' : 'Stop Details',
+          title: isEditing ? t('nav.editStop') : t('addStop.stopDetails'),
           headerRight: () => (
-            <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel="Save stop">
+            <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel={t('plans.saveStop')}>
               <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
             </Pressable>
           ),
@@ -98,15 +100,15 @@ export default function AddStopDetailsScreen() {
         {/* Recap of the steps before */}
         <StopSummary city={city} country={country} start={startDate} end={endDate} />
 
-        <SectionLabel>Getting there</SectionLabel>
+        <SectionLabel>{t('addStop.gettingThere')}</SectionLabel>
         <TransportPicker value={transport} onChange={setTransport} />
 
-        <SectionLabel>Notes</SectionLabel>
+        <SectionLabel>{t('plans.notes')}</SectionLabel>
         <Card>
-          <TextArea value={notes} onCommit={setNotes} live placeholder="Anything to remember about this stop" last />
+          <TextArea value={notes} onCommit={setNotes} live placeholder={t('addStop.notesPlaceholder')} last />
         </Card>
 
-        <SectionLabel>{`Tips for ${city}`}</SectionLabel>
+        <SectionLabel>{t('stopInfo.tipsFor', { city })}</SectionLabel>
         <Card>
           <View style={styles.tips}>
             <CityTips city={city} country={country} />

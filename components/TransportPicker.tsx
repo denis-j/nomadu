@@ -5,6 +5,7 @@ import { GlassPill } from './GlassPill';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import type { TransportType } from '../lib/database';
+import { useTranslation } from '../contexts/LanguageContext';
 
 /**
  * How one gets to a stop. One list for the picker in the add and edit
@@ -27,23 +28,24 @@ export function transportInfo(type: string | null | undefined) {
 
 /** The app's pills, wrapping so all six are in view; the active one is tinted. */
 export function TransportPicker({ value, onChange }: { value: TransportType; onChange: (t: TransportType) => void }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.row}>
-      {TRANSPORTS.map((t) => {
-        const active = value === t.type;
+      {TRANSPORTS.map((tr) => {
+        const active = value === tr.type;
         return (
           <GlassPill
-            key={t.type}
+            key={tr.type}
             active={active}
             onPress={() => {
               if (active) return;
               Haptics.selectionAsync();
-              onChange(t.type);
+              onChange(tr.type);
             }}
           >
             <View style={styles.pill}>
-              <Ionicons name={t.icon} size={15} color={active ? Colors.white : Colors.text} />
-              <Text style={[styles.label, active && styles.labelActive]}>{t.label}</Text>
+              <Ionicons name={tr.icon} size={15} color={active ? Colors.white : Colors.text} />
+              <Text style={[styles.label, active && styles.labelActive]}>{t(`transport.${tr.type}`)}</Text>
             </View>
           </GlassPill>
         );

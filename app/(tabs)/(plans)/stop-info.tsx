@@ -234,7 +234,7 @@ export default function StopInfoScreen() {
         <StatRow style={styles.statsRow}>
           <StatTile label={t('stopInfo.duration')} value={`${days}`} unit={days === 1 ? t('stopInfo.day') : t('stopInfo.days')} />
           <StatTile label={when.label} value={when.value} unit={when.unit} />
-          <StatTile label={t('plans.transport')} value={transport.label} icon={transport.icon} />
+          <StatTile label={t('plans.transport')} value={t(`transport.${transport.type}`)} icon={transport.icon} />
         </StatRow>
 
         {/* Details */}
