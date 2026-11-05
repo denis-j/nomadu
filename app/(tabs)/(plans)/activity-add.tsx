@@ -20,6 +20,7 @@ import { importActivityLink, type ImportedActivity, type LinkImport } from '../.
 import { getJourneyWithLegs, parseDate, type JourneyLeg } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
 import { track } from '../../../lib/analytics';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 type Params = {
   mode: 'link' | 'manual';
@@ -45,8 +46,9 @@ const PasteButton = Clipboard?.isPasteButtonAvailable ? Clipboard.ClipboardPaste
 
 /** The checkmark every form in the app saves with. */
 function SaveButton({ onPress, disabled }: { onPress: () => void; disabled: boolean }) {
+  const { t } = useTranslation();
   return (
-    <Pressable onPress={onPress} disabled={disabled} hitSlop={8} style={{ opacity: disabled ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel="Save">
+    <Pressable onPress={onPress} disabled={disabled} hitSlop={8} style={{ opacity: disabled ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel={t('common.save')}>
       <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
     </Pressable>
   );
@@ -59,6 +61,7 @@ function SaveButton({ onPress, disabled }: { onPress: () => void; disabled: bool
  * kind, where). Editing is the same form with the fields filled in.
  */
 export default function ActivityAddSheet() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams<Params>();
   const [legs, setLegs] = useState<JourneyLeg[]>([]);
   const [existing, setExisting] = useState<LocalActivity | null | undefined>(params.id ? undefined : null);
@@ -70,9 +73,9 @@ export default function ActivityAddSheet() {
     if (params.id) getActivity(params.id).then((a) => setExisting(a && !a.deleted ? a : null));
   }, [params.id]);
 
-  if (!params.journeySyncId) return <MissingRoute title="Things to do" message="This trip is no longer here." />;
-  if (params.id && existing === null) return <MissingRoute title="Things to do" message="This is no longer here." />;
-  if (existing === undefined) return <Stack.Screen options={{ title: 'Edit' }} />;
+  if (!params.journeySyncId) return <MissingRoute title={t('nav.thingsToDo')} message={t('documents.tripGone')} />;
+  if (params.id && existing === null) return <MissingRoute title={t('nav.thingsToDo')} message={t('activities.notHere')} />;
+  if (existing === undefined) return <Stack.Screen options={{ title: t('nav.edit') }} />;
 
   const defaultStop = params.stopSyncId ?? null;
   return params.mode === 'manual' || existing
@@ -84,6 +87,7 @@ export default function ActivityAddSheet() {
 
 /** The stops as choice rows, and "not placed yet" last. */
 function StopChoices({ legs, value, onPick }: { legs: JourneyLeg[]; value: string | null; onPick: (id: string | null) => void }) {
+  const { t } = useTranslation();
   return (
     <Card>
       {legs.filter((l) => l.sync_id).map((l) => (
@@ -95,7 +99,7 @@ function StopChoices({ legs, value, onPick }: { legs: JourneyLeg[]; value: strin
           onPress={() => onPick(l.sync_id!)}
         />
       ))}
-      <ChoiceRow title="Not placed yet" subtitle="Somewhere on this trip, to be decided" selected={value === null} onPress={() => onPick(null)} last />
+      <ChoiceRow title={t('activities.notPlacedYet')} subtitle={t('activities.somewhereDecide')} selected={value === null} onPress={() => onPick(null)} last />
     </Card>
   );
 }
@@ -103,6 +107,7 @@ function StopChoices({ legs, value, onPick }: { legs: JourneyLeg[]; value: strin
 // ─── By hand, and editing ────────────────────────────────────────────────────
 
 function ManualForm({ journeySyncId, legs, defaultStop, existing }: { journeySyncId: string; legs: JourneyLeg[]; defaultStop: string | null; existing: LocalActivity | null }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const [title, setTitle] = useState(existing?.title ?? '');
   const [category, setCategory] = useState<ActivityCategory>(existing?.category ?? 'sight');
@@ -136,18 +141,18 @@ function ManualForm({ journeySyncId, legs, defaultStop, existing }: { journeySyn
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
-      showToast('Saved');
+      showToast(t('plans.saved'));
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not save', 'error');
+      showToast(err?.message ?? t('plans.couldNotSave'), 'error');
       setSaving(false);
     }
   };
 
   return (
     <>
-      <Stack.Screen options={{ title: existing ? 'Edit' : 'Add something to do', headerRight: () => <SaveButton onPress={save} disabled={saving || !title.trim()} /> }} />
+      <Stack.Screen options={{ title: existing ? t('nav.edit') : t('activities.addSomething'), headerRight: () => <SaveButton onPress={save} disabled={saving || !title.trim()} /> }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={visaFormStyles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        <SectionLabel>What</SectionLabel>
+        <SectionLabel>{t('activities.what')}</SectionLabel>
         <Card>
           <View style={styles.nameRow}>
             <View style={styles.nameBadge}>
@@ -156,7 +161,7 @@ function ManualForm({ journeySyncId, legs, defaultStop, existing }: { journeySyn
             <TextInput
               value={title}
               onChangeText={setTitle}
-              placeholder="What do you want to do?"
+              placeholder={t('activities.whatPlaceholder')}
               placeholderTextColor={Colors.textTertiary}
               style={styles.nameInput}
               autoFocus={!existing}
@@ -166,7 +171,7 @@ function ManualForm({ journeySyncId, legs, defaultStop, existing }: { journeySyn
         </Card>
 
         {/* One row to swipe through, not a wall of twelve. */}
-        <SectionLabel>Kind</SectionLabel>
+        <SectionLabel>{t('activities.kind')}</SectionLabel>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.kindsScroll} contentContainerStyle={styles.kinds} keyboardShouldPersistTaps="handled">
           {ACTIVITY_CATEGORIES.map((c) => {
             const on = c === category;
@@ -183,21 +188,21 @@ function ManualForm({ journeySyncId, legs, defaultStop, existing }: { journeySyn
 
         {legs.length > 1 && (
           <>
-            <SectionLabel>On the trip</SectionLabel>
+            <SectionLabel>{t('activities.onTheTrip')}</SectionLabel>
             <StopChoices legs={legs} value={stop} onPick={setStop} />
           </>
         )}
 
-        <SectionLabel>Where</SectionLabel>
+        <SectionLabel>{t('activities.where')}</SectionLabel>
         <Card>
-          <TextRow label="Place" value={place} onCommit={setPlace} live placeholder="Name of the place" autoCapitalize="words" />
-          <TextRow label="Address" value={address} onCommit={setAddress} live placeholder="Street, area" />
-          <TextRow label="Website" value={url} onCommit={setUrl} live placeholder="https://" keyboardType="url" autoCapitalize="none" last />
+          <TextRow label={t('plans.place')} value={place} onCommit={setPlace} live placeholder={t('activities.placeNamePlaceholder')} autoCapitalize="words" />
+          <TextRow label={t('plans.address')} value={address} onCommit={setAddress} live placeholder={t('plans.addressPlaceholder')} />
+          <TextRow label={t('activities.website')} value={url} onCommit={setUrl} live placeholder={t('plans.httpsPlaceholder')} keyboardType="url" autoCapitalize="none" last />
         </Card>
 
-        <SectionLabel>Notes</SectionLabel>
+        <SectionLabel>{t('plans.notes')}</SectionLabel>
         <Card>
-          <TextArea value={notes} onCommit={setNotes} live placeholder="Opening hours, what to order, who told you" last />
+          <TextArea value={notes} onCommit={setNotes} live placeholder={t('activities.notesPlaceholder')} last />
         </Card>
       </ScrollView>
     </>
@@ -210,6 +215,7 @@ function ManualForm({ journeySyncId, legs, defaultStop, existing }: { journeySyn
 type Placement = 'guess' | string | null;
 
 function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; legs: JourneyLeg[]; defaultStop: string | null }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const [url, setUrl] = useState('');
   const [reading, setReading] = useState(false);
@@ -221,13 +227,13 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
   const pasted = (text: string) => {
     const found = firstUrl(text);
     if (found) setUrl(found);
-    else showToast('No link on the clipboard', 'error');
+    else showToast(t('activities.noLinkClipboard'), 'error');
   };
 
   const read = async () => {
     const link = firstUrl(url.trim());
     if (!link) {
-      showToast('Paste the link to a post', 'error');
+      showToast(t('activities.pasteLinkError'), 'error');
       return;
     }
     setReading(true);
@@ -243,7 +249,7 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
       // Where the post put them, when it could; else where the page was opened from.
       setPlacement(res.activities.some((x) => x.stop_id) ? 'guess' : defaultStop);
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not read that post', 'error');
+      showToast(err?.message ?? t('activities.couldNotReadPost'), 'error');
     } finally {
       setReading(false);
     }
@@ -257,7 +263,7 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
   const guessLine = (() => {
     const counts = new Map<string, number>();
     for (const p of picks) {
-      const city = cityOf(p.item.stop_id) ?? cityOf(defaultStop) ?? 'Not placed';
+      const city = cityOf(p.item.stop_id) ?? cityOf(defaultStop) ?? t('activities.notPlaced');
       counts.set(city, (counts.get(city) ?? 0) + 1);
     }
     return [...counts].map(([city, n]) => (picks.length > 1 ? `${city} · ${n}` : city)).join(', ');
@@ -266,7 +272,7 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
   const save = async () => {
     if (!result || saving) return;
     const items = keepPost
-      ? [{ title: result.caption?.split('\n')[0]?.slice(0, 100) || result.author || 'Saved post', category: 'other' as ActivityCategory, place: null, address: null, stop_id: null, notes: result.caption }]
+      ? [{ title: result.caption?.split('\n')[0]?.slice(0, 100) || result.author || t('activities.savedPost'), category: 'other' as ActivityCategory, place: null, address: null, stop_id: null, notes: result.caption }]
       : chosen.map((p) => p.item);
     if (items.length === 0) return;
     setSaving(true);
@@ -285,9 +291,9 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
       }
       track({ name: 'activity_added', props: { source: result.source } });
       router.back();
-      showToast(items.length === 1 ? 'Saved' : `${items.length} saved`);
+      showToast(items.length === 1 ? t('plans.saved') : t('activities.countSaved', { count: items.length }));
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not save', 'error');
+      showToast(err?.message ?? t('plans.couldNotSave'), 'error');
       setSaving(false);
     }
   };
@@ -295,18 +301,18 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
   return (
     <>
       {/* A link needs half a screen; the places found need the whole one. */}
-      <Stack.Screen options={{ title: result ? 'Found in the post' : 'From a post', sheetAllowedDetents: result ? [0.9, 1.0] : [0.46] }} />
+      <Stack.Screen options={{ title: result ? t('activities.foundInPost') : t('activities.fromPost'), sheetAllowedDetents: result ? [0.9, 1.0] : [0.46] }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={result ? visaFormStyles.content : styles.linkContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {!result ? (
           <>
-            <SectionLabel>Link</SectionLabel>
+            <SectionLabel>{t('plans.link')}</SectionLabel>
             <Card>
               <View style={styles.linkRow}>
                 <Ionicons name="link" size={18} color={Colors.textTertiary} />
                 <TextInput
                   value={url}
                   onChangeText={setUrl}
-                  placeholder="tiktok.com/@…"
+                  placeholder={t('activities.linkPlaceholder')}
                   placeholderTextColor={Colors.textTertiary}
                   style={styles.linkInput}
                   autoCapitalize="none"
@@ -316,7 +322,7 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
                   onSubmitEditing={read}
                 />
                 {url ? (
-                  <Pressable onPress={() => setUrl('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear">
+                  <Pressable onPress={() => setUrl('')} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('activities.clear')}>
                     <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
                   </Pressable>
                 ) : PasteButton ? (
@@ -332,18 +338,18 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
                 ) : null}
               </View>
             </Card>
-            <Hint>Copy the link in TikTok, Instagram or YouTube. Only the caption and the cover are read, never the video, and the places in it land on your stops.</Hint>
+            <Hint>{t('activities.linkHint')}</Hint>
 
             <View style={styles.footer}>
               <CloudyButton onPress={read} disabled={reading || !url.trim()} style={styles.cta} innerStyle={styles.ctaInner}>
                 {reading ? <ActivityIndicator color={Colors.cloudyButtonText} /> : null}
-                <Text style={styles.ctaText}>{reading ? 'Reading the post…' : 'Find the places'}</Text>
+                <Text style={styles.ctaText}>{reading ? t('activities.readingPost') : t('activities.findPlaces')}</Text>
               </CloudyButton>
             </View>
           </>
         ) : (
           <>
-            <SectionLabel>The post</SectionLabel>
+            <SectionLabel>{t('activities.thePost')}</SectionLabel>
             <Card>
               <View style={styles.postRow}>
                 {result.image_url ? (
@@ -361,10 +367,10 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
             </Card>
 
             {keepPost ? (
-              <Hint>No places in the caption. Keep the post as an idea and fill it in later.</Hint>
+              <Hint>{t('activities.noPlacesHint')}</Hint>
             ) : (
               <>
-                <SectionLabel>{picks.length === 1 ? 'One place found' : `${picks.length} places found`}</SectionLabel>
+                <SectionLabel>{picks.length === 1 ? t('activities.onePlaceFound') : t('activities.placesFound', { count: picks.length })}</SectionLabel>
                 <Card>
                   {picks.map((p, i) => (
                     <ChoiceRow
@@ -377,16 +383,16 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
                     />
                   ))}
                 </Card>
-                <Hint>Tap one to leave it out.</Hint>
+                <Hint>{t('activities.tapToLeaveOut')}</Hint>
               </>
             )}
 
             {legs.length > 0 && (
               <>
-                <SectionLabel>On the trip</SectionLabel>
+                <SectionLabel>{t('activities.onTheTrip')}</SectionLabel>
                 <Card>
                   {!keepPost && picks.some((p) => p.item.stop_id) && (
-                    <ChoiceRow title="Where the post says" subtitle={guessLine} selected={placement === 'guess'} onPress={() => setPlacement('guess')} />
+                    <ChoiceRow title={t('activities.wherePostSays')} subtitle={guessLine} selected={placement === 'guess'} onPress={() => setPlacement('guess')} />
                   )}
                   {legs.filter((l) => l.sync_id).map((l) => (
                     <ChoiceRow
@@ -397,7 +403,7 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
                       onPress={() => setPlacement(l.sync_id!)}
                     />
                   ))}
-                  <ChoiceRow title="Not placed yet" selected={placement === null} onPress={() => setPlacement(null)} last />
+                  <ChoiceRow title={t('activities.notPlacedYet')} selected={placement === null} onPress={() => setPlacement(null)} last />
                 </Card>
               </>
             )}
@@ -405,10 +411,10 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
             <View style={styles.footer}>
               <CloudyButton onPress={save} disabled={saving || (!keepPost && chosen.length === 0)} style={styles.cta} innerStyle={styles.ctaInner}>
                 {saving ? <ActivityIndicator color={Colors.cloudyButtonText} /> : null}
-                <Text style={styles.ctaText}>{keepPost ? 'Keep as idea' : chosen.length === 1 ? 'Save 1 place' : `Save ${chosen.length} places`}</Text>
+                <Text style={styles.ctaText}>{keepPost ? t('activities.keepAsIdea') : chosen.length === 1 ? t('activities.saveOnePlace') : t('activities.saveCountPlaces', { count: chosen.length })}</Text>
               </CloudyButton>
               <Pressable onPress={() => { setResult(null); setPicks([]); }} style={styles.secondary}>
-                <Text style={styles.secondaryText}>Another link</Text>
+                <Text style={styles.secondaryText}>{t('activities.anotherLink')}</Text>
               </Pressable>
             </View>
           </>

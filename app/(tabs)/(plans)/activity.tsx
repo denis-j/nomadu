@@ -17,6 +17,7 @@ import { deleteActivity, getActivity, moveActivity, setActivityStatus, type Loca
 import { ACTIVITY_CATEGORY_LABELS, ACTIVITY_STATUS_LABELS, type ActivityStatus } from '../../../lib/activityModel';
 import { getJourneyWithLegs, parseDate, type JourneyLeg } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 type Params = { id: string; journeyId: string; readOnly?: string };
 
@@ -43,6 +44,7 @@ function mapsUrl(a: LocalActivity, city: string | undefined): string {
  * words at the end. Nothing is edited here; "Edit" opens the form.
  */
 export default function ActivitySheet() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams<Params>();
   const router = useRouter();
   const readOnly = params.readOnly === '1';
@@ -61,19 +63,19 @@ export default function ActivitySheet() {
       setA(await work());
       if (toast) showToast(toast);
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not save', 'error');
+      showToast(err?.message ?? t('plans.couldNotSave'), 'error');
     }
   };
 
   if (a === undefined) return <Stack.Screen options={{ headerShown: false }} />;
-  if (a === null) return <MissingRoute title="Things to do" message="This is no longer here." />;
+  if (a === null) return <MissingRoute title={t('nav.thingsToDo')} message={t('activities.notHere')} />;
 
   const mark = SOURCE_MARK[a.source];
   const stop = legs.find((l) => l.sync_id === a.stop_id) ?? null;
   const picture = !!a.image_url && !failed;
   const located = a.latitude !== null && a.longitude !== null;
   const where = [a.place && a.place !== a.title ? a.place : null, stop?.city].filter(Boolean).join(', ');
-  const stopValue = stop ? `${stop.city}, ${fmtShort(stop.start_date)} – ${fmtShort(stop.end_date)}` : 'Not placed yet';
+  const stopValue = stop ? `${stop.city}, ${fmtShort(stop.start_date)} – ${fmtShort(stop.end_date)}` : t('activities.notPlacedYet');
   const website = a.url ? a.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '') : null;
 
   const edit = () => {
@@ -86,16 +88,16 @@ export default function ActivitySheet() {
   };
 
   const remove = () => {
-    Alert.alert(`Delete ${a.title}?`, undefined, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('activities.deleteTitle', { title: a.title }), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           await deleteActivity(a.id);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           router.back();
-          showToast('Deleted');
+          showToast(t('activities.deleted'));
         },
       },
     ]);
@@ -127,39 +129,39 @@ export default function ActivitySheet() {
         {/* Three facts, the status one a menu. */}
         <StatRow style={styles.statsRow}>
           <StatTile
-            label="Status"
+            label={t('activities.status')}
             value={ACTIVITY_STATUS_LABELS[a.status]}
             options={readOnly ? undefined : STATUS_OPTIONS}
             menuValue={a.status}
             onPick={readOnly ? undefined : (id) => apply(() => setActivityStatus(a.id, id as ActivityStatus))}
           />
-          <StatTile label="Kind" value={ACTIVITY_CATEGORY_LABELS[a.category]} icon={categoryIcon(a.category)} />
+          <StatTile label={t('activities.kind')} value={ACTIVITY_CATEGORY_LABELS[a.category]} icon={categoryIcon(a.category)} />
           {a.price !== null && a.currency ? (
-            <StatTile label="Price" value={a.price === 0 ? 'Free' : String(a.price)} unit={a.price === 0 ? undefined : a.currency} />
+            <StatTile label={t('activities.price')} value={a.price === 0 ? t('activities.free') : String(a.price)} unit={a.price === 0 ? undefined : a.currency} />
           ) : (
-            <StatTile label="Stop" value={stop?.city ?? 'Not placed'} />
+            <StatTile label={t('activities.stop')} value={stop?.city ?? t('activities.notPlaced')} />
           )}
         </StatRow>
 
         <View style={styles.section}>
-          <SectionLabel>Details</SectionLabel>
+          <SectionLabel>{t('activities.details')}</SectionLabel>
           <DetailCard>
             {readOnly ? (
-              <DetailRow icon="location-outline" label="Stop" value={stopValue} />
+              <DetailRow icon="location-outline" label={t('activities.stop')} value={stopValue} />
             ) : (
               <DetailRow
                 icon="location-outline"
-                label="Stop"
+                label={t('activities.stop')}
                 right={(
                   <Dropdown
                     right
-                    title="Move to"
+                    title={t('activities.moveTo')}
                     value={a.stop_id ?? NOT_PLACED}
                     options={[
                       ...legs.filter((l) => l.sync_id).map((l) => ({ id: l.sync_id!, label: l.city, subtitle: `${fmtShort(l.start_date)} – ${fmtShort(l.end_date)}` })),
-                      { id: NOT_PLACED, label: 'Not placed yet' },
+                      { id: NOT_PLACED, label: t('activities.notPlacedYet') },
                     ]}
-                    onPick={(id) => apply(() => moveActivity(a.id, id === NOT_PLACED ? null : id), 'Moved')}
+                    onPick={(id) => apply(() => moveActivity(a.id, id === NOT_PLACED ? null : id), t('activities.moved'))}
                   >
                     <View style={styles.pick}>
                       <Text style={styles.pickText} numberOfLines={1}>{stopValue}</Text>
@@ -172,13 +174,13 @@ export default function ActivitySheet() {
             {a.address ? (
               <>
                 <DetailSeparator />
-                <DetailRow icon="map-outline" label="Address" value={a.address} />
+                <DetailRow icon="map-outline" label={t('plans.address')} value={a.address} />
               </>
             ) : null}
             {mark ? (
               <>
                 <DetailSeparator />
-                <DetailRow icon={mark.icon} label="From" value={mark.label} />
+                <DetailRow icon={mark.icon} label={t('activities.from')} value={mark.label} />
               </>
             ) : null}
             {a.notes ? (
@@ -192,12 +194,12 @@ export default function ActivitySheet() {
 
         {/* Ways out, the same cards a stop leads to its stay with. */}
         <View style={styles.section}>
-          <LinkCard icon="navigate-outline" title="Directions" sub={a.place ?? a.address ?? stop?.city ?? 'Open in Maps'} onPress={() => Linking.openURL(mapsUrl(a, stop?.city))} />
+          <LinkCard icon="navigate-outline" title={t('activities.directions')} sub={a.place ?? a.address ?? stop?.city ?? t('activities.openInMaps')} onPress={() => Linking.openURL(mapsUrl(a, stop?.city))} />
           {a.source_url && mark ? (
-            <LinkCard icon={mark.icon} title={`Open on ${mark.label}`} sub="The post it came from" onPress={() => Linking.openURL(a.source_url!)} />
+            <LinkCard icon={mark.icon} title={t('activities.openOnSource', { label: mark.label })} sub={t('activities.postItCameFrom')} onPress={() => Linking.openURL(a.source_url!)} />
           ) : null}
           {a.url ? (
-            <LinkCard icon="globe-outline" title="Website" sub={website ?? undefined} onPress={() => Linking.openURL(a.url!)} />
+            <LinkCard icon="globe-outline" title={t('activities.website')} sub={website ?? undefined} onPress={() => Linking.openURL(a.url!)} />
           ) : null}
         </View>
 
@@ -205,10 +207,10 @@ export default function ActivitySheet() {
         {!readOnly && (
           <View style={styles.actions}>
             <TouchableOpacity onPress={edit} activeOpacity={0.5}>
-              <Text style={styles.editText}>Edit</Text>
+              <Text style={styles.editText}>{t('common.edit')}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={remove} activeOpacity={0.5}>
-              <Text style={styles.deleteText}>Delete</Text>
+              <Text style={styles.deleteText}>{t('common.delete')}</Text>
             </TouchableOpacity>
           </View>
         )}

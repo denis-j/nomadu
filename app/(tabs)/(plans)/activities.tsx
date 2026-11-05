@@ -18,6 +18,7 @@ import { Typography } from '../../../constants/typography';
 import { useJourneyActivities } from '../../../hooks/useActivities';
 import { addActivity, type LocalActivity } from '../../../lib/activities';
 import { ACTIVITY_CATEGORY_LABELS } from '../../../lib/activityModel';
+import { useTranslation } from '../../../contexts/LanguageContext';
 import { locateActivities } from '../../../lib/activityPlaces';
 import { suggestActivities, type ActivitySuggestion } from '../../../lib/ai';
 import { getJourneyWithLegs, parseDate, type JourneyLeg, type JourneyWithLegs } from '../../../lib/database';
@@ -60,6 +61,7 @@ function fmtRange(start: string, end: string): string {
  * cards the itinerary uses for a stop that is not there yet.
  */
 export default function ActivitiesScreen() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams<Params>();
   const router = useRouter();
   const nav = useNavigation();
@@ -118,12 +120,12 @@ export default function ActivitiesScreen() {
             <Dropdown
               right
               options={[
-                { id: 'link', label: 'Paste a link', icon: 'link' },
-                { id: 'manual', label: 'Add manually', icon: 'square.and.pencil' },
+                { id: 'link', label: t('activities.pasteLink'), icon: 'link' },
+                { id: 'manual', label: t('activities.addManually'), icon: 'square.and.pencil' },
               ]}
               onPick={(id) => openAdd(id as 'link' | 'manual')}
             >
-              <View hitSlop={12} accessibilityRole="button" accessibilityLabel="Add something to do">
+              <View hitSlop={12} accessibilityRole="button" accessibilityLabel={t('activities.addSomething')}>
                 <Ionicons name="add" size={26} color={Colors.text} />
               </View>
             </Dropdown>
@@ -131,8 +133,8 @@ export default function ActivitiesScreen() {
     });
   }, [nav, readOnly, openAdd]);
 
-  if (!params.journeySyncId || !journeyId || journey === null) return <MissingRoute title="Things to do" message="This trip is no longer here." />;
-  if (journey === undefined || !loaded) return <Stack.Screen options={{ title: 'Things to do' }} />;
+  if (!params.journeySyncId || !journeyId || journey === null) return <MissingRoute title={t('nav.thingsToDo')} message={t('documents.tripGone')} />;
+  if (journey === undefined || !loaded) return <Stack.Screen options={{ title: t('nav.thingsToDo') }} />;
 
   // One group per stop while everything is shown, the unplaced ones last;
   // one group, without its heading, once a pill narrows it down.
@@ -165,7 +167,7 @@ export default function ActivitiesScreen() {
   const hero = filter !== 'unplaced' && pins.length > 0;
 
   const pillOptions: PillOption[] = [
-    { key: 'all', label: 'All', active: filter === 'all', onPress: () => setFilter('all') },
+    { key: 'all', label: t('documents.all'), active: filter === 'all', onPress: () => setFilter('all') },
     ...legs.filter((l) => l.sync_id).map((l) => ({
       key: l.sync_id!,
       label: l.city,
@@ -174,13 +176,13 @@ export default function ActivitiesScreen() {
       onPress: () => setFilter(l.sync_id!),
     })),
     ...(unplaced.length > 0
-      ? [{ key: 'unplaced', label: 'Not placed', icon: 'pin-outline' as const, active: filter === 'unplaced', onPress: () => setFilter('unplaced') }]
+      ? [{ key: 'unplaced', label: t('activities.notPlaced'), icon: 'pin-outline' as const, active: filter === 'unplaced', onPress: () => setFilter('unplaced') }]
       : []),
   ];
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Things to do' }} />
+      <Stack.Screen options={{ title: t('nav.thingsToDo') }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
         {pills && <PillRow options={pillOptions} />}
 
@@ -212,8 +214,8 @@ export default function ActivitiesScreen() {
                   style={({ pressed }) => [styles.groupHead, pressed && { opacity: 0.6 }]}
                 >
                   {g.leg ? <Flag code={g.leg.country_code} size={18} /> : <Ionicons name="pin-outline" size={16} color={Colors.textSecondary} />}
-                  <Text style={styles.groupTitle}>{g.leg ? g.leg.city : 'Not placed yet'}</Text>
-                  <Text style={styles.groupMeta}>{g.leg ? fmtRange(g.leg.start_date, g.leg.end_date) : 'Open one to put it on a stop'}</Text>
+                  <Text style={styles.groupTitle}>{g.leg ? g.leg.city : t('activities.notPlacedYet')}</Text>
+                  <Text style={styles.groupMeta}>{g.leg ? fmtRange(g.leg.start_date, g.leg.end_date) : t('activities.openToPlace')}</Text>
                   <Ionicons name="chevron-forward" size={14} color={Colors.textTertiary} />
                 </Pressable>
               )}
@@ -244,28 +246,29 @@ export default function ActivitiesScreen() {
 
 /** Nothing here yet: what the page is for, and the two ways in, as the timeline's empty state offers them. */
 function Empty({ city, readOnly, owner, onLink, onManual }: { city: string | null; readOnly: boolean; owner: string | null; onLink: () => void; onManual: () => void }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIcon}>
         <Ionicons name="sparkles-outline" size={26} color={Colors.text} />
       </View>
-      <Text style={styles.emptyTitle}>{city ? `Nothing in ${city} yet` : 'Nothing planned yet'}</Text>
+      <Text style={styles.emptyTitle}>{city ? t('activities.nothingInCity', { city }) : t('activities.nothingPlanned')}</Text>
       <Text style={styles.emptyText}>
         {readOnly
-          ? `${owner ?? 'Your friend'} has not saved anything here yet.`
+          ? t('activities.friendNothing', { owner: owner ?? t('activities.yourFriend') })
           : city
-            ? 'Save a post you found, add a place yourself, or open the ideas below.'
-            : 'Save the posts you found, add places yourself, or pick a stop for ideas.'}
+            ? t('activities.saveCityHint')
+            : t('activities.saveHint')}
       </Text>
       {!readOnly && (
         <>
           <CloudyButton onPress={onLink} style={styles.emptyCta} innerStyle={styles.emptyCtaInner}>
             <Ionicons name="logo-tiktok" size={20} color={Colors.cloudyButtonText} />
-            <Text style={styles.emptyCtaText}>Paste a TikTok or Instagram link</Text>
+            <Text style={styles.emptyCtaText}>{t('activities.pasteTikTok')}</Text>
           </CloudyButton>
           <Pressable onPress={onManual} style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.55 }]}>
             <Ionicons name="add-circle-outline" size={20} color={Colors.text} />
-            <Text style={styles.secondaryText}>Add manually</Text>
+            <Text style={styles.secondaryText}>{t('activities.addManually')}</Text>
           </Pressable>
         </>
       )}
@@ -281,6 +284,7 @@ function Empty({ city, readOnly, owner, onLink, onManual }: { city: string | nul
  * is a dashed card and one tap saves it.
  */
 function Ideas({ leg, existing, journeySyncId, onAdded }: { leg: JourneyLeg; existing: string[]; journeySyncId: string; onAdded: () => Promise<void> }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<ActivitySuggestion[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -327,7 +331,7 @@ function Ideas({ leg, existing, journeySyncId, onAdded }: { leg: JourneyLeg; exi
       setItems((prev) => (prev ?? []).filter((x) => x !== s));
       await onAdded();
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not add', 'error');
+      showToast(err?.message ?? t('activities.couldNotAdd'), 'error');
     } finally {
       setAdding(null);
     }
@@ -339,16 +343,16 @@ function Ideas({ leg, existing, journeySyncId, onAdded }: { leg: JourneyLeg; exi
         <Pressable onPress={toggle} accessibilityRole="button" accessibilityState={{ expanded: open }} style={({ pressed }) => pressed && { opacity: 0.7 }}>
           <PillShell {...(hasGlass ? { glassEffectStyle: 'regular' as const } : {})} style={[styles.ideasPill, !hasGlass && styles.ideasPillFallback]}>
             <Ionicons name="sparkles" size={12} color={Colors.text} />
-            <Text style={styles.ideasPillText}>Ideas for {leg.city}</Text>
+            <Text style={styles.ideasPillText}>{t('activities.ideasFor', { city: leg.city })}</Text>
             <Animated.View style={chevronStyle}>
               <Ionicons name="chevron-down" size={13} color={Colors.textSecondary} />
             </Animated.View>
           </PillShell>
         </Pressable>
         {open && (loading ? (
-          <Text style={styles.ideasStatus}>Finding ideas…</Text>
+          <Text style={styles.ideasStatus}>{t('activities.findingIdeas')}</Text>
         ) : items ? (
-          <Pressable onPress={load} hitSlop={10} accessibilityRole="button" accessibilityLabel="New ideas">
+          <Pressable onPress={load} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('activities.newIdeas')}>
             <Ionicons name="refresh" size={16} color={Colors.textSecondary} />
           </Pressable>
         ) : null)}
@@ -359,7 +363,7 @@ function Ideas({ leg, existing, journeySyncId, onAdded }: { leg: JourneyLeg; exi
           {error && !loading && (
             <Pressable onPress={load} style={({ pressed }) => [styles.idea, styles.ideaError, pressed && { opacity: 0.6 }]}>
               <Ionicons name="cloud-offline-outline" size={18} color={Colors.textSecondary} />
-              <Text style={styles.ideaWhy}>Could not reach the AI. Tap to try again.</Text>
+              <Text style={styles.ideaWhy}>{t('activities.cannotReachAI')}</Text>
             </Pressable>
           )}
           {loading && !items && (
@@ -369,7 +373,7 @@ function Ideas({ leg, existing, journeySyncId, onAdded }: { leg: JourneyLeg; exi
             </>
           )}
           {items && items.length === 0 && !loading && (
-            <Text style={styles.ideasNone}>Nothing new right now. Try again in a bit.</Text>
+            <Text style={styles.ideasNone}>{t('activities.nothingNew')}</Text>
           )}
           {items?.map((s) => (
             <Pressable
@@ -377,7 +381,7 @@ function Ideas({ leg, existing, journeySyncId, onAdded }: { leg: JourneyLeg; exi
               onPress={() => take(s)}
               disabled={adding !== null}
               accessibilityRole="button"
-              accessibilityLabel={`Add ${s.title}`}
+              accessibilityLabel={t('activities.addNamed', { title: s.title })}
               style={({ pressed }) => [styles.idea, pressed && { opacity: 0.6 }, adding !== null && adding !== s.title && { opacity: 0.5 }]}
             >
               <View style={styles.ideaIcon}>
@@ -389,7 +393,7 @@ function Ideas({ leg, existing, journeySyncId, onAdded }: { leg: JourneyLeg; exi
                 <Text style={styles.ideaWhy}>{s.why}</Text>
                 <View style={styles.ideaAdd}>
                   <Ionicons name="add" size={14} color={Colors.text} />
-                  <Text style={styles.ideaAddText}>Add this</Text>
+                  <Text style={styles.ideaAddText}>{t('activities.addThis')}</Text>
                 </View>
               </View>
             </Pressable>
