@@ -33,6 +33,9 @@ import { DetailCard, DetailRow, DetailSeparator, LinkCard } from '../../../compo
 import { ACTIVITIES_UI } from '../../../lib/activityModel';
 import { formatMoney, nightsBetween, primaryOption } from '../../../lib/accommodationModel';
 import { showToast } from '../../../lib/toast';
+import { useTranslation } from '../../../contexts/LanguageContext';
+
+type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
 type Params = {
   legId: string;
@@ -63,41 +66,42 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 const fmtLong = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
 /** Where the stop stands from today: "Starts in 50 days", "Today: Day 2 of 4", "Ended 3 days ago". */
-function whenStat(start: Date, end: Date, days: number): { label: string; value: string; unit?: string } {
+function whenStat(start: Date, end: Date, days: number, t: TFunc): { label: string; value: string; unit?: string } {
   const today = parseDate(toYmd(new Date()));
   if (today < start) {
     const until = countDays(today, start) - 1;
-    return until === 1 ? { label: 'Starts', value: 'Tomorrow' } : { label: 'Starts', value: `in ${until}`, unit: 'days' };
+    return until === 1 ? { label: t('stopInfo.starts'), value: t('stopInfo.tomorrow') } : { label: t('stopInfo.starts'), value: t('stopInfo.inDays', { count: until }), unit: t('stopInfo.days') };
   }
   if (today > end) {
     const ago = countDays(end, today) - 1;
-    return ago === 1 ? { label: 'Ended', value: 'Yesterday' } : { label: 'Ended', value: `${ago}`, unit: 'days ago' };
+    return ago === 1 ? { label: t('stopInfo.ended'), value: t('stopInfo.yesterday') } : { label: t('stopInfo.ended'), value: `${ago}`, unit: t('stopInfo.daysAgo') };
   }
-  return { label: 'Today', value: `Day ${countDays(start, today)}`, unit: `of ${days}` };
+  return { label: t('stopInfo.today'), value: t('stopInfo.dayN', { n: countDays(start, today) }), unit: t('stopInfo.ofDays', { days }) };
 }
 
 /** The visa rule in a sentence, or what it means when there is none to track. */
-function visaLabel(rule: VisaRule | null): string | null {
+function visaLabel(rule: VisaRule | null, t: TFunc): string | null {
   if (!rule) return null;
-  if (rule.ruleType === 'visa_required') return 'Visa required';
+  if (rule.ruleType === 'visa_required') return t('stopInfo.visaRequired');
   return rule.label;
 }
 
 /** The second line of the stay card: nights, the pick, what it costs. */
-function staySummary(plan: NonNullable<ReturnType<typeof useAccommodation>['plan']>): string {
+function staySummary(plan: NonNullable<ReturnType<typeof useAccommodation>['plan']>, t: TFunc): string {
   const nights = nightsBetween(plan.check_in, plan.check_out);
-  const parts = [`${nights} ${nights === 1 ? 'night' : 'nights'}`];
+  const parts = [`${nights} ${nights === 1 ? t('stopInfo.nightSingular') : t('stopInfo.nightPlural')}`];
   const primary = primaryOption(plan);
   const price = plan.booking ? formatMoney(plan.booking.price, plan.booking.currency) : primary ? formatMoney(primary.total_price, primary.currency) : null;
   if (price) parts.push(price);
-  else if (plan.requirements.budget_per_night && plan.requirements.currency) parts.push(`up to ${formatMoney(plan.requirements.budget_per_night, plan.requirements.currency)}/night`);
-  if (!primary && plan.options.length) parts.push(`${plan.options.length} to compare`);
+  else if (plan.requirements.budget_per_night && plan.requirements.currency) parts.push(t('stopInfo.upToNight', { amount: formatMoney(plan.requirements.budget_per_night, plan.requirements.currency)! }));
+  if (!primary && plan.options.length) parts.push(t('stopInfo.toCompare', { count: plan.options.length }));
   return parts.join(' · ');
 }
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function StopInfoScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const nav = useNavigation();
   const params = useLocalSearchParams<Params>();
@@ -125,8 +129,8 @@ export default function StopInfoScreen() {
       .then((c) => setVisaRule(c ? getRuleForCitizen(c.countryCode, countryCode) : null))
       .catch(() => setVisaRule(null));
   }, [user?.uid, countryCode]);
-  const when = whenStat(startDate, endDate, days);
-  const visa = visaLabel(visaRule);
+  const when = whenStat(startDate, endDate, days, t);
+  const visa = visaLabel(visaRule, t);
 
   const handleEdit = () => {
     // Swap this sheet for the editor in one navigation update. A first version
@@ -175,22 +179,22 @@ export default function StopInfoScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert('Delete Stop', `Remove ${city} from this journey?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('stopInfo.deleteStopTitle'), t('stopInfo.removeFromJourney', { city: city ?? '' }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           await deleteJourneyLeg(Number(params.legId));
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           nav.goBack();
-          showToast('Stop removed');
+          showToast(t('stopInfo.stopRemoved'));
         },
       },
     ]);
   };
 
-  if (!complete) return <MissingRoute title="Stop" message="This stop is no longer here." />;
+  if (!complete) return <MissingRoute title={t('stopInfo.stop')} message={t('plans.stopGone')} />;
 
   const latitude = params.latitude ? Number(params.latitude) : null;
   const longitude = params.longitude ? Number(params.longitude) : null;
@@ -228,22 +232,22 @@ export default function StopInfoScreen() {
 
         {/* Stats: each fact once; the dates themselves are in the card below */}
         <StatRow style={styles.statsRow}>
-          <StatTile label="Duration" value={`${days}`} unit={days === 1 ? 'day' : 'days'} />
+          <StatTile label={t('stopInfo.duration')} value={`${days}`} unit={days === 1 ? t('stopInfo.day') : t('stopInfo.days')} />
           <StatTile label={when.label} value={when.value} unit={when.unit} />
-          <StatTile label="Transport" value={transport.label} icon={transport.icon} />
+          <StatTile label={t('plans.transport')} value={transport.label} icon={transport.icon} />
         </StatRow>
 
         {/* Details */}
         <View style={styles.section}>
-          <SectionLabel>Stop details</SectionLabel>
+          <SectionLabel>{t('stopInfo.stopDetails')}</SectionLabel>
           <DetailCard>
-            <DetailRow icon="log-in-outline" label="Arrival" value={fmtLong(startDate)} />
+            <DetailRow icon="log-in-outline" label={t('stopInfo.arrival')} value={fmtLong(startDate)} />
             <DetailSeparator />
-            <DetailRow icon="log-out-outline" label="Departure" value={fmtLong(endDate)} />
+            <DetailRow icon="log-out-outline" label={t('stopInfo.departure')} value={fmtLong(endDate)} />
             {visa ? (
               <>
                 <DetailSeparator />
-                <DetailRow icon="document-text-outline" label="Visa" value={visa} />
+                <DetailRow icon="document-text-outline" label={t('stopInfo.visa')} value={visa} />
               </>
             ) : null}
             {params.notes ? (
@@ -252,7 +256,7 @@ export default function StopInfoScreen() {
                 <View style={styles.notesRow}>
                   <View style={styles.detailLeft}>
                     <Ionicons name="create-outline" size={18} color={Colors.textTertiary} />
-                    <Text style={styles.detailLabel}>Notes</Text>
+                    <Text style={styles.detailLabel}>{t('plans.notes')}</Text>
                   </View>
                   <Text selectable style={styles.notesText}>{params.notes}</Text>
                 </View>
@@ -267,8 +271,8 @@ export default function StopInfoScreen() {
             <LinkCard
               icon="bed-outline"
               // The place by name once there is one; the badge says how far it is.
-              title={stay ? primaryOption(stay)?.name ?? planChipText(stay) : 'Where to stay'}
-              sub={stay ? staySummary(stay) : 'Requirements, options, the booking'}
+              title={stay ? primaryOption(stay)?.name ?? planChipText(stay) : t('stopInfo.whereToStay')}
+              sub={stay ? staySummary(stay, t) : t('stopInfo.reqOptionsBooking')}
               right={stay && stay.needed ? <StatusBadge status={stay.status} size="small" /> : undefined}
               onPress={openAccommodation}
             />
@@ -280,8 +284,8 @@ export default function StopInfoScreen() {
           <View style={styles.section}>
             <LinkCard
               icon="sparkles-outline"
-              title={things.length === 0 ? 'Things to do' : things.length === 1 ? '1 thing to do' : `${things.length} things to do`}
-              sub={things.length === 0 ? 'Ideas, suggestions, posts you saved' : things.slice(0, 3).map((a) => a.title).join(', ')}
+              title={things.length === 0 ? t('nav.thingsToDo') : things.length === 1 ? t('stopInfo.oneThing') : t('stopInfo.manyThings', { count: things.length })}
+              sub={things.length === 0 ? t('stopInfo.ideasSuggestions') : things.slice(0, 3).map((a) => a.title).join(', ')}
               onPress={openActivities}
             />
           </View>
@@ -289,7 +293,7 @@ export default function StopInfoScreen() {
 
         {/* Tips */}
         <View style={styles.section}>
-          <SectionLabel>{`Tips for ${city}`}</SectionLabel>
+          <SectionLabel>{t('stopInfo.tipsFor', { city: city ?? '' })}</SectionLabel>
           <GlassCard {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
             <CityTips city={city} country={country} />
           </GlassCard>
@@ -299,10 +303,10 @@ export default function StopInfoScreen() {
         {!readOnly && (
           <View style={styles.actions}>
             <TouchableOpacity style={styles.actionButton} onPress={handleEdit} activeOpacity={0.5}>
-              <Text style={styles.editText}>Edit stop</Text>
+              <Text style={styles.editText}>{t('stopInfo.editStop')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={handleDelete} activeOpacity={0.5}>
-              <Text style={styles.deleteText}>Delete stop</Text>
+              <Text style={styles.deleteText}>{t('stopInfo.deleteStop')}</Text>
             </TouchableOpacity>
           </View>
         )}
