@@ -12,6 +12,7 @@ import { Typography } from '../../../constants/typography';
 import { TOKEN_ENV_NAME, agentSetupText } from '../../../lib/agentSetup';
 import { functions } from '../../../lib/firebase';
 import { showToast } from '../../../lib/toast';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 const NAME_SUGGESTIONS = ['Hermes', 'Claude', 'ChatGPT'];
 
@@ -24,6 +25,7 @@ const NAME_SUGGESTIONS = ['Hermes', 'Claude', 'ChatGPT'];
  * Losing it costs a remove and a reconnect, which is cheap.
  */
 export default function ConnectAgentSheet() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [label, setLabel] = useState('');
   const [editTimeline, setEditTimeline] = useState(false);
@@ -42,7 +44,7 @@ export default function ConnectAgentSheet() {
       setReady({ token: res.data.token, label: res.data.label, editTimeline: res.data.edit_timeline });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not connect the agent', 'error');
+      showToast(err?.message ?? t('agent.couldNotConnect'), 'error');
     } finally {
       setBusy(false);
     }
@@ -55,7 +57,7 @@ export default function ConnectAgentSheet() {
       const Clipboard = require('expo-clipboard') as typeof import('expo-clipboard');
       await Clipboard.setStringAsync(value);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast(`${what} copied`);
+      showToast(t('agent.copied', { what }));
     } else {
       await Share.share({ message: value });
     }
@@ -64,26 +66,26 @@ export default function ConnectAgentSheet() {
   if (ready) {
     return (
       <>
-        <Stack.Screen options={{ title: `${ready.label} is ready` }} />
+        <Stack.Screen options={{ title: t('agent.isReady', { label: ready.label }) }} />
         <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
           <Card>
             <View style={styles.hand}>
-              <Text style={styles.rowTitle}>Instructions</Text>
-              <Text style={styles.rowText}>Go into {ready.label}&apos;s prompt or memory. They explain what the data is and what it can do.</Text>
-              <SecondaryButton icon="document-text-outline" label="Copy instructions" onPress={() => copy(agentSetupText(ready.editTimeline), 'Instructions')} />
+              <Text style={styles.rowTitle}>{t('agent.instructions')}</Text>
+              <Text style={styles.rowText}>{t('agent.instructionsText', { label: ready.label })}</Text>
+              <SecondaryButton icon="document-text-outline" label={t('agent.copyInstructions')} onPress={() => copy(agentSetupText(ready.editTimeline), t('agent.instructions'))} />
             </View>
             <View style={styles.separator} />
             <View style={styles.hand}>
-              <Text style={styles.rowTitle}>Key</Text>
+              <Text style={styles.rowTitle}>{t('agent.key')}</Text>
               <Text style={styles.rowText}>
-                Goes into {ready.label}&apos;s secrets or environment as <Text style={styles.mono}>{TOKEN_ENV_NAME}</Text>, never into the prompt. It is a password.
+                {t('agent.keyTextBefore', { label: ready.label })}<Text style={styles.mono}>{TOKEN_ENV_NAME}</Text>{t('agent.keyTextAfter')}
               </Text>
-              <SecondaryButton icon="key-outline" label="Copy key" onPress={() => copy(ready.token, 'Key')} />
+              <SecondaryButton icon="key-outline" label={t('agent.copyKey')} onPress={() => copy(ready.token, t('agent.key'))} />
             </View>
           </Card>
-          <Text style={styles.caption}>The key can be copied only while this sheet is open. Lost it? Remove {ready.label} and connect again.</Text>
+          <Text style={styles.caption}>{t('agent.keyCaption', { label: ready.label })}</Text>
           <CloudyButton onPress={() => router.back()} style={{ width: '100%' }} innerStyle={{ justifyContent: 'center' }}>
-            <Text style={styles.ctaText}>Done</Text>
+            <Text style={styles.ctaText}>{t('agent.done')}</Text>
           </CloudyButton>
         </ScrollView>
       </>
@@ -92,16 +94,16 @@ export default function ConnectAgentSheet() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Connect an agent' }} />
+      <Stack.Screen options={{ title: t('nav.connectAgent') }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-        <SectionLabel>Name</SectionLabel>
+        <SectionLabel>{t('agent.name')}</SectionLabel>
         <Card>
           <View style={styles.field}>
             <TextInput
               style={styles.input}
               value={label}
               onChangeText={setLabel}
-              placeholder="Name the agent"
+              placeholder={t('agent.namePlaceholder')}
               placeholderTextColor={systemColor('placeholderText')}
               returnKeyType="done"
               maxLength={40}
@@ -120,27 +122,27 @@ export default function ConnectAgentSheet() {
           </View>
         </Card>
 
-        <SectionLabel>Can it change your timeline?</SectionLabel>
+        <SectionLabel>{t('agent.canChange')}</SectionLabel>
         <Card>
           <Choice
             on={!editTimeline}
             icon="eye-outline"
-            title="Read only"
-            text="Sees where you have been, your visa and tax days, and can plan trips."
+            title={t('agent.readOnlyTitle')}
+            text={t('agent.readOnlyText')}
             onPress={() => setEditTimeline(false)}
           />
           <View style={styles.separator} />
           <Choice
             on={editTimeline}
             icon="create-outline"
-            title="Read and edit"
-            text="Can also add stays the tracker missed, fix dates and remove wrong ones. That moves your visa and tax days."
+            title={t('agent.readEditTitle')}
+            text={t('agent.readEditText')}
             onPress={() => setEditTimeline(true)}
           />
         </Card>
 
         <CloudyButton onPress={connect} style={{ width: '100%', opacity: canConnect ? 1 : 0.5 }} innerStyle={{ justifyContent: 'center' }}>
-          <Text style={styles.ctaText}>{busy ? 'Connecting…' : 'Connect'}</Text>
+          <Text style={styles.ctaText}>{busy ? t('agent.connecting') : t('agent.connect')}</Text>
         </CloudyButton>
       </ScrollView>
     </>
