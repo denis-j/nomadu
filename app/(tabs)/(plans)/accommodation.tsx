@@ -41,6 +41,9 @@ import { parseDate } from '../../../lib/database';
 import { toYmd } from '../../../lib/days';
 import { cityCoords, forwardGeocode } from '../../../lib/geocoding';
 import { showToast } from '../../../lib/toast';
+import { useTranslation } from '../../../contexts/LanguageContext';
+
+type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
 type Params = {
   stopSyncId: string;
@@ -78,42 +81,42 @@ function fmtRange(start: string, end: string): string {
 }
 
 /** What a person can still say about the status that the plan's data does not already: arrived, stayed, called off, or back on. */
-function statusChoices(plan: AccommodationPlan): { label: string; status: AccommodationStatus; icon: string }[] {
+function statusChoices(plan: AccommodationPlan, t: TFunc): { label: string; status: AccommodationStatus; icon: string }[] {
   const st = plan.status;
   if (st === 'cancelled') {
     const back: AccommodationStatus = plan.booking ? 'booked' : plan.selected_option_id ? 'selected' : plan.options.length ? 'options_available' : 'open';
-    return [{ label: 'Plan this stay again', status: back, icon: 'arrow.uturn.backward' }];
+    return [{ label: t('accommodation.planAgain'), status: back, icon: 'arrow.uturn.backward' }];
   }
   const out: { label: string; status: AccommodationStatus; icon: string }[] = [];
-  if (st === 'booked') out.push({ label: 'Checked in', status: 'checked_in', icon: 'key' });
-  if (st === 'booked' || st === 'checked_in') out.push({ label: 'Stayed', status: 'completed', icon: 'checkmark.circle' });
-  if (st !== 'completed') out.push({ label: 'Cancel this stay', status: 'cancelled', icon: 'xmark.circle' });
+  if (st === 'booked') out.push({ label: t('accommodation.checkedIn'), status: 'checked_in', icon: 'key' });
+  if (st === 'booked' || st === 'checked_in') out.push({ label: t('accommodation.stayed'), status: 'completed', icon: 'checkmark.circle' });
+  if (st !== 'completed') out.push({ label: t('accommodation.cancelStay'), status: 'cancelled', icon: 'xmark.circle' });
   return out;
 }
 
 /** "Airbnb · 85 EUR/night · ★ 4.8": the grey line under a place's name. */
-function optionLine(o: AccommodationOption): string {
+function optionLine(o: AccommodationOption, t: TFunc): string {
   const nightly = optionNightlyPrice(o);
   return [
     o.platform,
-    nightly !== null && o.currency ? `${formatMoney(nightly, o.currency)}/night` : null,
+    nightly !== null && o.currency ? `${formatMoney(nightly, o.currency)}${t('accommodation.perNightUnit')}` : null,
     o.rating !== null ? `★ ${o.rating}${o.rating_scale === 10 ? '/10' : ''}` : null,
   ].filter(Boolean).join(' · ');
 }
 
 /** What was asked for, in two or three lines: the head line, then one line each for the rest. */
-function describeRequirements(req: AccommodationRequirements): string[] {
+function describeRequirements(req: AccommodationRequirements, t: TFunc): string[] {
   const head = [
     req.type ? TYPE_LABELS[req.type] : null,
-    req.budget_per_night !== null && req.currency ? `up to ${formatMoney(req.budget_per_night, req.currency)} a night` : req.budget_total !== null && req.currency ? `up to ${formatMoney(req.budget_total, req.currency)}` : null,
-    req.areas.length ? `in ${req.areas.join(', ')}` : null,
+    req.budget_per_night !== null && req.currency ? t('accommodation.upToNight', { amount: formatMoney(req.budget_per_night, req.currency)! }) : req.budget_total !== null && req.currency ? t('accommodation.upToTotal', { amount: formatMoney(req.budget_total, req.currency)! }) : null,
+    req.areas.length ? t('accommodation.inAreas', { areas: req.areas.join(', ') }) : null,
   ].filter(Boolean).join(' · ');
   return [
     head,
     req.amenities.length ? req.amenities.map(amenityLabel).join(', ') : null,
-    req.work_requirements ? `For work: ${req.work_requirements}` : null,
-    req.min_requirements ? `Must have: ${req.min_requirements}` : null,
-    req.dates_flexible ? 'Dates are flexible' : null,
+    req.work_requirements ? t('accommodation.forWork', { text: req.work_requirements }) : null,
+    req.min_requirements ? t('accommodation.mustHave', { text: req.min_requirements }) : null,
+    req.dates_flexible ? t('accommodation.datesFlexible') : null,
     req.notes,
   ].filter((x): x is string => !!x);
 }
@@ -194,6 +197,9 @@ function useHeroPoint(address: string | null, city: string, country: string, cou
  * timeline; a booked place becomes a stay only when the phone is there.
  */
 export default function AccommodationScreen() {
+  const { t } = useTranslation();
+  const SORT_LABELS_L: Record<SortKey, string> = { score: t('accommodation.sortScore'), price: t('accommodation.sortPrice'), rating: t('accommodation.sortRating') };
+  const TILE_STATUS_L: Record<string, string> = { ...STATUS_LABELS, options_available: t('accommodation.statusOptions'), checked_in: t('accommodation.statusCheckedIn') };
   const router = useRouter();
   const params = useLocalSearchParams<Params>();
   // A link from outside can be missing any of these; the hooks below run
@@ -230,7 +236,7 @@ export default function AccommodationScreen() {
       setPlan(await work());
       if (toast) showToast(toast);
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not save', 'error');
+      showToast(err?.message ?? t('plans.couldNotSave'), 'error');
     }
   }, [plan, setPlan, journeySyncId, stopSyncId, stop]);
 
@@ -244,16 +250,16 @@ export default function AccommodationScreen() {
       return;
     }
     if (id !== 'remove') return;
-    Alert.alert('Remove this plan?', 'Requirements, options and booking details go with it.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('accommodation.removePlanTitle'), t('accommodation.removePlanBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('common.remove'),
         style: 'destructive',
         onPress: async () => {
           await deleteAccommodation(stopSyncId);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           router.back();
-          showToast('Plan removed');
+          showToast(t('accommodation.planRemoved'));
         },
       },
     ]);
@@ -271,43 +277,43 @@ export default function AccommodationScreen() {
   const addOption = () => go('/(tabs)/(plans)/stay-option-edit');
   const openBooking = (o?: AccommodationOption) => go('/(tabs)/(plans)/stay-booking', o ? { optionId: o.id } : {});
 
-  if (!complete) return <MissingRoute title="Stay" message="This stay is no longer here." />;
-  if (!loaded) return <Stack.Screen options={{ title: `Stay in ${params.city}` }} />;
+  if (!complete) return <MissingRoute title={t('accommodation.stay')} message={t('plans.stayGone')} />;
+  if (!loaded) return <Stack.Screen options={{ title: t('accommodation.stayInCity', { city: params.city ?? '' }) }} />;
 
   const req = view.requirements;
   const nights = nightsBetween(view.check_in, view.check_out);
   const others = sortOptions(view.options.filter((o) => o.id !== primary?.id), sortBy);
-  const choices = plan && !readOnly ? statusChoices(view) : [];
+  const choices = plan && !readOnly ? statusChoices(view, t) : [];
   const datesDiffer = !staysMatchStop(view, stop);
   const stopStay = defaultStay(stop);
   const stopNights = nightsBetween(stopStay.check_in, stopStay.check_out);
-  const reqLines = describeRequirements(req);
+  const reqLines = describeRequirements(req, t);
   const address = booking?.address ?? primary?.address ?? null;
 
   // The title under the map: the place once there is one, the city before.
   const title = primary ? primary.name : params.city;
   const subtitle = primary
     ? [primary.platform, address].filter(Boolean).join(' · ')
-    : `${params.country} · ${nights} ${nights === 1 ? 'night' : 'nights'}`;
+    : t('accommodation.subtitleCountryNights', { country: params.country ?? '', nights, nightsWord: nights === 1 ? t('accommodation.nightSingular') : t('accommodation.nightPlural') });
 
   // The third tile: what this stay costs, as far as that is known.
   const nightly = primary ? optionNightlyPrice(primary) : null;
   const money = booking && booking.price !== null && booking.currency
-    ? { label: 'Paid', value: String(booking.price), unit: booking.currency }
+    ? { label: t('accommodation.paid'), value: String(booking.price), unit: booking.currency }
     : primary && nightly !== null && primary.currency
-      ? { label: 'Per night', value: String(nightly), unit: primary.currency }
+      ? { label: t('plans.perNight'), value: String(nightly), unit: primary.currency }
       : req.budget_per_night !== null && req.currency
-        ? { label: 'Budget', value: String(req.budget_per_night), unit: `${req.currency}/night` }
-        : { label: 'Budget', value: 'Open' };
+        ? { label: t('accommodation.budget'), value: String(req.budget_per_night), unit: t('accommodation.budgetUnit', { currency: req.currency }) }
+        : { label: t('accommodation.budget'), value: t('accommodation.open') };
 
   // The booking, one row each; only what is filled in. The address is on
   // the map and in Directions, what was paid is in the tile. A long check-in
   // note is a paragraph, not a right-aligned column.
   const bookingRows: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }[] = [];
-  if (booking?.booking_reference) bookingRows.push({ icon: 'receipt-outline', label: 'Reference', value: booking.booking_reference });
-  if (booking?.check_in_info) bookingRows.push({ icon: 'log-in-outline', label: 'Check-in', value: booking.check_in_info });
-  if (booking?.check_out_info) bookingRows.push({ icon: 'log-out-outline', label: 'Check-out', value: booking.check_out_info });
-  if (booking?.provider_contact) bookingRows.push({ icon: 'call-outline', label: 'Contact', value: booking.provider_contact });
+  if (booking?.booking_reference) bookingRows.push({ icon: 'receipt-outline', label: t('plans.reference'), value: booking.booking_reference });
+  if (booking?.check_in_info) bookingRows.push({ icon: 'log-in-outline', label: t('plans.checkIn'), value: booking.check_in_info });
+  if (booking?.check_out_info) bookingRows.push({ icon: 'log-out-outline', label: t('plans.checkOut'), value: booking.check_out_info });
+  if (booking?.provider_contact) bookingRows.push({ icon: 'call-outline', label: t('plans.contact'), value: booking.provider_contact });
   const long = (v: string) => v.length > 28;
 
   const optionRow = (o: AccommodationOption) => (
@@ -315,14 +321,14 @@ export default function AccommodationScreen() {
       key={o.id}
       icon="bed-outline"
       title={o.name}
-      sub={optionLine(o) || o.address || undefined}
+      sub={optionLine(o, t) || o.address || undefined}
       right={o.score !== null ? <StatusChip label={String(o.score)} /> : undefined}
       onPress={() => openOption(o)}
     />
   );
   const sortControl = others.length > 1 ? (
-    <Dropdown right title="Sort by" value={sortBy} options={(['score', 'price', 'rating'] as SortKey[]).map((k) => ({ id: k, label: SORT_LABELS[k] }))} onPick={(id) => { Haptics.selectionAsync(); setSortBy(id as SortKey); }}>
-      <SectionControl label={SORT_LABELS[sortBy]} menu />
+    <Dropdown right title={t('accommodation.sortBy')} value={sortBy} options={(['score', 'price', 'rating'] as SortKey[]).map((k) => ({ id: k, label: SORT_LABELS_L[k] }))} onPick={(id) => { Haptics.selectionAsync(); setSortBy(id as SortKey); }}>
+      <SectionControl label={SORT_LABELS_L[sortBy]} menu />
     </Dropdown>
   ) : undefined;
 
@@ -330,7 +336,7 @@ export default function AccommodationScreen() {
     <>
       <Stack.Screen
         options={{
-          title: `Stay in ${params.city}`,
+          title: t('accommodation.stayInCity', { city: params.city ?? '' }),
           // The menu: the booking's form once there is one, and the way out.
           // Whether a place is needed at all stays an agent's call.
           headerRight: plan && !readOnly
@@ -338,8 +344,8 @@ export default function AccommodationScreen() {
                 <Dropdown
                   right
                   options={[
-                    ...(booked ? [{ id: 'booking', label: 'Edit booking', icon: 'square.and.pencil' }] : []),
-                    { id: 'remove', label: 'Remove this plan', icon: 'trash', destructive: true },
+                    ...(booked ? [{ id: 'booking', label: t('plans.editBooking'), icon: 'square.and.pencil' }] : []),
+                    { id: 'remove', label: t('accommodation.removeThisPlan'), icon: 'trash', destructive: true },
                   ]}
                   onPick={menuPick}
                 >
@@ -353,11 +359,11 @@ export default function AccommodationScreen() {
         {!view.needed ? (
           <View style={styles.section}>
             <DetailCard>
-              <DetailRow icon="bed-outline" label="Place" value="None needed at this stop" />
+              <DetailRow icon="bed-outline" label={t('plans.place')} value={t('accommodation.noneNeeded')} />
             </DetailCard>
             {!readOnly && (
               <TouchableOpacity onPress={() => apply(() => updateAccommodation(stopSyncId, { needed: true }))} activeOpacity={0.5} style={styles.textAction}>
-                <Text style={styles.textActionLabel}>Need a place here</Text>
+                <Text style={styles.textActionLabel}>{t('accommodation.needPlaceHere')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -379,21 +385,21 @@ export default function AccommodationScreen() {
             {/* Three facts, as under the title of a stop's sheet. */}
             <StatRow style={styles.statsRow}>
               <StatTile
-                label="Status"
-                value={TILE_STATUS[view.status]}
+                label={t('accommodation.status')}
+                value={TILE_STATUS_L[view.status]}
                 options={choices.length ? choices.map((c) => ({ id: c.status, label: c.label, icon: c.icon, destructive: c.status === 'cancelled' })) : undefined}
-                menuTitle="Moves on its own as you add places and book one"
+                menuTitle={t('accommodation.statusMovesHint')}
                 onPick={choices.length ? setStatusTo : undefined}
               />
-              <StatTile label="Nights" value={`${nights}`} unit={fmtRange(view.check_in, view.check_out)} />
+              <StatTile label={t('accommodation.nights')} value={`${nights}`} unit={fmtRange(view.check_in, view.check_out)} />
               <StatTile label={money.label} value={money.value} unit={money.unit} />
             </StatRow>
 
             {datesDiffer && (
               <Text style={styles.note}>
-                The stop runs {fmtRange(params.start, params.end)}, {stopNights} {stopNights === 1 ? 'night' : 'nights'}.
+                {t('accommodation.stopRuns', { range: fmtRange(params.start, params.end), nights: stopNights, nightsWord: stopNights === 1 ? t('accommodation.nightSingular') : t('accommodation.nightPlural') })}
                 {!readOnly && (
-                  <Text style={styles.noteLink} onPress={() => apply(() => updateAccommodation(stopSyncId, stopStay), 'Dates updated')}> Match the dates</Text>
+                  <Text style={styles.noteLink} onPress={() => apply(() => updateAccommodation(stopSyncId, stopStay), t('accommodation.datesUpdated'))}>{t('accommodation.matchDates')}</Text>
                 )}
               </Text>
             )}
@@ -401,7 +407,7 @@ export default function AccommodationScreen() {
             {booked ? (
               <>
                 {/* Booked: what you need at the door. Everything else is history. */}
-                <Section title="Booking">
+                <Section title={t('nav.booking')}>
                   {bookingRows.length > 0 || booking!.notes ? (
                     <DetailCard>
                       {bookingRows.map((r, i) => (
@@ -419,18 +425,18 @@ export default function AccommodationScreen() {
                     </DetailCard>
                   ) : null}
                   {booking!.booking_url ? (
-                    <LinkCard icon="receipt-outline" title="Open the reservation" sub={booking!.booking_url.replace(/^https?:\/\/(www\.)?/, '')} onPress={() => Linking.openURL(booking!.booking_url!)} />
+                    <LinkCard icon="receipt-outline" title={t('accommodation.openReservation')} sub={booking!.booking_url.replace(/^https?:\/\/(www\.)?/, '')} onPress={() => Linking.openURL(booking!.booking_url!)} />
                   ) : null}
                   {address ? (
-                    <LinkCard icon="navigate-outline" title="Directions" sub={address} onPress={() => Linking.openURL(mapsUrl(address))} />
+                    <LinkCard icon="navigate-outline" title={t('stayOption.directions')} sub={address} onPress={() => Linking.openURL(mapsUrl(address))} />
                   ) : null}
-                  <LinkCard icon="bed-outline" title="The listing" sub={optionLine(primary!) || 'Price, rating, notes'} onPress={() => openOption(primary!)} />
+                  <LinkCard icon="bed-outline" title={t('accommodation.theListing')} sub={optionLine(primary!, t) || t('accommodation.priceRatingNotes')} onPress={() => openOption(primary!)} />
                 </Section>
 
                 {others.length > 0 && (
                   <Section
-                    title={others.length === 1 ? 'Also looked at 1 place' : `Also looked at ${others.length} places`}
-                    right={<SectionControl label={othersOpen ? 'Hide' : 'Show'} onPress={() => { Haptics.selectionAsync(); animate(); setOthersOpen((v) => !v); }} />}
+                    title={others.length === 1 ? t('accommodation.alsoLookedOne') : t('accommodation.alsoLookedMany', { count: others.length })}
+                    right={<SectionControl label={othersOpen ? t('accommodation.hide') : t('accommodation.show')} onPress={() => { Haptics.selectionAsync(); animate(); setOthersOpen((v) => !v); }} />}
                   >
                     {othersOpen && others.map(optionRow)}
                   </Section>
@@ -440,26 +446,26 @@ export default function AccommodationScreen() {
               <>
                 {/* Not booked yet: the places found come first, one tap from booking. */}
                 {primary && (
-                  <Section title="Picked">
-                    {!readOnly && <SlotCard icon="receipt-outline" title="Book it" sub="Save the reference and how to get in" onPress={() => openBooking(primary)} />}
-                    <LinkCard icon="bed-outline" title="The listing" sub={optionLine(primary) || 'Price, rating, notes'} onPress={() => openOption(primary)} />
+                  <Section title={t('accommodation.picked')}>
+                    {!readOnly && <SlotCard icon="receipt-outline" title={t('accommodation.bookIt')} sub={t('accommodation.bookItSub')} onPress={() => openBooking(primary)} />}
+                    <LinkCard icon="bed-outline" title={t('accommodation.theListing')} sub={optionLine(primary, t) || t('accommodation.priceRatingNotes')} onPress={() => openOption(primary)} />
                   </Section>
                 )}
 
                 {(others.length > 0 || !readOnly) && (
                   <Section
-                    title={primary ? (others.length === 1 ? '1 other place' : `${others.length} other places`) : others.length ? `${others.length} ${others.length === 1 ? 'place found' : 'places found'}` : 'Places'}
+                    title={primary ? (others.length === 1 ? t('accommodation.otherOne') : t('accommodation.otherMany', { count: others.length })) : others.length ? (others.length === 1 ? t('accommodation.placeFoundOne', { count: others.length }) : t('accommodation.placeFoundMany', { count: others.length })) : t('accommodation.places')}
                     right={sortControl}
                   >
                     {others.map(optionRow)}
                     {!readOnly && (
-                      <SlotCard icon="add" title="Add a place" sub={view.options.length ? 'One more to compare' : 'A hotel, a flat, anything you found'} onPress={addOption} />
+                      <SlotCard icon="add" title={t('accommodation.addPlace')} sub={view.options.length ? t('accommodation.oneMoreCompare') : t('accommodation.aHotelFlat')} onPress={addOption} />
                     )}
                   </Section>
                 )}
 
                 {(reqLines.length > 0 || !readOnly) && (
-                  <Section title="Looking for" right={reqLines.length > 0 && !readOnly ? <SectionControl label="Edit" onPress={openRequirements} /> : undefined}>
+                  <Section title={t('nav.lookingFor')} right={reqLines.length > 0 && !readOnly ? <SectionControl label={t('common.edit')} onPress={openRequirements} /> : undefined}>
                     {reqLines.length > 0 ? (
                       <DetailCard>
                         <View style={styles.lines}>
@@ -469,7 +475,7 @@ export default function AccommodationScreen() {
                         </View>
                       </DetailCard>
                     ) : (
-                      <SlotCard icon="search-outline" title="Say what you need" sub="Budget, area, a desk, quiet at night" onPress={openRequirements} />
+                      <SlotCard icon="search-outline" title={t('accommodation.sayWhatNeed')} sub={t('accommodation.budgetAreaDesk')} onPress={openRequirements} />
                     )}
                   </Section>
                 )}
@@ -477,7 +483,7 @@ export default function AccommodationScreen() {
             )}
 
             {view.notes ? (
-              <Section title="Notes">
+              <Section title={t('plans.notes')}>
                 <DetailCard>
                   <Text selectable style={styles.notesText}>{view.notes}</Text>
                 </DetailCard>
