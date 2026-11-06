@@ -6,6 +6,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { getTripsByCity, parseDate, Trip } from '../../lib/database';
 import { MissingRoute } from '../../components/MissingRoute';
+import { useTranslation } from '../../contexts/LanguageContext';
 import { Flag } from '../../components/Flag';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
@@ -16,6 +17,7 @@ const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 export default function CityDetailScreen() {
+  const { t, countryName } = useTranslation();
   const { key } = useLocalSearchParams<{ key: string }>();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,13 +46,13 @@ export default function CityDetailScreen() {
   if (loading) {
     return (
       <View style={styles.loading}>
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={styles.loadingText}>{t('common.loading')}</Text>
       </View>
     );
   }
 
   if (trips.length === 0) {
-    return <MissingRoute title="City" message="No trips to this city." />;
+    return <MissingRoute title={t('cityScreen.city')} message={t('cityScreen.noTrips')} />;
   }
 
   const country = trips[0]?.country ?? '';
@@ -107,31 +109,31 @@ export default function CityDetailScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.city}>{city}</Text>
-          <Text style={styles.country}>{country}</Text>
+          <Text style={styles.country}>{countryName(country)}</Text>
         </View>
 
         {/* Stats */}
         <View style={styles.statsRow}>
           <Glass {...glassProps} style={[styles.statCard, !hasGlass && styles.statCardFallback]}>
-            <Text style={styles.statLabel}>Visits</Text>
+            <Text style={styles.statLabel}>{t('cityScreen.visits')}</Text>
             <Text style={styles.statValue}>{totalVisits}</Text>
           </Glass>
           <Glass {...glassProps} style={[styles.statCard, !hasGlass && styles.statCardFallback]}>
-            <Text style={styles.statLabel}>Total Days</Text>
+            <Text style={styles.statLabel}>{t('cityScreen.totalDays')}</Text>
             <Text style={styles.statValue}>{totalDays}</Text>
           </Glass>
         </View>
 
         {/* Timeline */}
         <View style={styles.timelineSection}>
-          <Text style={styles.timelineTitle}>Visit History</Text>
+          <Text style={styles.timelineTitle}>{t('cityScreen.visitHistory')}</Text>
           <View style={styles.timeline}>
             <View style={styles.timelineLine} />
             {trips.map((trip, index) => {
               const isActive = !trip.end_date;
               const dateRange = trip.end_date
                 ? `${formatDate(trip.start_date)} – ${formatDate(trip.end_date)}`
-                : `${formatDate(trip.start_date)} – Present`;
+                : `${formatDate(trip.start_date)} – ${t('cityScreen.present')}`;
 
               return (
                 <TouchableOpacity
@@ -151,7 +153,7 @@ export default function CityDetailScreen() {
                     style={[styles.timelineCard, !hasGlass && styles.timelineCardFallback]}
                   >
                     <View style={styles.timelineCardTop}>
-                      <Text style={styles.visitNumber}>Visit {index + 1}</Text>
+                      <Text style={styles.visitNumber}>{t('cityScreen.visitN', { n: index + 1 })}</Text>
                       <View style={styles.daysBadge}>
                         <Text style={styles.daysText}>{trip.days}d</Text>
                       </View>
@@ -160,7 +162,7 @@ export default function CityDetailScreen() {
                     {isActive && (
                       <View style={styles.activeBadge}>
                         <View style={styles.activeDot} />
-                        <Text style={styles.activeText}>Currently here</Text>
+                        <Text style={styles.activeText}>{t('cityScreen.currentlyHere')}</Text>
                       </View>
                     )}
                   </Glass>

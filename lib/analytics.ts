@@ -46,7 +46,11 @@ export type AnalyticsEvent =
   | { name: 'journey_created'; props: { from_guide: boolean } }
   | { name: 'stop_added' }
   | { name: 'document_added'; props: { kind: string } }
-  | { name: 'accommodation_option_added' };
+  | { name: 'accommodation_option_added' }
+  | { name: 'activity_added'; props: { source: string } }
+  | { name: 'activity_link_imported'; props: { source: string; found: number } }
+  | { name: 'activity_suggestions_loaded' }
+  | { name: 'expense_added'; props: { source: 'quick' | 'form' | 'receipt' } };
 
 let client: PostHog | null = null;
 

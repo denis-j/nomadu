@@ -34,6 +34,7 @@ import { showToast } from '../../../lib/toast';
 import { toYmd } from '../../../lib/days';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { Flag } from '../../../components/Flag';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -61,6 +62,7 @@ function GapIndicator({ fromDate, toDate, days, onAdd }: {
   days: number;
   onAdd: (from: Date, to: Date) => void;
 }) {
+  const { t } = useTranslation();
   const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return (
     <TouchableOpacity style={gapStyles.row} onPress={() => onAdd(fromDate, toDate)} activeOpacity={0.7}>
@@ -68,7 +70,7 @@ function GapIndicator({ fromDate, toDate, days, onAdd }: {
       <View style={gapStyles.dotCol} />
       <View style={gapStyles.card}>
         <View style={gapStyles.left}>
-          <Text style={gapStyles.days}>{days}d untracked</Text>
+          <Text style={gapStyles.days}>{t('timeline.daysUntracked', { days })}</Text>
           <Text style={gapStyles.dates}>{fmt(fromDate)} – {fmt(toDate)}</Text>
         </View>
         <Ionicons name="add-circle-outline" size={20} color={Colors.primary + '80'} />
@@ -123,6 +125,7 @@ const gapStyles = StyleSheet.create({
 // ─── Timeline empty state ───
 
 function TimelineEmpty({ onAdd, onImport }: { onAdd: () => void; onImport: () => void }) {
+  const { t } = useTranslation();
   // Bump key every time the Timeline tab gains focus → bubbles remount + re-animate
   const [focusKey, setFocusKey] = useState(0);
   useFocusEffect(
@@ -134,15 +137,15 @@ function TimelineEmpty({ onAdd, onImport }: { onAdd: () => void; onImport: () =>
     <View style={emptyStyles.container}>
       <TimelineBubbles key={focusKey} size={70} variant="burstWobble" />
 
-      <Text style={emptyStyles.title}>Start your travel timeline</Text>
+      <Text style={emptyStyles.title}>{t('timeline.emptyTitle')}</Text>
       <Text style={emptyStyles.subtitle}>
-        Trips appear here automatically as you move,{'\n'}or you can add them yourself.
+        {t('timeline.emptySubtitle')}
       </Text>
 
       <CloudyButton onPress={onImport}>
         <View style={emptyStyles.cloudyBtnContent}>
           <Ionicons name="sparkles" size={22} color={Colors.cloudyButtonText} />
-          <Text style={emptyStyles.cloudyTitle}>Import from screenshots</Text>
+          <Text style={emptyStyles.cloudyTitle}>{t('timeline.importFromScreenshots')}</Text>
         </View>
       </CloudyButton>
 
@@ -154,7 +157,7 @@ function TimelineEmpty({ onAdd, onImport }: { onAdd: () => void; onImport: () =>
         style={({ pressed }) => [emptyStyles.secondaryBtn, pressed && emptyStyles.secondaryBtnPressed]}
       >
         <Ionicons name="add-circle-outline" size={20} color={Colors.text} />
-        <Text style={emptyStyles.secondaryBtnText}>Add a trip manually</Text>
+        <Text style={emptyStyles.secondaryBtnText}>{t('timeline.addTripManually')}</Text>
       </Pressable>
     </View>
   );
@@ -280,6 +283,7 @@ function CountryGroupCard({
   onDeleteMany: (ids: number[]) => void;
   onEdit: (trip: Trip) => void;
 }) {
+  const { t, countryName } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   // ActionSheet still uses emoji, native iOS title strings handle it well.
   const emojiFlag = countryCodeToFlag(group.countryCode);
@@ -294,8 +298,8 @@ function CountryGroupCard({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     ActionSheetIOS.showActionSheetWithOptions(
       {
-        title: `${emojiFlag} ${group.country} · ${group.items.length} stops`,
-        options: ['Delete All Stops', 'Cancel'],
+        title: `${emojiFlag} ${countryName(group.country)} · ${t('timeline.stops', { count: group.items.length })}`,
+        options: [t('timeline.deleteAllStops'), t('common.cancel')],
         destructiveButtonIndex: 0,
         cancelButtonIndex: 1,
       },
@@ -359,7 +363,7 @@ function CountryGroupCard({
               </View>
             </View>
           </View>
-          <Text style={groupStyles.country}>{group.country}</Text>
+          <Text style={groupStyles.country}>{countryName(group.country)}</Text>
           <View style={groupStyles.headerBottom}>
             <Text style={groupStyles.dates}>{dateRange}</Text>
             {isActive && <View style={groupStyles.activeDot} />}
@@ -605,6 +609,7 @@ const fmt = (d: Date) =>
 
 export default function TimelineScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { trips, loading, refresh } = useTrips();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -655,11 +660,11 @@ export default function TimelineScreen() {
         if (cancelled || declined === print) return;
         askedRef.current = true;
         Alert.alert(
-          'Tidy up your timeline?',
-          `${removed} ${removed === 1 ? 'stop is a duplicate' : 'stops are duplicates'}, fragments of the same stay, or one-day blips from a stale location fix. Merging them leaves your history as it is, just without the noise.`,
+          t('timeline.tidyTitle'),
+          t(removed === 1 ? 'timeline.tidyBodyOne' : 'timeline.tidyBodyMany', { count: removed }),
           [
             {
-              text: 'Not now',
+              text: t('timeline.tidyNotNow'),
               style: 'cancel',
               onPress: () => {
                 AsyncStorage.setItem(REPAIR_HIDDEN_KEY, print).catch(() => {});
@@ -669,16 +674,16 @@ export default function TimelineScreen() {
               },
             },
             {
-              text: 'Tidy up',
+              text: t('timeline.tidyConfirm'),
               onPress: async () => {
                 try {
                   await applyTripRepair(plan);
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                   AsyncStorage.removeItem(REPAIR_HIDDEN_KEY).catch(() => {});
-                  showToast('Timeline tidied up');
+                  showToast(t('timeline.tidiedUp'));
                 } catch (error) {
                   console.error('Failed to tidy up timeline:', error);
-                  showToast('Could not tidy up your timeline', 'error');
+                  showToast(t('timeline.tidyFailed'), 'error');
                 } finally {
                   // The flag only stops a second alert while this one is
                   // open. Left set, the offer never came back for the rest
@@ -693,7 +698,7 @@ export default function TimelineScreen() {
         );
       })();
       return () => { cancelled = true; };
-    }, [loading, refresh]),
+    }, [loading, refresh, t]),
   );
 
   const handleRefresh = useCallback(async () => {
@@ -907,15 +912,15 @@ export default function TimelineScreen() {
     const result = await pickImportImages();
     if (!result.ok) {
       if (result.reason === 'no-permission') {
-        Alert.alert('Photo Access Needed', 'Please allow photo access to import screenshots.');
+        Alert.alert(t('timeline.photoAccessTitle'), t('timeline.photoAccessBody'));
       } else if (result.reason === 'empty') {
-        Alert.alert('Nothing imported', 'Could not read the selected images.');
+        Alert.alert(t('timeline.nothingImported'), t('timeline.nothingImportedBody'));
       }
       return;
     }
     setPendingImportImages(result.images);
     router.push('./import');
-  }, [router]);
+  }, [router, t]);
 
   const openEditSheet = useCallback((trip: Trip) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -951,11 +956,11 @@ export default function TimelineScreen() {
       }
     } catch (error) {
       console.error('Failed to delete stops:', error);
-      showToast('Could not delete all stops', 'error');
+      showToast(t('timeline.deleteAllFailed'), 'error');
     } finally {
       refresh();
     }
-  }, [refresh]);
+  }, [refresh, t]);
 
   // ─── Header ───
 
@@ -963,7 +968,7 @@ export default function TimelineScreen() {
     () => {
       if (Platform.OS !== 'ios') {
         return (
-          <Pressable onPress={() => openSheet()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Add trip">
+          <Pressable onPress={() => openSheet()} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('timeline.addTrip')}>
             <Ionicons name="add" size={28} color={Colors.primary} />
           </Pressable>
         );
@@ -972,7 +977,7 @@ export default function TimelineScreen() {
         <Host matchContents>
           <Menu label={<ExpoUIImage systemName="plus" size={18} color="#000000" />}>
             <ExpoUIButton
-              label="Add trip manually"
+              label={t('timeline.addTripManually')}
               systemImage="square.and.pencil"
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -980,7 +985,7 @@ export default function TimelineScreen() {
               }}
             />
             <ExpoUIButton
-              label="Import from screenshots"
+              label={t('timeline.importFromScreenshots')}
               systemImage="photo.on.rectangle"
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -991,7 +996,7 @@ export default function TimelineScreen() {
         </Host>
       );
     },
-    [openSheet, openImport],
+    [openSheet, openImport, t],
   );
 
   // ─── Main content ───

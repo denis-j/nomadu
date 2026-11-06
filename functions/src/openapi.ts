@@ -9,6 +9,8 @@
  */
 
 import { ACCOMMODATION_STATUSES, ACCOMMODATION_TYPES, MAX_OPTIONS } from '../../lib/accommodationModel';
+import { ACTIVITY_CATEGORIES, ACTIVITY_SOURCES, ACTIVITY_STATUSES, MAX_ACTIVITIES_PER_JOURNEY } from '../../lib/activityModel';
+import { EXPENSE_CATEGORIES, EXPENSE_SOURCES, MAX_EXPENSES_PER_JOURNEY } from '../../lib/expenseModel';
 
 export const API_BASE = 'https://us-central1-nomady-dcff6.cloudfunctions.net/agentApi/v1';
 export const TRANSPORTS = ['flight', 'train', 'car', 'bus', 'ferry', 'walk'] as const;
@@ -116,7 +118,12 @@ const journey = {
     start_date: { ...orNull(date), description: 'First day of the first stop' },
     end_date: { ...orNull(date), description: 'Last day of the last stop' },
     stops: { type: 'array', items: { $ref: '#/components/schemas/Stop' } },
-    travellers: { type: 'array', items: { type: 'string' }, description: 'Names; the owner is "You"', example: ['You', 'Alice'] },
+    travellers: {
+      type: 'array',
+      description: 'Who is on the trip. The ids are what an expense names in paid_by and the shares; the owner is "You".',
+      items: { type: 'object', required: ['id', 'name'], properties: { id: { type: 'string' }, name: { type: 'string' } } },
+      example: [{ id: '0c6f9d2e-1b7a-4a3e-9f1c-2d4e6a8b0c1f', name: 'You' }, { id: 'member-a1b2c3d4-0000-4000-8000-000000000001-uid42', name: 'Alice' }],
+    },
   },
 };
 
@@ -309,6 +316,189 @@ const accommodationOk = (description: string) => ({
 });
 const accommodationErrors = { 400: { $ref: '#/components/responses/BadRequest' }, 401: { $ref: '#/components/responses/Unauthorized' }, 404: { $ref: '#/components/responses/NotFound' } };
 
+// ─── Activities ──────────────────────────────────────────────────────────────
+
+const activityCategory = {
+  type: 'string',
+  enum: [...ACTIVITY_CATEGORIES],
+  description: 'What kind of thing it is. food is a meal or a restaurant, cafe a coffee or a place to work from, sight a landmark or viewpoint, culture museums, galleries and shows, tour anything guided.',
+};
+
+const activityStatus = {
+  type: 'string',
+  enum: [...ACTIVITY_STATUSES],
+  description: 'idea: worth considering (the default). planned: the user wants to do it. booked: tickets or a table are reserved. done: it happened.',
+};
+
+const activitySource = {
+  type: 'string',
+  enum: [...ACTIVITY_SOURCES],
+  description: 'Where the idea came from. Defaults to agent for what you create; tiktok, instagram, youtube or link when you took it from a post or page (put that address in source_url).',
+};
+
+const activityFields = {
+  title: { type: 'string', minLength: 1, maxLength: 120, example: 'Bánh mì at Bánh Mì Phượng' },
+  category: { $ref: '#/components/schemas/ActivityCategory' },
+  status: { $ref: '#/components/schemas/ActivityStatus' },
+  place: text(120, 'The venue or area by name'),
+  address: text(200),
+  latitude: { type: ['number', 'null'], minimum: -90, maximum: 90 },
+  longitude: { type: ['number', 'null'], minimum: -180, maximum: 180 },
+  url: { type: ['string', 'null'], format: 'uri', description: 'http(s) page about it: the venue, a booking, a map link' },
+  price: money('Per person, as far as known'),
+  currency: { ...currency, description: 'ISO 4217. Required when price is given.' },
+  notes: text(1000),
+  source: { $ref: '#/components/schemas/ActivitySource' },
+  source_url: { type: ['string', 'null'], format: 'uri', description: 'The post or page the idea came from' },
+  image_url: { type: ['string', 'null'], format: 'uri', description: 'A preview picture' },
+};
+
+const activity = {
+  type: 'object',
+  description: 'One thing to do on a trip. Belongs to a stop of the journey, or to none yet (stop_id null): an activity whose stop was removed from the journey also shows as not placed.',
+  required: ['id', 'journey_id', 'stop_id', 'title', 'category', 'status', 'place', 'address', 'latitude', 'longitude', 'url', 'price', 'currency', 'notes', 'source', 'source_url', 'image_url', 'sort_order', 'updated_at'],
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    journey_id: { type: 'string', format: 'uuid' },
+    stop_id: { type: ['string', 'null'], format: 'uuid', description: 'The stop it belongs to; null while not placed' },
+    ...activityFields,
+    sort_order: { type: 'number', description: 'Position within its stop, from 0' },
+    updated_at: { type: ['string', 'null'], format: 'date-time' },
+  },
+};
+
+const activityInput = {
+  type: 'object',
+  description: `An activity to create or the fields of one to change. Only title is required on a new one; absent fields keep their value on a PATCH, null clears them. A price needs a currency. At most ${MAX_ACTIVITIES_PER_JOURNEY} per journey.`,
+  required: ['title'],
+  properties: {
+    stop_id: { type: ['string', 'null'], format: 'uuid', description: 'Only on /journeys/{id}/activities: the stop to put it on, or null for not placed. On PATCH, moves it.' },
+    ...activityFields,
+    sort_order: { type: 'number', description: 'Optional. New ones go to the end of their stop.' },
+  },
+};
+
+const activityExample = {
+  id: '5b2d9c1e-8f3a-4d6b-9e0c-7a1f2e3d4c5b',
+  journey_id: 'a1b2c3d4-0000-4000-8000-000000000001',
+  stop_id: '3c1f2a9e-7d4b-4e0a-9b6f-1e2d3c4b5a60',
+  title: 'Egg coffee at Café Giảng',
+  category: 'cafe',
+  status: 'idea',
+  place: 'Café Giảng',
+  address: '39 Nguyễn Hữu Huân, Hoàn Kiếm, Hanoi',
+  latitude: null,
+  longitude: null,
+  url: null,
+  price: 35000,
+  currency: 'VND',
+  notes: 'The original since 1946, go before 10',
+  source: 'agent',
+  source_url: null,
+  image_url: null,
+  sort_order: 0,
+  updated_at: '2026-09-18T10:05:00.000Z',
+};
+
+const activityIdParam = { name: 'activityId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } };
+const activityOk = (description: string) => ({
+  description,
+  content: { 'application/json': { schema: { $ref: '#/components/schemas/Activity' }, example: activityExample } },
+});
+const activityErrors = { 400: { $ref: '#/components/responses/BadRequest' }, 401: { $ref: '#/components/responses/Unauthorized' }, 404: { $ref: '#/components/responses/NotFound' } };
+
+// ─── Expenses ────────────────────────────────────────────────────────────────
+
+const expenseCategory = {
+  type: 'string',
+  enum: [...EXPENSE_CATEGORIES],
+  description: 'What the money went on. stay is a hotel or flat, activity a ticket or tour, groceries the supermarket, food a meal out.',
+};
+
+const expenseSource = {
+  type: 'string',
+  enum: [...EXPENSE_SOURCES],
+  description: 'Typed in, read off a receipt photo in the app, or filed by you (the default for what you create).',
+};
+
+const expenseShare = {
+  type: 'object',
+  required: ['traveller_id', 'amount'],
+  properties: {
+    traveller_id: { type: 'string', description: 'A traveller id of the journey (see Journey.travellers)' },
+    amount: { type: 'number', minimum: 0, description: 'This person\'s part, in the expense\'s currency' },
+  },
+};
+
+const expenseFields = {
+  title: { type: 'string', minLength: 1, maxLength: 120, example: 'Dinner at Bún Chả Hương Liên' },
+  amount: { type: 'number', exclusiveMinimum: 0, description: 'What was paid in all, two decimals', example: 42.5 },
+  currency: { type: 'string', pattern: '^[A-Z]{3}$', description: 'ISO 4217, upper case', example: 'EUR' },
+  paid_by: { type: ['string', 'null'], description: 'The traveller who paid, by id; null when nobody said' },
+  shares: { type: 'array', items: { $ref: '#/components/schemas/ExpenseShare' }, description: 'Who it is split among and how much each; they add up to the amount. Empty: not split, the payer\'s own.' },
+  date: { ...date, description: 'The day it was paid' },
+  category: { $ref: '#/components/schemas/ExpenseCategory' },
+  notes: text(1000),
+  receipt_document_id: { type: ['string', 'null'], description: 'The receipt, as the id of a journey document the user added in the app. Read-only in practice: files are not available through the API.' },
+  source: { $ref: '#/components/schemas/ExpenseSource' },
+};
+
+const expense = {
+  type: 'object',
+  description: 'Money one traveller paid on the trip and how it is split. Belongs to a stop (stop_id) when its day falls into one, else to the journey alone.',
+  required: ['id', 'journey_id', 'stop_id', 'title', 'amount', 'currency', 'paid_by', 'shares', 'date', 'category', 'notes', 'receipt_document_id', 'source', 'updated_at'],
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    journey_id: { type: 'string', format: 'uuid' },
+    stop_id: { type: ['string', 'null'], format: 'uuid' },
+    ...expenseFields,
+    updated_at: { type: ['string', 'null'], format: 'date-time' },
+  },
+};
+
+const expenseInput = {
+  type: 'object',
+  description: `An expense to create or the fields of one to change. A new one needs title, amount and currency; absent fields keep their value on a PATCH, null clears them. The split is given as split_among (traveller ids, split equally) or as shares (ids with amounts that add up to the amount); a new expense that says neither is split equally among everyone on the trip. When only the amount changes, the split is scaled with it. At most ${MAX_EXPENSES_PER_JOURNEY} per journey.`,
+  required: ['title', 'amount', 'currency'],
+  properties: {
+    stop_id: { type: ['string', 'null'], format: 'uuid', description: 'The stop it belongs to. Left out, the stop whose days hold the date is taken; null for none.' },
+    split_among: { type: ['array', 'null'], items: { type: 'string' }, description: 'Traveller ids to split equally among; null for not split. Wins over shares when both are sent.' },
+    ...expenseFields,
+  },
+};
+
+const expenseExample = {
+  id: '7e1c4b2a-9d3f-4a6e-8b0c-5f2d1e3a4b6c',
+  journey_id: 'a1b2c3d4-0000-4000-8000-000000000001',
+  stop_id: '3c1f2a9e-7d4b-4e0a-9b6f-1e2d3c4b5a60',
+  title: 'Dinner at Bún Chả Hương Liên',
+  amount: 42.5,
+  currency: 'EUR',
+  paid_by: '0c6f9d2e-1b7a-4a3e-9f1c-2d4e6a8b0c1f',
+  shares: [
+    { traveller_id: '0c6f9d2e-1b7a-4a3e-9f1c-2d4e6a8b0c1f', amount: 21.25 },
+    { traveller_id: 'member-a1b2c3d4-0000-4000-8000-000000000001-uid42', amount: 21.25 },
+  ],
+  date: '2026-11-02',
+  category: 'food',
+  notes: null,
+  receipt_document_id: null,
+  source: 'agent',
+  updated_at: '2026-11-02T19:40:00.000Z',
+};
+
+const expenseSummary = {
+  totals: { type: 'array', description: 'What the trip cost, per currency, the biggest first. No exchange rates: a sum in baht stays in baht.', items: { type: 'object', required: ['currency', 'total'], properties: { currency: { type: 'string' }, total: { type: 'number' } } } },
+  balances: { type: 'array', description: 'Per traveller and currency: what they paid, their part of everything, and the difference (positive gets money back).', items: { type: 'object', required: ['traveller_id', 'currency', 'paid', 'owed', 'net'], properties: { traveller_id: { type: 'string' }, currency: { type: 'string' }, paid: { type: 'number' }, owed: { type: 'number' }, net: { type: 'number' } } } },
+  settle_up: { type: 'array', description: 'The fewest payments that even everyone out, per currency.', items: { type: 'object', required: ['from', 'to', 'amount', 'currency'], properties: { from: { type: 'string' }, to: { type: 'string' }, amount: { type: 'number' }, currency: { type: 'string' } } } },
+};
+
+const expenseIdParam = { name: 'expenseId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } };
+const expenseOk = (description: string) => ({
+  description,
+  content: { 'application/json': { schema: { $ref: '#/components/schemas/Expense' }, example: expenseExample } },
+});
+
 const visaStatus = {
   type: 'object',
   description: 'How much of a visa allowance is used. From the built-in visa rules for the citizenship, or from a visa the user entered.',
@@ -391,7 +581,7 @@ export function openapi() {
     openapi: '3.1.0',
     info: {
       title: 'Nomadu agent API',
-      version: '1.2.0',
+      version: '1.4.0',
       contact: { name: 'Nomadu', url: 'https://nomadu.app' },
       summary: 'A traveller\'s timeline, visa and tax standing, and plans, for an AI agent acting on their behalf.',
       description: [
@@ -408,6 +598,15 @@ export function openapi() {
         '',
         '## Accommodation',
         'Every planned stop can carry one accommodation plan (`/journeys/{id}/stops/{stopId}/accommodation`): whether a place is needed, what it should be like, the options that were found, the one that was picked and, once booked, the booking details. You research on the platforms yourself and save what you found here; Nomadu never searches or books anything. A plan is planning only: it never becomes a stay in the timeline and never changes visa or tax numbers. Check-in and check-out are stored on the plan and validated; when a stop is later moved, the plan keeps its dates and reports `dates_match_stop: false`, so ask the user before changing a booking. Every token may read and write plans, the same as journeys. `GET /accommodations?status=searching` lists the stops that still need a place; every stop in `/journeys` carries a one-line summary of its plan.',
+        'In the app the plan is one page per stop: the options you saved as a list the user sorts by your `score`, the price and the rating, each opening to its details and your `risks` and `notes`; the requirements in a few lines; and, once booked, the place on a map with the booking details and the check-in notes. The user books from the app as well, which saves a booking for an option (`booking.option_id`) and moves the status to `booked`, and can pick an option or set the status there too. Read the plan before you overwrite one.',
+        '',
+        '## Activities',
+        `Things to do on a trip: many per stop, each its own record (\`/journeys/{id}/activities\`). A restaurant, a viewpoint, a hike, a tour, with a category, a status (idea, planned, booked, done), the place and its address, a link, a price and notes. Save what you research or what the user asks for straight onto its stop (\`POST /journeys/{id}/stops/{stopId}/activities\`); when it is not clear where it belongs, create it with \`stop_id: null\` and the user places it in the app. An activity whose stop is later removed from the journey is shown as not placed; nothing is lost. Planning only, like accommodation: an activity never touches the timeline, visa or tax numbers. At most ${MAX_ACTIVITIES_PER_JOURNEY} per journey.`,
+        'In the app the activities of a trip are one list, filtered by stop, with the places on a map above it. Each is a row with its `image_url` as the picture (else its category), its `place` or category and `price` as the grey line, and its `status` as a capsule; its own sheet has the status as a menu, the details, directions and the post it came from (`source_url`). A `place` or `address` is enough for the map: the phone looks the point up itself and stores `latitude` and `longitude`, or send them when you have them. The user changes status and stop from the app too, so read an activity before you overwrite it.',
+        '',
+        '## Expenses',
+        `What the trip costs and who owes whom (\`/journeys/{id}/expenses\`). Each expense is one payment: a title, the amount and its currency, who paid (a traveller id from the journey), how it is split (equal shares among some or all travellers, or amounts per person), the day, a category, notes. The list answers with the sums the app shows: totals per currency, every traveller's balance, and the payments that settle everything. Save what the user tells you ("I paid 40 euros for dinner, split with Anna"); never guess who paid. Expenses are kept, not counted: nothing here touches the timeline, visa or tax numbers. At most ${MAX_EXPENSES_PER_JOURNEY} per journey.`,
+        'In the app the expenses are one list with the receipt photo or the category as the picture, the tiles on top (total, the user\'s part, what they get back or owe) and a settle-up card; the user types them in as one line ("Dinner 42") or photographs the receipt, and can change or delete yours. Read before you overwrite.',
         '',
         '## What the app does with your writes',
         'Everything you create or change syncs to the user\'s phone within seconds while the app is open, or on its next start. Tell the user when you have written something. Deleting is soft: the record is tombstoned and disappears from the app.',
@@ -420,6 +619,8 @@ export function openapi() {
       { name: 'Insights', description: 'Numbers derived from the timeline' },
       { name: 'Plans', description: 'Trips the user is planning' },
       { name: 'Accommodation', description: 'Where to stay at each planned stop: requirements, options found, the pick, the booking' },
+      { name: 'Activities', description: 'Things to do at each planned stop: places, sights, food, tours' },
+      { name: 'Expenses', description: 'What was paid on the trip, by whom, split how; and who owes whom' },
       { name: 'Meta', description: 'This document' },
     ],
     components: {
@@ -445,6 +646,16 @@ export function openapi() {
         Accommodation: accommodation,
         AccommodationInput: accommodationInput,
         AccommodationSummary: accommodationSummary,
+        ActivityCategory: activityCategory,
+        ActivityStatus: activityStatus,
+        ActivitySource: activitySource,
+        Activity: activity,
+        ActivityInput: activityInput,
+        ExpenseCategory: expenseCategory,
+        ExpenseSource: expenseSource,
+        ExpenseShare: expenseShare,
+        Expense: expense,
+        ExpenseInput: expenseInput,
       },
       examples: {
         Accommodation: { summary: 'A plan with one option, selected, not yet booked', value: accommodationExample },
@@ -796,6 +1007,127 @@ export function openapi() {
           ...auth, tags: ['Accommodation'], operationId: 'setAccommodationNotes', summary: 'Replace the plan\'s notes',
           requestBody: { required: true, content: json({ type: 'object', required: ['notes'], properties: { notes: { type: ['string', 'null'], maxLength: 2000 } } }, { notes: 'ask about late check-in' }) },
           responses: { 200: accommodationOk('Updated'), ...accommodationErrors },
+        },
+      },
+      '/journeys/{id}/activities': {
+        parameters: [idParam],
+        get: {
+          ...auth,
+          tags: ['Activities'],
+          operationId: 'listActivities',
+          summary: 'Things to do on a journey',
+          description: 'Every activity of the journey in trip order: stop by stop, then the ones not placed yet, each stop\'s in its own order. Filter by stop with `?stop=`.',
+          parameters: [{ name: 'stop', in: 'query', schema: { type: 'string', format: 'uuid' }, description: 'Only the activities of this stop' }],
+          responses: {
+            200: { description: 'OK', content: json({ type: 'object', required: ['activities'], properties: { activities: { type: 'array', items: { $ref: '#/components/schemas/Activity' } } } }, { activities: [activityExample] }) },
+            401: { $ref: '#/components/responses/Unauthorized' },
+            404: { $ref: '#/components/responses/NotFound' },
+          },
+        },
+        post: {
+          ...auth,
+          tags: ['Activities'],
+          operationId: 'createActivity',
+          summary: 'Add an activity, on a stop or not placed yet',
+          description: 'Give `stop_id` to put it on a stop of this journey, or leave it out (or null) when it is not clear where it belongs. source defaults to agent.',
+          requestBody: { required: true, content: json({ $ref: '#/components/schemas/ActivityInput' }, { title: 'Sunset at Marble Mountains', category: 'sight', stop_id: null, notes: 'Somewhere near Da Nang, from a reel' }) },
+          responses: { 201: activityOk('Created'), ...activityErrors },
+        },
+      },
+      '/journeys/{id}/stops/{stopId}/activities': {
+        parameters: [idParam, stopIdParam],
+        post: {
+          ...auth,
+          tags: ['Activities'],
+          operationId: 'createStopActivity',
+          summary: 'Add an activity to a stop',
+          description: 'Goes to the end of the stop\'s list. 404 when the stop is not on this journey. source defaults to agent.',
+          requestBody: { required: true, content: json({ $ref: '#/components/schemas/ActivityInput' }, { title: 'Egg coffee at Café Giảng', category: 'cafe', place: 'Café Giảng', address: '39 Nguyễn Hữu Huân, Hoàn Kiếm, Hanoi', price: 35000, currency: 'VND' }) },
+          responses: { 201: activityOk('Created'), ...activityErrors },
+        },
+      },
+      '/journeys/{id}/activities/{activityId}': {
+        parameters: [idParam, activityIdParam],
+        get: {
+          ...auth, tags: ['Activities'], operationId: 'getActivity', summary: 'One activity',
+          responses: { 200: activityOk('OK'), 401: { $ref: '#/components/responses/Unauthorized' }, 404: { $ref: '#/components/responses/NotFound' } },
+        },
+        patch: {
+          ...auth,
+          tags: ['Activities'],
+          operationId: 'updateActivity',
+          summary: 'Change an activity or move it to another stop',
+          description: 'Send only what changes; null clears a field. `stop_id` moves it (to the end of the new stop\'s list unless sort_order is given), null unplaces it. PUT does the same.',
+          requestBody: { required: true, content: json({ ...activityInput, required: [] }, { status: 'booked', notes: 'Table for 2 at 19:30' }) },
+          responses: { 200: activityOk('Updated'), ...activityErrors },
+        },
+        delete: {
+          ...auth, tags: ['Activities'], operationId: 'deleteActivity', summary: 'Remove an activity',
+          description: 'Ask the user first unless you just added it by mistake.',
+          responses: { 200: { description: 'Deleted', content: json({ type: 'object', properties: { ok: { type: 'boolean' } } }, { ok: true }) }, 401: { $ref: '#/components/responses/Unauthorized' }, 404: { $ref: '#/components/responses/NotFound' } },
+        },
+      },
+      '/journeys/{id}/expenses': {
+        parameters: [idParam],
+        get: {
+          ...auth,
+          tags: ['Expenses'],
+          operationId: 'listExpenses',
+          summary: 'What was paid on a journey, and who owes whom',
+          description: 'Every expense of the journey, newest day first, with the trip\'s sums: totals per currency, each traveller\'s balance and the payments that settle up. `?stop=` narrows the list to one stop; the sums stay the whole trip\'s. `travellers` lists the ids the shares may use.',
+          parameters: [{ name: 'stop', in: 'query', schema: { type: 'string', format: 'uuid' }, description: 'Only the expenses of this stop' }],
+          responses: {
+            200: {
+              description: 'OK',
+              content: json(
+                { type: 'object', required: ['expenses', 'travellers', 'totals', 'balances', 'settle_up'], properties: { expenses: { type: 'array', items: { $ref: '#/components/schemas/Expense' } }, travellers: { type: 'array', items: { type: 'string' } }, ...expenseSummary } },
+                { expenses: [expenseExample], travellers: ['0c6f9d2e-1b7a-4a3e-9f1c-2d4e6a8b0c1f', 'member-a1b2c3d4-0000-4000-8000-000000000001-uid42'], totals: [{ currency: 'EUR', total: 42.5 }], balances: [{ traveller_id: '0c6f9d2e-1b7a-4a3e-9f1c-2d4e6a8b0c1f', currency: 'EUR', paid: 42.5, owed: 21.25, net: 21.25 }, { traveller_id: 'member-a1b2c3d4-0000-4000-8000-000000000001-uid42', currency: 'EUR', paid: 0, owed: 21.25, net: -21.25 }], settle_up: [{ from: 'member-a1b2c3d4-0000-4000-8000-000000000001-uid42', to: '0c6f9d2e-1b7a-4a3e-9f1c-2d4e6a8b0c1f', amount: 21.25, currency: 'EUR' }] },
+              ),
+            },
+            401: { $ref: '#/components/responses/Unauthorized' },
+            404: { $ref: '#/components/responses/NotFound' },
+          },
+        },
+        post: {
+          ...auth,
+          tags: ['Expenses'],
+          operationId: 'createExpense',
+          summary: 'Add an expense',
+          description: 'On the stop whose days hold its date unless stop_id says otherwise. Split equally among everyone on the trip unless split_among or shares say otherwise.',
+          requestBody: { required: true, content: json({ $ref: '#/components/schemas/ExpenseInput' }, { title: 'Dinner', amount: 42.5, currency: 'EUR', paid_by: '0c6f9d2e-1b7a-4a3e-9f1c-2d4e6a8b0c1f', date: '2026-11-02', category: 'food' }) },
+          responses: { 201: expenseOk('Created'), ...activityErrors },
+        },
+      },
+      '/journeys/{id}/stops/{stopId}/expenses': {
+        parameters: [idParam, { name: 'stopId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        post: {
+          ...auth,
+          tags: ['Expenses'],
+          operationId: 'createStopExpense',
+          summary: 'Add an expense to a stop',
+          requestBody: { required: true, content: json({ $ref: '#/components/schemas/ExpenseInput' }, { title: 'Grab to the airport', amount: 180000, currency: 'VND', paid_by: '0c6f9d2e-1b7a-4a3e-9f1c-2d4e6a8b0c1f', split_among: ['0c6f9d2e-1b7a-4a3e-9f1c-2d4e6a8b0c1f'], category: 'transport' }) },
+          responses: { 201: expenseOk('Created'), ...activityErrors },
+        },
+      },
+      '/journeys/{id}/expenses/{expenseId}': {
+        parameters: [idParam, expenseIdParam],
+        get: {
+          ...auth, tags: ['Expenses'], operationId: 'getExpense', summary: 'One expense',
+          responses: { 200: expenseOk('OK'), 401: { $ref: '#/components/responses/Unauthorized' }, 404: { $ref: '#/components/responses/NotFound' } },
+        },
+        patch: {
+          ...auth,
+          tags: ['Expenses'],
+          operationId: 'updateExpense',
+          summary: 'Change an expense',
+          description: 'Send only what changes. A new amount scales the old split; a new date moves it to that day\'s stop unless stop_id is sent too.',
+          requestBody: { required: true, content: json({ ...expenseInput, required: [] }, { amount: 45, notes: 'Tip included' }) },
+          responses: { 200: expenseOk('Updated'), ...activityErrors },
+        },
+        delete: {
+          ...auth, tags: ['Expenses'], operationId: 'deleteExpense', summary: 'Remove an expense',
+          description: 'Ask the user first unless you just added it by mistake.',
+          responses: { 200: { description: 'Deleted', content: json({ type: 'object', properties: { ok: { type: 'boolean' } } }, { ok: true }) }, 401: { $ref: '#/components/responses/Unauthorized' }, 404: { $ref: '#/components/responses/NotFound' } },
         },
       },
       '/openapi.json': {

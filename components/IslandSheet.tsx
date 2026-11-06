@@ -27,6 +27,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Typography } from '../constants/typography';
+import { useTranslation } from '../contexts/LanguageContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -73,6 +74,7 @@ export function SheetLayer({
   snapPoint = 0.45,
   depth = 0,
 }: SheetLayerProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const sheetHeight = SCREEN_HEIGHT * snapPoint;
   const hideY = SCREEN_HEIGHT;
@@ -160,12 +162,12 @@ export function SheetLayer({
         {title && (
           <View style={styles.header}>
             {onBack ? (
-              <TouchableOpacity style={styles.backButton} onPress={onBack} accessibilityRole="button" accessibilityLabel="Back">
+              <TouchableOpacity style={styles.backButton} onPress={onBack} accessibilityRole="button" accessibilityLabel={t('auth.back')}>
                 <Ionicons name="chevron-back" size={20} color="#007AFF" />
               </TouchableOpacity>
             ) : null}
             <Text style={[styles.title, onBack && { marginLeft: 12 }]}>{title}</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={close} accessibilityRole="button" accessibilityLabel="Close">
+            <TouchableOpacity style={styles.closeButton} onPress={close} accessibilityRole="button" accessibilityLabel={t('join.close')}>
               <Ionicons name="close" size={20} color="#8E8E93" />
             </TouchableOpacity>
           </View>
@@ -183,7 +185,7 @@ export function SheetLayer({
               autoCorrect={false}
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityRole="button" accessibilityLabel="Clear search">
+              <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityRole="button" accessibilityLabel={t('passport.clearSearch')}>
                 <Ionicons name="close-circle" size={18} color="#C7C7CC" />
               </TouchableOpacity>
             )}
@@ -215,6 +217,7 @@ export function SheetBackdrop({
   onPress,
   blurIntensity = 80,
 }: SheetBackdropProps) {
+  const { t } = useTranslation();
   const opacity = useSharedValue(0);
 
   useEffect(() => {
@@ -226,7 +229,7 @@ export function SheetBackdrop({
   return (
     <Animated.View style={[styles.backdrop, animStyle]} pointerEvents={visible ? 'auto' : 'none'}>
       <BlurView intensity={blurIntensity} style={styles.blurView}>
-        <TouchableOpacity style={styles.backdropTouchable} onPress={onPress} activeOpacity={1} accessibilityRole="button" accessibilityLabel="Close" />
+        <TouchableOpacity style={styles.backdropTouchable} onPress={onPress} activeOpacity={1} accessibilityRole="button" accessibilityLabel={t('join.close')} />
       </BlurView>
     </Animated.View>
   );

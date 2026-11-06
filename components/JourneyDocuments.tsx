@@ -6,7 +6,8 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import type { JourneyDocument, JourneyTraveller } from '../lib/database';
-import { summarizeKinds } from '../lib/documents';
+import { summarizeKinds, walletDocuments } from '../lib/documents';
+import { useTranslation } from '../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -23,34 +24,56 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
  */
 export function DocumentsEntryCard({
   journeyId,
-  documents,
+  documents: allDocuments,
   travellers,
 }: {
   journeyId: number;
   documents: JourneyDocument[];
   travellers: JourneyTraveller[];
 }) {
+  const { t } = useTranslation();
+  const documents = walletDocuments(allDocuments);
   const open = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push({ pathname: '/(tabs)/(plans)/documents', params: { journeyId: String(journeyId) } });
   };
 
   const sub = documents.length === 0
-    ? 'Tickets, visas, arrival cards'
-    : summarizeKinds(documents.map((d) => d.kind))
-      + (travellers.length > 1 ? ` · ${travellers.length} travellers` : '');
+    ? t('addStop.documentsSub')
+    : summarizeKinds(documents.map((d) => d.kind), t)
+      + (travellers.length > 1 ? ` · ${t('docKind.travellers', { count: travellers.length })}` : '');
 
+  return <EntryCard icon="documents-outline" title={t('nav.documents')} sub={sub} count={documents.length} onPress={open} />;
+}
+
+/**
+ * A one-line way from the top of the itinerary into one of the trip's
+ * pages (documents, things to do): icon, title, a grey line, a count.
+ */
+export function EntryCard({
+  icon,
+  title,
+  sub,
+  count,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  sub: string;
+  count: number;
+  onPress: () => void;
+}) {
   return (
-    <Pressable onPress={open} style={({ pressed }) => pressed && { opacity: 0.7 }}>
+    <Pressable onPress={onPress} style={({ pressed }) => pressed && { opacity: 0.7 }}>
       <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
         <View style={styles.icon}>
-          <Ionicons name="documents-outline" size={20} color={Colors.text} />
+          <Ionicons name={icon} size={20} color={Colors.text} />
         </View>
         <View style={styles.text}>
-          <Text style={styles.title}>Documents</Text>
+          <Text style={styles.title}>{title}</Text>
           <Text style={styles.sub} numberOfLines={1}>{sub}</Text>
         </View>
-        {documents.length > 0 && <Text style={styles.count}>{documents.length}</Text>}
+        {count > 0 && <Text style={styles.count}>{count}</Text>}
         <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
       </Glass>
     </Pressable>

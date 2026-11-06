@@ -17,6 +17,8 @@ import { deleteAccount } from '../../../lib/auth';
 import { clearAllTravelData, startRealtimeSync } from '../../../lib/sync';
 import { useSync } from '../../../contexts/SyncContext';
 import { Flag } from '../../../components/Flag';
+import { LanguageSwitcher } from '../../../components/LanguageSwitcher';
+import { useTranslation } from '../../../contexts/LanguageContext';
 import { getHasFixedResidence, setHasFixedResidence } from '../../../lib/onboarding';
 import { IslandSheet } from '../../../components/IslandSheet';
 import { Avatar } from '../../../components/TravellerAvatars';
@@ -30,6 +32,7 @@ const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 export default function SettingsScreen() {
+  const { t, countryName } = useTranslation();
   const { permissions } = useLocation();
   const [trackingSheetVisible, setTrackingSheetVisible] = useState(false);
   const { isPro, expirationDate, productIdentifier } = useSubscription();
@@ -60,23 +63,23 @@ export default function SettingsScreen() {
     // billed by Apple/Google, not by us, and keeps renewing until the user
     // cancels it there. Saying so is both fair and something App Review looks
     // for on apps that combine subscriptions with account deletion.
-    const store = Platform.OS === 'ios' ? 'the App Store' : 'Google Play';
+    const store = Platform.OS === 'ios' ? t('settings.appStore') : t('settings.googlePlay');
     const message =
-      'This permanently deletes your account, all trips and all data, both on this device and in the cloud. It cannot be undone.' +
+      t('settings.deleteBody') +
       (isPro
-        ? `\n\nYour subscription is billed by ${store} and will keep renewing. Cancel it there first, otherwise you will still be charged.`
+        ? t('settings.deleteSubWarning', { store })
         : '');
 
     Alert.alert(
-      'Delete Account',
+      t('settings.deleteAccount'),
       message,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         ...(isPro
-          ? [{ text: 'Manage Subscription', onPress: handleManageSubscription }]
+          ? [{ text: t('settings.manageSubscription'), onPress: handleManageSubscription }]
           : []),
         {
-          text: 'Delete Account',
+          text: t('settings.deleteAccount'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -88,7 +91,7 @@ export default function SettingsScreen() {
               // already written for the user.
               console.error('deleteAccount error:', error);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-              Alert.alert('Account not deleted', error?.message ?? 'Please try again.');
+              Alert.alert(t('settings.accountNotDeleted'), error?.message ?? t('settings.tryAgain'));
             }
           },
         },
@@ -135,11 +138,11 @@ export default function SettingsScreen() {
   };
 
   const planLabel = () => {
-    if (!productIdentifier) return 'Pro';
-    if (productIdentifier.includes('lifetime')) return 'Lifetime';
-    if (productIdentifier.includes('yearly')) return 'Yearly';
-    if (productIdentifier.includes('monthly')) return 'Monthly';
-    return 'Pro';
+    if (!productIdentifier) return t('settings.planPro');
+    if (productIdentifier.includes('lifetime')) return t('settings.planLifetime');
+    if (productIdentifier.includes('yearly')) return t('settings.planYearly');
+    if (productIdentifier.includes('monthly')) return t('settings.planMonthly');
+    return t('settings.planPro');
   };
 
   return (
@@ -157,12 +160,12 @@ export default function SettingsScreen() {
             </View>
             <View style={styles.warningContent}>
               <Text style={styles.warningTitle}>
-                {needsAnyPermission ? 'Location Access Required' : 'Always Allow Location'}
+                {needsAnyPermission ? t('settings.locReqTitle') : t('settings.locAlwaysTitle')}
               </Text>
               <Text style={styles.warningText}>
                 {needsAnyPermission
-                  ? 'Nomadu needs location access to automatically track your trips. Tap to open Settings.'
-                  : 'For automatic background tracking, please change location access to "Always". Tap to open Settings.'}
+                  ? t('settings.locReqBody')
+                  : t('settings.locAlwaysBody')}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
@@ -180,9 +183,9 @@ export default function SettingsScreen() {
               resizeMode="contain"
             />
             <View style={styles.warningContent}>
-              <Text style={styles.warningTitle}>Enable Notifications</Text>
+              <Text style={styles.warningTitle}>{t('settings.enableNotif')}</Text>
               <Text style={styles.warningText}>
-                Turn this on to receive Visa and other warnings. Tap to open Settings
+                {t('settings.enableNotifBody')}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
@@ -192,7 +195,7 @@ export default function SettingsScreen() {
 
       {/* Account */}
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
-        <Text style={styles.sectionTitle}>Account</Text>
+        <Text style={styles.sectionTitle}>{t('settings.account')}</Text>
         <Pressable
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           onPress={() => {
@@ -200,25 +203,25 @@ export default function SettingsScreen() {
             router.push('/(tabs)/(settings)/profile');
           }}
           accessibilityRole="button"
-          accessibilityLabel="Edit your name and picture"
+          accessibilityLabel={t('settings.editProfile')}
         >
           <View style={styles.profileRow}>
             <Avatar
-              person={{ label: profile?.name || 'You', account: true, owner: false, seed: profile?.avatar ?? avatarSeed(user?.uid) }}
+              person={{ label: profile?.name || t('settings.you'), account: true, owner: false, seed: profile?.avatar ?? avatarSeed(user?.uid) }}
               size={40}
               animated
             />
             <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>{profile?.name || 'Your name'}</Text>
-              <Text style={styles.rowDescription}>How friends see you on a shared trip</Text>
+              <Text style={styles.rowLabel}>{profile?.name || t('settings.yourName')}</Text>
+              <Text style={styles.rowDescription}>{t('settings.nameDesc')}</Text>
             </View>
           </View>
           <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
         </Pressable>
         <View style={styles.separator} />
         <View style={styles.row}>
-          <Text style={styles.rowLabel}>Email</Text>
-          <Text style={styles.rowValue}>{user?.email ?? 'Not set'}</Text>
+          <Text style={styles.rowLabel}>{t('settings.email')}</Text>
+          <Text style={[styles.rowValue, styles.emailValue]} numberOfLines={1} ellipsizeMode="middle">{user?.email ?? t('settings.notSet')}</Text>
         </View>
         <View style={styles.separator} />
         <Pressable
@@ -228,15 +231,15 @@ export default function SettingsScreen() {
             router.push('/(tabs)/(settings)/passport');
           }}
         >
-          <Text style={styles.rowLabel}>Passport</Text>
+          <Text style={styles.rowLabel}>{t('settings.passport')}</Text>
           <View style={styles.passportValue}>
             {passportCode ? (
               <>
                 <Flag code={passportCode} size={18} />
-                <Text style={styles.rowValue}>{passportCountry}</Text>
+                <Text style={styles.rowValue}>{countryName(passportCountry)}</Text>
               </>
             ) : (
-              <Text style={styles.rowValue}>Not set</Text>
+              <Text style={styles.rowValue}>{t('settings.notSet')}</Text>
             )}
             <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
           </View>
@@ -250,17 +253,17 @@ export default function SettingsScreen() {
           }}
         >
           <View style={styles.rowContent}>
-            <Text style={styles.rowLabel}>AI agent</Text>
-            <Text style={styles.rowDescription}>Let Hermes or another agent use your data</Text>
+            <Text style={styles.rowLabel}>{t('settings.aiAgent')}</Text>
+            <Text style={styles.rowDescription}>{t('settings.aiAgentDesc')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
         </Pressable>
         <View style={styles.separator} />
         <View style={styles.row}>
           <View style={styles.rowContent}>
-            <Text style={styles.rowLabel}>Fixed Residence</Text>
+            <Text style={styles.rowLabel}>{t('settings.fixedResidence')}</Text>
             <Text style={styles.rowDescription}>
-              Permanent home in your country
+              {t('settings.fixedResidenceDesc')}
             </Text>
           </View>
           <Switch
@@ -276,27 +279,39 @@ export default function SettingsScreen() {
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-              { text: 'Cancel', style: 'cancel' },
+            Alert.alert(t('settings.signOut'), t('settings.signOutConfirm'), [
+              { text: t('common.cancel'), style: 'cancel' },
               {
-                text: 'Sign Out',
+                text: t('settings.signOut'),
                 style: 'destructive',
                 onPress: handleSignOut,
               },
             ]);
           }}
         >
-          <Text style={[styles.rowLabel, styles.destructive]}>Sign Out</Text>
+          <Text style={[styles.rowLabel, styles.destructive]}>{t('settings.signOut')}</Text>
         </Pressable>
+      </Glass>
+
+      {/* Preferences */}
+      <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
+        <Text style={styles.sectionTitle}>{t('settings.preferences')}</Text>
+        <View style={styles.row}>
+          <View style={styles.rowContent}>
+            <Text style={styles.rowLabel}>{t('language.title')}</Text>
+            <Text style={styles.rowDescription}>{t('language.subtitle')}</Text>
+          </View>
+          <LanguageSwitcher variant="inline" />
+        </View>
       </Glass>
 
       {/* Subscription */}
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
-        <Text style={styles.sectionTitle}>Subscription</Text>
+        <Text style={styles.sectionTitle}>{t('settings.subscription')}</Text>
         {/* Only Pro reaches the tabs: everyone else is on the paywall (app/_layout.tsx),
             which also offers restoring a purchase. */}
         <View style={styles.row}>
-          <Text style={styles.rowLabel}>Plan</Text>
+          <Text style={styles.rowLabel}>{t('settings.plan')}</Text>
           <View style={[styles.badge, styles.badgeGranted]}>
             <Text style={[styles.badgeText, styles.badgeTextGranted]}>{planLabel()}</Text>
           </View>
@@ -305,7 +320,7 @@ export default function SettingsScreen() {
           <>
             <View style={styles.separator} />
             <View style={styles.row}>
-              <Text style={styles.rowLabel}>Renews</Text>
+              <Text style={styles.rowLabel}>{t('settings.renews')}</Text>
               <Text style={styles.rowValue}>{formatDate(expirationDate)}</Text>
             </View>
           </>
@@ -315,34 +330,34 @@ export default function SettingsScreen() {
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           onPress={handleManageSubscription}
         >
-          <Text style={[styles.rowLabel, { color: Colors.primary }]}>Manage Subscription</Text>
+          <Text style={[styles.rowLabel, { color: Colors.primary }]}>{t('settings.manageSubscription')}</Text>
           <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
         </Pressable>
       </Glass>
 
       {/* Cloud Sync */}
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
-        <Text style={styles.sectionTitle}>Cloud Sync</Text>
+        <Text style={styles.sectionTitle}>{t('settings.cloudSync')}</Text>
         <View style={styles.row}>
           <View style={styles.rowContent}>
-            <Text style={styles.rowLabel}>Backed up</Text>
+            <Text style={styles.rowLabel}>{t('settings.backedUp')}</Text>
             <Text style={styles.rowDescription}>
-              Your trips live on this phone and in your account, so nothing is lost with the phone. Offline edits go up when you are back online.
+              {t('settings.backedUpDesc')}
             </Text>
           </View>
         </View>
         <View style={styles.separator} />
         <View style={styles.row}>
-          <Text style={styles.rowLabel}>Status</Text>
+          <Text style={styles.rowLabel}>{t('settings.status')}</Text>
           <Text style={styles.rowValue}>
-            {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'error' ? 'Waiting for a connection' : 'Up to date'}
+            {syncStatus === 'syncing' ? t('settings.syncing') : syncStatus === 'error' ? t('settings.waitingConnection') : t('settings.upToDate')}
           </Text>
         </View>
         {lastSynced && (
           <>
             <View style={styles.separator} />
             <View style={styles.row}>
-              <Text style={styles.rowLabel}>Last synced</Text>
+              <Text style={styles.rowLabel}>{t('settings.lastSynced')}</Text>
               <Text style={styles.rowValue}>{formatMoment(lastSynced)}</Text>
             </View>
           </>
@@ -357,17 +372,17 @@ export default function SettingsScreen() {
           disabled={syncStatus === 'syncing'}
         >
           <Text style={[styles.rowLabel, { color: Colors.primary, opacity: syncStatus === 'syncing' ? 0.5 : 1 }]}>
-            Sync Now
+            {t('settings.syncNow')}
           </Text>
         </Pressable>
       </Glass>
 
       {/* Location Tracking */}
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
-        <Text style={styles.sectionTitle}>Location Tracking</Text>
+        <Text style={styles.sectionTitle}>{t('settings.locationTracking')}</Text>
         <View style={styles.row}>
-          <Text style={styles.rowLabel}>Status</Text>
-          <StatusBadge granted={permissions.background} label={permissions.background ? 'Active' : 'Inactive'} />
+          <Text style={styles.rowLabel}>{t('settings.status')}</Text>
+          <StatusBadge granted={permissions.background} label={permissions.background ? t('settings.active') : t('settings.inactive')} />
         </View>
         <View style={styles.separator} />
         <Pressable
@@ -377,26 +392,26 @@ export default function SettingsScreen() {
             setTrackingSheetVisible(true);
           }}
         >
-          <Text style={styles.rowLabel}>How it works</Text>
+          <Text style={styles.rowLabel}>{t('settings.howItWorks')}</Text>
           <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
         </Pressable>
       </Glass>
 
       {/* Danger Zone */}
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
-        <Text style={styles.sectionTitle}>Danger Zone</Text>
+        <Text style={styles.sectionTitle}>{t('settings.dangerZone')}</Text>
         <Pressable
           disabled={isClearing}
           style={({ pressed }) => [styles.row, pressed && !isClearing && styles.rowPressed]}
           onPress={() => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             Alert.alert(
-              'Clear Travel Data',
-              'This deletes all trips and visits, on this device, in the cloud and on your other devices. Your planned trips stay. This cannot be undone.',
+              t('settings.clearDataTitle'),
+              t('settings.clearDataBody'),
               [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                  text: 'Clear Data',
+                  text: t('settings.clearData'),
                   style: 'destructive',
                   onPress: async () => {
                     setIsClearing(true);
@@ -404,10 +419,10 @@ export default function SettingsScreen() {
                       await clearAllTravelData(user?.uid ?? null);
                       if (user) startRealtimeSync(user.uid);
                       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                      showToast('Travel data cleared');
+                      showToast(t('settings.travelDataCleared'));
                     } catch (error: any) {
                       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-                      showToast(`Failed to clear: ${error?.message ?? error}`, 'error');
+                      showToast(t('settings.failedToClear', { error: error?.message ?? error }), 'error');
                     } finally {
                       setIsClearing(false);
                     }
@@ -418,7 +433,7 @@ export default function SettingsScreen() {
           }}
         >
           <Text style={[styles.rowLabel, styles.destructive, isClearing && styles.rowLabelMuted]}>
-            {isClearing ? 'Clearing…' : 'Clear Travel Data'}
+            {isClearing ? t('settings.clearing') : t('settings.clearDataTitle')}
           </Text>
           {isClearing && <ActivityIndicator size="small" color={Colors.error} />}
         </Pressable>
@@ -427,13 +442,13 @@ export default function SettingsScreen() {
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           onPress={handleDeleteAccount}
         >
-          <Text style={[styles.rowLabel, styles.destructive]}>Delete Account</Text>
+          <Text style={[styles.rowLabel, styles.destructive]}>{t('settings.deleteAccount')}</Text>
         </Pressable>
       </Glass>
 
       {/* About */}
       <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
-        <Text style={styles.sectionTitle}>About</Text>
+        <Text style={styles.sectionTitle}>{t('settings.about')}</Text>
         <Pressable
           style={styles.row}
           onPress={() => {
@@ -450,33 +465,33 @@ export default function SettingsScreen() {
             }
           }}
         >
-          <Text style={styles.rowLabel}>Version</Text>
+          <Text style={styles.rowLabel}>{t('settings.version')}</Text>
           <Text style={styles.rowValue}>{appVersion}</Text>
         </Pressable>
         <View style={styles.separator} />
         <View style={styles.row}>
-          <Text style={styles.rowLabel}>Storage</Text>
-          <Text style={styles.rowValue}>Local + Cloud</Text>
+          <Text style={styles.rowLabel}>{t('settings.storage')}</Text>
+          <Text style={styles.rowValue}>{t('settings.localCloud')}</Text>
         </View>
         <View style={styles.separator} />
         <Pressable style={styles.row} onPress={() => openLegal(PRIVACY_URL)} accessibilityRole="link">
-          <Text style={styles.rowLabel}>Privacy Policy</Text>
+          <Text style={styles.rowLabel}>{t('settings.privacyPolicy')}</Text>
           <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
         </Pressable>
         <View style={styles.separator} />
         <Pressable style={styles.row} onPress={() => openLegal(TERMS_URL)} accessibilityRole="link">
-          <Text style={styles.rowLabel}>Terms of Use</Text>
+          <Text style={styles.rowLabel}>{t('settings.termsOfUse')}</Text>
           <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
         </Pressable>
         <View style={styles.separator} />
         <Pressable style={styles.row} onPress={() => openLegal(IMPRINT_URL)} accessibilityRole="link">
-          <Text style={styles.rowLabel}>Legal Notice</Text>
+          <Text style={styles.rowLabel}>{t('settings.legalNotice')}</Text>
           <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
         </Pressable>
       </Glass>
 
       <Text style={styles.footer}>
-        Data is stored on this device and synced to your account.
+        {t('settings.footer')}
       </Text>
     </ScrollView>
 
@@ -484,52 +499,52 @@ export default function SettingsScreen() {
         inline
         visible={trackingSheetVisible}
         onClose={() => setTrackingSheetVisible(false)}
-        title="Location Tracking"
+        title={t('settings.locationTracking')}
         snapPoint={0.55}
       >
         <View style={styles.sheetContent}>
           <View style={styles.sheetItem}>
             <Ionicons name="battery-half-outline" size={22} color={Colors.primary} />
             <View style={styles.sheetItemText}>
-              <Text style={styles.sheetItemTitle}>Battery efficient</Text>
+              <Text style={styles.sheetItemTitle}>{t('settings.sheetBatteryTitle')}</Text>
               <Text style={styles.sheetItemDesc}>
-                Uses iOS Significant Location Changes, so it only wakes when you move to a new area.
+                {t('settings.sheetBatteryDesc')}
               </Text>
             </View>
           </View>
           <View style={styles.sheetItem}>
             <Ionicons name="time-outline" size={22} color={Colors.primary} />
             <View style={styles.sheetItemText}>
-              <Text style={styles.sheetItemTitle}>Background checks</Text>
+              <Text style={styles.sheetItemTitle}>{t('settings.sheetBgTitle')}</Text>
               <Text style={styles.sheetItemDesc}>
-                Your location is checked roughly every 6–12 hours in the background, only when you move.
+                {t('settings.sheetBgDesc')}
               </Text>
             </View>
           </View>
           <View style={styles.sheetItem}>
             <Ionicons name="phone-portrait-outline" size={22} color={Colors.primary} />
             <View style={styles.sheetItemText}>
-              <Text style={styles.sheetItemTitle}>Instant on open</Text>
+              <Text style={styles.sheetItemTitle}>{t('settings.sheetInstantTitle')}</Text>
               <Text style={styles.sheetItemDesc}>
-                When you open the app, your location is checked immediately so your trips are always up to date.
+                {t('settings.sheetInstantDesc')}
               </Text>
             </View>
           </View>
           <View style={styles.sheetItem}>
             <Ionicons name="navigate-outline" size={22} color={Colors.primary} />
             <View style={styles.sheetItemText}>
-              <Text style={styles.sheetItemTitle}>City-level only</Text>
+              <Text style={styles.sheetItemTitle}>{t('settings.sheetCityTitle')}</Text>
               <Text style={styles.sheetItemDesc}>
-                We only need to know which city and country you&apos;re in, not your exact position.
+                {t('settings.sheetCityDesc')}
               </Text>
             </View>
           </View>
           <View style={styles.sheetItem}>
             <Ionicons name="lock-closed-outline" size={22} color={Colors.primary} />
             <View style={styles.sheetItemText}>
-              <Text style={styles.sheetItemTitle}>Private by design</Text>
+              <Text style={styles.sheetItemTitle}>{t('settings.sheetPrivateTitle')}</Text>
               <Text style={styles.sheetItemDesc}>
-                Your trips are stored on this device and in your Nomadu account. Place names come from Apple Maps or OpenStreetMap, and screenshots you import are read by our AI service. Nothing is sold or used for advertising.
+                {t('settings.sheetPrivateDesc')}
               </Text>
             </View>
           </View>
@@ -540,10 +555,11 @@ export default function SettingsScreen() {
 }
 
 function StatusBadge({ granted, label }: { granted: boolean; label?: string }) {
+  const { t } = useTranslation();
   return (
     <View style={[styles.badge, granted ? styles.badgeGranted : styles.badgeDenied]}>
       <Text style={[styles.badgeText, granted ? styles.badgeTextGranted : styles.badgeTextDenied]}>
-        {label ?? (granted ? 'Granted' : 'Not Granted')}
+        {label ?? (granted ? t('settings.granted') : t('settings.notGranted'))}
       </Text>
     </View>
   );
@@ -653,6 +669,10 @@ const styles = StyleSheet.create({
   rowValue: {
     ...Typography.body,
     color: Colors.textSecondary,
+  },
+  emailValue: {
+    flexShrink: 1,
+    marginLeft: 16,
   },
   passportValue: {
     flexDirection: 'row',

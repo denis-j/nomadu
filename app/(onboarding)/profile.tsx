@@ -22,6 +22,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { LOCAL_ONBOARDING_UID } from '../../lib/onboarding';
 import { getProfile, setProfile, suggestedFaces } from '../../lib/profile';
 import { track } from '../../lib/analytics';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 /**
  * Onboarding step 1: a name and a face. A face is suggested straight away;
@@ -32,6 +33,7 @@ import { track } from '../../lib/analytics';
 export default function ProfileScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const uid = user?.uid ?? LOCAL_ONBOARDING_UID;
   const [name, setName] = useState('');
   // The first of the offered faces, already fetched on the welcome screen.
@@ -63,9 +65,9 @@ export default function ProfileScreen() {
           <KeyboardLift style={styles.flex}>
             <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
               <Animated.View entering={FadeIn.delay(TITLE_DELAY).duration(ENTER_DURATION)} style={styles.header}>
-                <Text style={styles.title}>{"Who's traveling?"}</Text>
+                <Text style={styles.title}>{t('onboarding.profile.title')}</Text>
                 <Text style={styles.subtitle}>
-                  {"Pick a face and tell us your name. It's how friends see you on a shared trip."}
+                  {t('onboarding.profile.subtitle')}
                 </Text>
               </Animated.View>
 
@@ -80,9 +82,9 @@ export default function ProfileScreen() {
                   style={[styles.cta, !canContinue && styles.ctaDisabled]}
                   innerStyle={styles.ctaInner}
                 >
-                  <Text style={styles.ctaText}>Continue</Text>
+                  <Text style={styles.ctaText}>{t('onboarding.profile.continue')}</Text>
                 </CloudyButton>
-                <Text style={styles.footerText}>You can change both later in Settings.</Text>
+                <Text style={styles.footerText}>{t('onboarding.profile.footer')}</Text>
               </Animated.View>
             </ScrollView>
           </KeyboardLift>

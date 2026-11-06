@@ -18,6 +18,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { getCitizenship, setCitizenship } from '../../../lib/onboarding';
 import { searchCountries, getCountryCode, getCountryNames, getPopularCountries } from '../../../utils/geography';
 import { Flag } from '../../../components/Flag';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const EXPANDED_WIDTH = SCREEN_WIDTH - 32;
@@ -26,6 +27,7 @@ const OPEN_CONFIG = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
 const CLOSE_CONFIG = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
 
 export default function PassportScreen() {
+  const { t, countryName } = useTranslation();
   const { user } = useAuth();
   const [query, setQuery] = useState('');
   const [currentCountry, setCurrentCountry] = useState<string | null>(null);
@@ -72,9 +74,16 @@ export default function PassportScreen() {
     const popularSet = new Set(popularList);
     return getCountryNames()
       .filter((c) => !popularSet.has(c))
-      .sort((a, b) => a.localeCompare(b));
+      .sort((a, b) => countryName(a).localeCompare(countryName(b)));
   })();
-  const searchResults = isSearching ? searchCountries(query) : [];
+  const searchResults = (() => {
+    if (!isSearching) return [];
+    const q = query.trim().toLowerCase();
+    const eng = searchCountries(query);
+    const seen = new Set(eng);
+    const de = getCountryNames().filter((c) => !seen.has(c) && countryName(c).toLowerCase().includes(q));
+    return [...eng, ...de];
+  })();
 
   const handleSelect = useCallback(async (countryName: string) => {
     if (!user) return;
@@ -134,8 +143,8 @@ export default function PassportScreen() {
           <View style={styles.currentSection}>
             {currentCode ? <Flag code={currentCode} size={32} /> : null}
             <View style={styles.currentInfo}>
-              <Text style={styles.currentLabel}>Current passport</Text>
-              <Text style={styles.currentCountry}>{currentCountry}</Text>
+              <Text style={styles.currentLabel}>{t('passport.currentPassport')}</Text>
+              <Text style={styles.currentCountry}>{countryName(currentCountry)}</Text>
             </View>
           </View>
         )}
@@ -152,12 +161,12 @@ export default function PassportScreen() {
               />
             ))}
             {searchResults.length === 0 && (
-              <Text style={styles.empty}>No countries found</Text>
+              <Text style={styles.empty}>{t('passport.noResults')}</Text>
             )}
           </>
         ) : (
           <>
-            <Text style={styles.sectionLabel}>Popular</Text>
+            <Text style={styles.sectionLabel}>{t('passport.popular')}</Text>
             {popularList.map((name, i) => (
               <CountryRow
                 key={`p-${name}-${i}`}
@@ -166,7 +175,7 @@ export default function PassportScreen() {
                 onPress={() => handleSelect(name)}
               />
             ))}
-            <Text style={styles.sectionLabel}>All countries</Text>
+            <Text style={styles.sectionLabel}>{t('passport.allCountries')}</Text>
             {allCountriesSorted.map((name, i) => (
               <CountryRow
                 key={`a-${name}-${i}`}
@@ -208,7 +217,7 @@ export default function PassportScreen() {
               }}
             >
               <Ionicons name="search" size={16} color={Colors.textSecondary} />
-              <Text style={styles.chipText}>Search countries</Text>
+              <Text style={styles.chipText}>{t('passport.searchCountries')}</Text>
             </View>
 
             {/* Expanded input */}
@@ -224,7 +233,7 @@ export default function PassportScreen() {
                 <TextInput
                   ref={inputRef}
                   style={styles.searchInput}
-                  placeholder="Type a country name…"
+                  placeholder={t('passport.searchPlaceholder')}
                   placeholderTextColor={Colors.textTertiary}
                   value={query}
                   onChangeText={setQuery}
@@ -233,7 +242,7 @@ export default function PassportScreen() {
                   returnKeyType="search"
                 />
                 {query.length > 0 && (
-                  <Pressable onPress={() => { setQuery(''); inputRef.current?.focus(); }} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
+                  <Pressable onPress={() => { setQuery(''); inputRef.current?.focus(); }} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('passport.clearSearch')}>
                     <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
                   </Pressable>
                 )}
@@ -368,6 +377,7 @@ function CountryRow({
   isSelected: boolean;
   onPress: () => void;
 }) {
+  const { countryName } = useTranslation();
   const code = getCountryCode(name);
   return (
     <Pressable
@@ -375,7 +385,7 @@ function CountryRow({
       onPress={onPress}
     >
       <Flag code={code} size={22} />
-      <Text style={styles.itemText}>{name}</Text>
+      <Text style={styles.itemText}>{countryName(name)}</Text>
       {isSelected && (
         <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
       )}

@@ -10,11 +10,12 @@ import { showToast } from '../../../lib/toast';
 import { Colors, systemColor } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { track } from '../../../lib/analytics';
-
-const SUGGESTIONS = ['Thailand 2026', 'Summer Vacation', 'City Break', 'Road Trip', 'Beach Holiday'];
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 /** A trip starts with a name: one field in the app's card, a few names to tap as a start. */
 export default function CreateJourneyScreen() {
+  const { t } = useTranslation();
+  const SUGGESTIONS = [t('plans.sugg1'), t('plans.sugg2'), t('plans.sugg3'), t('plans.sugg4'), t('plans.sugg5')];
   const router = useRouter();
   const inputRef = useRef<TextInput>(null);
   const [title, setTitle] = useState('');
@@ -32,7 +33,7 @@ export default function CreateJourneyScreen() {
       // One navigation update: the sheet goes, the trip comes. Dismissing and
       // pushing on a timer raced the sheet's dismissal and crashed the stack.
       router.replace(`/(tabs)/(plans)/${id}` as any);
-      showToast('Journey created');
+      showToast(t('plans.createToast'));
     } catch (err) {
       console.error('Failed to create journey:', err);
       setSaving(false);
@@ -44,7 +45,7 @@ export default function CreateJourneyScreen() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <Pressable onPress={handleCreate} disabled={!canSave} hitSlop={8} style={{ opacity: canSave ? 1 : 0.3 }} accessibilityRole="button" accessibilityLabel="Create trip">
+            <Pressable onPress={handleCreate} disabled={!canSave} hitSlop={8} style={{ opacity: canSave ? 1 : 0.3 }} accessibilityRole="button" accessibilityLabel={t('plans.createTrip')}>
               <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
             </Pressable>
           ),
@@ -58,7 +59,7 @@ export default function CreateJourneyScreen() {
               style={styles.input}
               value={title}
               onChangeText={setTitle}
-              placeholder="Name your trip"
+              placeholder={t('plans.nameYourTrip')}
               placeholderTextColor={Colors.textTertiary}
               autoFocus
               returnKeyType="done"

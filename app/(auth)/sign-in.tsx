@@ -24,6 +24,7 @@ import { Typography } from '../../constants/typography';
 import { googleSignInAvailable, useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { signInWithEmail, signInWithApple } from '../../lib/auth';
 import { showToast } from '../../lib/toast';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const LOGO_SIZE = 130;
 
@@ -46,6 +47,7 @@ const gradientColorSets = [
 ];
 
 export default function SignInScreen() {
+  const { t } = useTranslation();
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
@@ -56,14 +58,14 @@ export default function SignInScreen() {
 
   const handleSignIn = async () => {
     if (!email || !password) {
-      showToast('Please enter your email and password.', 'error');
+      showToast(t('auth.enterBoth'), 'error');
       return;
     }
     setLoading(true);
     try {
       await signInWithEmail(email.trim(), password);
     } catch (e: any) {
-      showToast(e.message ?? 'Something went wrong.', 'error');
+      showToast(e.message ?? t('auth.somethingWrong'), 'error');
     } finally {
       setLoading(false);
     }
@@ -74,7 +76,7 @@ export default function SignInScreen() {
     try {
       await signInWithApple();
     } catch (e: any) {
-      if (e.code !== 'ERR_REQUEST_CANCELED') showToast(e.message ?? 'Apple sign in failed.', 'error');
+      if (e.code !== 'ERR_REQUEST_CANCELED') showToast(e.message ?? t('auth.appleFailed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -85,7 +87,7 @@ export default function SignInScreen() {
     try {
       await googleSignIn();
     } catch (e: any) {
-      if (!e.message?.includes('cancelled')) showToast(e.message ?? 'Google sign in failed.', 'error');
+      if (!e.message?.includes('cancelled')) showToast(e.message ?? t('auth.googleFailed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -109,8 +111,8 @@ export default function SignInScreen() {
             >
               {/* The logo in 3D: one quick turn on arrival, then it turns under a finger. */}
               <LogoModel3D size={LOGO_SIZE} motion="intro" style={styles.appIcon} />
-              <Text style={styles.title}>Welcome home</Text>
-              <Text style={styles.subtitle}>Sign in to continue your journey</Text>
+              <Text style={styles.title}>{t('auth.signInTitle')}</Text>
+              <Text style={styles.subtitle}>{t('auth.signInSubtitle')}</Text>
             </Animated.View>
 
             {/* Form */}
@@ -125,7 +127,7 @@ export default function SignInScreen() {
                     style={styles.input}
                     value={email}
                     onChangeText={setEmail}
-                    placeholder="Email"
+                    placeholder={t('auth.email')}
                     placeholderTextColor={Colors.textTertiary}
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -143,7 +145,7 @@ export default function SignInScreen() {
                     style={[styles.input, styles.inputFlex]}
                     value={password}
                     onChangeText={setPassword}
-                    placeholder="Password"
+                    placeholder={t('auth.password')}
                     placeholderTextColor={Colors.textTertiary}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
@@ -155,7 +157,7 @@ export default function SignInScreen() {
                   />
                   <Link href="/(auth)/forgot-password" asChild>
                     <TouchableOpacity hitSlop={8}>
-                      <Text style={styles.forgotInline}>Forgot?</Text>
+                      <Text style={styles.forgotInline}>{t('auth.forgot')}</Text>
                     </TouchableOpacity>
                   </Link>
                   <TouchableOpacity
@@ -163,7 +165,7 @@ export default function SignInScreen() {
                     hitSlop={10}
                     style={styles.eyeBtn}
                     accessibilityRole="button"
-                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                    accessibilityLabel={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                   >
                     <Ionicons
                       name={showPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -183,15 +185,15 @@ export default function SignInScreen() {
                 {loading ? (
                   <ActivityIndicator color={Colors.text} />
                 ) : (
-                  <Text style={styles.continueButtonText}>Login</Text>
+                  <Text style={styles.continueButtonText}>{t('auth.login')}</Text>
                 )}
               </CloudyButton>
 
               <View style={styles.signUpRow}>
-                <Text style={styles.signUpText}>Don&rsquo;t have an account? </Text>
+                <Text style={styles.signUpText}>{t('auth.noAccount')}</Text>
                 <Link href="/(auth)/sign-up" asChild>
                   <TouchableOpacity hitSlop={6}>
-                    <Text style={styles.signUpLink}>Sign up</Text>
+                    <Text style={styles.signUpLink}>{t('auth.signUp')}</Text>
                   </TouchableOpacity>
                 </Link>
               </View>
@@ -206,7 +208,7 @@ export default function SignInScreen() {
               {(Platform.OS === 'ios' || googleSignInAvailable) && (
                 <View style={styles.orRow}>
                   <View style={styles.orLine} />
-                  <Text style={styles.orText}>or continue with</Text>
+                  <Text style={styles.orText}>{t('auth.orContinue')}</Text>
                   <View style={styles.orLine} />
                 </View>
               )}
@@ -216,7 +218,7 @@ export default function SignInScreen() {
                   <TouchableOpacity onPress={handleAppleSignIn} disabled={loading} activeOpacity={0.85}>
                     <Glass {...glassProps} style={[styles.socialButton, !hasGlass && styles.socialButtonFallback]}>
                       <Ionicons name="logo-apple" size={20} color={Colors.text} />
-                      <Text style={styles.socialButtonText}>Continue with Apple</Text>
+                      <Text style={styles.socialButtonText}>{t('auth.continueApple')}</Text>
                     </Glass>
                   </TouchableOpacity>
                 )}
@@ -225,7 +227,7 @@ export default function SignInScreen() {
                   <TouchableOpacity onPress={handleGoogleSignIn} disabled={loading} activeOpacity={0.85}>
                     <Glass {...glassProps} style={[styles.socialButton, !hasGlass && styles.socialButtonFallback]}>
                       <Ionicons name="logo-google" size={20} color="#EA4335" />
-                      <Text style={styles.socialButtonText}>Continue with Google</Text>
+                      <Text style={styles.socialButtonText}>{t('auth.continueGoogle')}</Text>
                     </Glass>
                   </TouchableOpacity>
                 )}

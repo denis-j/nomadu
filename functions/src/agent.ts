@@ -35,6 +35,8 @@ import {
   tombstonePlansForStops,
   type AccommodationSummary,
 } from './accommodation';
+import { tombstoneActivitiesForJourney, handleActivityRoute } from './activities';
+import { tombstoneExpensesForJourney, handleExpenseRoute } from './expenses';
 import { ApiError, send, type Caller } from './api';
 import { TRANSPORTS, docsHtml, openapi } from './openapi';
 
@@ -287,7 +289,8 @@ function publicJourney(id: string, x: FirebaseFirestore.DocumentData, accommodat
       notes: l.notes ?? null,
       accommodation: accommodations.get(l.sync_id) ?? null,
     })),
-    travellers: (Array.isArray(x.travellers) ? x.travellers : []).map((t: any) => t.name),
+    // With their ids: an expense names who paid and who shares by them.
+    travellers: (Array.isArray(x.travellers) ? x.travellers : []).map((t: any) => ({ id: String(t?.sync_id ?? ''), name: String(t?.name ?? '') })),
   };
 }
 
@@ -472,6 +475,25 @@ async function handle(req: Request, res: Response): Promise<void> {
     await handleAccommodationRoute(caller, req, res, id, deeper[1], deeper.slice(3));
     return;
   }
+  // Activities: /journeys/{id}/activities[/{activityId}], and creating one
+  // straight onto a stop at /journeys/{id}/stops/{stopId}/activities.
+  if (resource === 'journeys' && id && deeper[0] === 'activities' && deeper.length <= 2) {
+    await handleActivityRoute(caller, req, res, id, null, deeper.slice(1));
+    return;
+  }
+  if (resource === 'journeys' && id && deeper[0] === 'stops' && deeper[1] && deeper[2] === 'activities' && deeper.length === 3) {
+    await handleActivityRoute(caller, req, res, id, deeper[1], []);
+    return;
+  }
+  // Expenses, the same two ways in.
+  if (resource === 'journeys' && id && deeper[0] === 'expenses' && deeper.length <= 2) {
+    await handleExpenseRoute(caller, req, res, id, null, deeper.slice(1));
+    return;
+  }
+  if (resource === 'journeys' && id && deeper[0] === 'stops' && deeper[1] && deeper[2] === 'expenses' && deeper.length === 3) {
+    await handleExpenseRoute(caller, req, res, id, deeper[1], []);
+    return;
+  }
   if (req.method === 'GET' && resource === 'accommodations' && !id) {
     await listAccommodations(caller, req, res);
     return;
@@ -630,6 +652,8 @@ async function handle(req: Request, res: Response): Promise<void> {
       if (!snap.exists) throw new ApiError(404, 'not-found', 'No such journey.');
       await ref.update({ deleted: true, updated_at: Timestamp.now(), synced_at: FieldValue.serverTimestamp() });
       await tombstonePlansForJourney(uid, id);
+      await tombstoneActivitiesForJourney(uid, id);
+      await tombstoneExpensesForJourney(uid, id);
       send(res, 200, { ok: true });
       return;
     }

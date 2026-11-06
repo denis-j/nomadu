@@ -8,6 +8,7 @@ import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { getBadgeInfo, markBadgeUnlocked } from '../lib/badges';
 import { playCollectSound } from '../lib/sound';
+import { useTranslation } from '../contexts/LanguageContext';
 
 const BLACK_BG = '#000000';
 
@@ -32,6 +33,7 @@ interface BadgeUnlockOverlayProps {
  * RNScreens form-sheet detent issue when transitioning from the create flow.
  */
 export function BadgeUnlockOverlay({ countryCode, onClose }: BadgeUnlockOverlayProps) {
+  const { t } = useTranslation();
   const info = getBadgeInfo(countryCode);
 
   useEffect(() => {
@@ -63,7 +65,7 @@ export function BadgeUnlockOverlay({ countryCode, onClose }: BadgeUnlockOverlayP
 
         <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
           <View pointerEvents="none" style={styles.topBlock}>
-            <Text style={styles.eyebrow}>Reward</Text>
+            <Text style={styles.eyebrow}>{t('badge.reward')}</Text>
             <Text style={styles.title}>{info.name}</Text>
             <View style={styles.metaRow}>
               <Text style={styles.metaText}>Earned on: {formatTodayShort()}</Text>
@@ -74,7 +76,7 @@ export function BadgeUnlockOverlay({ countryCode, onClose }: BadgeUnlockOverlayP
             <CloudyButton onPress={handleCollect} haptic={Haptics.ImpactFeedbackStyle.Medium}>
               <View style={styles.ctaContent}>
                 <Ionicons name="sparkles" size={20} color={Colors.cloudyButtonText} />
-                <Text style={styles.ctaText}>Collect</Text>
+                <Text style={styles.ctaText}>{t('badge.collect')}</Text>
               </View>
             </CloudyButton>
           </View>

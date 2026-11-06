@@ -26,12 +26,14 @@ import { Flag } from '../../../components/Flag';
 import { YearPicker } from '../../../components/YearPicker';
 import type { YearFilter } from '../../../lib/yearFilter';
 import type { Stats } from '../../../lib/database';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 export default function StatsScreen() {
+  const { t, countryName } = useTranslation();
   const [yearFilter, setYearFilter] = useState<YearFilter>(new Date().getFullYear());
   const { stats, loading, refresh: refreshStats, home } = useStats(yearFilter);
   const { visaStatuses, loading: visaLoading, refresh: refreshVisa } = useVisaTracker();
@@ -75,9 +77,9 @@ export default function StatsScreen() {
     return (
       <View style={styles.emptyContainer}>
         <StatsBars key={focusKey} size={80} variant="burstWobble" />
-        <Text style={styles.emptyTitle}>No stats yet</Text>
+        <Text style={styles.emptyTitle}>{t('stats.noStatsTitle')}</Text>
         <Text style={styles.emptySubtitle}>
-          Once you start tracking,{'\n'}your countries, cities and days will show up here.
+          {t('stats.noStatsSubtitle')}
         </Text>
       </View>
     );
@@ -102,9 +104,9 @@ export default function StatsScreen() {
           the gap is days with no recorded location, not days spent at home. */}
       {yearFilter !== null && stats.daysInWindow > 0 && (
         <Text style={styles.coverage}>
-          {stats.daysTracked} of {stats.daysInWindow} days tracked
+          {t('stats.daysTrackedLine', { tracked: stats.daysTracked, total: stats.daysInWindow })}
           {stats.daysTracked < stats.daysInWindow
-            ? ` · ${stats.daysInWindow - stats.daysTracked} with no location`
+            ? t('stats.withNoLocation', { count: stats.daysInWindow - stats.daysTracked })
             : ''}
         </Text>
       )}
@@ -113,14 +115,14 @@ export default function StatsScreen() {
       <View style={styles.miniRow}>
         <MiniStatCard
           value={stats.totalCountries}
-          label="Countries"
+          label={t('stats.countries')}
           icon="earth"
           accentColor={Colors.textSecondary}
-          sublabel={stats.newCountries > 0 ? `${stats.newCountries} new` : undefined}
+          sublabel={stats.newCountries > 0 ? t('stats.newCount', { count: stats.newCountries }) : undefined}
         />
         <MiniStatCard
           value={stats.totalCities}
-          label="Cities"
+          label={t('stats.cities')}
           icon="location"
           accentColor={Colors.accent}
         />
@@ -128,13 +130,13 @@ export default function StatsScreen() {
       <View style={styles.miniRow}>
         <MiniStatCard
           value={stats.stops}
-          label="Stops"
+          label={t('stats.stops')}
           icon="footsteps"
           accentColor={Colors.textSecondary}
         />
         <MiniStatCard
           value={stats.avgStayDays ? `${stats.avgStayDays}d` : '0d'}
-          label="Average stay"
+          label={t('stats.averageStay')}
           icon="time"
           accentColor={Colors.accent}
         />
@@ -142,15 +144,15 @@ export default function StatsScreen() {
 
       {/* Active tracking: Visa + Tax side-by-side, always 2-col */}
       <View style={styles.countriesSection}>
-        <Text style={styles.sectionTitle}>Active tracking</Text>
+        <Text style={styles.sectionTitle}>{t('stats.activeTracking')}</Text>
         <View style={styles.trackerRow}>
           {mostCritical ? (
             <TrackerCard
               accentColor={Colors.cloudyBlue}
-              title="Visa"
+              title={t('stats.visa')}
               count={activeVisas.length}
               code={mostCritical.destinationCode}
-              country={mostCritical.destination}
+              country={countryName(mostCritical.destination)}
               daysLeft={mostCritical.daysRemaining}
               total={mostCritical.daysAllowed}
               onPress={() => {
@@ -161,7 +163,7 @@ export default function StatsScreen() {
           ) : (
             <EmptyTrackerCard
               accentColor={Colors.cloudyBlue}
-              title="Visa"
+              title={t('stats.visa')}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push('/(tabs)/(stats)/visa');
@@ -171,10 +173,10 @@ export default function StatsScreen() {
           {mostCriticalTax ? (
             <TrackerCard
               accentColor={Colors.accent}
-              title="Tax"
+              title={t('stats.tax')}
               count={taxStatuses.length}
               code={mostCriticalTax.countryCode}
-              country={mostCriticalTax.country}
+              country={countryName(mostCriticalTax.country)}
               daysLeft={mostCriticalTax.daysRemaining}
               total={mostCriticalTax.thresholdDays}
               onPress={() => {
@@ -185,7 +187,7 @@ export default function StatsScreen() {
           ) : (
             <EmptyTrackerCard
               accentColor={Colors.accent}
-              title="Tax"
+              title={t('stats.tax')}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push('/(tabs)/(stats)/tax');
@@ -206,7 +208,7 @@ export default function StatsScreen() {
       {/* Top destinations, horizontal scroll */}
       {stats.topCountries.length > 0 && (
         <View style={styles.topDestSection}>
-          <Text style={[styles.sectionTitle, { paddingLeft: 0 }]}>Top destinations</Text>
+          <Text style={[styles.sectionTitle, { paddingLeft: 0 }]}>{t('stats.topDestinations')}</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -217,7 +219,7 @@ export default function StatsScreen() {
                 key={country.country_code + index}
                 rank={index + 1}
                 code={country.country_code}
-                country={country.country}
+                country={countryName(country.country)}
                 days={country.days}
               />
             ))}
@@ -268,6 +270,7 @@ function StatsHero({
   yearFilter: YearFilter;
   home: { code: string; country: string } | null;
 }) {
+  const { t, countryName } = useTranslation();
   const [size, setSize] = useState({ w: 0, h: 0 });
   const isYearMode = yearFilter !== null;
 
@@ -276,8 +279,8 @@ function StatsHero({
   // number that separates someone who travelled from someone who didn't.
   const value = isYearMode ? stats.daysAway : stats.totalCountries;
   const unit = isYearMode
-    ? `${stats.daysAway === 1 ? 'day' : 'days'} away${home ? ` from ${home.country}` : ''}`
-    : `${stats.totalCountries === 1 ? 'country' : 'countries'} visited`;
+    ? `${t(stats.daysAway === 1 ? 'stats.dayAway' : 'stats.daysAway')}${home ? t('stats.awayFrom', { country: countryName(home.country) }) : ''}`
+    : t(stats.totalCountries === 1 ? 'stats.countryVisited' : 'stats.countriesVisited');
 
   const pct = isYearMode
     ? (stats.daysInWindow > 0 ? Math.min(100, (stats.daysAway / stats.daysInWindow) * 100) : 0)
@@ -285,7 +288,7 @@ function StatsHero({
   // One word. The denominator (the days elapsed) is already on screen in the
   // coverage line right under the card; repeating it inside a 72px ring
   // squeezed three words into eight-point type.
-  const ringSub = isYearMode ? 'away' : 'of world';
+  const ringSub = isYearMode ? t('stats.ringAway') : t('stats.ringOfWorld');
   const dashOffset = RING_CIRCUMFERENCE * (1 - pct / 100);
 
   return (
@@ -299,7 +302,7 @@ function StatsHero({
       <CloudBackdrop width={size.w} height={size.h} patches={HERO_PATCHES} blur={7} />
       <View style={heroStyles.row}>
         <View style={heroStyles.textBlock}>
-          <Text style={heroStyles.eyebrow}>{isYearMode ? `${yearFilter}` : 'All time'}</Text>
+          <Text style={heroStyles.eyebrow}>{isYearMode ? `${yearFilter}` : t('stats.allTime')}</Text>
           <Text style={heroStyles.value}>{value}</Text>
           <Text style={heroStyles.unit}>{unit}</Text>
         </View>
@@ -501,6 +504,7 @@ function TrackerCard({
   total: number;
   onPress: () => void;
 }) {
+  const { t } = useTranslation();
   // Progress shows "how much of the allowance is LEFT", so a fresh start
   // (daysLeft == total) is a full bar, and approaching zero drains it.
   const pct = total > 0 ? Math.max(0, Math.min(100, (daysLeft / total) * 100)) : 0;
@@ -538,7 +542,7 @@ function TrackerCard({
               {daysLeft}
             </Text>
             {/* Days left, so say so: "109 / 183 days" read as 109 used. */}
-            <Text style={trackerStyles.unit}>of {total} left</Text>
+            <Text style={trackerStyles.unit}>{t('stats.ofLeft', { total })}</Text>
           </View>
           <View style={trackerStyles.progressTrack}>
             <View
@@ -569,6 +573,7 @@ function EmptyTrackerCard({
   title: string;
   onPress: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Pressable
       onPress={onPress}
@@ -581,12 +586,12 @@ function EmptyTrackerCard({
         <View style={trackerStyles.headerBlock}>
           <Text style={trackerStyles.title}>{title}</Text>
           <Text style={trackerStyles.country} numberOfLines={1}>
-            Not tracking
+            {t('stats.notTracking')}
           </Text>
         </View>
 
         <View style={trackerStyles.emptyCta}>
-          <Text style={[trackerStyles.emptyCtaText, { color: accentColor }]}>Set up</Text>
+          <Text style={[trackerStyles.emptyCtaText, { color: accentColor }]}>{t('stats.setUp')}</Text>
           <Ionicons name="chevron-forward" size={13} color={accentColor} />
         </View>
       </Glass>
@@ -703,6 +708,7 @@ const trackerStyles = StyleSheet.create({
 const MONTH_LABELS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
 function MonthlyChart({ days, year }: { days: number[]; year: number }) {
+  const { t } = useTranslation();
   const max = Math.max(...days);
   const total = days.reduce((sum, d) => sum + d, 0);
   const currentMonth = new Date().getMonth();
@@ -716,10 +722,10 @@ function MonthlyChart({ days, year }: { days: number[]; year: number }) {
       style={[chartStyles.card, !hasGlass && chartStyles.cardFallback]}
     >
       <View style={chartStyles.header}>
-        <Text style={chartStyles.eyebrow}>Days away by month</Text>
+        <Text style={chartStyles.eyebrow}>{t('stats.daysAwayByMonth')}</Text>
         <Text style={chartStyles.totalValue}>
           {total}
-          <Text style={chartStyles.totalUnit}> total</Text>
+          <Text style={chartStyles.totalUnit}>{t('stats.total')}</Text>
         </Text>
       </View>
 
@@ -970,6 +976,7 @@ const topStyles = StyleSheet.create({
 // ─── Badges section ─────────────────────────────────────────────────────────
 
 function BadgesSection({ visitedCodes }: { visitedCodes: Set<string> }) {
+  const { t } = useTranslation();
   const earned = BADGE_LIBRARY.filter((b) => visitedCodes.has(b.code));
   return (
     <View style={badgeStyles.section}>
@@ -980,11 +987,11 @@ function BadgesSection({ visitedCodes }: { visitedCodes: Set<string> }) {
         }}
         style={({ pressed }) => [badgeStyles.sectionHeader, pressed && { opacity: 0.6 }]}
       >
-        <Text style={badgeStyles.sectionTitle}>Badges</Text>
+        <Text style={badgeStyles.sectionTitle}>{t('stats.badges')}</Text>
         <View style={badgeStyles.progressLink}>
           <Text style={badgeStyles.progressValue}>{earned.length}</Text>
           <Text style={badgeStyles.progressTotal}>
-            / {BADGE_LIBRARY.length} collected
+            / {t('stats.collected', { total: BADGE_LIBRARY.length })}
           </Text>
           <Ionicons name="chevron-forward" size={14} color={Colors.textTertiary} />
         </View>

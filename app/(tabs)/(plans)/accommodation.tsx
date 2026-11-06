@@ -1,59 +1,47 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Alert, LayoutAnimation, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, LayoutAnimation, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
-import { Card } from '../../../components/visaForm';
+import { PlaceMap } from '../../../components/activities/PlaceMap';
 import { Dropdown } from '../../../components/Dropdown';
 import { Flag } from '../../../components/Flag';
 import { MissingRoute } from '../../../components/MissingRoute';
-import {
-  MoneyRow,
-  StatusBadge,
-  TextArea,
-  TextRow,
-  amountText,
-  describeRequirements,
-  parseAmount,
-  parseRating,
-  ratingText,
-} from '../../../components/accommodationForm';
+import { DetailCard, DetailNotes, DetailRow, DetailSeparator, LinkCard, SectionControl, SectionHead, SlotCard, StatusChip } from '../../../components/SheetRows';
+import { StatRow, StatTile } from '../../../components/StatTile';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { useAccommodation } from '../../../hooks/useAccommodations';
 import {
-  addAccommodationOption,
   deleteAccommodation,
-  removeAccommodationOption,
-  saveAccommodationBooking,
-  selectAccommodationOption,
-  setAccommodationNotes,
   setAccommodationStatus,
   startAccommodation,
   updateAccommodation,
-  updateAccommodationOption,
   type LocalAccommodation,
 } from '../../../lib/accommodations';
 import {
-  TYPE_LABELS,
-  amenityLabel,
+  STATUS_LABELS,
   createPlan,
   defaultStay,
   formatMoney,
   nightsBetween,
   optionNightlyPrice,
+  primaryOption,
   sortOptions,
   staysMatchStop,
   type AccommodationOption,
   type AccommodationPlan,
+  type AccommodationRequirements,
   type AccommodationStatus,
 } from '../../../lib/accommodationModel';
-import { currencyForCountry } from '../../../lib/currencies';
 import { parseDate } from '../../../lib/database';
 import { toYmd } from '../../../lib/days';
+import { cityCoords, forwardGeocode } from '../../../lib/geocoding';
 import { showToast } from '../../../lib/toast';
-import { track } from '../../../lib/analytics';
+import { useTranslation } from '../../../contexts/LanguageContext';
+
+type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
 type Params = {
   stopSyncId: string;
@@ -69,24 +57,16 @@ type Params = {
 
 type SortKey = 'score' | 'price' | 'rating';
 
+/** The status in a third of the width: the two long names shortened, the rest as they are. */
+
 /** Every write on this page: run it, keep the result, say when it failed. */
 type Apply = (work: () => Promise<LocalAccommodation>, toast?: string) => Promise<void>;
 
-const fmtShort = (ymd: string) => parseDate(ymd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const hasGlass = isLiquidGlassAvailable();
+const GlassCard = hasGlass ? GlassView : View;
+const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
-/** What a person can still say about the status that the plan's data does not already: arrived, stayed, called off, or back on. */
-function statusChoices(plan: AccommodationPlan): { label: string; status: AccommodationStatus; icon: string }[] {
-  const st = plan.status;
-  if (st === 'cancelled') {
-    const back: AccommodationStatus = plan.booking ? 'booked' : plan.selected_option_id ? 'selected' : plan.options.length ? 'options_available' : 'open';
-    return [{ label: 'Plan this stay again', status: back, icon: 'arrow.uturn.backward' }];
-  }
-  const out: { label: string; status: AccommodationStatus; icon: string }[] = [];
-  if (st === 'booked') out.push({ label: 'Checked in', status: 'checked_in', icon: 'key' });
-  if (st === 'booked' || st === 'checked_in') out.push({ label: 'Stayed', status: 'completed', icon: 'checkmark.circle' });
-  if (st !== 'completed') out.push({ label: 'Cancel this stay', status: 'cancelled', icon: 'xmark.circle' });
-  return out;
-}
+const fmtShort = (ymd: string) => parseDate(ymd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 /** "Nov 10 – 13" inside a month, "Nov 28 – Dec 2" across one, as on the itinerary. */
 function fmtRange(start: string, end: string): string {
@@ -96,18 +76,114 @@ function fmtRange(start: string, end: string): string {
   return `${fmtShort(start)} – ${fmtShort(end)}`;
 }
 
+/** What a person can still say about the status that the plan's data does not already: arrived, stayed, called off, or back on. */
+function statusChoices(plan: AccommodationPlan, t: TFunc): { label: string; status: AccommodationStatus; icon: string }[] {
+  const st = plan.status;
+  if (st === 'cancelled') {
+    const back: AccommodationStatus = plan.booking ? 'booked' : plan.selected_option_id ? 'selected' : plan.options.length ? 'options_available' : 'open';
+    return [{ label: t('accommodation.planAgain'), status: back, icon: 'arrow.uturn.backward' }];
+  }
+  const out: { label: string; status: AccommodationStatus; icon: string }[] = [];
+  if (st === 'booked') out.push({ label: t('accommodation.checkedIn'), status: 'checked_in', icon: 'key' });
+  if (st === 'booked' || st === 'checked_in') out.push({ label: t('accommodation.stayed'), status: 'completed', icon: 'checkmark.circle' });
+  if (st !== 'completed') out.push({ label: t('accommodation.cancelStay'), status: 'cancelled', icon: 'xmark.circle' });
+  return out;
+}
+
+/** "Airbnb · 85 EUR/night · ★ 4.8": the grey line under a place's name. */
+function optionLine(o: AccommodationOption, t: TFunc): string {
+  const nightly = optionNightlyPrice(o);
+  return [
+    o.platform,
+    nightly !== null && o.currency ? `${formatMoney(nightly, o.currency)}${t('accommodation.perNightUnit')}` : null,
+    o.rating !== null ? `★ ${o.rating}${o.rating_scale === 10 ? '/10' : ''}` : null,
+  ].filter(Boolean).join(' · ');
+}
+
+/** What was asked for, in two or three lines: the head line, then one line each for the rest. */
+function describeRequirements(req: AccommodationRequirements, t: TFunc): string[] {
+  const head = [
+    req.type ? t(`accType.${req.type}`) : null,
+    req.budget_per_night !== null && req.currency ? t('accommodation.upToNight', { amount: formatMoney(req.budget_per_night, req.currency)! }) : req.budget_total !== null && req.currency ? t('accommodation.upToTotal', { amount: formatMoney(req.budget_total, req.currency)! }) : null,
+    req.areas.length ? t('accommodation.inAreas', { areas: req.areas.join(', ') }) : null,
+  ].filter(Boolean).join(' · ');
+  return [
+    head,
+    req.amenities.length ? req.amenities.map((a) => t(`amenities.${a}`)).join(', ') : null,
+    req.work_requirements ? t('accommodation.forWork', { text: req.work_requirements }) : null,
+    req.min_requirements ? t('accommodation.mustHave', { text: req.min_requirements }) : null,
+    req.dates_flexible ? t('accommodation.datesFlexible') : null,
+    req.notes,
+  ].filter((x): x is string => !!x);
+}
+
+function mapsUrl(address: string): string {
+  const q = encodeURIComponent(address);
+  return Platform.OS === 'ios' ? `http://maps.apple.com/?q=${q}` : `geo:0,0?q=${q}`;
+}
+
 const animate = () => LayoutAnimation.configureNext(LayoutAnimation.create(220, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
 
-const hasGlass = isLiquidGlassAvailable();
-const Glass = hasGlass ? GlassView : View;
-const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
+// ─── Where the place is ──────────────────────────────────────────────────────
+
+type Point = { latitude: number; longitude: number };
+/** A street or two around a place; a city and its surroundings around a stop, as on the stop's sheet. */
+const PLACE_SPAN = 0.012;
+const CITY_SPAN = 0.4;
+/** Closer than this to the city's own point, a result is the city, not the place. */
+const CITY_CENTRE_M = 400;
+
+/** Answers kept for the session: the geocoder is rate-limited and an address does not move. */
+const points = new Map<string, Point | null>();
+
+function metres(a: Point, b: Point): number {
+  const rad = Math.PI / 180;
+  const dLat = (b.latitude - a.latitude) * rad;
+  const dLng = (b.longitude - a.longitude) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.latitude * rad) * Math.cos(b.latitude * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(h));
+}
 
 /**
- * Where to stay at one stop, on one page, drawn like the itinerary it
- * belongs to: the stop's own card on top, then the stay in the order
- * things happen, each part under a plain heading like the wallet's. Looking
- * for, options, booking, notes. Nothing opens a second screen; a field is
- * edited where it is shown and saved when it is left.
+ * The point for the map on top: the place's address where there is one and
+ * the geocoder knows it, else the city. A result that is just the middle of
+ * the city means the street was not known, and the city view is the honest
+ * picture then.
+ */
+function useHeroPoint(address: string | null, city: string, country: string, countryCode: string): { point: Point; span: number } | null {
+  const [hero, setHero] = useState<{ point: Point; span: number } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const cityKey = `city:${city}|${countryCode}`;
+      const cityPoint = points.has(cityKey) ? points.get(cityKey)! : await cityCoords(city, country, countryCode);
+      points.set(cityKey, cityPoint);
+      let place: Point | null = null;
+      if (address) {
+        const key = `addr:${address}|${city}`;
+        place = points.has(key) ? points.get(key)! : await forwardGeocode(`${address}, ${city}, ${country}`);
+        points.set(key, place);
+        if (place && cityPoint && metres(place, cityPoint) < CITY_CENTRE_M) place = null;
+      }
+      if (cancelled) return;
+      if (place) setHero({ point: place, span: PLACE_SPAN });
+      else if (cityPoint) setHero({ point: cityPoint, span: CITY_SPAN });
+      else setHero(null);
+    })();
+    return () => { cancelled = true; };
+  }, [address, city, country, countryCode]);
+  return hero;
+}
+
+// ─── Screen ──────────────────────────────────────────────────────────────────
+
+/**
+ * Where to stay at one stop, built like the stop's own sheet: the place on
+ * the map with a glass plate, its name centred under it, three tiles, then
+ * only as much as the moment needs. Booked: what you need at the door; the
+ * places looked at are folded away. Not yet: the places found, with one
+ * tap to book, and what you were looking for in a few lines. Nothing is
+ * typed into this page; each part has its own sheet.
  *
  * Until the first change the plan exists only on this screen (`createPlan`
  * in memory); the first write stores it. Opening the page and closing it
@@ -117,18 +193,26 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
  * timeline; a booked place becomes a stay only when the phone is there.
  */
 export default function AccommodationScreen() {
+  const { t, countryName } = useTranslation();
+  const SORT_LABELS_L: Record<SortKey, string> = { score: t('accommodation.sortScore'), price: t('accommodation.sortPrice'), rating: t('accommodation.sortRating') };
+  const TILE_STATUS_L: Record<string, string> = {
+    ...Object.fromEntries(Object.keys(STATUS_LABELS).map((k) => [k, t(`accStatus.${k}`)])),
+    options_available: t('accommodation.statusOptions'),
+    checked_in: t('accommodation.statusCheckedIn'),
+  };
   const router = useRouter();
   const params = useLocalSearchParams<Params>();
   // A link from outside can be missing any of these; the hooks below run
   // before the guard further down can bail out, so they get a harmless
-  // stand-in rather than `undefined`, which used to take the screen down
-  // inside fromYmd.
+  // stand-in rather than `undefined`.
   const complete = !!params.stopSyncId && !!params.journeySyncId && !!params.start && !!params.end;
   const today = toYmd(new Date());
   const stopSyncId = params.stopSyncId ?? '';
   const journeySyncId = params.journeySyncId ?? '';
   const { plan, loaded, setPlan } = useAccommodation(params.stopSyncId);
   const readOnly = params.readOnly === '1';
+  const [sortBy, setSortBy] = useState<SortKey>('score');
+  const [othersOpen, setOthersOpen] = useState(false);
 
   const stop = useMemo(
     () => ({ start_date: params.start ?? today, end_date: params.end ?? today }),
@@ -139,124 +223,272 @@ export default function AccommodationScreen() {
     [journeySyncId, stopSyncId, stop],
   );
   const view: AccommodationPlan = plan ?? draft;
+  const primary = primaryOption(view);
+  const booking = view.booking;
+  const booked = !!booking && !!primary;
+  const hero = useHeroPoint(primary ? booking?.address ?? primary.address : null, params.city ?? '', params.country ?? '', params.countryCode ?? '');
 
   // The first write creates the row (startAccommodation returns an existing
   // one untouched, so a second write racing the first is harmless).
   const apply: Apply = useCallback(async (work, toast) => {
     try {
-      if (!plan) await startAccommodation(params.journeySyncId, { sync_id: params.stopSyncId, ...stop });
+      if (!plan) await startAccommodation(journeySyncId, { sync_id: stopSyncId, ...stop });
       setPlan(await work());
       if (toast) showToast(toast);
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not save', 'error');
+      showToast(err?.message ?? t('plans.couldNotSave'), 'error');
     }
-  }, [plan, setPlan, params.journeySyncId, params.stopSyncId, stop]);
+  }, [plan, setPlan, journeySyncId, stopSyncId, stop]);
 
-  // Prices at this stop are in its country's currency unless the plan
-  // already says otherwise.
-  const currency = view.requirements.currency ?? view.options[0]?.currency ?? currencyForCountry(params.countryCode) ?? 'EUR';
-
-  // The status moves on its own (options, a pick, a booking); the badge's
-  // menu offers only what the data cannot know by itself.
-  const setStatusTo = (st: AccommodationStatus) => {
-    if (st !== view.status) apply(() => setAccommodationStatus(params.stopSyncId, st));
+  const setStatusTo = (st: string) => {
+    if (st !== view.status) apply(() => setAccommodationStatus(stopSyncId, st as AccommodationStatus));
   };
 
   const menuPick = (id: string) => {
-    if (id === 'needed') apply(() => updateAccommodation(params.stopSyncId, { needed: !view.needed }));
+    if (id === 'booking') {
+      openBooking();
+      return;
+    }
     if (id !== 'remove') return;
-    Alert.alert('Remove this plan?', 'Requirements, options and booking details go with it.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('accommodation.removePlanTitle'), t('accommodation.removePlanBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('common.remove'),
         style: 'destructive',
         onPress: async () => {
-          await deleteAccommodation(params.stopSyncId);
+          await deleteAccommodation(stopSyncId);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           router.back();
-          showToast('Plan removed');
+          showToast(t('accommodation.planRemoved'));
         },
       },
     ]);
   };
 
+  // The sheets this page opens; each gets what it needs to create the plan
+  // if there is none yet.
+  const sheet = { stopSyncId, journeySyncId, start: params.start, end: params.end, countryCode: params.countryCode, city: params.city };
+  const go = (pathname: string, extra: Record<string, string> = {}) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({ pathname, params: { ...sheet, ...extra } } as any);
+  };
+  const openRequirements = () => go('/(tabs)/(plans)/stay-requirements');
+  const openOption = (o: AccommodationOption) => go('/(tabs)/(plans)/stay-option', { optionId: o.id, ...(readOnly && { readOnly: '1' }) });
+  const addOption = () => go('/(tabs)/(plans)/stay-option-edit');
+  const openBooking = (o?: AccommodationOption) => go('/(tabs)/(plans)/stay-booking', o ? { optionId: o.id } : {});
+
+  if (!complete) return <MissingRoute title={t('accommodation.stay')} message={t('plans.stayGone')} />;
+  if (!loaded) return <Stack.Screen options={{ title: t('accommodation.stayInCity', { city: params.city ?? '' }) }} />;
+
+  const req = view.requirements;
+  const nights = nightsBetween(view.check_in, view.check_out);
+  const others = sortOptions(view.options.filter((o) => o.id !== primary?.id), sortBy);
+  const choices = plan && !readOnly ? statusChoices(view, t) : [];
   const datesDiffer = !staysMatchStop(view, stop);
   const stopStay = defaultStay(stop);
   const stopNights = nightsBetween(stopStay.check_in, stopStay.check_out);
+  const reqLines = describeRequirements(req, t);
+  const address = booking?.address ?? primary?.address ?? null;
 
-  if (!complete) return <MissingRoute title="Stay" message="This stay is no longer here." />;
+  // The title under the map: the place once there is one, the city before.
+  const title = primary ? primary.name : params.city;
+  const subtitle = primary
+    ? [primary.platform, address].filter(Boolean).join(' · ')
+    : t('accommodation.subtitleCountryNights', { country: countryName(params.country), nights, nightsWord: nights === 1 ? t('accommodation.nightSingular') : t('accommodation.nightPlural') });
 
-  if (!loaded) return <Stack.Screen options={{ title: `Stay in ${params.city}` }} />;
+  // The third tile: what this stay costs, as far as that is known.
+  const nightly = primary ? optionNightlyPrice(primary) : null;
+  const money = booking && booking.price !== null && booking.currency
+    ? { label: t('accommodation.paid'), value: String(booking.price), unit: booking.currency }
+    : primary && nightly !== null && primary.currency
+      ? { label: t('plans.perNight'), value: String(nightly), unit: primary.currency }
+      : req.budget_per_night !== null && req.currency
+        ? { label: t('accommodation.budget'), value: String(req.budget_per_night), unit: t('accommodation.budgetUnit', { currency: req.currency }) }
+        : { label: t('accommodation.budget'), value: t('accommodation.open') };
 
-  if (readOnly) return <ReadOnlyStay plan={plan} city={params.city} country={params.country} countryCode={params.countryCode} />;
+  // The booking, one row each; only what is filled in. The address is on
+  // the map and in Directions, what was paid is in the tile. A long check-in
+  // note is a paragraph, not a right-aligned column.
+  const bookingRows: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }[] = [];
+  if (booking?.booking_reference) bookingRows.push({ icon: 'receipt-outline', label: t('plans.reference'), value: booking.booking_reference });
+  if (booking?.check_in_info) bookingRows.push({ icon: 'log-in-outline', label: t('plans.checkIn'), value: booking.check_in_info });
+  if (booking?.check_out_info) bookingRows.push({ icon: 'log-out-outline', label: t('plans.checkOut'), value: booking.check_out_info });
+  if (booking?.provider_contact) bookingRows.push({ icon: 'call-outline', label: t('plans.contact'), value: booking.provider_contact });
+  const long = (v: string) => v.length > 28;
+
+  const optionRow = (o: AccommodationOption) => (
+    <LinkCard
+      key={o.id}
+      icon="bed-outline"
+      title={o.name}
+      sub={optionLine(o, t) || o.address || undefined}
+      right={o.score !== null ? <StatusChip label={String(o.score)} /> : undefined}
+      onPress={() => openOption(o)}
+    />
+  );
+  const sortControl = others.length > 1 ? (
+    <Dropdown right title={t('accommodation.sortBy')} value={sortBy} options={(['score', 'price', 'rating'] as SortKey[]).map((k) => ({ id: k, label: SORT_LABELS_L[k] }))} onPick={(id) => { Haptics.selectionAsync(); setSortBy(id as SortKey); }}>
+      <SectionControl label={SORT_LABELS_L[sortBy]} menu />
+    </Dropdown>
+  ) : undefined;
 
   return (
     <>
       <Stack.Screen
         options={{
-          title: `Stay in ${params.city}`,
-          headerRight: plan
+          title: t('accommodation.stayInCity', { city: params.city ?? '' }),
+          // The menu: the booking's form once there is one, and the way out.
+          // Whether a place is needed at all stays an agent's call.
+          headerRight: plan && !readOnly
             ? () => (
                 <Dropdown
                   right
                   options={[
-                    { id: 'needed', label: view.needed ? 'No place needed here' : 'Need a place here', icon: view.needed ? 'bed.double' : 'bed.double.fill' },
-                    { id: 'remove', label: 'Remove this plan', icon: 'trash', destructive: true },
+                    ...(booked ? [{ id: 'booking', label: t('plans.editBooking'), icon: 'square.and.pencil' }] : []),
+                    { id: 'remove', label: t('accommodation.removeThisPlan'), icon: 'trash', destructive: true },
                   ]}
                   onPick={menuPick}
                 >
-                  <Ionicons name="ellipsis-horizontal-circle" size={24} color={Colors.text} />
+                  <Ionicons name="ellipsis-horizontal" size={24} color={Colors.text} />
                 </Dropdown>
               )
             : undefined,
         }}
       />
-      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        <StopCard
-          city={params.city}
-          country={params.country}
-          countryCode={params.countryCode}
-          plan={view}
-          onStatus={plan && view.needed ? setStatusTo : undefined}
-        />
-
-        {datesDiffer && view.needed && (
-          <View style={styles.warn}>
-            <Text style={styles.warnText}>
-              The stop runs {fmtRange(params.start, params.end)}, {stopNights} {stopNights === 1 ? 'night' : 'nights'}.
-            </Text>
-            <Pressable
-              onPress={() => apply(() => updateAccommodation(params.stopSyncId, stopStay), 'Dates updated')}
-              style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
-            >
-              <Text style={styles.actionText}>Match</Text>
-            </Pressable>
-          </View>
-        )}
-
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
         {!view.needed ? (
-          <View style={styles.noPlace}>
-            <Text style={styles.noPlaceText}>No place needed here</Text>
-            <Pressable onPress={() => apply(() => updateAccommodation(params.stopSyncId, { needed: true }))} style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}>
-              <Text style={styles.actionText}>Need one</Text>
-            </Pressable>
+          <View style={styles.section}>
+            <DetailCard>
+              <DetailRow icon="bed-outline" label={t('plans.place')} value={t('accommodation.noneNeeded')} />
+            </DetailCard>
+            {!readOnly && (
+              <TouchableOpacity onPress={() => apply(() => updateAccommodation(stopSyncId, { needed: true }))} activeOpacity={0.5} style={styles.textAction}>
+                <Text style={styles.textActionLabel}>{t('accommodation.needPlaceHere')}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <>
-            {/* Keyed by stop: a page reused for another stop must not keep what was folded open. */}
-            <RequirementsSection key={`r${params.stopSyncId}`} plan={view} apply={apply} stopId={params.stopSyncId} currency={currency} />
-            <OptionsSection key={`o${params.stopSyncId}`} plan={view} apply={apply} stopId={params.stopSyncId} currency={currency} />
-            <BookingSection key={`b${params.stopSyncId}`} plan={view} apply={apply} stopId={params.stopSyncId} currency={currency} />
-            <Section title="Notes">
-              <Card>
-                <TextArea
-                  value={view.notes ?? ''}
-                  onCommit={(v) => apply(() => setAccommodationNotes(params.stopSyncId, v.trim() || null))}
-                  placeholder="Anything to remember about staying here"
-                  last
-                />
-              </Card>
-            </Section>
+            {/* Hero map, as on the stop's sheet: the place once there is one, the city before. */}
+            <View style={styles.mapContainer}>
+              {hero && <PlaceMap latitude={hero.point.latitude} longitude={hero.point.longitude} delta={hero.span} lift={0} style={StyleSheet.absoluteFill} />}
+              <GlassCard {...glassProps} style={[styles.mapOverlay, !hasGlass && styles.mapOverlayFallback]}>
+                {primary ? <Ionicons name="bed-outline" size={22} color={Colors.text} /> : <Flag code={params.countryCode} size={28} />}
+              </GlassCard>
+            </View>
+
+            <View style={styles.header}>
+              <Text style={styles.title}>{title}</Text>
+              {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+            </View>
+
+            {/* Three facts, as under the title of a stop's sheet. */}
+            <StatRow style={styles.statsRow}>
+              <StatTile
+                label={t('accommodation.status')}
+                value={TILE_STATUS_L[view.status]}
+                options={choices.length ? choices.map((c) => ({ id: c.status, label: c.label, icon: c.icon, destructive: c.status === 'cancelled' })) : undefined}
+                menuTitle={t('accommodation.statusMovesHint')}
+                onPick={choices.length ? setStatusTo : undefined}
+              />
+              <StatTile label={t('accommodation.nights')} value={`${nights}`} unit={fmtRange(view.check_in, view.check_out)} />
+              <StatTile label={money.label} value={money.value} unit={money.unit} />
+            </StatRow>
+
+            {datesDiffer && (
+              <Text style={styles.note}>
+                {t('accommodation.stopRuns', { range: fmtRange(params.start, params.end), nights: stopNights, nightsWord: stopNights === 1 ? t('accommodation.nightSingular') : t('accommodation.nightPlural') })}
+                {!readOnly && (
+                  <Text style={styles.noteLink} onPress={() => apply(() => updateAccommodation(stopSyncId, stopStay), t('accommodation.datesUpdated'))}>{t('accommodation.matchDates')}</Text>
+                )}
+              </Text>
+            )}
+
+            {booked ? (
+              <>
+                {/* Booked: what you need at the door. Everything else is history. */}
+                <Section title={t('nav.booking')}>
+                  {bookingRows.length > 0 || booking!.notes ? (
+                    <DetailCard>
+                      {bookingRows.map((r, i) => (
+                        <View key={r.label}>
+                          {i > 0 && <DetailSeparator />}
+                          {long(r.value) ? <DetailNotes icon={r.icon} label={r.label} text={r.value} /> : <DetailRow icon={r.icon} label={r.label} value={r.value} />}
+                        </View>
+                      ))}
+                      {booking!.notes ? (
+                        <>
+                          {bookingRows.length > 0 && <DetailSeparator />}
+                          <DetailNotes text={booking!.notes} />
+                        </>
+                      ) : null}
+                    </DetailCard>
+                  ) : null}
+                  {booking!.booking_url ? (
+                    <LinkCard icon="receipt-outline" title={t('accommodation.openReservation')} sub={booking!.booking_url.replace(/^https?:\/\/(www\.)?/, '')} onPress={() => Linking.openURL(booking!.booking_url!)} />
+                  ) : null}
+                  {address ? (
+                    <LinkCard icon="navigate-outline" title={t('stayOption.directions')} sub={address} onPress={() => Linking.openURL(mapsUrl(address))} />
+                  ) : null}
+                  <LinkCard icon="bed-outline" title={t('accommodation.theListing')} sub={optionLine(primary!, t) || t('accommodation.priceRatingNotes')} onPress={() => openOption(primary!)} />
+                </Section>
+
+                {others.length > 0 && (
+                  <Section
+                    title={others.length === 1 ? t('accommodation.alsoLookedOne') : t('accommodation.alsoLookedMany', { count: others.length })}
+                    right={<SectionControl label={othersOpen ? t('accommodation.hide') : t('accommodation.show')} onPress={() => { Haptics.selectionAsync(); animate(); setOthersOpen((v) => !v); }} />}
+                  >
+                    {othersOpen && others.map(optionRow)}
+                  </Section>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Not booked yet: the places found come first, one tap from booking. */}
+                {primary && (
+                  <Section title={t('accommodation.picked')}>
+                    {!readOnly && <SlotCard icon="receipt-outline" title={t('accommodation.bookIt')} sub={t('accommodation.bookItSub')} onPress={() => openBooking(primary)} />}
+                    <LinkCard icon="bed-outline" title={t('accommodation.theListing')} sub={optionLine(primary, t) || t('accommodation.priceRatingNotes')} onPress={() => openOption(primary)} />
+                  </Section>
+                )}
+
+                {(others.length > 0 || !readOnly) && (
+                  <Section
+                    title={primary ? (others.length === 1 ? t('accommodation.otherOne') : t('accommodation.otherMany', { count: others.length })) : others.length ? (others.length === 1 ? t('accommodation.placeFoundOne', { count: others.length }) : t('accommodation.placeFoundMany', { count: others.length })) : t('accommodation.places')}
+                    right={sortControl}
+                  >
+                    {others.map(optionRow)}
+                    {!readOnly && (
+                      <SlotCard icon="add" title={t('accommodation.addPlace')} sub={view.options.length ? t('accommodation.oneMoreCompare') : t('accommodation.aHotelFlat')} onPress={addOption} />
+                    )}
+                  </Section>
+                )}
+
+                {(reqLines.length > 0 || !readOnly) && (
+                  <Section title={t('nav.lookingFor')} right={reqLines.length > 0 && !readOnly ? <SectionControl label={t('common.edit')} onPress={openRequirements} /> : undefined}>
+                    {reqLines.length > 0 ? (
+                      <DetailCard>
+                        <View style={styles.lines}>
+                          {reqLines.map((line, i) => (
+                            <Text key={i} selectable style={i === 0 ? styles.lineHead : styles.line}>{line}</Text>
+                          ))}
+                        </View>
+                      </DetailCard>
+                    ) : (
+                      <SlotCard icon="search-outline" title={t('accommodation.sayWhatNeed')} sub={t('accommodation.budgetAreaDesk')} onPress={openRequirements} />
+                    )}
+                  </Section>
+                )}
+              </>
+            )}
+
+            {view.notes ? (
+              <Section title={t('plans.notes')}>
+                <DetailCard>
+                  <Text selectable style={styles.notesText}>{view.notes}</Text>
+                </DetailCard>
+              </Section>
+            ) : null}
           </>
         )}
       </ScrollView>
@@ -264,649 +496,49 @@ export default function AccommodationScreen() {
   );
 }
 
-// ─── The stop, and the spine ─────────────────────────────────────────────────
-
-/** The stop as it is on the itinerary: flag, city, country, the stay's dates, the status where the days badge sits. */
-function StopCard({
-  city,
-  country,
-  countryCode,
-  plan,
-  onStatus,
-}: {
-  city: string;
-  country: string;
-  countryCode: string;
-  plan: AccommodationPlan;
-  onStatus?: (status: AccommodationStatus) => void;
-}) {
-  const nights = nightsBetween(plan.check_in, plan.check_out);
-  const choices = onStatus ? statusChoices(plan) : [];
-  const badge = <StatusBadge status={plan.status} size="small" onPress={onStatus && choices.length ? () => {} : undefined} />;
-  return (
-    <Glass {...glassProps} style={[styles.stopCard, !hasGlass && styles.stopCardFallback]}>
-      <Flag code={countryCode} size={28} style={styles.stopFlag} />
-      <View style={styles.stopCenter}>
-        <Text style={styles.stopCity}>{city}</Text>
-        <Text style={styles.stopCountry}>{country}</Text>
-        <Text style={styles.stopDates}>
-          {fmtRange(plan.check_in, plan.check_out)} · {nights} {nights === 1 ? 'night' : 'nights'}
-        </Text>
-      </View>
-      <View style={styles.stopRight}>
-        {!plan.needed ? null : onStatus && choices.length ? (
-          <Dropdown
-            title="Moves on its own as you add places, pick one and save the booking"
-            options={choices.map((c) => ({ id: c.status, label: c.label, icon: c.icon, destructive: c.status === 'cancelled' }))}
-            right
-            onPick={(id) => onStatus(id as AccommodationStatus)}
-          >
-            {badge}
-          </Dropdown>
-        ) : badge}
-      </View>
-    </Glass>
-  );
-}
-
-/** A part of the stay under a heading like the wallet's, with room for the sort keys on the right. */
+/** A part of the stay under a grey heading, as the sections of a stop's sheet. */
 function Section({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
-      <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        {right}
-      </View>
+      <SectionHead title={title} right={right} />
       {children}
     </View>
   );
 }
 
-// ─── A friend's plan ─────────────────────────────────────────────────────────
-
-/** The same page with nothing to touch: where the friend sleeps, as they planned it. */
-function ReadOnlyStay({ plan, city, country, countryCode }: { plan: LocalAccommodation | null; city: string; country: string; countryCode: string }) {
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const b = plan?.booking ?? null;
-  const primary = plan ? plan.options.find((o) => o.id === (b?.option_id ?? plan.selected_option_id)) ?? null : null;
-  const noop: Apply = async () => {};
-  return (
-    <>
-      <Stack.Screen options={{ title: `Stay in ${city}` }} />
-      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
-        {!plan || !plan.needed ? (
-          <Text style={styles.readEmpty}>{plan ? 'No place needed here.' : 'Nothing planned here yet.'}</Text>
-        ) : (
-          <>
-            <StopCard city={city} country={country} countryCode={countryCode} plan={plan} />
-
-            <>
-              <Section title="Looking for">
-                <Card>
-                  <View style={styles.readBlock}>
-                    {describeRequirements(plan.requirements, plan).map((line, i) => (
-                      <Text key={i} style={i === 0 ? styles.readTitle : styles.readLine}>{line}</Text>
-                    ))}
-                    {plan.requirements.notes ? <Text style={styles.readLine}>{plan.requirements.notes}</Text> : null}
-                  </View>
-                </Card>
-              </Section>
-
-              {plan.options.length > 0 && (
-                <Section title={`${plan.options.length} ${plan.options.length === 1 ? 'option' : 'options'}`}>
-                  {sortOptions(plan.options, 'score').map((o) => (
-                    <OptionItem
-                      key={o.id}
-                      option={o}
-                      plan={plan}
-                      apply={noop}
-                      stopId={plan.id}
-                      expanded={expanded === o.id}
-                      onToggle={() => { animate(); setExpanded(expanded === o.id ? null : o.id); }}
-                      readOnly
-                    />
-                  ))}
-                </Section>
-              )}
-
-              {b && (
-                <Section title="Booking">
-                  <Card>
-                    {primary && <ReadRow label="Place" value={primary.name} />}
-                    {b.booking_reference ? <ReadRow label="Reference" value={b.booking_reference} /> : null}
-                    {formatMoney(b.price, b.currency) ? <ReadRow label="Paid" value={formatMoney(b.price, b.currency)!} /> : null}
-                    {b.address ? <ReadRow label="Address" value={b.address} /> : null}
-                    {b.check_in_info ? <ReadRow label="Check-in" value={b.check_in_info} /> : null}
-                    {b.check_out_info ? <ReadRow label="Check-out" value={b.check_out_info} /> : null}
-                    {b.provider_contact ? <ReadRow label="Contact" value={b.provider_contact} /> : null}
-                    {b.booking_url ? (
-                      <Pressable onPress={() => Linking.openURL(b.booking_url!)} style={styles.readLink}>
-                        <Text style={styles.actionText}>Open the reservation</Text>
-                      </Pressable>
-                    ) : null}
-                  </Card>
-                </Section>
-              )}
-
-              {plan.notes ? (
-                <Section title="Notes">
-                  <Card>
-                    <Text style={[styles.readLine, styles.readBlock]} selectable>{plan.notes}</Text>
-                  </Card>
-                </Section>
-              ) : null}
-            </>
-          </>
-        )}
-      </ScrollView>
-    </>
-  );
-}
-
-function ReadRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.readRow}>
-      <Text style={styles.readRowLabel}>{label}</Text>
-      <Text style={styles.readRowValue} selectable>{value}</Text>
-    </View>
-  );
-}
-
-// ─── What you need ───────────────────────────────────────────────────────────
-
-function RequirementsSection({ plan, apply, stopId, currency }: { plan: AccommodationPlan; apply: Apply; stopId: string; currency: string }) {
-  const req = plan.requirements;
-  const setReq = (patch: Record<string, unknown>) => apply(() => updateAccommodation(stopId, { requirements: patch }));
-
-  const commitBudget = (amount: string, currency: string) => {
-    if (amount.trim() && !currency.trim()) {
-      showToast('Add a currency next to the budget, like EUR', 'error');
-      return;
-    }
-    setReq({ budget_per_night: parseAmount(amount), currency: currency.trim() || null });
-  };
-
-  // What an agent filed as separate fields. Read here, written through the API.
-  const filed = [
-    req.type ? TYPE_LABELS[req.type] : null,
-    req.amenities.length ? req.amenities.map(amenityLabel).join(', ') : null,
-    req.areas.length ? `In ${req.areas.join(', ')}` : null,
-    req.work_requirements,
-    req.min_requirements,
-    req.dates_flexible ? 'Flexible dates' : null,
-  ].filter(Boolean).join(' · ');
-
-  // Two fields, always there: the budget and what matters in words. What an
-  // agent filed beyond that is read back in grey underneath.
-  return (
-    <Section title="Looking for">
-      <Card>
-        <MoneyRow label="Budget per night" amount={amountText(req.budget_per_night)} currency={req.currency ?? ''} suggested={currency} onCommit={commitBudget} />
-        <TextArea
-          value={req.notes ?? ''}
-          onCommit={(v) => setReq({ notes: v.trim() || null })}
-          placeholder="Area, wifi, a desk, quiet at night"
-          last={!filed}
-        />
-        {filed ? <Text style={styles.filed}>{filed}</Text> : null}
-      </Card>
-    </Section>
-  );
-}
-
-// ─── Options ─────────────────────────────────────────────────────────────────
-
-function OptionsSection({ plan, apply, stopId, currency }: { plan: AccommodationPlan; apply: Apply; stopId: string; currency: string }) {
-  const [sortBy, setSortBy] = useState<SortKey>('score');
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-
-  // Sorting is the comparison: the best by the chosen key is simply first.
-  const sorted = useMemo(() => sortOptions(plan.options, sortBy), [plan.options, sortBy]);
-  const count = plan.options.length;
-
-  const sort = count > 1 ? (
-    <View style={styles.sortRow}>
-      {(['score', 'price', 'rating'] as SortKey[]).map((k) => (
-        <Pressable key={k} onPress={() => { Haptics.selectionAsync(); setSortBy(k); }} hitSlop={6}>
-          <Text style={[styles.sortKey, sortBy === k && styles.sortKeyActive]}>{k === 'score' ? 'Score' : k === 'price' ? 'Price' : 'Rating'}</Text>
-        </Pressable>
-      ))}
-    </View>
-  ) : undefined;
-
-  return (
-    <Section title={count ? `${count} ${count === 1 ? 'option' : 'options'}` : 'Options'} right={sort}>
-      {sorted.map((o) => (
-        <OptionItem
-          key={o.id}
-          option={o}
-          plan={plan}
-          apply={apply}
-          stopId={stopId}
-          currency={currency}
-          expanded={expanded === o.id}
-          onToggle={() => { animate(); setExpanded(expanded === o.id ? null : o.id); }}
-        />
-      ))}
-
-      {/* A place that is not there yet, as a suggested stop is on the itinerary: dashed. */}
-      {adding ? (
-        <Card>
-          <AddOptionForm
-            currency={currency}
-            onCancel={() => { animate(); setAdding(false); }}
-            onAdd={async (input) => {
-              await apply(async () => {
-                const saved = await addAccommodationOption(stopId, input);
-                track({ name: 'accommodation_option_added' });
-                return saved;
-              }, 'Option added');
-              animate();
-              setAdding(false);
-            }}
-          />
-        </Card>
-      ) : (
-        <Pressable onPress={() => { Haptics.selectionAsync(); animate(); setAdding(true); }} style={({ pressed }) => [styles.slot, pressed && { opacity: 0.6 }]}>
-          <View style={styles.slotIcon}>
-            <Ionicons name="add" size={20} color={Colors.text} />
-          </View>
-          <View style={styles.optionTitle}>
-            <Text style={styles.slotTitle}>Add a place</Text>
-            <Text style={styles.optionSub}>{count ? 'One more to compare' : 'A hotel, a flat, anything you found'}</Text>
-          </View>
-        </Pressable>
-      )}
-    </Section>
-  );
-}
-
-function AddOptionForm({ currency: initialCurrency, onAdd, onCancel }: { currency: string; onAdd: (input: Record<string, unknown>) => Promise<void>; onCancel: () => void }) {
-  const [name, setName] = useState('');
-  const [url, setUrl] = useState('');
-  const [perNight, setPerNight] = useState('');
-  const [currency, setCurrency] = useState(initialCurrency);
-
-  const add = () => {
-    if (!name.trim()) {
-      showToast('Give the place a name', 'error');
-      return;
-    }
-    if (perNight.trim() && !currency.trim()) {
-      showToast('Add a currency next to the price, like EUR', 'error');
-      return;
-    }
-    onAdd({
-      name,
-      url: url || null,
-      price_per_night: parseAmount(perNight),
-      currency: currency || null,
-      last_checked_at: new Date().toISOString(),
-    });
-  };
-
-  return (
-    <>
-      <TextRow label="Name" value={name} onCommit={setName} live placeholder="Loft in Tay Ho" autoCapitalize="words" />
-      <TextRow label="Link" value={url} onCommit={setUrl} live placeholder="https://" keyboardType="url" autoCapitalize="none" />
-      <MoneyRow label="Per night" amount={perNight} currency={currency} suggested={initialCurrency} onCommit={(a, c) => { setPerNight(a); setCurrency(c); }} live />
-      <View style={styles.inlineButtons}>
-        <Pressable onPress={onCancel} style={({ pressed }) => [styles.inlineButton, pressed && { opacity: 0.6 }]}>
-          <Text style={styles.inlineButtonMuted}>Cancel</Text>
-        </Pressable>
-        <Pressable onPress={add} style={({ pressed }) => [styles.inlineButton, pressed && { opacity: 0.6 }]}>
-          <Ionicons name="add" size={18} color={Colors.text} />
-          <Text style={styles.inlineButtonText}>Add</Text>
-        </Pressable>
-      </View>
-    </>
-  );
-}
-
-function OptionItem({
-  option: o,
-  plan,
-  apply,
-  stopId,
-  currency: suggested,
-  expanded,
-  onToggle,
-  readOnly = false,
-}: {
-  option: AccommodationOption;
-  plan: AccommodationPlan;
-  apply: Apply;
-  stopId: string;
-  currency?: string;
-  expanded: boolean;
-  onToggle: () => void;
-  readOnly?: boolean;
-}) {
-  const [editing, setEditing] = useState(false);
-  const picked = plan.selected_option_id === o.id;
-  const booked = plan.booking?.option_id === o.id;
-
-  const nightly = optionNightlyPrice(o);
-  const nights = nightsBetween(o.check_in, o.check_out);
-  // One grey line under the name: where, what it costs a night, how it is rated.
-  const rating = o.rating !== null ? `★ ${o.rating}${o.rating_scale === 10 ? '/10' : ''}` : null;
-  const line = [
-    o.platform,
-    nightly !== null && o.currency ? `${formatMoney(nightly, o.currency)}/night` : null,
-    rating,
-  ].filter(Boolean).join(' · ');
-  const detail = [
-    formatMoney(o.total_price, o.currency) ? `${formatMoney(o.total_price, o.currency)} for ${nights} ${nights === 1 ? 'night' : 'nights'}` : null,
-    o.fees !== null && o.fees > 0 && o.currency ? `${formatMoney(o.fees, o.currency)} fees` : null,
-    o.review_count !== null ? `${o.review_count} reviews` : null,
-    o.cancellation_policy,
-    o.address,
-  ].filter(Boolean).join(' · ');
-  const tag = booked ? 'Booked' : picked ? 'Picked' : null;
-
-  const set = (patch: Record<string, unknown>) => apply(() => updateAccommodationOption(stopId, o.id, patch));
-  const commitMoney = (field: 'total_price' | 'price_per_night') => (amount: string, currency: string) => {
-    if (amount.trim() && !currency.trim()) {
-      showToast('Add a currency next to the price, like EUR', 'error');
-      return;
-    }
-    set({ [field]: parseAmount(amount), currency: currency.trim() || null });
-  };
-
-  const pick = () => apply(() => selectAccommodationOption(stopId, picked ? null : o.id), picked ? undefined : `${o.name} picked`);
-
-  const remove = () => {
-    Alert.alert(`Remove ${o.name}?`, undefined, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => apply(() => removeAccommodationOption(stopId, o.id), 'Option removed') },
-    ]);
-  };
-
-  return (
-    <Pressable
-      onPress={() => { Haptics.selectionAsync(); if (editing) setEditing(false); onToggle(); }}
-      accessibilityRole="button"
-      accessibilityState={{ expanded }}
-      style={({ pressed }) => pressed && !expanded && { opacity: 0.75 }}
-    >
-      <Glass {...glassProps} style={[styles.option, !hasGlass && styles.optionFallback, (picked || booked) && styles.optionPicked]}>
-        <View style={styles.optionTop}>
-          <View style={[styles.optionBubble, (picked || booked) && styles.optionBubbleOn]}>
-            <Ionicons name={booked ? 'receipt-outline' : picked ? 'checkmark' : 'bed-outline'} size={18} color={picked || booked ? Colors.white : Colors.text} />
-          </View>
-          <View style={styles.optionTitle}>
-            <Text style={styles.optionName} numberOfLines={expanded ? undefined : 1}>{o.name}</Text>
-            {line ? <Text style={styles.optionSub} numberOfLines={2}>{line}</Text> : null}
-          </View>
-          {tag && (
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>{tag}</Text>
-            </View>
-          )}
-          {o.score !== null && (
-            <View style={styles.score}>
-              <Text style={styles.scoreText}>{o.score}</Text>
-            </View>
-          )}
-        </View>
-
-        {expanded && (
-          <View style={styles.optionDetails}>
-            {detail ? <Text style={styles.optionDetailText}>{detail}</Text> : null}
-            {o.amenities.length > 0 && <Text style={styles.optionDetailText}>{o.amenities.map(amenityLabel).join(', ')}</Text>}
-            {o.risks ? <Text style={styles.optionDetailText}>Risk: {o.risks}</Text> : null}
-            {o.notes ? <Text style={styles.optionDetailText}>{o.notes}</Text> : null}
-            {o.last_checked_at ? <Text style={styles.optionChecked}>Checked {new Date(o.last_checked_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text> : null}
-
-            {readOnly && o.url ? (
-              <Pressable onPress={() => Linking.openURL(o.url!)} style={({ pressed }) => [styles.actionButton, styles.actionSelf, pressed && { opacity: 0.7 }]}>
-                <Text style={styles.actionText}>Open</Text>
-              </Pressable>
-            ) : null}
-            {!readOnly && (
-            <View style={styles.optionActions}>
-              <Pressable onPress={pick} style={({ pressed }) => [styles.actionButton, picked && styles.actionButtonActive, pressed && { opacity: 0.7 }]}>
-                <Text style={[styles.actionText, picked && styles.actionTextActive]}>{picked ? 'Picked' : 'Pick'}</Text>
-              </Pressable>
-              {o.url ? (
-                <Pressable onPress={() => Linking.openURL(o.url!)} style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}>
-                  <Text style={styles.actionText}>Open</Text>
-                </Pressable>
-              ) : null}
-              <Pressable onPress={() => { Haptics.selectionAsync(); animate(); setEditing(!editing); }} style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}>
-                <Text style={styles.actionText}>{editing ? 'Done' : 'Edit'}</Text>
-              </Pressable>
-              <Pressable onPress={remove} style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]} accessibilityLabel="Remove">
-                <Ionicons name="trash-outline" size={15} color={Colors.textSecondary} />
-              </Pressable>
-            </View>
-            )}
-
-          {editing && (
-            <View style={styles.optionEditor}>
-              <TextRow label="Name" value={o.name} onCommit={(v) => set({ name: v })} autoCapitalize="words" />
-              <TextRow label="Link" value={o.url ?? ''} onCommit={(v) => set({ url: v || null })} placeholder="https://" keyboardType="url" autoCapitalize="none" />
-              <MoneyRow label="Per night" amount={amountText(o.price_per_night)} currency={o.currency ?? ''} suggested={suggested} onCommit={commitMoney('price_per_night')} />
-              <MoneyRow label="Total" amount={amountText(o.total_price)} currency={o.currency ?? ''} suggested={suggested} onCommit={commitMoney('total_price')} />
-              <TextRow label="Rating" value={ratingText(o.rating, o.rating_scale)} onCommit={(v) => set(parseRating(v, o.rating_scale))} placeholder="4.8 or 8.6/10" />
-              <TextRow label="Your score" value={amountText(o.score)} onCommit={(v) => set({ score: parseAmount(v) })} placeholder="out of 10" keyboardType="decimal-pad" />
-              <TextArea value={o.notes ?? ''} onCommit={(v) => set({ notes: v.trim() || null })} placeholder="Notes" last />
-            </View>
-          )}
-          </View>
-        )}
-      </Glass>
-    </Pressable>
-  );
-}
-
-// ─── Booking ─────────────────────────────────────────────────────────────────
-
-function BookingSection({ plan, apply, stopId, currency }: { plan: AccommodationPlan; apply: Apply; stopId: string; currency: string }) {
-  const b = plan.booking;
-  const primary = plan.options.find((o) => o.id === (b?.option_id ?? plan.selected_option_id)) ?? null;
-  const afterStay = plan.status === 'checked_in' || plan.status === 'completed' || (b?.review_rating ?? null) !== null;
-
-  const set = (patch: Record<string, unknown>) => apply(() => saveAccommodationBooking(stopId, patch));
-  const commitMoney = (field: 'price', currencyField: 'currency') => (amount: string, currency: string) => {
-    if (amount.trim() && !currency.trim()) {
-      showToast('Add a currency next to the amount, like EUR', 'error');
-      return;
-    }
-    set({ [field]: parseAmount(amount), [currencyField]: currency.trim() || null });
-  };
-
-  // Until there is a place, the phase is a dashed slot that says what comes
-  // first; a booking form about nothing helped nobody.
-  if (!b && !primary) {
-    return (
-      <Section title="Booking">
-        <View style={[styles.slot, styles.slotMuted]}>
-          <View style={styles.slotIcon}>
-            <Ionicons name="receipt-outline" size={18} color={Colors.textTertiary} />
-          </View>
-          <View style={styles.optionTitle}>
-            <Text style={[styles.slotTitle, styles.slotTitleMuted]}>Nothing booked yet</Text>
-            <Text style={styles.optionSub}>Pick a place above first</Text>
-          </View>
-        </View>
-      </Section>
-    );
-  }
-
-  return (
-    <Section title="Booking">
-      <Card>
-        {primary && (
-          <View style={styles.bookingPlace}>
-            <Ionicons name="bed-outline" size={16} color={Colors.textSecondary} />
-            <Text style={styles.bookingPlaceText} numberOfLines={1}>{primary.name}</Text>
-          </View>
-        )}
-        <TextRow label="Reference" value={b?.booking_reference ?? ''} onCommit={(v) => set({ booking_reference: v || null })} placeholder="Confirmation number" autoCapitalize="characters" />
-        <MoneyRow label="Paid" amount={amountText(b?.price ?? null)} currency={b?.currency ?? primary?.currency ?? ''} suggested={primary?.currency ?? currency} onCommit={commitMoney('price', 'currency')} />
-        <TextRow label="Address" value={b?.address ?? primary?.address ?? ''} onCommit={(v) => set({ address: v || null })} placeholder="Street, building, floor" />
-        <TextArea label="Check-in" value={b?.check_in_info ?? ''} onCommit={(v) => set({ check_in_info: v.trim() || null })} placeholder="From 15:00, lockbox code" />
-        <TextRow label="Contact" value={b?.provider_contact ?? ''} onCommit={(v) => set({ provider_contact: v || null })} placeholder="Host or reception" />
-        {afterStay ? (
-          <>
-            <TextRow label="Your rating out of 5" value={amountText(b?.review_rating ?? null)} onCommit={(v) => set({ review_rating: parseAmount(v) })} placeholder="4.5" keyboardType="decimal-pad" />
-            <TextArea label="How was it" value={b?.review_text ?? ''} onCommit={(v) => set({ review_text: v.trim() || null })} placeholder="Would you stay again?" last />
-          </>
-        ) : (
-          <TextArea label="Notes" value={b?.notes ?? ''} onCommit={(v) => set({ notes: v.trim() || null })} placeholder="Anything else" last />
-        )}
-      </Card>
-    </Section>
-  );
-}
-
+// Same measures as the stop's sheet (stop-info.tsx).
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 12, paddingBottom: 120 },
-  noPlace: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 12, paddingHorizontal: 4 },
-  noPlaceText: { ...Typography.titleSmall, fontWeight: '500' },
-
-  // ─── The stop, as on the itinerary ───
-  stopCard: {
-    borderRadius: 18,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+  content: { paddingBottom: 120 },
+  mapContainer: {
+    height: 240,
+    borderRadius: 20,
     overflow: 'hidden',
-    borderCurve: 'continuous',
-  },
-  stopCardFallback: { backgroundColor: Colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.border },
-  stopFlag: { marginTop: 2 },
-  stopCenter: { flex: 1, gap: 2 },
-  stopCity: { ...Typography.bodyLarge, fontWeight: '700', letterSpacing: -0.2 },
-  stopCountry: { ...Typography.bodySmall, color: Colors.textSecondary },
-  stopDates: { ...Typography.bodySmall, color: Colors.textSecondary, fontVariant: ['tabular-nums'], marginTop: 2 },
-  stopRight: { alignItems: 'flex-end', gap: 6 },
-
-  // ─── Sections, headed like the wallet's ───
-  section: { gap: 10, marginTop: 8 },
-  sectionHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 4 },
-  sectionTitle: { ...Typography.titleMedium },
-
-  // ─── Dashed slot, as a suggested stop ───
-  slot: {
-    borderRadius: 18,
-    borderCurve: 'continuous',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: Colors.border,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  slotMuted: { opacity: 0.7 },
-  slotIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    borderCurve: 'continuous',
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  slotTitle: { ...Typography.titleSmall, fontWeight: '600' },
-  slotTitleMuted: { color: Colors.textSecondary },
-
-  warn: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  warnText: { ...Typography.bodySmall, color: Colors.textSecondary, flex: 1, lineHeight: 18 },
-  filed: { ...Typography.bodySmall, color: Colors.textSecondary, paddingBottom: 14, marginTop: -6 },
-
-  sortRow: { flexDirection: 'row', gap: 12, paddingBottom: 3 },
-  sortKey: { ...Typography.label, color: Colors.textTertiary, fontWeight: '600' },
-  sortKeyActive: { color: Colors.text },
-
-  // Same card as a stop on the itinerary.
-  option: {
-    borderRadius: 18,
-    borderCurve: 'continuous',
-    padding: 16,
-    gap: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  optionFallback: {
-    backgroundColor: Colors.surface,
-    borderColor: Colors.border,
-  },
-  optionPicked: { borderColor: Colors.text },
-  optionTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  optionBubble: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    borderCurve: 'continuous',
-    backgroundColor: Colors.primary + '10',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  optionBubbleOn: { backgroundColor: Colors.text },
-  optionTitle: { flex: 1, gap: 2 },
-  optionName: { ...Typography.titleSmall, fontWeight: '600' },
-  optionSub: { ...Typography.bodySmall, color: Colors.textSecondary },
-  score: {
-    backgroundColor: Colors.primary + '14',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  scoreText: { ...Typography.caption, fontWeight: '700', color: Colors.primary, fontVariant: ['tabular-nums'] },
-  tag: {
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  tagText: { ...Typography.caption, fontWeight: '600', color: Colors.textSecondary },
-
-  optionDetails: { gap: 6 },
-  optionDetailText: { ...Typography.bodySmall, color: Colors.textSecondary, lineHeight: 18 },
-  optionChecked: { ...Typography.caption, color: Colors.textTertiary },
-  optionActions: { flexDirection: 'row', gap: 8, marginTop: 6 },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 999,
+    marginHorizontal: 16,
+    marginTop: 16,
     borderCurve: 'continuous',
     backgroundColor: Colors.surfaceSecondary,
   },
-  actionButtonActive: { backgroundColor: Colors.text },
-  actionText: { ...Typography.label, fontWeight: '600' },
-  actionTextActive: { color: Colors.white },
-  // The rows draw their separators 20pt out to the sides, the card's own
-  // padding; inside the option card there are 16, so pull them in.
-  optionEditor: { paddingHorizontal: 4, marginTop: 4 },
-
-  inlineButtons: { flexDirection: 'row', justifyContent: 'center', gap: 28 },
-  inlineButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 14 },
-  inlineButtonText: { ...Typography.titleSmall, fontWeight: '600' },
-  inlineButtonMuted: { ...Typography.titleSmall, fontWeight: '500', color: Colors.textSecondary },
-
-  actionSelf: { alignSelf: 'flex-start', marginTop: 6 },
-  readEmpty: { ...Typography.body, color: Colors.textSecondary, paddingHorizontal: 4 },
-  readBlock: { paddingVertical: 14, gap: 3 },
-  readTitle: { ...Typography.titleSmall, fontWeight: '600' },
-  readLine: { ...Typography.bodySmall, color: Colors.textSecondary, lineHeight: 18 },
-  readRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, paddingVertical: 13 },
-  readRowLabel: { ...Typography.titleSmall, fontWeight: '500' },
-  readRowValue: { ...Typography.titleSmall, fontWeight: '400', color: Colors.textSecondary, flex: 1, textAlign: 'right' },
-  readLink: { paddingVertical: 14 },
-  bookingPlace: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12, paddingBottom: 2 },
-  bookingPlaceText: { ...Typography.bodySmall, color: Colors.textSecondary, flex: 1 },
+  mapOverlay: {
+    position: 'absolute',
+    bottom: 12,
+    left: 16,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    overflow: 'hidden',
+  },
+  mapOverlayFallback: { backgroundColor: 'rgba(255,255,255,0.9)' },
+  header: { alignItems: 'center', paddingTop: 20, paddingBottom: 4, paddingHorizontal: 24, gap: 2 },
+  title: { ...Typography.displayMedium, fontSize: 26, fontWeight: '700', textAlign: 'center' },
+  subtitle: { ...Typography.titleSmall, fontWeight: '400', color: Colors.textSecondary, marginTop: 2, textAlign: 'center' },
+  statsRow: { marginHorizontal: 16, marginTop: 20 },
+  section: { marginHorizontal: 16, marginTop: 16, gap: 10 },
+  note: { ...Typography.bodySmall, color: Colors.textSecondary, marginHorizontal: 20, marginTop: 10, lineHeight: 18 },
+  noteLink: { fontWeight: '600', color: Colors.text },
+  notesText: { ...Typography.bodySmall, fontSize: 14, lineHeight: 20 },
+  lines: { gap: 4 },
+  lineHead: { ...Typography.titleSmall, fontWeight: '600' },
+  line: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary, lineHeight: 20 },
+  textAction: { alignSelf: 'center', paddingVertical: 10 },
+  textActionLabel: { ...Typography.bodyMedium, fontWeight: '600' },
 });

@@ -1,13 +1,15 @@
 import { Stack } from 'expo-router/stack';
 import { Colors, sheetBackground, sheetWithHeader } from '../../../constants/colors';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 export default function PlansStack() {
+  const { t } = useTranslation();
   return (
     <Stack>
       <Stack.Screen
         name="index"
         options={{
-          title: 'Journeys',
+          title: t('nav.journeys'),
           headerLargeTitle: true,
         }}
       />
@@ -18,7 +20,7 @@ export default function PlansStack() {
           // title chip, add disc): a native header title cannot grow into
           // the travellers panel. Set here so the first frame is right.
           headerShown: false,
-          headerBackTitle: 'Journeys',
+          headerBackTitle: t('nav.journeys'),
           title: '',
         }}
       />
@@ -75,11 +77,110 @@ export default function PlansStack() {
           headerBackButtonDisplayMode: 'minimal',
         }}
       />
+      {/* The stay and its things to do are pages like the wallet: a native
+          header, a sheet for each thing that is edited. */}
       <Stack.Screen
         name="accommodation"
         options={{
           headerBackButtonDisplayMode: 'minimal',
           headerLargeTitle: false,
+        }}
+      />
+      <Stack.Screen
+        name="stay-requirements"
+        options={{
+          presentation: sheetWithHeader,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.85, 1.0],
+          headerBackButtonDisplayMode: 'minimal',
+          contentStyle: { backgroundColor: Colors.background },
+        }}
+      />
+      <Stack.Screen
+        name="stay-option"
+        options={{
+          presentation: 'formSheet',
+          headerShown: false,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.9, 1.0],
+          contentStyle: { backgroundColor: Colors.background },
+        }}
+      />
+      <Stack.Screen
+        name="stay-option-edit"
+        options={{
+          presentation: sheetWithHeader,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.85, 1.0],
+          headerBackButtonDisplayMode: 'minimal',
+          contentStyle: { backgroundColor: Colors.background },
+        }}
+      />
+      <Stack.Screen
+        name="stay-booking"
+        options={{
+          presentation: sheetWithHeader,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.85, 1.0],
+          headerBackButtonDisplayMode: 'minimal',
+          contentStyle: { backgroundColor: Colors.background },
+        }}
+      />
+      <Stack.Screen
+        name="activities"
+        options={{
+          title: t('nav.thingsToDo'),
+          headerBackButtonDisplayMode: 'minimal',
+          headerLargeTitle: false,
+        }}
+      />
+      <Stack.Screen
+        name="activity"
+        options={{
+          presentation: 'formSheet',
+          headerShown: false,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.9, 1.0],
+          contentStyle: { backgroundColor: Colors.background },
+        }}
+      />
+      <Stack.Screen
+        name="activity-add"
+        options={{
+          presentation: sheetWithHeader,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.9, 1.0],
+          headerBackButtonDisplayMode: 'minimal',
+          contentStyle: { backgroundColor: Colors.background },
+        }}
+      />
+      {/* Expenses, like the things to do: a page, a sheet to read one, a form. */}
+      <Stack.Screen
+        name="expenses"
+        options={{
+          title: t('nav.expenses'),
+          headerBackButtonDisplayMode: 'minimal',
+          headerLargeTitle: false,
+        }}
+      />
+      <Stack.Screen
+        name="expense"
+        options={{
+          presentation: 'formSheet',
+          headerShown: false,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.9, 1.0],
+          contentStyle: { backgroundColor: Colors.background },
+        }}
+      />
+      <Stack.Screen
+        name="expense-add"
+        options={{
+          presentation: sheetWithHeader,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.9, 1.0],
+          headerBackButtonDisplayMode: 'minimal',
+          contentStyle: { backgroundColor: Colors.background },
         }}
       />
       <Stack.Screen
@@ -111,7 +212,7 @@ export default function PlansStack() {
         name="create"
         options={{
           presentation: sheetWithHeader,
-          title: 'New Trip',
+          title: t('nav.newTrip'),
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.34],
           contentStyle: { backgroundColor: sheetBackground },

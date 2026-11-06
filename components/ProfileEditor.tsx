@@ -8,6 +8,7 @@ import { Typography } from '../constants/typography';
 import { useAvatar } from '../lib/avatars';
 import { AnimatedFace } from './AnimatedFace';
 import { suggestedFaces } from '../lib/profile';
+import { useTranslation } from '../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -34,6 +35,7 @@ export function ProfileEditor({
   onAvatarChange: (seed: string) => void;
   autoFocus?: boolean;
 }) {
+  const { t } = useTranslation();
   // Saved and fetched ahead (prefetchSuggestedFaces), so they show at once.
   const alternatives = useMemo(suggestedFaces, []);
 
@@ -58,7 +60,7 @@ export function ProfileEditor({
             key={seed}
             onPress={() => pick(seed)}
             accessibilityRole="button"
-            accessibilityLabel="Use this face"
+            accessibilityLabel={t('comp.useThisFace')}
             accessibilityState={{ selected: seed === avatar }}
             style={({ pressed }) => [styles.alt, seed === avatar && styles.altOn, pressed && { opacity: 0.7 }]}
           >
@@ -72,7 +74,7 @@ export function ProfileEditor({
           style={styles.input}
           value={name}
           onChangeText={onNameChange}
-          placeholder="Your name"
+          placeholder={t('comp.yourName')}
           placeholderTextColor={Colors.textTertiary}
           autoCapitalize="words"
           autoComplete="name"
@@ -80,7 +82,7 @@ export function ProfileEditor({
           maxLength={40}
           returnKeyType="done"
           autoFocus={autoFocus}
-          accessibilityLabel="Your name"
+          accessibilityLabel={t('comp.yourName')}
         />
       </Glass>
     </View>

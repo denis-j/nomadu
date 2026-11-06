@@ -22,6 +22,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { DOCUMENT_KINDS, DocumentKind, importDocumentFile, isImageMime, kindMeta } from '../../../lib/documents';
 import { showToast } from '../../../lib/toast';
 import { MissingRoute } from '../../../components/MissingRoute';
+import { useTranslation } from '../../../contexts/LanguageContext';
 import { useJourneyExists } from '../../../hooks/useJourneyExists';
 import { track } from '../../../lib/analytics';
 
@@ -40,13 +41,15 @@ interface Picked {
  */
 /** Reachable by link: without a real trip there is nothing to show or add to. */
 export default function AddDocumentScreen() {
+  const { t } = useTranslation();
   const { journeyId } = useLocalSearchParams<{ journeyId: string }>();
   const exists = useJourneyExists(Number(journeyId));
-  if (exists === false) return <MissingRoute title="Add document" message="This trip is no longer here." />;
+  if (exists === false) return <MissingRoute title={t('nav.addDocument')} message={t('documents.tripGone')} />;
   return <AddDocumentScreenContent />;
 }
 
 function AddDocumentScreenContent() {
+  const { t } = useTranslation();
   const nav = useNavigation();
   // The wallet passes what it already knows: the slot that was tapped and
   // whose tab was open. Both are just defaults, still changeable here.
@@ -77,7 +80,7 @@ function AddDocumentScreenContent() {
 
   const addTraveller = () => {
     Alert.prompt(
-      'Who else is travelling?',
+      t('documents.whoTravelling'),
       undefined,
       async (name) => {
         const trimmed = (name ?? '').trim();
@@ -112,7 +115,7 @@ function AddDocumentScreenContent() {
     Haptics.selectionAsync();
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
-      showToast('Camera access is off in Settings', 'error');
+      showToast(t('addDoc.cameraOff'), 'error');
       return;
     }
     const res = await ImagePicker.launchCameraAsync({ quality: 0.9 });
@@ -133,13 +136,13 @@ function AddDocumentScreenContent() {
     takePicked({ uri: a.uri, name: a.name ?? null, mime: a.mimeType ?? null });
   };
 
-  const missing = !picked ? 'Pick a file first' : !title.trim() ? 'Give it a name' : null;
+  const missing = !picked ? t('addDoc.pickFile') : !title.trim() ? t('addDoc.giveName') : null;
 
   const save = async () => {
     if (saving) return;
     if (missing || !picked) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      showToast(missing ?? 'Form is incomplete', 'error');
+      showToast(missing ?? t('addDoc.formIncomplete'), 'error');
       return;
     }
     setSaving(true);
@@ -157,24 +160,24 @@ function AddDocumentScreenContent() {
       track({ name: 'document_added', props: { kind } });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       nav.goBack();
-      showToast('Document added');
+      showToast(t('addDoc.added'));
     } catch (err) {
       console.error('Failed to add document:', err);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      showToast('Could not save the document', 'error');
+      showToast(t('addDoc.couldNotSave'), 'error');
       setSaving(false);
     }
   };
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Add document' }} />
+      <Stack.Screen options={{ title: t('nav.addDocument') }} />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={visaFormStyles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <SectionLabel>File</SectionLabel>
+        <SectionLabel>{t('addDoc.file')}</SectionLabel>
         {picked ? (
           <Card>
             <View style={styles.pickedRow}>
@@ -186,30 +189,30 @@ function AddDocumentScreenContent() {
                 </View>
               )}
               <View style={styles.pickedText}>
-                <Text style={styles.pickedName} numberOfLines={1}>{picked.name ?? 'Photo'}</Text>
+                <Text style={styles.pickedName} numberOfLines={1}>{picked.name ?? t('addDoc.photo')}</Text>
                 <Text style={styles.pickedMime} numberOfLines={1}>{picked.mime ?? 'file'}</Text>
               </View>
-              <Pressable onPress={() => setPicked(null)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Remove file">
+              <Pressable onPress={() => setPicked(null)} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('addDoc.removeFile')}>
                 <Ionicons name="close-circle" size={22} color={Colors.textTertiary} />
               </Pressable>
             </View>
           </Card>
         ) : (
           <Card>
-            <SourceRow icon="images-outline" title="From Photos" subtitle="A screenshot or a photo you already have" onPress={fromPhotos} />
+            <SourceRow icon="images-outline" title={t('addDoc.fromPhotos')} subtitle={t('addDoc.fromPhotosSub')} onPress={fromPhotos} />
             <View style={styles.separator} />
-            <SourceRow icon="folder-open-outline" title="From Files" subtitle="A PDF from Mail, Files or a download" onPress={fromFiles} />
+            <SourceRow icon="folder-open-outline" title={t('addDoc.fromFiles')} subtitle={t('addDoc.fromFilesSub')} onPress={fromFiles} />
             <View style={styles.separator} />
-            <SourceRow icon="camera-outline" title="Take a photo" subtitle="A paper ticket or a stamp" onPress={fromCamera} />
+            <SourceRow icon="camera-outline" title={t('addDoc.takePhoto')} subtitle={t('addDoc.takePhotoSub')} onPress={fromCamera} />
           </Card>
         )}
 
-        <SectionLabel>Name</SectionLabel>
+        <SectionLabel>{t('addDoc.name')}</SectionLabel>
         <Card>
           <View style={styles.inputRow}>
             <TextInput
               style={styles.input}
-              placeholder="BER to KUL, eVisa, Arrival card …"
+              placeholder={t('addDoc.namePlaceholder')}
               placeholderTextColor={Colors.textTertiary}
               value={title}
               onChangeText={setTitle}
@@ -218,20 +221,20 @@ function AddDocumentScreenContent() {
           </View>
         </Card>
 
-        <SectionLabel>What is it</SectionLabel>
+        <SectionLabel>{t('addDoc.whatIsIt')}</SectionLabel>
         <Card>
-          {DOCUMENT_KINDS.map((k, i) => (
+          {DOCUMENT_KINDS.filter((k) => !k.hidden).map((k, i, all) => (
             <ChoiceRow
               key={k.kind}
-              title={k.label}
+              title={t(`docKind.${k.kind}`)}
               selected={kind === k.kind}
               onPress={() => setKind(k.kind)}
-              last={i === DOCUMENT_KINDS.length - 1}
+              last={i === all.length - 1}
             />
           ))}
         </Card>
 
-        <SectionLabel>Whose is it</SectionLabel>
+        <SectionLabel>{t('addDoc.whoseIsIt')}</SectionLabel>
         <Card>
           {/* On a friend's trip only oneself and everyone: what the owner's
               wallet shows of one's documents is exactly that. */}
@@ -244,16 +247,16 @@ function AddDocumentScreenContent() {
             />
           ))}
           <ChoiceRow
-            title="Everyone"
-            subtitle="A booking that covers the whole group"
+            title={t('documents.everyone')}
+            subtitle={t('addDoc.everyoneSub')}
             selected={travellerId === null}
             onPress={() => setTravellerId(null)}
             last={!!owner}
           />
           {!owner && (
             <ChoiceRow
-              title="Someone else"
-              subtitle="Add a travel companion"
+              title={t('addDoc.someoneElse')}
+              subtitle={t('addDoc.someoneElseSub')}
               selected={false}
               onPress={addTraveller}
               last
@@ -263,7 +266,7 @@ function AddDocumentScreenContent() {
 
         <View style={styles.footer}>
           <CloudyButton onPress={save} style={styles.cta} innerStyle={styles.ctaInner}>
-            <Text style={styles.ctaText}>{saving ? 'Adding…' : 'Add document'}</Text>
+            <Text style={styles.ctaText}>{saving ? t('addDoc.adding') : t('nav.addDocument')}</Text>
           </CloudyButton>
           {missing && <Text style={styles.missing}>{missing}</Text>}
         </View>

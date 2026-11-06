@@ -23,6 +23,7 @@ import { VisaStatus } from '../../../lib/visaCalculations';
 import { TaxStatus } from '../../../lib/taxCalculations';
 import { SCHENGEN_COUNTRIES } from '../../../constants/visaRules';
 import { checkLocationPermissions, foregroundLocationCheck, isTrackingActive, startBackgroundTracking } from '../../../lib/location';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const EXPANDED_WIDTH = SCREEN_WIDTH - 32;
@@ -61,6 +62,7 @@ interface MorphChipProps {
 }
 
 function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipProps) {
+  const { t, countryName } = useTranslation();
   const [chipWidth, setChipWidth] = useState(0);
   const [rowHeight, setRowHeight] = useState(0);
   const [statsHeight, setStatsHeight] = useState(0);
@@ -148,7 +150,7 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
           <Flag code={currentTrip.country_code} size={16} />
           <Text style={styles.chipCity}>{currentTrip.city}</Text>
           <View style={styles.chipDivider} />
-          <Text style={styles.chipCountry}>{currentTrip.country}</Text>
+          <Text style={styles.chipCountry}>{countryName(currentTrip.country)}</Text>
         </View>
 
         {/* Stats – always mounted, clipped by height + faded by opacity */}
@@ -162,11 +164,11 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
 
           {/* Row 1: Here · Arrived · Total */}
           <View style={styles.statsRow}>
-            <StatItem value={`${currentTrip.days}d`} label="Here" />
+            <StatItem value={`${currentTrip.days}d`} label={t('map.here')} />
             <View style={styles.statSep} />
-            <StatItem value={arrived} label="Arrived" />
+            <StatItem value={arrived} label={t('map.arrived')} />
             <View style={styles.statSep} />
-            <StatItem value={`${totalDaysInCity}d`} label="All Stays" />
+            <StatItem value={`${totalDaysInCity}d`} label={t('map.allStays')} />
           </View>
 
           {/* Row 2: Visa + Tax */}
@@ -176,21 +178,21 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
               <View style={styles.trackingRow}>
                 {visaStatus && (
                   <View style={styles.trackingItem}>
-                    <Text style={styles.trackingLabel}>VISA</Text>
+                    <Text style={styles.trackingLabel}>{t('map.visa')}</Text>
                     <Text style={[styles.trackingValue, { color: visaStatusColor(visaStatus.status) }]}>
-                      {visaStatus.daysRemaining}d left
+                      {t('map.daysLeft', { days: visaStatus.daysRemaining })}
                     </Text>
-                    <Text style={styles.trackingSubLabel}>of {visaStatus.daysAllowed}d</Text>
+                    <Text style={styles.trackingSubLabel}>{t('map.ofDays', { days: visaStatus.daysAllowed })}</Text>
                   </View>
                 )}
                 {visaStatus && taxStatus && <View style={styles.statSep} />}
                 {taxStatus && (
                   <View style={styles.trackingItem}>
-                    <Text style={styles.trackingLabel}>TAX</Text>
+                    <Text style={styles.trackingLabel}>{t('map.tax')}</Text>
                     <Text style={[styles.trackingValue, { color: taxStatusColor(taxStatus.status) }]}>
                       {taxStatus.daysPresent}/{taxStatus.thresholdDays}d
                     </Text>
-                    <Text style={styles.trackingSubLabel}>183d rule</Text>
+                    <Text style={styles.trackingSubLabel}>{t('map.rule183')}</Text>
                   </View>
                 )}
               </View>
@@ -203,6 +205,7 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
 }
 
 export default function MapScreen() {
+  const { t } = useTranslation();
   const { trips, loading, refresh } = useTrips();
   const { visaStatuses } = useVisaTracker();
   const { taxStatuses } = useTaxTracker();
@@ -289,10 +292,10 @@ export default function MapScreen() {
                   off. With permission granted and no trips yet, the first
                   recorded location is simply still to come. */}
               {detecting
-                ? 'Detecting your location…'
+                ? t('map.detecting')
                 : hasLocationPermission
-                  ? 'Your first stay appears once a location is recorded'
-                  : 'Enable location tracking to see your trips'}
+                  ? t('map.firstStay')
+                  : t('map.enableTracking')}
             </Text>
           </ChipWrapper>
         ) : null}

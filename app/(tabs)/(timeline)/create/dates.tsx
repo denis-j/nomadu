@@ -11,6 +11,7 @@ import { getCountryCode } from '../../../../utils/geography';
 import { showToast } from '../../../../lib/toast';
 import { hasBadge, isBadgeUnlocked, setPendingUnlock } from '../../../../lib/badges';
 import { track } from '../../../../lib/analytics';
+import { useTranslation } from '../../../../contexts/LanguageContext';
 
 type Params = {
   country: string;
@@ -28,6 +29,7 @@ const RANGE_COLOR = '#000000';
 const RANGE_BG = 'rgba(0,0,0,0.08)';
 
 export default function CreateDatesScreen() {
+  const { t, countryName } = useTranslation();
   const parentNav = useNavigation();
   const params = useLocalSearchParams<Params>();
   const { country, city } = params;
@@ -140,7 +142,7 @@ export default function CreateDatesScreen() {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       parentNav.getParent()?.goBack();
-      showToast(isEditing ? 'Trip updated' : 'Trip added');
+      showToast(isEditing ? t('timelineCreate.tripUpdated') : t('timelineCreate.tripAdded'));
     } catch (err) {
       console.error('Failed to save trip:', err);
       savingRef.current = false;
@@ -152,9 +154,9 @@ export default function CreateDatesScreen() {
     <>
       <Stack.Screen
         options={{
-          title: isEditing ? 'Edit Dates' : 'Trip Dates',
+          title: isEditing ? t('timelineCreate.editDates') : t('timelineCreate.tripDates'),
           headerRight: () => (
-            <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel="Save trip">
+            <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel={t('timelineCreate.saveTrip')}>
               <SymbolView
                 name={{ ios: 'checkmark', android: 'check' }}
                 tintColor={systemColor('label')}
@@ -171,7 +173,7 @@ export default function CreateDatesScreen() {
       >
         {/* Location + days summary */}
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLocation}>{city}, {country}</Text>
+          <Text style={styles.summaryLocation}>{city}, {countryName(country)}</Text>
           <View style={styles.daysBubble}>
             <Text style={styles.daysText}>{days}d</Text>
           </View>
@@ -180,7 +182,7 @@ export default function CreateDatesScreen() {
         {/* Hint */}
         {!noEndDate && (
           <Text style={styles.hint}>
-            {pickingEnd ? 'Tap a date for the end' : 'Tap a date for the start'}
+            {pickingEnd ? t('timelineCreate.tapEnd') : t('timelineCreate.tapStart')}
           </Text>
         )}
 
@@ -211,7 +213,7 @@ export default function CreateDatesScreen() {
         {/* Still traveling toggle */}
         <View style={styles.section}>
           <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Still traveling</Text>
+            <Text style={styles.toggleLabel}>{t('timelineCreate.stillTraveling')}</Text>
             <Switch
               value={noEndDate}
               onValueChange={(v) => {

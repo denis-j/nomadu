@@ -4,6 +4,7 @@ import { Flag } from './Flag';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { guideDays, type DestinationGuide } from '../constants/guides';
+import { useTranslation } from '../contexts/LanguageContext';
 
 export const GUIDE_CARD_WIDTH = 140;
 
@@ -14,6 +15,7 @@ export const GUIDE_CARD_WIDTH = 140;
  * up a wall of text on a photo.
  */
 export function GuideCard({ guide, onPress }: { guide: DestinationGuide; onPress: () => void }) {
+  const { t, countryName } = useTranslation();
   const days = guideDays(guide);
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
@@ -28,9 +30,9 @@ export function GuideCard({ guide, onPress }: { guide: DestinationGuide; onPress
           <Flag code={guide.countryCode} size={20} />
         </View>
         <View style={styles.text}>
-          <Text style={styles.country} numberOfLines={1}>{guide.country}</Text>
+          <Text style={styles.country} numberOfLines={1}>{countryName(guide.country)}</Text>
           <Text style={styles.meta}>
-            {guide.legs.length} {guide.legs.length === 1 ? 'stop' : 'stops'} · {days} days
+            {guide.legs.length} {guide.legs.length === 1 ? t('plans.stopSingular') : t('plans.stopPlural')} · {days} {t('plans.days')}
           </Text>
         </View>
       </ImageBackground>

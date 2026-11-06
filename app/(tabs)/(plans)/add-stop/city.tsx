@@ -4,6 +4,7 @@ import { systemColor } from '../../../../constants/colors';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { getCitiesByCountryPaginated, searchCitiesByCountry } from '../../../../utils/geography';
+import { useTranslation } from '../../../../contexts/LanguageContext';
 
 type Params = {
   journeyId: string;
@@ -19,6 +20,7 @@ type Params = {
 };
 
 export default function AddStopCityScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<Params>();
   const { country } = params;
@@ -102,7 +104,7 @@ export default function AddStopCityScreen() {
         options={{
           title: country,
           headerSearchBarOptions: {
-            placeholder: 'Search cities…',
+            placeholder: t('timelineCreate.searchCities'),
             onChangeText: (e: any) => handleSearch(e.nativeEvent.text),
           },
         }}
@@ -133,11 +135,11 @@ export default function AddStopCityScreen() {
         ))}
         {!isSearching && !query && hasMore && (
           <Pressable style={styles.loadMore} onPress={loadMore}>
-            <Text style={styles.loadMoreText}>{loadingMore ? 'Loading…' : 'Load more'}</Text>
+            <Text style={styles.loadMoreText}>{loadingMore ? t('common.loading') : t('timelineCreate.loadMore')}</Text>
           </Pressable>
         )}
         {!isSearching && displayed.length === 0 && (
-          <Text style={styles.empty}>No cities found</Text>
+          <Text style={styles.empty}>{t('timelineCreate.noCitiesFound')}</Text>
         )}
         {/* The city list is not exhaustive, so a search that finds nothing
             lets the user continue with the name as typed. The country is
@@ -149,7 +151,7 @@ export default function AddStopCityScreen() {
             onPress={() => pickCity(trimmedQuery)}
           >
             <Text style={[styles.itemText, styles.customItemText]} numberOfLines={1}>
-              {`Use "${trimmedQuery}"`}
+              {t('addStop.useQuery', { query: trimmedQuery })}
             </Text>
             <Text style={styles.chevron}>›</Text>
           </Pressable>

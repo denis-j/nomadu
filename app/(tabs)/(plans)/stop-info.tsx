@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,9 +27,15 @@ import { useAccommodation } from '../../../hooks/useAccommodations';
 import { useAuth } from '../../../hooks/useAuth';
 import { countDays, toYmd } from '../../../lib/days';
 import { getCitizenship } from '../../../lib/onboarding';
-import { setPendingStay } from '../../../lib/accommodationBridge';
+import { setPendingActivities, setPendingStay } from '../../../lib/accommodationBridge';
+import { useJourneyActivities } from '../../../hooks/useActivities';
+import { DetailCard, DetailRow, DetailSeparator, LinkCard } from '../../../components/SheetRows';
+import { ACTIVITIES_UI } from '../../../lib/activityModel';
 import { formatMoney, nightsBetween, primaryOption } from '../../../lib/accommodationModel';
 import { showToast } from '../../../lib/toast';
+import { useTranslation } from '../../../contexts/LanguageContext';
+
+type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
 type Params = {
   legId: string;
@@ -61,41 +66,42 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 const fmtLong = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
 /** Where the stop stands from today: "Starts in 50 days", "Today: Day 2 of 4", "Ended 3 days ago". */
-function whenStat(start: Date, end: Date, days: number): { label: string; value: string; unit?: string } {
+function whenStat(start: Date, end: Date, days: number, t: TFunc): { label: string; value: string; unit?: string } {
   const today = parseDate(toYmd(new Date()));
   if (today < start) {
     const until = countDays(today, start) - 1;
-    return until === 1 ? { label: 'Starts', value: 'Tomorrow' } : { label: 'Starts', value: `in ${until}`, unit: 'days' };
+    return until === 1 ? { label: t('stopInfo.starts'), value: t('stopInfo.tomorrow') } : { label: t('stopInfo.starts'), value: t('stopInfo.inDays', { count: until }), unit: t('stopInfo.days') };
   }
   if (today > end) {
     const ago = countDays(end, today) - 1;
-    return ago === 1 ? { label: 'Ended', value: 'Yesterday' } : { label: 'Ended', value: `${ago}`, unit: 'days ago' };
+    return ago === 1 ? { label: t('stopInfo.ended'), value: t('stopInfo.yesterday') } : { label: t('stopInfo.ended'), value: `${ago}`, unit: t('stopInfo.daysAgo') };
   }
-  return { label: 'Today', value: `Day ${countDays(start, today)}`, unit: `of ${days}` };
+  return { label: t('stopInfo.today'), value: t('stopInfo.dayN', { n: countDays(start, today) }), unit: t('stopInfo.ofDays', { days }) };
 }
 
 /** The visa rule in a sentence, or what it means when there is none to track. */
-function visaLabel(rule: VisaRule | null): string | null {
+function visaLabel(rule: VisaRule | null, t: TFunc): string | null {
   if (!rule) return null;
-  if (rule.ruleType === 'visa_required') return 'Visa required';
+  if (rule.ruleType === 'visa_required') return t('stopInfo.visaRequired');
   return rule.label;
 }
 
 /** The second line of the stay card: nights, the pick, what it costs. */
-function staySummary(plan: NonNullable<ReturnType<typeof useAccommodation>['plan']>): string {
+function staySummary(plan: NonNullable<ReturnType<typeof useAccommodation>['plan']>, t: TFunc): string {
   const nights = nightsBetween(plan.check_in, plan.check_out);
-  const parts = [`${nights} ${nights === 1 ? 'night' : 'nights'}`];
+  const parts = [`${nights} ${nights === 1 ? t('stopInfo.nightSingular') : t('stopInfo.nightPlural')}`];
   const primary = primaryOption(plan);
   const price = plan.booking ? formatMoney(plan.booking.price, plan.booking.currency) : primary ? formatMoney(primary.total_price, primary.currency) : null;
   if (price) parts.push(price);
-  else if (plan.requirements.budget_per_night && plan.requirements.currency) parts.push(`up to ${formatMoney(plan.requirements.budget_per_night, plan.requirements.currency)}/night`);
-  if (!primary && plan.options.length) parts.push(`${plan.options.length} to compare`);
+  else if (plan.requirements.budget_per_night && plan.requirements.currency) parts.push(t('stopInfo.upToNight', { amount: formatMoney(plan.requirements.budget_per_night, plan.requirements.currency)! }));
+  if (!primary && plan.options.length) parts.push(t('stopInfo.toCompare', { count: plan.options.length }));
   return parts.join(' · ');
 }
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function StopInfoScreen() {
+  const { t, countryName } = useTranslation();
   const router = useRouter();
   const nav = useNavigation();
   const params = useLocalSearchParams<Params>();
@@ -108,6 +114,9 @@ export default function StopInfoScreen() {
   const transport = transportInfo(params.transport);
 
   const { plan: stay } = useAccommodation(params.stopSyncId);
+  const stopIds = useMemo(() => [params.stopSyncId ?? null], [params.stopSyncId]);
+  const { byStop: activitiesByStop } = useJourneyActivities(params.journeySyncId, stopIds);
+  const things = params.stopSyncId ? activitiesByStop.get(params.stopSyncId) ?? [] : [];
   const readOnly = params.readOnly === '1';
 
   // The visa rule for this passport in this country, the same one the
@@ -120,8 +129,8 @@ export default function StopInfoScreen() {
       .then((c) => setVisaRule(c ? getRuleForCitizen(c.countryCode, countryCode) : null))
       .catch(() => setVisaRule(null));
   }, [user?.uid, countryCode]);
-  const when = whenStat(startDate, endDate, days);
-  const visa = visaLabel(visaRule);
+  const when = whenStat(startDate, endDate, days, t);
+  const visa = visaLabel(visaRule, t);
 
   const handleEdit = () => {
     // Swap this sheet for the editor in one navigation update. A first version
@@ -162,23 +171,30 @@ export default function StopInfoScreen() {
     nav.goBack();
   };
 
+  const openActivities = () => {
+    if (!params.stopSyncId || !params.journeySyncId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPendingActivities({ stopSyncId: params.stopSyncId, journeySyncId: params.journeySyncId, readOnly });
+    nav.goBack();
+  };
+
   const handleDelete = () => {
-    Alert.alert('Delete Stop', `Remove ${city} from this journey?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('stopInfo.deleteStopTitle'), t('stopInfo.removeFromJourney', { city: city ?? '' }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           await deleteJourneyLeg(Number(params.legId));
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           nav.goBack();
-          showToast('Stop removed');
+          showToast(t('stopInfo.stopRemoved'));
         },
       },
     ]);
   };
 
-  if (!complete) return <MissingRoute title="Stop" message="This stop is no longer here." />;
+  if (!complete) return <MissingRoute title={t('stopInfo.stop')} message={t('plans.stopGone')} />;
 
   const latitude = params.latitude ? Number(params.latitude) : null;
   const longitude = params.longitude ? Number(params.longitude) : null;
@@ -211,73 +227,73 @@ export default function StopInfoScreen() {
         <View style={[styles.header, hasCoords && styles.headerWithMap]}>
           {!hasCoords && <Flag code={countryCode} size={32} />}
           <Text style={styles.city}>{city}</Text>
-          <Text style={styles.country}>{country}</Text>
+          <Text style={styles.country}>{countryName(country)}</Text>
         </View>
 
         {/* Stats: each fact once; the dates themselves are in the card below */}
         <StatRow style={styles.statsRow}>
-          <StatTile label="Duration" value={`${days}`} unit={days === 1 ? 'day' : 'days'} />
+          <StatTile label={t('stopInfo.duration')} value={`${days}`} unit={days === 1 ? t('stopInfo.day') : t('stopInfo.days')} />
           <StatTile label={when.label} value={when.value} unit={when.unit} />
-          <StatTile label="Transport" value={transport.label} icon={transport.icon} />
+          <StatTile label={t('plans.transport')} value={t(`transport.${transport.type}`)} icon={transport.icon} />
         </StatRow>
 
         {/* Details */}
         <View style={styles.section}>
-          <SectionLabel>Stop details</SectionLabel>
-          <GlassCard {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
-            <DetailRow icon="log-in-outline" label="Arrival" value={fmtLong(startDate)} />
-            <View style={styles.separator} />
-            <DetailRow icon="log-out-outline" label="Departure" value={fmtLong(endDate)} />
+          <SectionLabel>{t('stopInfo.stopDetails')}</SectionLabel>
+          <DetailCard>
+            <DetailRow icon="log-in-outline" label={t('stopInfo.arrival')} value={fmtLong(startDate)} />
+            <DetailSeparator />
+            <DetailRow icon="log-out-outline" label={t('stopInfo.departure')} value={fmtLong(endDate)} />
             {visa ? (
               <>
-                <View style={styles.separator} />
-                <DetailRow icon="document-text-outline" label="Visa" value={visa} />
+                <DetailSeparator />
+                <DetailRow icon="document-text-outline" label={t('stopInfo.visa')} value={visa} />
               </>
             ) : null}
             {params.notes ? (
               <>
-                <View style={styles.separator} />
+                <DetailSeparator />
                 <View style={styles.notesRow}>
                   <View style={styles.detailLeft}>
                     <Ionicons name="create-outline" size={18} color={Colors.textTertiary} />
-                    <Text style={styles.detailLabel}>Notes</Text>
+                    <Text style={styles.detailLabel}>{t('plans.notes')}</Text>
                   </View>
                   <Text selectable style={styles.notesText}>{params.notes}</Text>
                 </View>
               </>
             ) : null}
-          </GlassCard>
+          </DetailCard>
         </View>
 
         {/* Where to stay. On a friend's trip only once they planned something. */}
         {params.stopSyncId && params.journeySyncId && (!readOnly || stay) ? (
-          <Pressable onPress={openAccommodation} style={({ pressed }) => [styles.section, pressed && { opacity: 0.7 }]}>
-            <GlassCard {...glassProps} style={[styles.card, styles.stayCard, !hasGlass && styles.cardFallback]}>
-              <View style={styles.stayIcon}>
-                <Ionicons name="bed-outline" size={20} color={Colors.text} />
-              </View>
-              <View style={styles.stayText}>
-                {stay ? (
-                  <>
-                    <Text style={styles.stayTitle} numberOfLines={1}>{planChipText(stay)}</Text>
-                    <Text style={styles.staySub} numberOfLines={1}>{staySummary(stay)}</Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.stayTitle}>Where to stay</Text>
-                    <Text style={styles.staySub}>Requirements, options, the booking</Text>
-                  </>
-                )}
-              </View>
-              {stay ? <StatusBadge status={stay.status} size="small" /> : null}
-              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-            </GlassCard>
-          </Pressable>
+          <View style={styles.section}>
+            <LinkCard
+              icon="bed-outline"
+              // The place by name once there is one; the badge says how far it is.
+              title={stay ? primaryOption(stay)?.name ?? planChipText(stay, t) : t('stopInfo.whereToStay')}
+              sub={stay ? staySummary(stay, t) : t('stopInfo.reqOptionsBooking')}
+              right={stay && stay.needed ? <StatusBadge status={stay.status} size="small" /> : undefined}
+              onPress={openAccommodation}
+            />
+          </View>
+        ) : null}
+
+        {/* Things to do, the same way in. */}
+        {ACTIVITIES_UI && params.stopSyncId && params.journeySyncId && (!readOnly || things.length > 0) ? (
+          <View style={styles.section}>
+            <LinkCard
+              icon="sparkles-outline"
+              title={things.length === 0 ? t('nav.thingsToDo') : things.length === 1 ? t('stopInfo.oneThing') : t('stopInfo.manyThings', { count: things.length })}
+              sub={things.length === 0 ? t('stopInfo.ideasSuggestions') : things.slice(0, 3).map((a) => a.title).join(', ')}
+              onPress={openActivities}
+            />
+          </View>
         ) : null}
 
         {/* Tips */}
         <View style={styles.section}>
-          <SectionLabel>{`Tips for ${city}`}</SectionLabel>
+          <SectionLabel>{t('stopInfo.tipsFor', { city: city ?? '' })}</SectionLabel>
           <GlassCard {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
             <CityTips city={city} country={country} />
           </GlassCard>
@@ -287,27 +303,15 @@ export default function StopInfoScreen() {
         {!readOnly && (
           <View style={styles.actions}>
             <TouchableOpacity style={styles.actionButton} onPress={handleEdit} activeOpacity={0.5}>
-              <Text style={styles.editText}>Edit stop</Text>
+              <Text style={styles.editText}>{t('stopInfo.editStop')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={handleDelete} activeOpacity={0.5}>
-              <Text style={styles.deleteText}>Delete stop</Text>
+              <Text style={styles.deleteText}>{t('stopInfo.deleteStop')}</Text>
             </TouchableOpacity>
           </View>
         )}
       </ScrollView>
     </>
-  );
-}
-
-function DetailRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <View style={styles.detailLeft}>
-        <Ionicons name={icon} size={18} color={Colors.textTertiary} />
-        <Text style={styles.detailLabel}>{label}</Text>
-      </View>
-      <Text selectable style={styles.detailValue}>{value}</Text>
-    </View>
   );
 }
 
@@ -344,27 +348,10 @@ const styles = StyleSheet.create({
   section: { marginHorizontal: 16, marginTop: 16, gap: 10 },
   card: { borderRadius: 16, padding: 18, overflow: 'hidden' },
   cardFallback: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
-  separator: { height: 1, backgroundColor: Colors.border, marginVertical: 12 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   detailLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   detailLabel: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary },
-  detailValue: { ...Typography.bodySmall, fontSize: 14, fontWeight: '500', flexShrink: 1, textAlign: 'right' },
   notesRow: { gap: 8 },
   notesText: { ...Typography.bodySmall, fontSize: 14, lineHeight: 20 },
-  // ─── Where to stay ───
-  stayCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  stayIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    borderCurve: 'continuous',
-    backgroundColor: Colors.surfaceSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stayText: { flex: 1, gap: 2 },
-  stayTitle: { ...Typography.titleSmall, fontWeight: '600' },
-  staySub: { ...Typography.bodySmall, color: Colors.textSecondary },
   // ─── Actions ───
   actions: { flexDirection: 'row', justifyContent: 'center', gap: 32, marginHorizontal: 16, marginTop: 24, paddingVertical: 14 },
   actionButton: { alignItems: 'center' },

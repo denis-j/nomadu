@@ -11,6 +11,7 @@ import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { auth, functions } from '../../../lib/firebase';
 import { showToast } from '../../../lib/toast';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 interface AgentToken {
   id: string;
@@ -29,6 +30,8 @@ const cacheKey = () => `@agent_tokens_${auth.currentUser?.uid ?? 'anon'}`;
  * knows and refreshes when the sheet closes.
  */
 export default function AgentAccessScreen() {
+  const { t } = useTranslation();
+  const tr = t;
   const router = useRouter();
   const [agents, setAgents] = useState<AgentToken[] | null>(null);
 
@@ -40,7 +43,7 @@ export default function AgentAccessScreen() {
       AsyncStorage.setItem(cacheKey(), JSON.stringify(res.data.tokens)).catch(() => {});
     } catch {
       setAgents((prev) => prev ?? []);
-      showToast('Could not load your agents', 'error');
+      showToast(t('agent.couldNotLoad'), 'error');
     }
   }, []);
 
@@ -63,10 +66,10 @@ export default function AgentAccessScreen() {
 
   const remove = (t: AgentToken) => {
     Haptics.selectionAsync();
-    Alert.alert(`Remove "${t.label}"?`, 'It loses access immediately. To connect it again, it needs a new key.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(tr('agent.removeTitle', { label: t.label }), tr('agent.removeBody'), [
+      { text: tr('common.cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: tr('common.remove'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -74,7 +77,7 @@ export default function AgentAccessScreen() {
             await fn({ id: t.id });
             load();
           } catch {
-            showToast('Could not remove the agent', 'error');
+            showToast(tr('agent.couldNotRemove'), 'error');
           }
         },
       },
@@ -83,7 +86,7 @@ export default function AgentAccessScreen() {
 
   const when = (iso: string) => {
     const d = new Date(iso);
-    if (d.toDateString() === new Date().toDateString()) return 'today';
+    if (d.toDateString() === new Date().toDateString()) return t('agent.today');
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
@@ -91,12 +94,12 @@ export default function AgentAccessScreen() {
 
   const connectButton = (
     <CloudyButton onPress={connect} style={{ width: '100%' }} innerStyle={{ justifyContent: 'center' }}>
-      <Text style={styles.ctaText}>{hasAgents ? 'Connect another agent' : 'Connect an agent'}</Text>
+      <Text style={styles.ctaText}>{hasAgents ? t('agent.connectAnother') : t('agent.connectAgent')}</Text>
     </CloudyButton>
   );
   const agentList = (
     <>
-      <SectionLabel>Connected agents</SectionLabel>
+      <SectionLabel>{t('agent.connectedAgents')}</SectionLabel>
       <Card>
         {agents === null ? (
           <AgentSkeleton />
@@ -108,10 +111,10 @@ export default function AgentAccessScreen() {
                 <View style={styles.agentText}>
                   <Text style={styles.agentLabel}>{t.label}</Text>
                   <Text style={styles.agentMeta} numberOfLines={1}>
-                    {[t.edit_timeline ? 'edits timeline' : 'read only', t.last_used_at ? `last used ${when(t.last_used_at)}` : 'not used yet'].join('  ·  ')}
+                    {[t.edit_timeline ? tr('agent.editsTimeline') : tr('agent.readOnlyMeta'), t.last_used_at ? tr('agent.lastUsed', { when: when(t.last_used_at) }) : tr('agent.notUsedYet')].join('  ·  ')}
                   </Text>
                 </View>
-                <Pressable onPress={() => remove(t)} hitSlop={10} accessibilityLabel={`Remove ${t.label}`}>
+                <Pressable onPress={() => remove(t)} hitSlop={10} accessibilityLabel={tr('agent.removeNamed', { label: t.label })}>
                   <Ionicons name="trash-outline" size={18} color={Colors.error} />
                 </Pressable>
               </View>
@@ -124,19 +127,19 @@ export default function AgentAccessScreen() {
 
   const canDo = (
     <>
-      <SectionLabel>What it can do</SectionLabel>
+      <SectionLabel>{t('agent.whatItCanDo')}</SectionLabel>
       <Card>
-        <Can icon="time-outline" title="Look up where you have been" text="Every tracked stay with city, country and dates, for any period you ask about." />
+        <Can icon="time-outline" title={t('agent.cap1Title')} text={t('agent.cap1Text')} />
         <View style={styles.separator} />
-        <Can icon="stats-chart-outline" title="Count your days" text="Days away from home, countries, cities and stops, per year or all time." />
+        <Can icon="stats-chart-outline" title={t('agent.cap2Title')} text={t('agent.cap2Text')} />
         <View style={styles.separator} />
-        <Can icon="shield-checkmark-outline" title="Check visa and tax standing" text="Days allowed, used and left per destination, and your tax exposure per country." />
+        <Can icon="shield-checkmark-outline" title={t('agent.cap3Title')} text={t('agent.cap3Text')} />
         <View style={styles.separator} />
-        <Can icon="map-outline" title="Plan trips" text="Read, create, change and delete your plans. They show up in Plan after the next sync." />
+        <Can icon="map-outline" title={t('agent.cap4Title')} text={t('agent.cap4Text')} />
         <View style={styles.separator} />
-        <Can icon="create-outline" title="Fix your timeline, if you allow it" text="Add a stay the tracker missed, correct dates, remove a wrong one. You choose this when connecting." />
+        <Can icon="create-outline" title={t('agent.cap5Title')} text={t('agent.cap5Text')} />
         <View style={styles.separator} />
-        <Can icon="lock-closed-outline" title="Not your documents" text="Tickets, visas and bookings stay on this phone." muted />
+        <Can icon="lock-closed-outline" title={t('agent.cap6Title')} text={t('agent.cap6Text')} muted />
       </Card>
     </>
   );

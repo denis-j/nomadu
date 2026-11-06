@@ -7,6 +7,7 @@ import Animated, { FadeOut, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { useTranslation } from '../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -24,6 +25,7 @@ interface UpdateBannerProps {
  * the pill, the staged update still applies on the next cold start.
  */
 export function UpdateBanner({ visible, onApply }: UpdateBannerProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [dismissed, setDismissed] = useState(false);
 
@@ -50,12 +52,12 @@ export function UpdateBanner({ visible, onApply }: UpdateBannerProps) {
         <View style={styles.iconWrap}>
           <Ionicons name="sparkles" size={14} color={Colors.cloudyButtonText} />
         </View>
-        <Text style={styles.text}>Update ready</Text>
+        <Text style={styles.text}>{t('comp.updateReady')}</Text>
         <Pressable onPress={handleDismiss} hitSlop={6} style={styles.laterBtn}>
-          <Text style={styles.laterText}>Later</Text>
+          <Text style={styles.laterText}>{t('comp.later')}</Text>
         </Pressable>
         <Pressable onPress={handleApply} hitSlop={6} style={styles.applyBtn}>
-          <Text style={styles.applyText}>Now</Text>
+          <Text style={styles.applyText}>{t('comp.now')}</Text>
         </Pressable>
       </Glass>
     </Animated.View>

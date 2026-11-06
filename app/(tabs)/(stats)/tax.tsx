@@ -13,6 +13,9 @@ import { CloudyButton } from '../../../components/CloudyButton';
 import { Flag } from '../../../components/Flag';
 import { YearPicker } from '../../../components/YearPicker';
 import { TaxStatus } from '../../../lib/taxCalculations';
+import { useTranslation } from '../../../contexts/LanguageContext';
+
+type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -25,12 +28,12 @@ function getProgressColor(percent: number): string {
   return Colors.success;
 }
 
-function getStatusLabel(status: TaxStatus['status']): string {
+function getStatusLabel(status: TaxStatus['status'], t: TFunc): string {
   switch (status) {
-    case 'resident': return 'Tax Resident';
-    case 'warning': return 'Warning';
-    case 'caution': return 'Caution';
-    case 'safe': return 'Safe';
+    case 'resident': return t('tax.statusResident');
+    case 'warning': return t('tax.statusWarning');
+    case 'caution': return t('tax.statusCaution');
+    case 'safe': return t('tax.statusSafe');
   }
 }
 
@@ -44,6 +47,7 @@ function getStatusColor(status: TaxStatus['status']): string {
 }
 
 function TaxCard({ tax }: { tax: TaxStatus }) {
+  const { t, countryName } = useTranslation();
   const progressColor = getProgressColor(tax.percentUsed);
   const statusColor = getStatusColor(tax.status);
   const progressWidth = Math.min(tax.percentUsed, 100);
@@ -54,13 +58,13 @@ function TaxCard({ tax }: { tax: TaxStatus }) {
         <View style={styles.cardTitle}>
           <Flag code={tax.countryCode} size={24} />
           <View style={styles.titleText}>
-            <Text style={styles.destination}>{tax.country}</Text>
+            <Text style={styles.destination}>{countryName(tax.country)}</Text>
             <Text style={styles.ruleLabel}>{tax.ruleLabel}</Text>
           </View>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: statusColor + '18' }]}>
           <Text style={[styles.statusText, { color: statusColor }]}>
-            {getStatusLabel(tax.status)}
+            {getStatusLabel(tax.status, t)}
           </Text>
         </View>
       </View>
@@ -79,12 +83,12 @@ function TaxCard({ tax }: { tax: TaxStatus }) {
       <View style={styles.cardFooter}>
         <Text style={styles.daysText}>
           <Text style={styles.daysUsed}>{tax.daysPresent}</Text>
-          <Text style={styles.daysOf}> of </Text>
+          <Text style={styles.daysOf}>{t('tax.ofConnector')}</Text>
           <Text style={styles.daysAllowed}>{tax.thresholdDays}</Text>
-          <Text style={styles.daysOf}> days present</Text>
+          <Text style={styles.daysOf}>{t('tax.daysPresentSuffix')}</Text>
         </Text>
         <Text style={[styles.daysRemaining, { color: progressColor }]}>
-          {tax.daysRemaining}d left
+          {t('tax.daysLeft', { days: tax.daysRemaining })}
         </Text>
       </View>
     </Glass>
@@ -94,6 +98,7 @@ function TaxCard({ tax }: { tax: TaxStatus }) {
 const TAX_DISCLAIMER_SEEN_KEY = '@tax_disclaimer_seen';
 
 export default function TaxScreen() {
+  const { t, countryName } = useTranslation();
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const { taxStatuses, availableYears, loading, citizenshipCode, citizenshipCountry, refresh } =
     useTaxTracker(year);
@@ -135,8 +140,8 @@ export default function TaxScreen() {
       >
         <View style={styles.emptyInner}>
           <SymbolView name={{ ios: 'person.text.rectangle', android: 'id_card' }} size={48} tintColor={systemColor('tertiaryLabel')} weight="regular" />
-          <Text style={styles.emptyTitle}>No citizenship set</Text>
-          <Text style={styles.emptySubtitle}>Set your citizenship in Settings to see tax residence tracking.</Text>
+          <Text style={styles.emptyTitle}>{t('tax.noCitizenshipTitle')}</Text>
+          <Text style={styles.emptySubtitle}>{t('tax.noCitizenshipSubtitle')}</Text>
         </View>
       </ScrollView>
     );
@@ -156,21 +161,21 @@ export default function TaxScreen() {
       />
 
       <View style={styles.subtitleRow}>
-        <Text style={styles.subtitle}>Based on </Text>
+        <Text style={styles.subtitle}>{t('tax.basedOn')}</Text>
         {citizenshipCode && <Flag code={citizenshipCode} size={14} />}
-        <Text style={styles.subtitle}> {citizenshipCountry} citizenship · {year}</Text>
+        <Text style={styles.subtitle}>{t('tax.citizenshipSuffix', { country: countryName(citizenshipCountry), year })}</Text>
       </View>
       {/* Which stretch each card counts is on the card itself (ruleLabel);
           this says up front that it differs, and that it is an estimate. */}
       <Text style={[styles.subtitle, styles.estimate]}>
-        Estimate by each country&apos;s tax year: the calendar year for most, from Apr 6 in the UK, from Jul 1 in Australia, any 12 months in New Zealand.
+        {t('tax.estimate')}
       </Text>
 
       {taxStatuses.length === 0 ? (
         <View style={styles.emptyForYear}>
-          <Text style={styles.emptyForYearTitle}>No tax exposure in {year}</Text>
+          <Text style={styles.emptyForYearTitle}>{t('tax.noExposureTitle', { year })}</Text>
           <Text style={styles.emptyForYearSubtitle}>
-            You haven&apos;t spent days in any taxable country during this year.
+            {t('tax.noExposureSubtitle')}
           </Text>
         </View>
       ) : (
@@ -181,19 +186,16 @@ export default function TaxScreen() {
         <View style={styles.disclaimerIconWrap}>
           <Ionicons name="information-circle" size={22} color={Colors.cloudyButtonText} />
         </View>
-        <Text style={styles.disclaimerTitle}>Reference only, not tax advice</Text>
+        <Text style={styles.disclaimerTitle}>{t('tax.disclaimerTitle')}</Text>
         <Text style={styles.disclaimer}>
-          Nomadu&rsquo;s 183-day rule is a simplification. Many countries use rolling
-          12-month windows, fiscal years, CFC rules, treaty tie-breakers, or other
-          tests that this app does not model. Always consult a qualified tax advisor
-          before making decisions based on these numbers.
+          {t('tax.disclaimerBody')}
         </Text>
         <Pressable
           hitSlop={6}
           onPress={() => Linking.openURL('https://en.wikipedia.org/wiki/Tax_residence')}
           style={styles.disclaimerLinkRow}
         >
-          <Text style={styles.disclaimerLink}>Learn about tax residency</Text>
+          <Text style={styles.disclaimerLink}>{t('tax.learnMore')}</Text>
           <Ionicons name="open-outline" size={13} color={Colors.cloudyButtonText} />
         </Pressable>
       </Glass>
@@ -210,6 +212,7 @@ export default function TaxScreen() {
 }
 
 function FirstRunDisclaimerModal({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
+  const { t } = useTranslation();
   return (
     <Modal
       visible={visible}
@@ -226,22 +229,16 @@ function FirstRunDisclaimerModal({ visible, onDismiss }: { visible: boolean; onD
           <View style={styles.modalIconWrap}>
             <Ionicons name="information-circle" size={32} color={Colors.cloudyButtonText} />
           </View>
-          <Text style={styles.modalTitle}>Before you trust this tab</Text>
+          <Text style={styles.modalTitle}>{t('tax.modalTitle')}</Text>
           <Text style={styles.modalBody}>
-            The Tax tab uses a simplified 183-day rule to flag countries where you
-            might be triggering tax residency. Real tax law is far more nuanced:
-            rolling windows, fiscal years, treaty tie-breakers, CFC rules, and more.
-            {'\n\n'}
-            Nomadu is not a tax advisor and is not liable for tax filings, fines, or
-            other consequences of relying on this data. Always consult a qualified
-            tax professional before acting on what you see here.
+            {t('tax.modalBody')}
           </Text>
           <CloudyButton
             onPress={onDismiss}
             style={styles.modalButton}
             innerStyle={styles.modalButtonInner}
           >
-            <Text style={styles.modalButtonText}>I understand</Text>
+            <Text style={styles.modalButtonText}>{t('tax.understand')}</Text>
           </CloudyButton>
         </Glass>
       </View>

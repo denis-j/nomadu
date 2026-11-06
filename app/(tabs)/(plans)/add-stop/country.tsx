@@ -3,7 +3,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { systemColor } from '../../../../constants/colors';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { getPopularCountries, searchCountries, getCountryCode } from '../../../../utils/geography';
+import { getPopularCountries, searchCountries, getCountryCode, getCountryNames } from '../../../../utils/geography';
+import { useTranslation } from '../../../../contexts/LanguageContext';
 import { Flag } from '../../../../components/Flag';
 
 const popularCountries = getPopularCountries();
@@ -22,11 +23,19 @@ type Params = {
 };
 
 export default function AddStopCountryScreen() {
+  const { t, countryName } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<Params>();
   const [query, setQuery] = useState('');
 
-  const filtered = query.trim() ? searchCountries(query) : popularCountries;
+  const filtered = query.trim()
+    ? (() => {
+        const eng = searchCountries(query);
+        const seen = new Set(eng);
+        const ql = query.trim().toLowerCase();
+        return [...eng, ...getCountryNames().filter((c) => !seen.has(c) && countryName(c).toLowerCase().includes(ql))];
+      })()
+    : popularCountries;
   const isEditing = !!params.legId;
 
   const pickCountry = (name: string) => {
@@ -51,9 +60,9 @@ export default function AddStopCountryScreen() {
     <>
       <Stack.Screen
         options={{
-          title: isEditing ? 'Edit Country' : 'Choose Country',
+          title: isEditing ? t('timelineCreate.editCountry') : t('nav.chooseCountry'),
           headerSearchBarOptions: {
-            placeholder: 'Search countries…',
+            placeholder: t('common.searchCountries'),
             onChangeText: (e: any) => setQuery(e.nativeEvent.text),
           },
         }}
@@ -63,7 +72,7 @@ export default function AddStopCountryScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.list}
       >
-        {!query.trim() && <Text style={styles.sectionLabel}>Popular</Text>}
+        {!query.trim() && <Text style={styles.sectionLabel}>{t('addStop.popular')}</Text>}
         {filtered.map((name) => {
           const code = getCountryCode(name);
           return (
@@ -75,12 +84,12 @@ export default function AddStopCountryScreen() {
               <View style={styles.flagWrap}>
                 <Flag code={code} size={20} />
               </View>
-              <Text style={styles.itemText}>{name}</Text>
+              <Text style={styles.itemText}>{countryName(name)}</Text>
               <Text style={styles.chevron}>›</Text>
             </Pressable>
           );
         })}
-        {filtered.length === 0 && <Text style={styles.empty}>No countries found</Text>}
+        {filtered.length === 0 && <Text style={styles.empty}>{t('passport.noResults')}</Text>}
       </ScrollView>
     </>
   );

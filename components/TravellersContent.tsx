@@ -4,6 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { Avatar, avatarPeople, type AvatarPerson } from './TravellerAvatars';
+import { useTranslation } from '../contexts/LanguageContext';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useJourneyDocuments } from '../hooks/useJourneyDocuments';
@@ -21,11 +22,15 @@ import { showToast } from '../lib/toast';
  * plan along or stops them; a small pencil marks who may.
  */
 export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId: number; onChanged: () => void; onClose: () => void }) {
+  const { t } = useTranslation();
   const { travellers, owner, uid, refresh } = useJourneyDocuments(journeyId, { ensureSelf: true });
   const [journey, setJourney] = useState<Journey | null>(null);
   // Who may plan along, as the shared trip says. Read live, not stored: the
   // owner changes it here, and it is only ever needed while this is open.
   const [editors, setEditors] = useState<Set<string>>(new Set());
+  // Friends being removed: gone from the row at once, while the server
+  // (which can take a few seconds to wake up) does the actual removal.
+  const [removing, setRemoving] = useState<Set<string>>(new Set());
   const syncId = journey?.sync_id ?? null;
   const sharedTrip = !!journey?.share_code || !!journey?.shared_owner_uid;
 
@@ -54,7 +59,7 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
   }, [loadEditors]);
 
   const isOwner = !owner;
-  const people = avatarPeople(travellers, uid, owner);
+  const people = avatarPeople(travellers, uid, owner).filter((p) => !removing.has(p.key));
   const byKey = new Map(travellers.map((t) => [String(t.id), t]));
   const shared = !!journey?.share_code;
   const url = journey?.share_code ? `${SHARE_BASE}/${journey.share_code}` : null;
@@ -64,88 +69,101 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
       const Clipboard = require('expo-clipboard') as typeof import('expo-clipboard');
       await Clipboard.setStringAsync(value);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast(`${what} copied`);
+      showToast(t('comp.copied', { what }));
     } else {
       await Share.share({ message: value });
     }
   };
 
-  const rename = (t: JourneyTraveller) => {
-    Alert.prompt('Rename', undefined, async (name) => {
+  const rename = (trav: JourneyTraveller) => {
+    Alert.prompt(t('comp.rename'), undefined, async (name) => {
       const next = (name ?? '').trim();
-      if (!next || next === t.name) return;
-      await renameJourneyTraveller(t.id, next);
+      if (!next || next === trav.name) return;
+      await renameJourneyTraveller(trav.id, next);
       reload();
-    }, 'plain-text', t.name === 'You' ? '' : t.name);
+    }, 'plain-text', trav.name === 'You' ? '' : trav.name);
   };
 
-  const remove = (t: JourneyTraveller, p: AvatarPerson) => {
-    const isMember = !!t.uid && t.uid !== uid;
+  const remove = (trav: JourneyTraveller, p: AvatarPerson) => {
+    const isMember = !!trav.uid && trav.uid !== uid;
     Alert.alert(
-      `Remove ${p.label}?`,
-      isMember ? 'The trip disappears from their phone. The invite link keeps working, so they can come back.' : 'Their documents stay, just without a name on them.',
+      t('comp.removeNamedTitle', { name: p.label }),
+      isMember ? t('comp.removeMemberBody') : t('comp.theirDocsStay'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('common.remove'),
           style: 'destructive',
           onPress: async () => {
+            const hide = (on: boolean) => setRemoving((prev) => {
+              const next = new Set(prev);
+              if (on) next.add(p.key);
+              else next.delete(p.key);
+              return next;
+            });
+            hide(true);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            showToast(t('comp.removedToast', { name: p.label }));
             try {
-              if (isMember && journey?.sync_id) await removeMember(journey.sync_id, t.uid!);
-              else await deleteJourneyTraveller(t.id);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              showToast(`${p.label} removed`);
+              if (isMember && journey?.sync_id) {
+                await removeMember(journey.sync_id, trav.uid!);
+                // Off the list here too, without waiting for the mirror's snapshot.
+                await deleteJourneyTraveller(trav.id);
+              } else {
+                await deleteJourneyTraveller(trav.id);
+              }
             } catch (err: any) {
-              showToast(err?.message ?? 'Could not remove', 'error');
+              showToast(err?.message ?? t('comp.couldNotRemoveNamed', { name: p.label }), 'error');
             }
-            reload();
+            await reload();
+            hide(false);
           },
         },
       ],
     );
   };
 
-  const toggleEditing = async (t: JourneyTraveller, p: AvatarPerson, canEdit: boolean) => {
-    if (!syncId || !t.uid) return;
+  const toggleEditing = async (trav: JourneyTraveller, p: AvatarPerson, canEdit: boolean) => {
+    if (!syncId || !trav.uid) return;
     try {
-      await setMemberCanEdit(syncId, t.uid, canEdit);
+      await setMemberCanEdit(syncId, trav.uid, canEdit);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast(canEdit ? `${p.label} can plan the trip now` : `${p.label} can only view the trip now`);
+      showToast(canEdit ? t('comp.canPlanNow', { name: p.label }) : t('comp.canViewNow', { name: p.label }));
     } catch (err: any) {
-      showToast(err?.message ?? 'Could not change that', 'error');
+      showToast(err?.message ?? t('comp.couldNotChange'), 'error');
     }
     reload();
   };
 
   const personMenu = (p: AvatarPerson) => {
-    const t = byKey.get(p.key);
-    if (!t || !isOwner) return;
+    const trav = byKey.get(p.key);
+    if (!trav || !isOwner) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const self = t.uid === uid || (!t.uid && t.name === 'You');
+    const self = trav.uid === uid || (!trav.uid && trav.name === 'You');
     // Only a friend who joined through the app can be let in; a name typed
     // here has no phone to plan from.
-    const member = !self && !!t.uid && shared;
-    const editing = member && editors.has(t.uid!);
+    const member = !self && !!trav.uid && shared;
+    const editing = member && editors.has(trav.uid!);
     const options = [
-      'Rename',
-      ...(member ? [editing ? 'Stop editing' : 'Allow editing'] : []),
-      ...(self ? [] : ['Remove from trip']),
-      'Cancel',
+      t('comp.rename'),
+      ...(member ? [editing ? t('comp.stopEditing') : t('comp.allowEditing')] : []),
+      ...(self ? [] : [t('comp.removeFromTrip')]),
+      t('common.cancel'),
     ];
     ActionSheetIOS.showActionSheetWithOptions(
       {
         title: p.label,
-        message: member ? (editing ? 'Can add and change stops, dates and where to stay.' : 'Can view the trip.') : undefined,
+        message: member ? (editing ? t('comp.canAddChange') : t('comp.canView')) : undefined,
         options,
         destructiveButtonIndex: self ? undefined : options.length - 2,
         cancelButtonIndex: options.length - 1,
       },
       (i) => {
         const choice = options[i];
-        if (choice === 'Rename') rename(t);
-        else if (choice === 'Allow editing') toggleEditing(t, p, true);
-        else if (choice === 'Stop editing') toggleEditing(t, p, false);
-        else if (choice === 'Remove from trip') remove(t, p);
+        if (choice === t('comp.rename')) rename(byKey.get(p.key)!);
+        else if (choice === t('comp.allowEditing')) toggleEditing(byKey.get(p.key)!, p, true);
+        else if (choice === t('comp.stopEditing')) toggleEditing(byKey.get(p.key)!, p, false);
+        else if (choice === t('comp.removeFromTrip')) remove(byKey.get(p.key)!, p);
       },
     );
   };
@@ -163,7 +181,7 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
             <View>
               <Avatar person={p} size={44} animated />
               {byKey.get(p.key)?.uid && editors.has(byKey.get(p.key)!.uid!) ? (
-                <View style={styles.editBadge} accessibilityLabel="Can edit">
+                <View style={styles.editBadge} accessibilityLabel={t('comp.canEdit')}>
                   <Ionicons name="pencil" size={10} color="#fff" />
                 </View>
               ) : null}
@@ -173,11 +191,11 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
           </Pressable>
         ))}
         {isOwner && (
-          <Pressable onPress={invite} style={({ pressed }) => [styles.person, pressed && { opacity: 0.6 }]} accessibilityLabel="Invite friends">
+          <Pressable onPress={invite} style={({ pressed }) => [styles.person, pressed && { opacity: 0.6 }]} accessibilityLabel={t('comp.inviteFriends')}>
             <View style={styles.addDisc}>
               <Ionicons name="add" size={20} color={Colors.textSecondary} />
             </View>
-            <Text style={[styles.name, styles.nameMuted]}>Invite</Text>
+            <Text style={[styles.name, styles.nameMuted]}>{t('comp.invite')}</Text>
           </Pressable>
         )}
       </View>
@@ -186,20 +204,20 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
 
       {isOwner ? (
         <>
-          <Row icon="paper-plane-outline" title={shared ? 'Share the invite link' : 'Invite friends'} onPress={invite} last={!shared} />
+          <Row icon="paper-plane-outline" title={shared ? t('comp.shareInviteLink') : t('comp.inviteFriends')} onPress={invite} last={!shared} />
           {shared && journey?.share_code ? (
             <>
               <Pressable onPress={() => copy(url!, 'Link')} onLongPress={() => copy(journey.share_code!, 'Code')} style={({ pressed }) => [styles.codeRow, pressed && { opacity: 0.6 }]}>
-                <Text style={styles.codeLabel}>Code</Text>
+                <Text style={styles.codeLabel}>{t('comp.code')}</Text>
                 <Text style={styles.code} selectable>{journey.share_code}</Text>
                 <Ionicons name="copy-outline" size={15} color={Colors.textTertiary} />
               </Pressable>
-              <Row icon="close-circle-outline" title="Stop sharing" destructive last onPress={() => stopSharing(journey).then(reload)} />
+              <Row icon="close-circle-outline" title={t('plans.stopSharing')} destructive last onPress={() => stopSharing(journey).then(reload)} />
             </>
           ) : null}
         </>
       ) : (
-        <Row icon="exit-outline" title="Leave trip" destructive last onPress={() => journey && leaveTrip(journey).then(async () => { onChanged(); onClose(); })} />
+        <Row icon="exit-outline" title={t('plans.leaveTrip')} destructive last onPress={() => journey && leaveTrip(journey).then(async () => { onChanged(); onClose(); })} />
       )}
     </View>
   );

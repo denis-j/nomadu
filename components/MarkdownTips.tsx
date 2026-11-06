@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { useTranslation } from '../contexts/LanguageContext';
 import { getCityTips } from '../lib/ai';
 
 /**
@@ -68,6 +69,7 @@ export function MarkdownTips({ text }: { text: string }) {
 
 /** The tips for a city, fetched (or read from the cache) while a spinner holds the place. */
 export function CityTips({ city, country }: { city: string; country: string }) {
+  const { t } = useTranslation();
   const [tips, setTips] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   useEffect(() => {
@@ -89,7 +91,7 @@ export function CityTips({ city, country }: { city: string; country: string }) {
       </View>
     );
   }
-  if (!tips) return <Text style={[styles.muted, styles.empty]}>No tips available</Text>;
+  if (!tips) return <Text style={[styles.muted, styles.empty]}>{t('comp.noTips')}</Text>;
   return <MarkdownTips text={tips} />;
 }
 

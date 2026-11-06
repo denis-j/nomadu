@@ -20,6 +20,7 @@ import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { resetPassword } from '../../lib/auth';
 import { showToast } from '../../lib/toast';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -40,6 +41,7 @@ const gradientColorSets = [
 ];
 
 export default function ForgotPasswordScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const emailRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
@@ -48,7 +50,7 @@ export default function ForgotPasswordScreen() {
 
   const handleReset = async () => {
     if (!email) {
-      showToast('Please enter your email address.', 'error');
+      showToast(t('auth.enterEmail'), 'error');
       return;
     }
     setLoading(true);
@@ -56,7 +58,7 @@ export default function ForgotPasswordScreen() {
       await resetPassword(email.trim());
       setSent(true);
     } catch (e: any) {
-      showToast(e.message ?? 'Could not send reset email.', 'error');
+      showToast(e.message ?? t('auth.resetFailed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -76,7 +78,7 @@ export default function ForgotPasswordScreen() {
                 onPress={() => router.back()}
                 hitSlop={12}
                 accessibilityRole="button"
-                accessibilityLabel="Back"
+                accessibilityLabel={t('auth.back')}
                 style={({ pressed }) => [styles.backInner, pressed && { opacity: 0.6 }]}
               >
                 <Ionicons name="chevron-back" size={22} color={Colors.text} />
@@ -87,7 +89,7 @@ export default function ForgotPasswordScreen() {
               onPress={() => router.back()}
               hitSlop={12}
               accessibilityRole="button"
-              accessibilityLabel="Back"
+              accessibilityLabel={t('auth.back')}
               style={({ pressed }) => [styles.backBtnFallback, pressed && { opacity: 0.6 }]}
             >
               <Ionicons name="chevron-back" size={22} color={Colors.text} />
@@ -103,9 +105,9 @@ export default function ForgotPasswordScreen() {
               style={styles.appIcon}
               resizeMode="contain"
             />
-            <Text style={styles.title}>Forgot password</Text>
+            <Text style={styles.title}>{t('auth.forgotTitle')}</Text>
             <Text style={styles.subtitle}>
-              Enter your email and we&rsquo;ll send you a reset link
+              {t('auth.forgotSubtitle')}
             </Text>
           </Animated.View>
 
@@ -118,7 +120,7 @@ export default function ForgotPasswordScreen() {
                   style={styles.input}
                   value={email}
                   onChangeText={setEmail}
-                  placeholder="Email"
+                  placeholder={t('auth.email')}
                   placeholderTextColor={Colors.textTertiary}
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -134,13 +136,13 @@ export default function ForgotPasswordScreen() {
 
             {sent && (
               <Text style={styles.successText}>
-                Reset email sent. Check your inbox.
+                {t('auth.resetSent')}
               </Text>
             )}
 
             {sent ? (
               <CloudyButton onPress={() => router.back()} style={styles.continueButton} innerStyle={styles.continueInner}>
-                <Text style={styles.continueButtonText}>Back to sign in</Text>
+                <Text style={styles.continueButtonText}>{t('auth.backToSignIn')}</Text>
               </CloudyButton>
             ) : (
               <CloudyButton
@@ -152,7 +154,7 @@ export default function ForgotPasswordScreen() {
                 {loading ? (
                   <ActivityIndicator color={Colors.text} />
                 ) : (
-                  <Text style={styles.continueButtonText}>Send reset link</Text>
+                  <Text style={styles.continueButtonText}>{t('auth.sendResetLink')}</Text>
                 )}
               </CloudyButton>
             )}

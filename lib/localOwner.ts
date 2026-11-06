@@ -11,6 +11,8 @@ import {
   resetUsageThresholdState,
 } from './notifications';
 import { forgetAccommodationPlans } from '../hooks/useAccommodations';
+import { forgetActivities } from '../hooks/useActivities';
+import { forgetExpenses } from '../hooks/useExpenses';
 import { reportError } from './monitoring';
 import { cloudChanged } from './syncTrigger';
 import { resetProfileCache } from './profile';
@@ -84,6 +86,8 @@ export async function wipeLocalData(): Promise<void> {
   await wipeLocalDatabase();
   resetPrefetchCaches();
   forgetAccommodationPlans();
+  forgetActivities();
+  forgetExpenses();
   resetProfileCache();
 
   // The rest is cleanup around the data, which is already gone. A failure

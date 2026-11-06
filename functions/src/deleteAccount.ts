@@ -35,8 +35,8 @@ export const deleteAccount = onCall(
     const db = getFirestore();
 
     try {
-      // Removes users/{uid} together with its trips, visas, journeys and
-      // accommodations subcollections.
+      // Removes users/{uid} together with its trips, visas, journeys,
+      // accommodations and activities subcollections.
       await db.recursiveDelete(db.doc(`users/${uid}`));
 
       // Usage counters and agent tokens live outside the user document. The

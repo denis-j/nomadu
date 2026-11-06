@@ -29,10 +29,15 @@ import * as Haptics from 'expo-haptics';
 import { useJourney } from '../../../hooks/useJourney';
 import { useJourneyDocuments } from '../../../hooks/useJourneyDocuments';
 import { useJourneyAccommodations } from '../../../hooks/useAccommodations';
-import { consumePendingStay } from '../../../lib/accommodationBridge';
-import { planChipText, statusColor } from '../../../components/accommodationForm';
+import { consumePendingActivities, consumePendingStay } from '../../../lib/accommodationBridge';
+import { useJourneyActivities } from '../../../hooks/useActivities';
+import { useJourneyExpenses } from '../../../hooks/useExpenses';
+import { ACTIVITIES_UI } from '../../../lib/activityModel';
+import { balances, formatAmount, totals } from '../../../lib/expenseModel';
+import { planChipShort, statusColor } from '../../../components/accommodationForm';
 import type { LocalAccommodation } from '../../../lib/accommodations';
-import { DocumentsEntryCard } from '../../../components/JourneyDocuments';
+import { DocumentsEntryCard, EntryCard } from '../../../components/JourneyDocuments';
+import { GlassDisc } from '../../../components/GlassDisc';
 import { AvatarStack, avatarPeople, avatarStackWidth, type AvatarPerson } from '../../../components/TravellerAvatars';
 import { TravellersContent } from '../../../components/TravellersContent';
 import { useAuth } from '../../../hooks/useAuth';
@@ -57,6 +62,9 @@ import { calculateAllTaxStatuses, TaxStatus } from '../../../lib/taxCalculations
 import { SCHENGEN_COUNTRIES, getRuleForCitizen } from '../../../constants/visaRules';
 import { chainDates, countDays, fromYmd, toYmd } from '../../../lib/days';
 import { getCountryCode } from '../../../utils/geography';
+import { useTranslation } from '../../../contexts/LanguageContext';
+
+type TFunc = (key: string, params?: Record<string, string | number>) => string;
 import { Flag } from '../../../components/Flag';
 import { suggestNextStops, StopSuggestion } from '../../../lib/ai';
 import { cachedMapSnapshot, storeMapSnapshot } from '../../../lib/mapSnapshot';
@@ -170,6 +178,21 @@ function legDays(start: string, end: string): number {
 // ─── Journey Map Card ─────────────────────────────────────────────────────────
 
 const MAP_HEIGHT = 360;
+/** What the list keeps free for the tab bar: with the insets off, nothing else does. */
+const IOS_TAB_BAR = Platform.OS === 'ios' ? 83 : 0;
+
+/**
+ * Sits in front of the list so react-native-screens does not find it.
+ *
+ * Under native tabs the library looks down the first child of every screen
+ * and turns a scroll view's contentInsetAdjustmentBehavior "never" into
+ * "automatic". Left to that, iOS bounced this page to a stale inset once a
+ * screen with a navigation bar had been pushed and popped: the list settled
+ * 54pt too low and then snapped up.
+ */
+function ScrollViewShield() {
+  return <View collapsable={false} pointerEvents="none" style={styles.scrollViewShield} />;
+}
 /** Breathing room under the lowest pin. */
 const MAP_CHIP_ZONE = 36;
 /** Span shown around a single stop: the city and its surroundings, not the continent. */
@@ -193,10 +216,10 @@ const MAP_PIN = require('../../../assets/icons/map-pin.png');
  * fitted into the visible window.
  */
 function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; headerHeight: number; onPress: () => void }) {
-  // iOS starts the list below the status bar, Android (edge to edge) at the
-  // very top; without this the map sat a status bar too high there.
-  const safeTop = useSafeAreaInsets().top;
-  const listTop = Platform.OS === 'android' ? safeTop : 0;
+  const { t } = useTranslation();
+  // The list starts at the very top of the screen on both platforms (see
+  // ScrollViewShield); the map is pulled up from there, under the bar.
+  const listTop = useSafeAreaInsets().top;
   const mapRef = useRef<RNMapView>(null);
 
   const coordLegs = useMemo(
@@ -299,7 +322,7 @@ function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; h
   if (coords.length === 0 || !initialRegion) return null;
 
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Open the route on a map" style={[styles.mapCard, { marginTop: listTop - headerHeight }]}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={t('trip.openRouteMap')} style={[styles.mapCard, { marginTop: listTop - headerHeight }]}>
       {snapshot ? (
         <Image source={{ uri: snapshot }} style={styles.map} contentFit="cover" transition={fresh ? 180 : 0} />
       ) : (
@@ -365,17 +388,6 @@ const FACE = 22;
 const MORPH_OPEN = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
 const MORPH_CLOSE = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
 
-/** A 44pt glass disc with one symbol: the back and add buttons of the bar. */
-function GlassDisc({ icon, size, onPress, label }: { icon: keyof typeof Ionicons.glyphMap; size: number; onPress: () => void; label: string }) {
-  return (
-    <Pressable onPress={onPress} hitSlop={6} accessibilityRole="button" accessibilityLabel={label} style={({ pressed }) => pressed && { opacity: 0.7 }}>
-      <ChipShell {...chipGlassProps} {...(hasGlass ? { isInteractive: true } : {})} style={[styles.disc, !hasGlass && styles.titleChipFallback]}>
-        <Ionicons name={icon} size={size} color={Colors.text} />
-      </ChipShell>
-    </Pressable>
-  );
-}
-
 /**
  * The header title as the Map tab's glass chip, and like the Map tab's chip
  * it morphs: a tap and the capsule widens and grows downward into the
@@ -417,6 +429,7 @@ function TripMorphChip({
   /** Room between the two discs when closed; the screen's width minus 32 when open. */
   maxWidth: { closed: number; open: number };
 }) {
+  const { t } = useTranslation();
   const span = tripSpan(legs);
   const [chipWidth, setChipWidth] = useState(0);
   const [panelHeight, setPanelHeight] = useState(0);
@@ -483,7 +496,7 @@ function TripMorphChip({
             <View style={styles.titleChipText}>
               <Text style={styles.titleChipTitle} numberOfLines={1}>{title}</Text>
               <Text style={styles.titleChipSub} numberOfLines={1}>
-                {owner ? `with ${owner}` : span ? span.status : 'No stops yet'}
+                {owner ? t('trip.withOwner', { owner }) : span ? span.status : t('trip.noStopsYet')}
               </Text>
             </View>
             {people.length > 0 && (
@@ -551,8 +564,8 @@ type LegCardProps = {
   /** The stop's accommodation plan, when one was started. */
   stay: LocalAccommodation | null;
   onPress: (leg: JourneyLeg) => void;
-  /** Tap on the stay chip: straight to the accommodation page. */
-  onOpenStay: (leg: JourneyLeg) => void;
+  /** How many things to do are planned here. */
+  activityCount: number;
   onDrag?: () => void;
   visaStatuses: VisaStatus[];
   taxStatuses: TaxStatus[];
@@ -566,13 +579,14 @@ const LegCard = React.memo(function LegCard({
   firstInCountry,
   stay,
   onPress,
-  onOpenStay,
+  activityCount,
   onDrag,
   visaStatuses,
   taxStatuses,
   citizenshipCode,
   enter = true,
 }: LegCardProps) {
+  const { t, countryName } = useTranslation();
   const days = legDays(leg.start_date, leg.end_date);
 
   const isSchengen = !!leg.country_code && (SCHENGEN_COUNTRIES as readonly string[]).includes(leg.country_code);
@@ -605,7 +619,7 @@ const LegCard = React.memo(function LegCard({
   const plannedTaxExceeds = plannedDays >= TAX_THRESHOLD;
 
   // ── Build chips ───────────────────────────────────────────────────────────────
-  interface Chip { label: string; color: string; icon?: keyof typeof Ionicons.glyphMap; onPress?: () => void }
+  interface Chip { label: string; color: string; icon?: keyof typeof Ionicons.glyphMap }
   const chips: Chip[] = [];
 
   // A green "180d left" under every Thai stop is noise: say it once per
@@ -613,29 +627,34 @@ const LegCard = React.memo(function LegCard({
   if (trackedVisa && (trackedVisa.status !== 'ok' || firstInCountry)) {
     const color = visaChipColor(trackedVisa.status);
     const label = isSchengen
-      ? `${trackedVisa.daysRemaining}d Schengen left`
-      : `${trackedVisa.daysRemaining}d visa left`;
+      ? t('trip.schengenLeft', { days: trackedVisa.daysRemaining })
+      : t('trip.visaLeft', { days: trackedVisa.daysRemaining });
     chips.push({ label, color });
   } else if (!trackedVisa && plannedVisaExceeds) {
     // No tracked data but this leg alone exceeds the limit
     const label = isSchengen
-      ? `${plannedDays}d > ${visaLimit}d Schengen`
-      : `${plannedDays}d > ${visaLimit}d visa`;
+      ? t('trip.schengenExceeds', { days: plannedDays, limit: visaLimit! })
+      : t('trip.visaExceeds', { days: plannedDays, limit: visaLimit! });
     chips.push({ label, color: Colors.error });
   }
 
   if (trackedTax) {
     const color = taxChipColor(trackedTax.status);
-    chips.push({ label: `⚠︎ ${trackedTax.daysPresent}/${trackedTax.thresholdDays}d tax`, color });
+    chips.push({ label: t('trip.taxChip', { present: trackedTax.daysPresent, threshold: trackedTax.thresholdDays }), color });
   } else if (plannedTaxExceeds && !trackedVisa) {
     // Only show projected tax if not already covered by tracked data
-    chips.push({ label: `⚠︎ ${plannedDays}d > ${TAX_THRESHOLD}d tax risk`, color: Colors.error });
+    chips.push({ label: t('trip.taxRiskChip', { days: plannedDays, threshold: TAX_THRESHOLD }), color: Colors.error });
   }
 
   // Where you sleep, once that is being planned. Grey until there is a
-  // place, black from then on; no third colour.
+  // place, black from then on; no third colour. The chips only say; a chip
+  // is too small to hit on a phone, the card opens the stop's sheet and
+  // its big cards lead on from there.
   if (stay && stay.needed) {
-    chips.push({ label: planChipText(stay), color: statusColor(stay.status), icon: 'bed-outline', onPress: () => onOpenStay(leg) });
+    chips.push({ label: planChipShort(stay, t), color: statusColor(stay.status), icon: 'bed-outline' });
+  }
+  if (ACTIVITIES_UI && activityCount > 0) {
+    chips.push({ label: activityCount === 1 ? t('trip.oneThing') : t('trip.manyThings', { count: activityCount }), color: Colors.text, icon: 'sparkles-outline' });
   }
 
   const CardWrap = hasGlass ? GlassView : View;
@@ -644,7 +663,8 @@ const LegCard = React.memo(function LegCard({
   // How you get there sits on the line before the stop, for the first one
   // too: a trip starts with a flight. Stops chain, so there is nothing else
   // for the connector to say.
-  const transport = TRANSPORTS.find((t) => t.type === leg.transport) ?? TRANSPORTS[0];
+  const transport = TRANSPORTS.find((tr) => tr.type === leg.transport) ?? TRANSPORTS[0];
+  const transportLabel = t(`transport.${transport.type}`);
 
   return (
     <View style={styles.legWrapper}>
@@ -656,7 +676,7 @@ const LegCard = React.memo(function LegCard({
         <View style={styles.dotCol} />
         <View style={styles.connectorBadge}>
           <Ionicons name={transport.icon as any} size={13} color={Colors.textSecondary} />
-          <MorphText style={styles.connectorText}>{transport.label}</MorphText>
+          <MorphText style={styles.connectorText}>{transportLabel}</MorphText>
         </View>
       </Animated.View>
 
@@ -672,43 +692,43 @@ const LegCard = React.memo(function LegCard({
             <View style={styles.dot} />
           </View>
           <CardWrap {...cardProps} style={[styles.legCard, !hasGlass && styles.legCardFallback]}>
-            {/* Flag */}
-            <Flag code={leg.country_code ?? ''} size={28} style={styles.legFlagWrap} />
+            <View style={styles.legMain}>
+              {/* Flag */}
+              <Flag code={leg.country_code ?? ''} size={28} style={styles.legFlagWrap} />
 
-            {/* Center info */}
-            <View style={styles.legCenter}>
-              <Text style={styles.legCity}>{leg.city}</Text>
-              <Text style={styles.legCountry}>{leg.country}</Text>
-              <MorphText style={styles.legDates}>
-                {fmtRange(leg.start_date, leg.end_date)}
-              </MorphText>
-              {leg.notes ? (
-                <Text style={styles.legNotes} numberOfLines={2}>{leg.notes}</Text>
-              ) : null}
-              {chips.length > 0 && (
-                <View style={styles.statusChipsRow}>
-                  {chips.map((chip, i) => (
-                    <Pressable
-                      key={i}
-                      onPress={chip.onPress}
-                      disabled={!chip.onPress}
-                      hitSlop={chip.onPress ? 6 : undefined}
-                      style={({ pressed }) => [styles.statusChip, { backgroundColor: chip.icon ? Colors.surfaceSecondary : chip.color + '14' }, pressed && { opacity: 0.6 }]}
-                    >
-                      {chip.icon && <Ionicons name={chip.icon} size={12} color={chip.color} style={styles.statusChipIcon} />}
-                      <Text style={[styles.statusChipText, { color: chip.color }]}>{chip.label}</Text>
-                    </Pressable>
-                  ))}
+              {/* Center info */}
+              <View style={styles.legCenter}>
+                <Text style={styles.legCity}>{leg.city}</Text>
+                <Text style={styles.legCountry}>{countryName(leg.country)}</Text>
+                <MorphText style={styles.legDates}>
+                  {fmtRange(leg.start_date, leg.end_date)}
+                </MorphText>
+                {leg.notes ? (
+                  <Text style={styles.legNotes} numberOfLines={2}>{leg.notes}</Text>
+                ) : null}
+              </View>
+
+              {/* Right badges */}
+              <View style={styles.legRight}>
+                <View style={styles.daysBadge}>
+                  <MorphText style={styles.daysText}>{days}d</MorphText>
                 </View>
-              )}
-            </View>
-
-            {/* Right badges */}
-            <View style={styles.legRight}>
-              <View style={styles.daysBadge}>
-                <MorphText style={styles.daysText}>{days}d</MorphText>
               </View>
             </View>
+
+            {/* The chips under the whole row, in line with the city: beside
+                the days badge the text column was a few points too narrow
+                for two of them side by side. */}
+            {chips.length > 0 && (
+              <View style={[styles.statusChipsRow, styles.statusChipsInset]}>
+                {chips.map((chip, i) => (
+                  <View key={i} style={[styles.statusChip, { backgroundColor: chip.icon ? Colors.surfaceSecondary : chip.color + '14' }]}>
+                    {chip.icon && <Ionicons name={chip.icon} size={12} color={chip.color} style={styles.statusChipIcon} />}
+                    <Text style={[styles.statusChipText, { color: chip.color }]}>{chip.label}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </CardWrap>
         </View>
       </Pressable>
@@ -724,12 +744,37 @@ const LegCard = React.memo(function LegCard({
   prev.leg.country === next.leg.country &&
   prev.firstInCountry === next.firstInCountry &&
   prev.stay?.updated_at === next.stay?.updated_at &&
+  prev.activityCount === next.activityCount &&
   // The visa and tax chips arrive a moment after the first render; the
   // card must not sit on its first, chipless frame when they do.
   prev.visaStatuses === next.visaStatuses &&
   prev.taxStatuses === next.taxStatuses &&
   prev.citizenshipCode === next.citizenshipCode
 );
+
+/** "1,240 EUR · you get back 30" under the expenses card; what it is for while empty. */
+function expensesSummary(list: { amount: number; currency: string; paid_by: string | null; shares: { traveller_id: string; amount: number }[]; deleted: boolean }[], meId: string | null, travellers: number, t: TFunc): string {
+  if (list.length === 0) return travellers > 1 ? t('trip.expensesEmptyShared') : t('trip.expensesEmptySolo');
+  const sums = totals(list);
+  const main = `${formatAmount(sums[0].total)} ${sums[0].currency}`;
+  const extra = sums.length > 1 ? ` +${sums.length - 1}` : '';
+  const net = meId ? balances(list).find((b) => b.traveller_id === meId && b.currency === sums[0].currency)?.net ?? 0 : 0;
+  const you = net > 0.004 ? t('trip.youGetBack', { amount: formatAmount(net) }) : net < -0.004 ? t('trip.youOwe', { amount: formatAmount(-net) }) : t('trip.allSettled');
+  return `${main}${extra} · ${you}`;
+}
+
+/** "2 booked · 5 ideas" under the things-to-do card; what it is for while empty. */
+function activitiesSummary(list: { status: string }[], t: TFunc): string {
+  if (list.length === 0) return t('trip.activitiesEmpty');
+  const n = (st: string) => list.filter((a) => a.status === st).length;
+  const parts = [
+    n('booked') ? t('trip.booked', { count: n('booked') }) : null,
+    n('planned') ? t('trip.planned', { count: n('planned') }) : null,
+    n('idea') ? (n('idea') === 1 ? t('trip.ideaOne', { count: n('idea') }) : t('trip.ideaMany', { count: n('idea') })) : null,
+    n('done') ? t('trip.done', { count: n('done') }) : null,
+  ];
+  return parts.filter(Boolean).join(' · ');
+}
 
 // ─── Suggestion Leg Card ──────────────────────────────────────────────────────
 
@@ -747,6 +792,7 @@ function SuggestionLegCard({
   onAdd: () => void;
   disabled?: boolean;
 }) {
+  const { t: tt, countryName } = useTranslation();
   const countryCode = getCountryCode(suggestion.country);
   const days = legDays(suggestion.startDate, suggestion.endDate);
 
@@ -759,20 +805,20 @@ function SuggestionLegCard({
         onPress={onAdd}
         disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel={`Add ${suggestion.city}, ${suggestion.country}`}
+        accessibilityLabel={tt('trip.addNamed', { city: suggestion.city, country: suggestion.country })}
         style={({ pressed }) => [styles.suggCard, pressed && { opacity: 0.6 }, disabled && { opacity: 0.5 }]}
       >
         <Flag code={countryCode} size={28} style={styles.legFlagWrap} />
         <View style={styles.legCenter}>
           <Text style={styles.legCity}>{suggestion.city}</Text>
-          <Text style={styles.legCountry}>{suggestion.country}</Text>
+          <Text style={styles.legCountry}>{countryName(suggestion.country)}</Text>
           <Text style={styles.legDates}>
             {fmtShort(suggestion.startDate)} – {fmtShort(suggestion.endDate)}
           </Text>
           <Text style={styles.suggReason}>{suggestion.reason}</Text>
           <View style={styles.suggAdd}>
             <Ionicons name="add" size={14} color={Colors.text} />
-            <Text style={styles.suggAddText}>Add this stop</Text>
+            <Text style={styles.suggAddText}>{tt('trip.addThisStop')}</Text>
           </View>
         </View>
         <View style={styles.legRight}>
@@ -826,6 +872,11 @@ function AISuggestionsSection({
   /** Reload with a new wish ('' clears it). */
   onRefine: (preference: string) => void;
 }) {
+  const { t } = useTranslation();
+  const PREF_LABELS: Record<string, string> = {
+    Beaches: t('trip.prefBeaches'), Islands: t('trip.prefIslands'), Mountains: t('trip.prefMountains'),
+    'Cheap cities': t('trip.prefCheapCities'), Nightlife: t('trip.prefNightlife'), Culture: t('trip.prefCulture'),
+  };
   const PillShell = hasGlass ? GlassView : View;
   const custom = preference.trim() !== '' && !PREFERENCE_CHIPS.includes(preference);
   const [showInput, setShowInput] = useState(custom);
@@ -870,7 +921,7 @@ function AISuggestionsSection({
             )}
           >
             <Ionicons name="sparkles" size={12} color={Colors.text} />
-            <Text style={styles.aiPillText}>AI suggestions</Text>
+            <Text style={styles.aiPillText}>{t('trip.aiSuggestions')}</Text>
             <Animated.View style={chevronStyle}>
               <Ionicons name="chevron-down" size={13} color={Colors.textSecondary} />
             </Animated.View>
@@ -879,9 +930,9 @@ function AISuggestionsSection({
         {!collapsed && (
         <View style={styles.aiHeaderRight}>
           {loading ? (
-            <Text style={styles.aiStatus}>Finding stops…</Text>
+            <Text style={styles.aiStatus}>{t('trip.findingStops')}</Text>
           ) : (
-            <TouchableOpacity onPress={onRefresh} hitSlop={10} accessibilityRole="button" accessibilityLabel="New suggestions">
+            <TouchableOpacity onPress={onRefresh} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('trip.newSuggestions')}>
               <Ionicons name="refresh" size={16} color={Colors.textSecondary} />
             </TouchableOpacity>
           )}
@@ -902,7 +953,7 @@ function AISuggestionsSection({
                   disabled={loading}
                   style={[styles.aiChip, active && styles.aiChipActive]}
                 >
-                  <Text style={[styles.aiChipText, active && styles.aiChipTextActive]}>{chip}</Text>
+                  <Text style={[styles.aiChipText, active && styles.aiChipTextActive]}>{PREF_LABELS[chip] ?? chip}</Text>
                 </Pressable>
               );
             })}
@@ -916,7 +967,7 @@ function AISuggestionsSection({
             >
               <Ionicons name="create-outline" size={12} color={custom || showInput ? Colors.white : Colors.text} />
               <Text style={[styles.aiChipText, (custom || showInput) && styles.aiChipTextActive]}>
-                {custom ? preference : 'Something else'}
+                {custom ? preference : t('trip.somethingElse')}
               </Text>
             </Pressable>
           </ScrollView>
@@ -927,7 +978,7 @@ function AISuggestionsSection({
                 style={styles.aiInput}
                 value={draft}
                 onChangeText={setDraft}
-                placeholder="Somewhere quiet by the sea, good coffee…"
+                placeholder={t('trip.suggestionPlaceholder')}
                 placeholderTextColor={systemColor('placeholderText')}
                 returnKeyType="search"
                 onSubmitEditing={submitDraft}
@@ -939,7 +990,7 @@ function AISuggestionsSection({
                 onPress={submitDraft}
                 disabled={loading || !draft.trim()}
                 accessibilityRole="button"
-                accessibilityLabel="Get suggestions"
+                accessibilityLabel={t('trip.getSuggestions')}
                 style={{ opacity: !draft.trim() || loading ? 0.3 : 1 }}
                 hitSlop={8}
               >
@@ -955,7 +1006,7 @@ function AISuggestionsSection({
               </View>
               <View style={[styles.suggCard, styles.aiErrorCard]}>
                 <Ionicons name="cloud-offline-outline" size={18} color={Colors.textSecondary} />
-                <Text style={styles.aiErrorText}>Could not reach the AI. Tap to try again.</Text>
+                <Text style={styles.aiErrorText}>{t('trip.cannotReachAI')}</Text>
               </View>
             </Pressable>
           )}
@@ -979,6 +1030,7 @@ function AISuggestionsSection({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function JourneyDetailScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { id, travellers: openTravellersParam } = useLocalSearchParams<{ id: string; travellers?: string }>();
   const journeyId = Number(id);
@@ -997,6 +1049,9 @@ export default function JourneyDetailScreen() {
   // too: a stop card that grows a chip a frame after it appeared reads as
   // a flicker.
   const { plans: stays, loaded: staysLoaded } = useJourneyAccommodations(journeyId);
+  const stopSyncIds = useMemo(() => (journey?.legs ?? []).map((l) => l.sync_id), [journey?.legs]);
+  const { activities, byStop: activitiesByStop } = useJourneyActivities(journey?.sync_id, stopSyncIds);
+  const { expenses } = useJourneyExpenses(journey?.sync_id);
 
   // ─── Visa / Tax statuses ─────────────────────────────────────────────────────
 
@@ -1174,23 +1229,28 @@ export default function JourneyDetailScreen() {
     });
   }, [router, journeyId, journey?.legs]);
 
-  const openStay = useCallback((leg: JourneyLeg) => {
-    if (!leg.sync_id || !journey?.sync_id) return;
+  const openActivities = useCallback((leg?: JourneyLeg) => {
+    if (!journey?.sync_id) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push({
-      pathname: '/(tabs)/(plans)/accommodation',
+      pathname: '/(tabs)/(plans)/activities',
       params: {
-        stopSyncId: leg.sync_id,
+        journeyId: String(journeyId),
         journeySyncId: journey.sync_id,
-        city: leg.city,
-        country: leg.country,
-        countryCode: leg.country_code,
-        start: leg.start_date,
-        end: leg.end_date,
+        ...(leg?.sync_id && { stopSyncId: leg.sync_id }),
         ...(readOnly && { readOnly: '1' }),
       },
     });
-  }, [router, journey?.sync_id, readOnly]);
+  }, [router, journeyId, journey?.sync_id, readOnly]);
+
+  const openExpenses = useCallback(() => {
+    if (!journey?.sync_id) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({
+      pathname: '/(tabs)/(plans)/expenses',
+      params: { journeyId: String(journeyId), journeySyncId: journey.sync_id, ...(readOnly && { readOnly: '1' }) },
+    });
+  }, [router, journeyId, journey?.sync_id, readOnly]);
 
   const openStopInfo = useCallback((leg: JourneyLeg) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1219,12 +1279,18 @@ export default function JourneyDetailScreen() {
   // full size (see accommodationBridge).
   useFocusEffect(
     useCallback(() => {
+      const things = consumePendingActivities();
+      if (things) {
+        const { readOnly: roThings, ...restThings } = things;
+        const t = setTimeout(() => router.push({ pathname: '/(tabs)/(plans)/activities', params: { journeyId: String(journeyId), ...restThings, ...(roThings && { readOnly: '1' }) } }), 350);
+        return () => clearTimeout(t);
+      }
       const stay = consumePendingStay();
       if (!stay) return;
       const { readOnly: ro, ...rest } = stay;
       const t = setTimeout(() => router.push({ pathname: '/(tabs)/(plans)/accommodation', params: { ...rest, ...(ro && { readOnly: '1' }) } }), 350);
       return () => clearTimeout(t);
-    }, [router]),
+    }, [router, journeyId]),
   );
 
   const handleAddSuggestion = useCallback((s: StopSuggestion) => {
@@ -1255,18 +1321,18 @@ export default function JourneyDetailScreen() {
     if (!journey) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (followed) {
-      const options = [...(readOnly ? [] : ['Rename']), 'Leave trip', 'Cancel'];
+      const options = [...(readOnly ? [] : [t('trip.rename')]), t('plans.leaveTrip'), t('common.cancel')];
       ActionSheetIOS.showActionSheetWithOptions(
         { title: journey.title, options, destructiveButtonIndex: options.length - 2, cancelButtonIndex: options.length - 1 },
         async (i) => {
-          if (options[i] === 'Rename') {
-            Alert.prompt('Rename trip', undefined, async (name) => {
+          if (options[i] === t('trip.rename')) {
+            Alert.prompt(t('trip.renameTrip'), undefined, async (name) => {
               const next = (name ?? '').trim();
               if (!next || next === journey.title) return;
               await updateJourneyTitle(journeyId, next);
               refresh();
             }, 'plain-text', journey.title);
-          } else if (options[i] === 'Leave trip') {
+          } else if (options[i] === t('plans.leaveTrip')) {
             await leaveTrip(journey);
             if (!(await getJourneyWithLegs(journeyId))) router.back();
           }
@@ -1275,7 +1341,7 @@ export default function JourneyDetailScreen() {
       return;
     }
     const shared = !!journey.share_code;
-    const options = ['Invite friends', ...(shared ? ['Stop sharing'] : []), 'Rename', 'Delete trip', 'Cancel'];
+    const options = [t('plans.inviteFriends'), ...(shared ? [t('plans.stopSharing')] : []), t('trip.rename'), t('plans.deleteTrip'), t('common.cancel')];
     ActionSheetIOS.showActionSheetWithOptions(
       { title: journey.title, options, destructiveButtonIndex: options.length - 2, cancelButtonIndex: options.length - 1 },
       (i) => {
@@ -1285,21 +1351,21 @@ export default function JourneyDetailScreen() {
         } else if (shared && i === 1) {
           stopSharing(journey).then(refresh);
         } else if (i === rename) {
-          Alert.prompt('Rename trip', undefined, async (name) => {
+          Alert.prompt(t('trip.renameTrip'), undefined, async (name) => {
             const next = (name ?? '').trim();
             if (!next || next === journey.title) return;
             await updateJourneyTitle(journeyId, next);
             refresh();
           }, 'plain-text', journey.title);
         } else if (i === rename + 1) {
-          Alert.alert('Delete this trip?', 'Stops and documents go with it.', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Delete', style: 'destructive', onPress: async () => { await deleteJourneyWithDocuments(journeyId); router.back(); } },
+          Alert.alert(t('plans.deleteTripTitle'), t('plans.deleteTripBody'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('common.delete'), style: 'destructive', onPress: async () => { await deleteJourneyWithDocuments(journeyId); router.back(); } },
           ]);
         }
       },
     );
-  }, [journey, journeyId, followed, readOnly, refresh, router]);
+  }, [journey, journeyId, followed, readOnly, refresh, router, t]);
 
   // The travellers panel unfolds from the chip rather than sliding up as a
   // sheet: the faces are in the chip, so that is where they open.
@@ -1367,7 +1433,7 @@ export default function JourneyDetailScreen() {
           firstInCountry={!legs.slice(0, index).some((l) => l.country_code === item.country_code)}
           stay={item.sync_id ? stays.get(item.sync_id) ?? null : null}
           onPress={openStopInfo}
-          onOpenStay={openStay}
+          activityCount={item.sync_id ? activitiesByStop.get(item.sync_id)?.length ?? 0 : 0}
           onDrag={readOnly ? undefined : drag}
           visaStatuses={visaStatuses}
           taxStatuses={taxStatuses}
@@ -1376,7 +1442,7 @@ export default function JourneyDetailScreen() {
         />
       </ScaleDecorator>
     );
-  }, [legs, stays, openStopInfo, openStay, readOnly, visaStatuses, taxStatuses, citizenshipCode]);
+  }, [legs, stays, activitiesByStop, openStopInfo, readOnly, visaStatuses, taxStatuses, citizenshipCode]);
 
   const onHeaderLayout = useCallback((e: any) => {
     setTimelineTop(e.nativeEvent.layout.height);
@@ -1385,13 +1451,31 @@ export default function JourneyDetailScreen() {
   // The line runs from the header down to the end cap. It lives inside the
   // header so it scrolls natively with the content; a first version moved it
   // by hand from scroll events, which arrive on the JS thread a frame late.
-  const lineHeight = contentSize > timelineTop ? contentSize - timelineTop - footerHeight - 70 : 0;
+  const lineHeight = contentSize > timelineTop ? contentSize - timelineTop - footerHeight - 70 - IOS_TAB_BAR : 0;
   const lineColor = Colors.primary + '20';
 
   const listHeader = useMemo(() => (
     <View onLayout={onHeaderLayout}>
       <JourneyMapCard legs={legs} headerHeight={headerHeight} onPress={openMap} />
       <DocumentsEntryCard journeyId={journeyId} documents={docs.documents} travellers={docs.travellers} />
+      {ACTIVITIES_UI && legs.length > 0 && (!readOnly || activities.length > 0) && (
+        <EntryCard
+          icon="sparkles-outline"
+          title={t('nav.thingsToDo')}
+          sub={activitiesSummary(activities, t)}
+          count={activities.length}
+          onPress={() => openActivities()}
+        />
+      )}
+      {legs.length > 0 && (!readOnly || expenses.length > 0) && (
+        <EntryCard
+          icon="receipt-outline"
+          title={t('nav.expenses')}
+          sub={expensesSummary(expenses, docs.travellers.find((tv) => !!user?.uid && tv.uid === user.uid)?.sync_id ?? null, docs.travellers.length, t)}
+          count={expenses.length}
+          onPress={openExpenses}
+        />
+      )}
       {legs.length > 0 && timelineTop > 0 && lineHeight > 0 && (
         <View pointerEvents="none" style={[styles.timelineLine, { top: timelineTop, height: lineHeight }]}>
           <LinearGradient
@@ -1402,7 +1486,7 @@ export default function JourneyDetailScreen() {
         </View>
       )}
     </View>
-  ), [legs, headerHeight, onHeaderLayout, journeyId, docs.documents, docs.travellers, timelineTop, lineHeight, openMap]);
+  ), [legs, headerHeight, onHeaderLayout, journeyId, docs.documents, docs.travellers, timelineTop, lineHeight, openMap, activities, readOnly, openActivities, expenses, openExpenses, user?.uid]);
 
   const chainedSuggestions = useMemo(() => suggestions.map((s) => chainedSuggestion(s, legs)), [suggestions, legs]);
 
@@ -1440,7 +1524,7 @@ export default function JourneyDetailScreen() {
   // A made-up or deleted trip id showed an empty trip with "Add your first
   // stop", which added stops to a trip that does not exist.
   if (!loading && (!journey || journey.deleted)) {
-    return <MissingRoute title="Trip" message="This trip is no longer here." />;
+    return <MissingRoute title={t('trip.title')} message={t('documents.tripGone')} />;
   }
 
   return (
@@ -1451,19 +1535,21 @@ export default function JourneyDetailScreen() {
         <View style={styles.emptyWrap}>
           <EmptyState
             icon="✈️"
-            title="No stops yet"
-            subtitle={readOnly ? `${journey?.shared_owner_name ?? 'Your friend'} has not planned any stops yet.` : "City, dates, and how you'll get there. The rest builds from that."}
+            title={t('trip.noStopsTitle')}
+            subtitle={readOnly ? t('trip.friendNoStops', { owner: journey?.shared_owner_name ?? t('activities.yourFriend') }) : t('trip.noStopsSubtitle')}
           />
           {!readOnly && (
             <View style={styles.emptyCta}>
               <CloudyButton onPress={openAddSheet} style={{ width: '100%' }} innerStyle={{ justifyContent: 'center' }}>
-                <Text style={styles.emptyCtaText}>Add your first stop</Text>
+                <Text style={styles.emptyCtaText}>{t('trip.addFirstStop')}</Text>
               </CloudyButton>
             </View>
           )}
         </View>
       ) : (
         <GestureHandlerRootView style={{ flex: 1 }}>
+          {/* Keeps the list out of react-native-screens' reach. */}
+          <ScrollViewShield />
           <DraggableFlatList
             data={staysLoaded && visaLoaded ? legs : []}
             keyExtractor={(item) => String(item.id)}
@@ -1476,19 +1562,20 @@ export default function JourneyDetailScreen() {
             contentInsetAdjustmentBehavior="never"
             // Without a map nothing pushes the content below the transparent header.
             contentContainerStyle={styles.content}
+            scrollIndicatorInsets={{ top: insets.top, bottom: IOS_TAB_BAR }}
             activationDistance={15}
             onContentSizeChange={(_, h) => setContentSize(h)}
           />
         </GestureHandlerRootView>
       )}
       {/* Behind the open chip: a touch anywhere else folds it back. */}
-      {travellersOpen && <Pressable style={StyleSheet.absoluteFill} onPress={closeTravellers} accessibilityLabel="Close" />}
+      {travellersOpen && <Pressable style={StyleSheet.absoluteFill} onPress={closeTravellers} accessibilityLabel={t('trip.close')} />}
 
       {/* The bar: two discs and the chip between them, over the map. */}
       <View style={[styles.bar, { top: insets.top }]} pointerEvents="box-none">
-        <GlassDisc icon="chevron-back" size={24} onPress={() => router.back()} label="Back" />
+        <GlassDisc icon="chevron-back" size={24} onPress={() => router.back()} label={t('trip.back')} />
         <View style={styles.barSpacer} pointerEvents="none" />
-        {!readOnly && <GlassDisc icon="add" size={28} onPress={openAddSheet} label="Add a stop" />}
+        {!readOnly && <GlassDisc icon="add" size={28} onPress={openAddSheet} label={t('trip.addStop')} />}
       </View>
       <View style={[styles.morphSlot, { top: insets.top }]} pointerEvents="box-none">
         <TripMorphChip
@@ -1518,8 +1605,9 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
     paddingRight: 16,
     paddingTop: 0,
-    paddingBottom: 100,
+    paddingBottom: 100 + IOS_TAB_BAR,
   },
+  scrollViewShield: { height: 0 },
 
   emptyWrap: { flex: 1 },
   emptyCta: { paddingHorizontal: 32, paddingBottom: 140 },
@@ -1605,11 +1693,13 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 18,
     padding: 16,
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+  },
+  legMain: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
   },
   legCardFallback: {
     backgroundColor: Colors.surface,
@@ -1650,6 +1740,8 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 8,
   },
+  // Flag width plus the gap: the chips start where the city does.
+  statusChipsInset: { marginLeft: 28 + 12 },
   statusChip: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -3,6 +3,7 @@ import { Stack, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
+import { useTranslation } from '../contexts/LanguageContext';
 
 /**
  * Any link the app has no screen for. Expo Router's default page offered a
@@ -11,19 +12,20 @@ import { Typography } from '../constants/typography';
  */
 export default function NotFoundScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   return (
     <>
-      <Stack.Screen options={{ title: 'Not found', headerShown: false }} />
+      <Stack.Screen options={{ title: t('nav.notFound'), headerShown: false }} />
       <View style={styles.wrap}>
         <Ionicons name="compass-outline" size={32} color={Colors.textTertiary} />
-        <Text style={styles.title}>This page does not exist</Text>
-        <Text style={styles.text}>The link may be old or mistyped.</Text>
+        <Text style={styles.title}>{t('notFound.heading')}</Text>
+        <Text style={styles.text}>{t('notFound.body')}</Text>
         <Pressable
           accessibilityRole="button"
           onPress={() => router.replace('/(tabs)/(timeline)')}
           style={({ pressed }) => [styles.button, pressed && { opacity: 0.6 }]}
         >
-          <Text style={styles.buttonText}>Back to your timeline</Text>
+          <Text style={styles.buttonText}>{t('notFound.back')}</Text>
         </Pressable>
       </View>
     </>

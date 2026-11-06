@@ -7,6 +7,7 @@ import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
 import { StopSummary } from '../../../../components/StopSummary';
 import { parseDate } from '../../../../lib/database';
+import { useTranslation } from '../../../../contexts/LanguageContext';
 
 type Params = {
   journeyId: string;
@@ -28,6 +29,7 @@ const RANGE_COLOR = '#000000';
 const RANGE_BG = 'rgba(0,0,0,0.08)';
 
 export default function AddStopDatesScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<Params>();
   const { country, city } = params;
@@ -128,9 +130,9 @@ export default function AddStopDatesScreen() {
     <>
       <Stack.Screen
         options={{
-          title: isEditing ? 'Edit Dates' : 'Dates',
+          title: isEditing ? t('timelineCreate.editDates') : t('addStop.dates'),
           headerRight: () => (
-            <Pressable onPress={handleNext} hitSlop={8} accessibilityRole="button" accessibilityLabel="Next">
+            <Pressable onPress={handleNext} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('addStop.next')}>
               <SymbolView
                 name={{ ios: 'arrow.right', android: 'arrow_forward' }}
                 tintColor={systemColor('label')}

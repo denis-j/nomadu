@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { CountryPicker } from '../../../../components/CountryPicker';
+import { useTranslation } from '../../../../contexts/LanguageContext';
 
 type Params = {
   id?: string;
@@ -13,6 +14,7 @@ type Params = {
 };
 
 export default function CreateCountryScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<Params>();
   const [query, setQuery] = useState('');
@@ -36,9 +38,9 @@ export default function CreateCountryScreen() {
     <>
       <Stack.Screen
         options={{
-          title: isEditing ? 'Edit Country' : 'Choose Country',
+          title: isEditing ? t('timelineCreate.editCountry') : t('nav.chooseCountry'),
           headerSearchBarOptions: {
-            placeholder: 'Search countries…',
+            placeholder: t('common.searchCountries'),
             onChangeText: (e: any) => setQuery(e.nativeEvent.text),
           },
         }}

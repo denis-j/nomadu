@@ -1,20 +1,22 @@
 import { Stack } from 'expo-router/stack';
-import { headerTransparent, sheetWithHeader } from '../../../constants/colors';
+import { Colors, headerTransparent, sheetWithHeader } from '../../../constants/colors';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 export default function SettingsStack() {
+  const { t } = useTranslation();
   return (
     <Stack>
       <Stack.Screen
         name="index"
         options={{
-          title: 'Settings',
+          title: t('nav.settings'),
           headerLargeTitle: true,
         }}
       />
       <Stack.Screen
         name="passport"
         options={{
-          title: 'Passport',
+          title: t('nav.passport'),
           headerTransparent,
           headerBlurEffect: 'systemMaterial',
           headerBackButtonDisplayMode: 'minimal',
@@ -25,13 +27,14 @@ export default function SettingsStack() {
         options={{
           presentation: sheetWithHeader,
           sheetGrabberVisible: true,
-          sheetAllowedDetents: [0.75, 1.0],
+          sheetAllowedDetents: [0.6],
+          contentStyle: { backgroundColor: Colors.background },
         }}
       />
       <Stack.Screen
         name="agent"
         options={{
-          title: 'AI agent',
+          title: t('nav.aiAgent'),
           headerBackButtonDisplayMode: 'minimal',
         }}
       />

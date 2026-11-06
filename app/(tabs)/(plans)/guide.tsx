@@ -15,6 +15,7 @@ import { getRuleForCitizen, type VisaRule } from '../../../constants/visaRules';
 import { appIconUrl, guideById, guideDays } from '../../../constants/guides';
 import { useAuth } from '../../../hooks/useAuth';
 import { getCitizenship } from '../../../lib/onboarding';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -30,6 +31,7 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
  * thing the itinerary's chips will say later.
  */
 export default function GuideScreen() {
+  const { t, countryName } = useTranslation();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const guide = guideById(id);
@@ -46,9 +48,9 @@ export default function GuideScreen() {
   if (!guide) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Guide' }} />
+        <Stack.Screen options={{ title: t('nav.guide') }} />
         <View style={styles.missing}>
-          <Text style={styles.missingText}>This guide is no longer here.</Text>
+          <Text style={styles.missingText}>{t('guide.gone')}</Text>
         </View>
       </>
     );
@@ -57,9 +59,9 @@ export default function GuideScreen() {
   const days = guideDays(guide);
   const visaValue = visa
     ? visa.ruleType === 'visa_required'
-      ? { value: 'Required', unit: undefined }
-      : { value: `${visa.allowedDays}`, unit: 'days' }
-    : { value: 'Check', unit: undefined };
+      ? { value: t('guide.required'), unit: undefined }
+      : { value: `${visa.allowedDays}`, unit: t('guide.days') }
+    : { value: t('guide.check'), unit: undefined };
 
   const plan = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -79,20 +81,20 @@ export default function GuideScreen() {
           />
           <View style={styles.heroText}>
             <Flag code={guide.countryCode} size={28} />
-            <Text style={styles.heroCountry}>{guide.country}</Text>
+            <Text style={styles.heroCountry}>{countryName(guide.country)}</Text>
             <Text style={styles.heroTagline}>{guide.tagline}</Text>
           </View>
         </ImageBackground>
 
         {/* The trip in numbers, the visa one from your own passport */}
         <StatRow style={styles.stats}>
-          <StatTile label="Route" value={`${days}`} unit="days" />
-          <StatTile label="Stops" value={`${guide.legs.length}`} />
-          <StatTile label="Visa" value={visaValue.value} unit={visaValue.unit} />
+          <StatTile label={t('guide.route')} value={`${days}`} unit={t('guide.days')} />
+          <StatTile label={t('guide.stops')} value={`${guide.legs.length}`} />
+          <StatTile label={t('guide.visa')} value={visaValue.value} unit={visaValue.unit} />
         </StatRow>
-        {visa ? <Text style={styles.visaNote}>{visa.label} on your passport</Text> : null}
+        {visa ? <Text style={styles.visaNote}>{t('guide.onPassport', { label: visa.label })}</Text> : null}
 
-        <Section title="Good to know">
+        <Section title={t('guide.goodToKnow')}>
           <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
             {guide.tips.map((tip, i) => (
               <View key={i}>
@@ -106,7 +108,7 @@ export default function GuideScreen() {
           </Glass>
         </Section>
 
-        <Section title="Apps everyone uses">
+        <Section title={t('guide.appsEveryone')}>
           <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
             {guide.apps.map((app, i) => (
               <View key={app.name}>
@@ -125,7 +127,7 @@ export default function GuideScreen() {
           </Glass>
         </Section>
 
-        <Section title="A route to start from">
+        <Section title={t('guide.routeToStart')}>
           <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
             {guide.legs.map((leg, i) => {
               const nights = leg.endOffset - leg.startOffset + 1;
@@ -138,7 +140,7 @@ export default function GuideScreen() {
                       <Ionicons name={transport.icon} size={15} color={Colors.textSecondary} />
                     </View>
                     <Text style={styles.legCity} numberOfLines={1}>{leg.city}</Text>
-                    <Text style={styles.legDays}>{nights} {nights === 1 ? 'day' : 'days'}</Text>
+                    <Text style={styles.legDays}>{nights} {nights === 1 ? t('plans.day') : t('plans.days')}</Text>
                   </View>
                 </View>
               );
@@ -148,10 +150,10 @@ export default function GuideScreen() {
 
         <View style={styles.ctaWrap}>
           <CloudyButton onPress={plan} style={styles.cta} innerStyle={styles.ctaInner}>
-            <Text style={styles.ctaText}>Plan this trip</Text>
+            <Text style={styles.ctaText}>{t('guide.planThisTrip')}</Text>
           </CloudyButton>
         </View>
-        <Text style={styles.foot}>Creates a trip with these {guide.legs.length} stops. Everything stays editable.</Text>
+        <Text style={styles.foot}>{t('guide.foot', { count: guide.legs.length })}</Text>
       </ScrollView>
     </>
   );

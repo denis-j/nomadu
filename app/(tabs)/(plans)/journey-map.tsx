@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import RNMapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useJourney } from '../../../hooks/useJourney';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 const MAP_PIN = require('../../../assets/icons/map-pin.png');
 
@@ -11,6 +12,7 @@ const MAP_PIN = require('../../../assets/icons/map-pin.png');
  * screen only shows a picture; this is where a map earns its place.
  */
 export default function JourneyMapScreen() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{ journeyId: string }>();
   const { journey } = useJourney(Number(params.journeyId));
   const mapRef = useRef<RNMapView>(null);
@@ -36,7 +38,7 @@ export default function JourneyMapScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: journey?.title ?? 'Map' }} />
+      <Stack.Screen options={{ title: journey?.title ?? t('plans.mapFallback') }} />
       <View style={styles.container}>
         <RNMapView
           ref={mapRef}

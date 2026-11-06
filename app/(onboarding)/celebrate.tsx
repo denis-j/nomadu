@@ -19,11 +19,13 @@ import { useOnboarding } from '../../contexts/OnboardingContext';
 import { useSubscription } from '../../hooks/useSubscription';
 import { setCelebrating } from '../../lib/celebration';
 import { playAirHornSound } from '../../lib/sound';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 export default function CelebrateScreen() {
   const router = useRouter();
   const { refresh } = useSubscription();
   const { markOnboardingComplete } = useOnboarding();
+  const { t } = useTranslation();
 
   useEffect(() => {
     playAirHornSound();
@@ -73,13 +75,13 @@ export default function CelebrateScreen() {
             entering={FadeIn.delay(220).duration(500)}
             style={styles.title}
           >
-            Welcome aboard
+            {t('onboarding.celebrate.title')}
           </Animated.Text>
           <Animated.Text
             entering={FadeIn.delay(360).duration(500)}
             style={styles.subtitle}
           >
-            The world is yours to track.
+            {t('onboarding.celebrate.subtitle')}
           </Animated.Text>
         </View>
         <Animated.View
@@ -91,7 +93,7 @@ export default function CelebrateScreen() {
             style={styles.cta}
             innerStyle={styles.ctaInner}
           >
-            <Text style={styles.ctaText}>Let&rsquo;s go</Text>
+            <Text style={styles.ctaText}>{t('onboarding.celebrate.cta')}</Text>
           </CloudyButton>
         </Animated.View>
       </SafeAreaView>

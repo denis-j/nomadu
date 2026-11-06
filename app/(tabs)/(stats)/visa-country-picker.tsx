@@ -3,8 +3,10 @@ import { useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { CountryPicker } from '../../../components/CountryPicker';
 import { setPendingCountry } from '../../../lib/countryPickerBridge';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 export default function VisaCountryPickerScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [query, setQuery] = useState('');
 
@@ -12,9 +14,9 @@ export default function VisaCountryPickerScreen() {
     <>
       <Stack.Screen
         options={{
-          title: 'Choose Country',
+          title: t('nav.chooseCountry'),
           headerSearchBarOptions: {
-            placeholder: 'Search countries…',
+            placeholder: t('common.searchCountries'),
             onChangeText: (e: any) => setQuery(e.nativeEvent.text),
           },
         }}
