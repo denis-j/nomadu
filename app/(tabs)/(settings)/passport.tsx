@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     fontSize: 15,
   },
-  sectionLabel: { ...Typography.sectionTitle, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 6 },
+  sectionLabel: { ...Typography.sectionLabel, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 6 },
   // ─── Morph Chip ───
   chipContainer: {
     position: 'absolute',

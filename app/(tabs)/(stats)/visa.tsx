@@ -327,33 +327,23 @@ export default function VisaScreen() {
 
   if (!citizenshipCode) {
     return (
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.emptyScroll}
-      >
-        <EmptyState
-          icons={[{ name: 'earth', color: '#A6B4C2' }, { name: 'person', color: '#4DC1FF' }, { name: 'document-text', color: '#A6B4C2' }]}
-          title={t('visa.noCitizenshipTitle')}
-          subtitle={t('visa.noCitizenshipSubtitle')}
-          primary={{ label: t('visa.setPassport'), onPress: () => router.push('/(tabs)/(settings)/passport') }}
-        />
-      </ScrollView>
+      <EmptyState
+        icons={[{ name: 'earth', color: '#A6B4C2' }, { name: 'person', color: '#4DC1FF' }, { name: 'document-text', color: '#A6B4C2' }]}
+        title={t('visa.noCitizenshipTitle')}
+        subtitle={t('visa.noCitizenshipSubtitle')}
+        primary={{ label: t('visa.setPassport'), onPress: () => router.push('/(tabs)/(settings)/passport') }}
+      />
     );
   }
 
   if (visaStatuses.length === 0) {
     return (
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.emptyScroll}
-      >
-        <EmptyState
-          icons={[{ name: 'calendar', color: '#A6B4C2' }, { name: 'document-text', color: '#4DC1FF' }, { name: 'airplane', color: '#A6B4C2' }]}
-          title={t('visa.noVisasTitle')}
-          subtitle={t('visa.noVisasSubtitle')}
-          primary={{ label: t('visa.addVisa'), icon: 'add-circle-outline', onPress: goToAdd }}
-        />
-      </ScrollView>
+      <EmptyState
+        icons={[{ name: 'calendar', color: '#A6B4C2' }, { name: 'document-text', color: '#4DC1FF' }, { name: 'airplane', color: '#A6B4C2' }]}
+        title={t('visa.noVisasTitle')}
+        subtitle={t('visa.noVisasSubtitle')}
+        primary={{ label: t('visa.addVisa'), icon: 'add-circle-outline', onPress: goToAdd }}
+      />
     );
   }
 
@@ -482,7 +472,6 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingBottom: 100,
   },
-  emptyScroll: { flexGrow: 1 },
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -528,7 +517,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     marginBottom: 2,
   },
-  sectionTitle: { ...Typography.sectionTitle },
+  sectionTitle: { ...Typography.sectionLabel },
   sectionMeta: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -242,6 +242,7 @@ export default function JourneysScreen() {
       >
         {!loading && journeys.length === 0 ? (
           <EmptyState
+            inline
             icons={[{ name: 'compass', color: '#A6B4C2' }, { name: 'airplane', color: '#4DC1FF' }, { name: 'map', color: '#A6B4C2' }]}
             title={t('plans.noJourneysTitle')}
             subtitle={t('plans.noJourneysSub')}
@@ -381,7 +382,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 12,
   },
-  featSectionTitle: { ...Typography.sectionTitle },
+  featSectionTitle: {
+    ...Typography.titleLarge,
+    fontSize: 20,
+    letterSpacing: -0.3,
+  },
   featSectionSub: {
     ...Typography.bodySmall,
     color: Colors.textTertiary,

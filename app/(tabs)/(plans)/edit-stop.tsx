@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingBottom: 60,
   },
-  sectionTitle: { ...Typography.sectionTitle },
+  sectionTitle: { ...Typography.sectionLabel },
   hint: {
     fontSize: 13,
     color: systemColor('tertiaryLabel'),

@@ -344,17 +344,11 @@ function ReviewStep({
 
   if (candidates.length === 0) {
     return (
-      <ScrollView
-        style={reviewStyles.scrollView}
-        contentContainerStyle={reviewStyles.emptyContainer}
-        contentInsetAdjustmentBehavior="automatic"
-      >
-        <EmptyState
-          icons={[{ name: 'image', color: '#A6B4C2' }, { name: 'search', color: '#4DC1FF' }, { name: 'airplane', color: '#A6B4C2' }]}
-          title={t('tlImport.noTripsFound')}
-          subtitle={imageCount === 1 ? t('tlImport.noTripsBodyOne') : t('tlImport.noTripsBodyMany')}
-        />
-      </ScrollView>
+      <EmptyState
+        icons={[{ name: 'image', color: '#A6B4C2' }, { name: 'search', color: '#4DC1FF' }, { name: 'airplane', color: '#A6B4C2' }]}
+        title={t('tlImport.noTripsFound')}
+        subtitle={imageCount === 1 ? t('tlImport.noTripsBodyOne') : t('tlImport.noTripsBodyMany')}
+      />
     );
   }
 
@@ -518,7 +512,7 @@ const reviewStyles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingBottom: 8,
   },
-  sectionTitle: { ...Typography.sectionTitle },
+  sectionTitle: { ...Typography.sectionLabel },
   sectionCount: { ...Typography.bodySmall, color: Colors.textTertiary },
   sectionList: {
     backgroundColor: Colors.surface,
@@ -539,7 +533,6 @@ const reviewStyles = StyleSheet.create({
     marginTop: 20,
     paddingHorizontal: 20,
   },
-  emptyContainer: { flexGrow: 1 },
 });
 
 const rowStyles = StyleSheet.create({

@@ -81,8 +81,8 @@ export function LinkCard({
 }
 
 /**
- * A section's heading, the same bold title as everywhere, with room on the
- * right for one small control: a sort, an "Edit".
+ * A section's heading, the same grey uppercase label as `SectionLabel`,
+ * with room on the right for one small control: a sort, an "Edit".
  */
 export function SectionHead({ title, right }: { title: string; right?: React.ReactNode }) {
   return (
@@ -201,8 +201,9 @@ const styles = StyleSheet.create({
   linkTitle: { ...Typography.titleSmall, fontWeight: '600' },
   linkSub: { ...Typography.bodySmall, color: Colors.textSecondary },
 
+  // Same words as visaForm's SectionLabel, in a row with a control.
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 20 },
-  sectionTitle: { ...Typography.sectionTitle },
+  sectionTitle: { ...Typography.sectionLabel },
   sectionControl: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   sectionControlText: { ...Typography.label, fontWeight: '600', color: Colors.textSecondary },
 

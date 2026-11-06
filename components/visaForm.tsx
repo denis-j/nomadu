@@ -637,7 +637,7 @@ const s = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
 
-  sectionTitle: { ...Typography.sectionTitle, marginTop: 6 },
+  sectionTitle: { ...Typography.sectionLabel, marginTop: 6 },
   hint: {
     ...Typography.bodySmall,
     color: Colors.textSecondary,

@@ -135,17 +135,32 @@ export default function TaxScreen() {
 
   if (!citizenshipCode) {
     return (
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.emptyScroll}
-      >
+      <EmptyState
+        icons={[{ name: 'earth', color: '#A6B4C2' }, { name: 'person', color: '#4DC1FF' }, { name: 'cash', color: '#A6B4C2' }]}
+        title={t('tax.noCitizenshipTitle')}
+        subtitle={t('tax.noCitizenshipSubtitle')}
+        primary={{ label: t('tax.setPassport'), onPress: () => router.push('/(tabs)/(settings)/passport') }}
+      />
+    );
+  }
+
+  if (taxStatuses.length === 0) {
+    return (
+      <View style={styles.emptyPage}>
+        <View style={styles.emptyPicker}>
+          <YearPicker
+            years={availableYears}
+            value={year}
+            onChange={(v) => setYear(v ?? new Date().getFullYear())}
+            includeAllTime={false}
+          />
+        </View>
         <EmptyState
-          icons={[{ name: 'earth', color: '#A6B4C2' }, { name: 'person', color: '#4DC1FF' }, { name: 'cash', color: '#A6B4C2' }]}
-          title={t('tax.noCitizenshipTitle')}
-          subtitle={t('tax.noCitizenshipSubtitle')}
-          primary={{ label: t('tax.setPassport'), onPress: () => router.push('/(tabs)/(settings)/passport') }}
+        icons={[{ name: 'calendar', color: '#A6B4C2' }, { name: 'cash', color: '#4DC1FF' }, { name: 'earth', color: '#A6B4C2' }]}
+        title={t('tax.noExposureTitle', { year })}
+        subtitle={t('tax.noExposureSubtitle')}
         />
-      </ScrollView>
+      </View>
     );
   }
 
@@ -173,15 +188,7 @@ export default function TaxScreen() {
         {t('tax.estimate')}
       </Text>
 
-      {taxStatuses.length === 0 ? (
-        <EmptyState
-          icons={[{ name: 'calendar', color: '#A6B4C2' }, { name: 'cash', color: '#4DC1FF' }, { name: 'earth', color: '#A6B4C2' }]}
-          title={t('tax.noExposureTitle', { year })}
-          subtitle={t('tax.noExposureSubtitle')}
-        />
-      ) : (
-        taxStatuses.map((tax) => <TaxCard key={tax.countryCode} tax={tax} />)
-      )}
+      {taxStatuses.map((tax) => <TaxCard key={tax.countryCode} tax={tax} />)}
 
       <Glass {...glassProps} style={[styles.disclaimerBlock, !hasGlass && styles.disclaimerBlockFallback]}>
         <View style={styles.disclaimerIconWrap}>
@@ -253,6 +260,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingBottom: 100,
   },
+  emptyPage: { flex: 1 },
+  emptyPicker: { padding: 16, paddingBottom: 0 },
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -361,7 +370,6 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   // Native empty state (no citizenship)
-  emptyScroll: { flexGrow: 1 },
 
   // Disclaimer block (Glass, cloud tint)
   disclaimer: {

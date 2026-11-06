@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingHorizontal: 16,
   },
-  timelineTitle: { ...Typography.sectionTitle, marginBottom: 16 },
+  timelineTitle: { ...Typography.sectionLabel, marginBottom: 16 },
   timeline: {
     position: 'relative',
   },

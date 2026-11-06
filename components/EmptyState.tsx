@@ -1,5 +1,6 @@
 import { useCallback, useState, type ComponentProps } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
@@ -26,6 +27,10 @@ interface EmptyStateProps {
   primary?: EmptyAction;
   /** A second way in, under the first. */
   secondary?: EmptyAction;
+  /** Something follows it on the page (guides, ideas), which keeps clear of the tab bar itself. */
+  inline?: boolean;
+  /** On a tab root with a large title: iOS runs the screen on behind it, so keep clear of it to stay centred. */
+  belowLargeTitle?: boolean;
 }
 
 /**
@@ -34,7 +39,8 @@ interface EmptyStateProps {
  * not build another; see "UI rules" in AGENTS.md. Inside a ScrollView give the
  * content container `flexGrow: 1` to centre it.
  */
-export function EmptyState({ icons, bars, title, subtitle, primary, secondary }: EmptyStateProps) {
+export function EmptyState({ icons, bars, title, subtitle, primary, secondary, inline, belowLargeTitle }: EmptyStateProps) {
+  const insets = useSafeAreaInsets();
   // A new key each time the screen gains focus plays the picture again.
   const [focusKey, setFocusKey] = useState(0);
   useFocusEffect(
@@ -44,7 +50,7 @@ export function EmptyState({ icons, bars, title, subtitle, primary, secondary }:
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, inline && styles.inline, belowLargeTitle && Platform.OS === 'ios' && { paddingTop: insets.top + LARGE_HEADER_HEIGHT + 32 }]}>
       {bars ? (
         <StatsBars key={focusKey} size={80} variant="burstWobble" />
       ) : (
@@ -57,7 +63,7 @@ export function EmptyState({ icons, bars, title, subtitle, primary, secondary }:
       {primary && (
         <CloudyButton onPress={primary.onPress} innerStyle={styles.primaryInner}>
           {primary.icon && <Ionicons name={primary.icon} size={22} color={Colors.cloudyButtonText} />}
-          <Text style={styles.primaryText}>{primary.label}</Text>
+          <Text style={styles.primaryText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{primary.label}</Text>
         </CloudyButton>
       )}
 
@@ -78,13 +84,19 @@ export function EmptyState({ icons, bars, title, subtitle, primary, secondary }:
   );
 }
 
+/** The bar and the large title on iOS, below the status bar. */
+const LARGE_HEADER_HEIGHT = 96;
+
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 32, gap: 14 },
+  // The screen runs on under the floating tab bar: the extra space at the
+  // bottom centres the content in what can be seen.
+  container: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingTop: 32, paddingBottom: 116, gap: 14 },
+  inline: { paddingBottom: 32 },
   title: { ...Typography.titleLarge, textAlign: 'center', letterSpacing: -0.4, marginTop: 8 },
   subtitle: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
   subtitleBeforeButton: { marginBottom: 12 },
   primaryInner: { justifyContent: 'center', gap: 10 },
-  primaryText: { ...Typography.titleSmall, fontWeight: '700', color: Colors.cloudyButtonText },
+  primaryText: { ...Typography.titleSmall, fontWeight: '700', color: Colors.cloudyButtonText, flexShrink: 1 },
   secondary: {
     width: '100%',
     maxWidth: 360,

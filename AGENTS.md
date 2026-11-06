@@ -92,14 +92,22 @@ variant, and do not restyle one locally.
   above it. `leading` is only the magnifier of a search, `trailing` holds one small
   control (show password, clear, send, a currency). Do not use `TextInput` directly.
   The one exception is the morphing search chip in `(settings)/passport.tsx`.
-- **Section headings are bold**, always `Typography.sectionTitle`, in sentence case. Use
-  `SectionHead` or `SectionLabel` where they fit. Never uppercase: `Typography.eyebrow`
-  is only for a small tag above a value (a stat label, "All time").
+- **Section headings come in two kinds.** The quiet one is the default: small, grey and
+  uppercase, as in Settings and in every sheet: always `Typography.sectionLabel`, through
+  `SectionHead` or `SectionLabel` where they fit, never its own values. The bold one is for a heading that opens a big block of
+  its own on a main page, like "Reiseführer" in the Plan tab. Do not make quiet headings bold.
+  `npm run lint` fails on an uppercase style written outside `constants/typography.ts`.
 - **Nothing here yet is `EmptyState`** (`components/EmptyState.tsx`), modelled on Verlauf
   and Tracking: the moving picture, a bold title, a grey line. The way in is a cloud
   button (`primary`), with an outlined `secondary` if there is a second one; leave them
   out when there is nothing to do, or for a guest on a shared trip. Pick three `icons`
-  that fit the screen. No emoji, no static icon, no "tap +" in the text. Dashed
+  that fit the screen. No emoji, no static icon, no "tap +" in the text. It always sits
+  centred in the visible area between the header and the tab bar, and the page does not
+  scroll: render it directly, never in a `ScrollView` with `flexGrow` and automatic insets.
+  On a tab root with a large title pass `belowLargeTitle`.
+  A control needed to get out of it (filter pills, a year picker) stays above it. A map, an
+  input or a note that only serves the content is hidden until there is content. The only
+  exception is `inline`, when real content follows it on the page. Dashed
   `SlotCard`s for suggested items and one-line "no results" in a search are not empty states.
 
 ## Secrets & env

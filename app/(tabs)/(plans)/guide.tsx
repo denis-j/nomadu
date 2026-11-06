@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   visaNote: { ...Typography.caption, color: Colors.textTertiary, marginHorizontal: 20, marginTop: 8 },
 
   section: { marginHorizontal: 16, marginTop: 22, gap: 10 },
-  sectionTitle: { ...Typography.sectionTitle, paddingHorizontal: 4 },
+  sectionTitle: { ...Typography.sectionLabel, paddingHorizontal: 4 },
   card: { borderRadius: 18, borderCurve: 'continuous', paddingHorizontal: 16, overflow: 'hidden', backgroundColor: Colors.surface },
   cardFallback: { borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.border },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border },

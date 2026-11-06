@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router/stack';
-import { sheetBackground, headerTransparent, sheetWithHeader } from '../../../constants/colors';
+import { sheetBackground, sheetWithHeader } from '../../../constants/colors';
 import { useTranslation } from '../../../contexts/LanguageContext';
 
 export default function StatsStack() {
@@ -54,7 +54,6 @@ export default function StatsStack() {
         options={{
           title: t('nav.taxResidence'),
           headerBackButtonDisplayMode: 'minimal',
-          headerTransparent
         }}
       />
     </Stack>

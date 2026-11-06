@@ -188,6 +188,15 @@ export default function ExpensesScreen() {
   const others = sums.slice(1);
   const settledWord = myNet > 0.004 ? t('expenses.youGetBack') : myNet < -0.004 ? t('expenses.youOwe') : t('expenses.balance');
 
+  if (expenses.length === 0) {
+    return (
+      <>
+        <Stack.Screen options={{ title: t('nav.expenses') }} />
+        <Empty readOnly={readOnly} owner={journey.shared_owner_name ?? null} onSnap={chooseReceipt} onManual={() => openForm()} />
+      </>
+    );
+  }
+
   return (
     <>
       <Stack.Screen options={{ title: t('nav.expenses') }} />
@@ -218,52 +227,46 @@ export default function ExpensesScreen() {
           </FormCard>
         )}
 
-        {expenses.length === 0 ? (
-          <Empty readOnly={readOnly} owner={journey.shared_owner_name ?? null} onSnap={chooseReceipt} onManual={() => openForm()} />
-        ) : (
-          <>
-            <StatRow>
-              <StatTile label={t('expenses.total')} value={formatAmount(sums[0].total)} unit={main} />
-              <StatTile label={t('expenses.yourPart')} value={formatAmount(myPart)} unit={main} />
-              <StatTile label={settledWord} value={settledWord === t('expenses.balance') ? t('expenses.settled') : formatAmount(Math.abs(myNet))} unit={settledWord === t('expenses.balance') ? undefined : main} />
-            </StatRow>
-            {others.length > 0 && (
-              <Text style={styles.note}>{t('expenses.also', { list: others.map((s) => `${formatAmount(s.total)} ${s.currency}`).join(' · ') })}</Text>
-            )}
-
-            {transfers.length > 0 && (
-              <View style={styles.section}>
-                <SectionHead title={t('expenses.settleUp')} />
-                <DetailCard>
-                  {transfers.map((t, i) => (
-                    <View key={`${t.from}-${t.to}-${t.currency}`}>
-                      {i > 0 && <DetailSeparator />}
-                      <TransferRow transfer={t} meId={meId} nameOf={nameOf} person={people.get(t.from) ?? null} />
-                    </View>
-                  ))}
-                </DetailCard>
-              </View>
-            )}
-
-            {days.map((day) => (
-              <View key={day.date} style={styles.section}>
-                <SectionHead title={dayLabel(day.date, t)} />
-                <View style={styles.list}>
-                  {day.items.map((e) => (
-                    <ExpenseRow
-                      key={e.id}
-                      expense={e}
-                      receiptUri={receiptImageUri(e.receipt_document_id ? receiptOf.get(e.receipt_document_id) : null)}
-                      nameOf={nameOf}
-                      meId={meId}
-                      onPress={() => openExpense(e)}
-                    />
-                  ))}
-                </View>
-              </View>
-            ))}
-          </>
+        <StatRow>
+          <StatTile label={t('expenses.total')} value={formatAmount(sums[0].total)} unit={main} />
+          <StatTile label={t('expenses.yourPart')} value={formatAmount(myPart)} unit={main} />
+          <StatTile label={settledWord} value={settledWord === t('expenses.balance') ? t('expenses.settled') : formatAmount(Math.abs(myNet))} unit={settledWord === t('expenses.balance') ? undefined : main} />
+        </StatRow>
+        {others.length > 0 && (
+          <Text style={styles.note}>{t('expenses.also', { list: others.map((s) => `${formatAmount(s.total)} ${s.currency}`).join(' · ') })}</Text>
         )}
+
+        {transfers.length > 0 && (
+          <View style={styles.section}>
+            <SectionHead title={t('expenses.settleUp')} />
+            <DetailCard>
+              {transfers.map((t, i) => (
+                <View key={`${t.from}-${t.to}-${t.currency}`}>
+                  {i > 0 && <DetailSeparator />}
+                  <TransferRow transfer={t} meId={meId} nameOf={nameOf} person={people.get(t.from) ?? null} />
+                </View>
+              ))}
+            </DetailCard>
+          </View>
+        )}
+
+        {days.map((day) => (
+          <View key={day.date} style={styles.section}>
+            <SectionHead title={dayLabel(day.date, t)} />
+            <View style={styles.list}>
+              {day.items.map((e) => (
+                <ExpenseRow
+                  key={e.id}
+                  expense={e}
+                  receiptUri={receiptImageUri(e.receipt_document_id ? receiptOf.get(e.receipt_document_id) : null)}
+                  nameOf={nameOf}
+                  meId={meId}
+                  onPress={() => openExpense(e)}
+                />
+              ))}
+            </View>
+          </View>
+        ))}
       </ScrollView>
     </>
   );

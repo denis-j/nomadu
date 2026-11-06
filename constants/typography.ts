@@ -1,5 +1,5 @@
 import type { TextStyle } from 'react-native';
-import { Colors } from './colors';
+import { Colors, systemColor } from './colors';
 
 /**
  * Typography scale for the entire app. Spread these into StyleSheets:
@@ -15,6 +15,8 @@ import { Colors } from './colors';
  * Rules of thumb:
  * - Default to one of these. Reach for a custom fontSize only if the design
  *   genuinely needs it (oversized hero numerals, decorative outliers).
+ * - A quiet section heading (grey, uppercase, above a card or list) is always
+ *   `sectionLabel`; never rebuild it from `eyebrow` or from its own values.
  * - For numeric displays add `fontVariant: ['tabular-nums']` so digits don't
  *   shimmer when they change. The dedicated `numericLarge` already includes it.
  * - Brand styles are the big welcome lines; use them for those moments,
@@ -75,13 +77,6 @@ export const Typography = {
     color: Colors.text,
   }),
 
-  /** Every section heading in the app: bold, sentence case, never uppercase. */
-  sectionTitle: T({
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text,
-  }),
-
   // ─── Body, content ─────────────────────────────────────────────────────
   bodyLarge: T({
     fontSize: 17,
@@ -116,11 +111,20 @@ export const Typography = {
     color: Colors.text,
   }),
 
-  // ─── Eyebrow, small uppercase tags above a value, never a section heading ─
+  // ─── Eyebrow, small uppercase tags above titles ────────────────────────
   eyebrow: T({
     fontSize: 11,
     fontWeight: '600',
     color: Colors.textSecondary,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  }),
+
+  /** A quiet section heading: in Settings, in every sheet, above a list. */
+  sectionLabel: T({
+    fontSize: 13,
+    fontWeight: '600',
+    color: systemColor('secondaryLabel'),
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   }),

@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  sectionTitle: { ...Typography.sectionTitle, marginBottom: 12 },
+  sectionTitle: { ...Typography.sectionLabel, marginBottom: 12 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

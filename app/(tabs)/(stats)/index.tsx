@@ -69,7 +69,7 @@ export default function StatsScreen() {
   const hasAnyData = stats.availableYears.length > 1 || stats.daysTracked > 0;
   if (!hasAnyData) {
     return (
-      <EmptyState bars title={t('stats.noStatsTitle')} subtitle={t('stats.noStatsSubtitle')} />
+      <EmptyState bars belowLargeTitle title={t('stats.noStatsTitle')} subtitle={t('stats.noStatsSubtitle')} />
     );
   }
 
@@ -1053,7 +1053,7 @@ const badgeStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingRight: 16,
   },
-  sectionTitle: { ...Typography.sectionTitle },
+  sectionTitle: { ...Typography.sectionLabel },
   progressLink: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -1197,7 +1197,7 @@ const styles = StyleSheet.create({
     marginHorizontal: -16,
     paddingLeft: 16,
   },
-  sectionTitle: { ...Typography.sectionTitle, paddingLeft: 4 },
+  sectionTitle: { ...Typography.sectionLabel, paddingLeft: 4 },
   cardPressed: {
     opacity: 0.7,
   },

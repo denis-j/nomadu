@@ -154,7 +154,7 @@ export default function ActivitiesScreen() {
   const pills = legs.length > 1 || unplaced.length > 0;
 
   // The map on top: the places in view that have a point; while none has,
-  // the stops themselves, so the page always opens on where this is.
+  // the stops themselves. With nothing in view the empty state stands alone.
   const placed: MapPin[] = groups
     .flatMap((g) => g.items)
     .filter((a) => a.latitude !== null && a.longitude !== null)
@@ -163,7 +163,7 @@ export default function ActivitiesScreen() {
     .filter((l) => l.latitude !== null && l.longitude !== null)
     .map((l) => ({ latitude: l.latitude!, longitude: l.longitude! }));
   const pins = placed.length ? placed : stopPins;
-  const hero = filter !== 'unplaced' && pins.length > 0;
+  const hero = shown > 0 && filter !== 'unplaced' && pins.length > 0;
 
   const pillOptions: PillOption[] = [
     { key: 'all', label: t('documents.all'), active: filter === 'all', onPress: () => setFilter('all') },
@@ -182,8 +182,13 @@ export default function ActivitiesScreen() {
   return (
     <>
       <Stack.Screen options={{ title: t('nav.thingsToDo') }} />
-      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
-        {pills && <PillRow options={pillOptions} />}
+      <ScrollView
+        contentInsetAdjustmentBehavior={shown === 0 ? 'never' : 'automatic'}
+        alwaysBounceVertical={shown > 0}
+        contentContainerStyle={[styles.content, shown === 0 && !ideasLeg && styles.contentEmpty, shown === 0 && !!ideasLeg && styles.contentEmptyIdeas]}
+      >
+        {/* In its own box: a horizontal list would stretch to fill the empty page. */}
+        {pills && <View><PillRow options={pillOptions} /></View>}
 
         {hero && (
           <View style={styles.mapContainer}>
@@ -196,13 +201,16 @@ export default function ActivitiesScreen() {
         )}
 
         {shown === 0 ? (
-          <Empty
-            city={filterLeg?.city ?? (legs.length === 1 ? legs[0].city : null)}
-            readOnly={readOnly}
-            owner={journey.shared_owner_name ?? null}
-            onLink={() => openAdd('link')}
-            onManual={() => openAdd('manual')}
-          />
+          <View style={styles.emptyWrap}>
+            <Empty
+              city={filterLeg?.city ?? (legs.length === 1 ? legs[0].city : null)}
+              readOnly={readOnly}
+              owner={journey.shared_owner_name ?? null}
+              inline={!readOnly && !!ideasLeg}
+              onLink={() => openAdd('link')}
+              onManual={() => openAdd('manual')}
+            />
+          </View>
         ) : (
           groups.map((g) => (
             <View key={g.key} style={styles.group}>
@@ -244,10 +252,11 @@ export default function ActivitiesScreen() {
 // ─── Empty ───────────────────────────────────────────────────────────────────
 
 /** Nothing here yet: what the page is for, and the two ways in, as the timeline's empty state offers them. */
-function Empty({ city, readOnly, owner, onLink, onManual }: { city: string | null; readOnly: boolean; owner: string | null; onLink: () => void; onManual: () => void }) {
+function Empty({ city, readOnly, owner, inline, onLink, onManual }: { city: string | null; readOnly: boolean; owner: string | null; inline: boolean; onLink: () => void; onManual: () => void }) {
   const { t } = useTranslation();
   return (
     <EmptyState
+      inline={inline}
       icons={[{ name: 'map', color: '#A6B4C2' }, { name: 'sparkles', color: '#4DC1FF' }, { name: 'restaurant', color: '#A6B4C2' }]}
       title={city ? t('activities.nothingInCity', { city }) : t('activities.nothingPlanned')}
       subtitle={
@@ -409,6 +418,11 @@ function IdeaSkeleton() {
 const styles = StyleSheet.create({
   // Same page measures as the wallet.
   content: { padding: 16, paddingBottom: 100, gap: 20 },
+  // Nothing in view: the empty state fills the page and centres itself, and
+  // the screen's own width applies to it, as everywhere else.
+  contentEmpty: { flexGrow: 1, paddingBottom: 0 },
+  contentEmptyIdeas: { flexGrow: 1 },
+  emptyWrap: { flexGrow: 1, marginHorizontal: -16 },
 
   // The map, as on the stay's page; the plate as the Map tab's chip.
   mapContainer: {
@@ -436,7 +450,7 @@ const styles = StyleSheet.create({
 
   group: { gap: 10 },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 },
-  groupTitle: { ...Typography.sectionTitle },
+  groupTitle: { ...Typography.sectionLabel },
   groupMeta: { ...Typography.caption, color: Colors.textTertiary, flex: 1, fontVariant: ['tabular-nums'] },
   list: { gap: 10 },
 

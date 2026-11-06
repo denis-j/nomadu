@@ -108,13 +108,7 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
     gap: 8,
   },
-  label: {
-    ...Typography.eyebrow,
-    fontSize: 13,
-    letterSpacing: 0.6,
-    marginTop: 8,
-    marginBottom: 4,
-  },
+  label: { ...Typography.sectionLabel, marginTop: 8, marginBottom: 4 },
   canvasWrap: {
     width: '100%',
     aspectRatio: 1,

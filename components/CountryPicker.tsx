@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   list: {
     paddingBottom: 40,
   },
-  sectionLabel: { ...Typography.sectionTitle, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 },
+  sectionLabel: { ...Typography.sectionLabel, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 },
   item: {
     flexDirection: 'row',
     alignItems: 'center',

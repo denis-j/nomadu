@@ -910,6 +910,7 @@ export default function TimelineScreen() {
     if (!loading && trips.length === 0) {
       return (
         <EmptyState
+          belowLargeTitle
           title={t('timeline.emptyTitle')}
           subtitle={t('timeline.emptySubtitle')}
           primary={{ label: t('timeline.importFromScreenshots'), icon: 'sparkles', onPress: openImport }}
