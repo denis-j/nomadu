@@ -21,7 +21,9 @@ export function useJourney(id: number) {
   // Another journey: its last known state, or loading until it is in. Only
   // on a change of id: run on mount too, it blanked the cached first frame.
   const [shownId, setShownId] = useState(id);
-  if (shownId !== id) {
+  // Object.is: a malformed link gives NaN, which never equals itself and would
+  // set the state again on every render.
+  if (!Object.is(shownId, id)) {
     setShownId(id);
     const known = journeyDetail(id)?.journey;
     setJourney(known ?? null);
