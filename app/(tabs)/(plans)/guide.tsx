@@ -31,7 +31,7 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
  * thing the itinerary's chips will say later.
  */
 export default function GuideScreen() {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const guide = guideById(id);
@@ -81,7 +81,7 @@ export default function GuideScreen() {
           />
           <View style={styles.heroText}>
             <Flag code={guide.countryCode} size={28} />
-            <Text style={styles.heroCountry}>{guide.country}</Text>
+            <Text style={styles.heroCountry}>{countryName(guide.country)}</Text>
             <Text style={styles.heroTagline}>{guide.tagline}</Text>
           </View>
         </ImageBackground>

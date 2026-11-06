@@ -27,7 +27,7 @@ const OPEN_CONFIG = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
 const CLOSE_CONFIG = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
 
 export default function PassportScreen() {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const { user } = useAuth();
   const [query, setQuery] = useState('');
   const [currentCountry, setCurrentCountry] = useState<string | null>(null);
@@ -137,7 +137,7 @@ export default function PassportScreen() {
             {currentCode ? <Flag code={currentCode} size={32} /> : null}
             <View style={styles.currentInfo}>
               <Text style={styles.currentLabel}>{t('passport.currentPassport')}</Text>
-              <Text style={styles.currentCountry}>{currentCountry}</Text>
+              <Text style={styles.currentCountry}>{countryName(currentCountry)}</Text>
             </View>
           </View>
         )}

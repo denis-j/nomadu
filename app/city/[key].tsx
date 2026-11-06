@@ -17,7 +17,7 @@ const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 export default function CityDetailScreen() {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const { key } = useLocalSearchParams<{ key: string }>();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,7 +109,7 @@ export default function CityDetailScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.city}>{city}</Text>
-          <Text style={styles.country}>{country}</Text>
+          <Text style={styles.country}>{countryName(country)}</Text>
         </View>
 
         {/* Stats */}

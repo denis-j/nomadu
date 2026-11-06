@@ -193,7 +193,7 @@ function useHeroPoint(address: string | null, city: string, country: string, cou
  * timeline; a booked place becomes a stay only when the phone is there.
  */
 export default function AccommodationScreen() {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const SORT_LABELS_L: Record<SortKey, string> = { score: t('accommodation.sortScore'), price: t('accommodation.sortPrice'), rating: t('accommodation.sortRating') };
   const TILE_STATUS_L: Record<string, string> = {
     ...Object.fromEntries(Object.keys(STATUS_LABELS).map((k) => [k, t(`accStatus.${k}`)])),
@@ -294,7 +294,7 @@ export default function AccommodationScreen() {
   const title = primary ? primary.name : params.city;
   const subtitle = primary
     ? [primary.platform, address].filter(Boolean).join(' · ')
-    : t('accommodation.subtitleCountryNights', { country: params.country ?? '', nights, nightsWord: nights === 1 ? t('accommodation.nightSingular') : t('accommodation.nightPlural') });
+    : t('accommodation.subtitleCountryNights', { country: countryName(params.country), nights, nightsWord: nights === 1 ? t('accommodation.nightSingular') : t('accommodation.nightPlural') });
 
   // The third tile: what this stay costs, as far as that is known.
   const nightly = primary ? optionNightlyPrice(primary) : null;

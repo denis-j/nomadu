@@ -241,16 +241,50 @@ export async function restorePurchases(): Promise<CustomerInfo> {
   return Purchases.restorePurchases();
 }
 
-export async function identifyUser(uid: string): Promise<void> {
-  if (!REVENUECAT_ENABLED) return;
-  try {
-    // A network round trip at every launch otherwise; the SDK keeps the
-    // identified user across launches.
-    if ((await currentAppUserId()) === uid) return;
-    await Purchases.logIn(uid);
-  } catch {
-    // Non-critical: app works without RevenueCat identification
+/** The entitlement a CustomerInfo from RevenueCat describes. */
+export function entitlementOf(info: CustomerInfo): Omit<Entitlement, 'verified'> {
+  const entitlement = info.entitlements.active[ENTITLEMENT_ID];
+  return {
+    isActive: !!entitlement,
+    expirationDate: entitlement?.expirationDate ?? null,
+    productIdentifier: entitlement?.productIdentifier ?? null,
+  };
+}
+
+const IDENTIFY_RETRY_DELAYS_MS = [1000, 2000];
+
+let identifying: { uid: string; result: Promise<boolean> } | null = null;
+
+async function logInWithRetry(uid: string): Promise<boolean> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await Purchases.logIn(uid);
+      return true;
+    } catch {
+      const delay = IDENTIFY_RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) return false;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
   }
+}
+
+/**
+ * Make RevenueCat answer for this account. False when it could not be reached:
+ * it is then still on the previous user, so its answer says nothing about this
+ * account. Sign-in and the subscription hook both ask at the same moment, and
+ * they share one attempt.
+ */
+export async function identifyUser(uid: string): Promise<boolean> {
+  if (!REVENUECAT_ENABLED) return true;
+  // A network round trip at every launch otherwise; the SDK keeps the
+  // identified user across launches.
+  if ((await currentAppUserId()) === uid) return true;
+  if (identifying?.uid === uid) return identifying.result;
+  const result = logInWithRetry(uid).finally(() => {
+    identifying = null;
+  });
+  identifying = { uid, result };
+  return result;
 }
 
 export async function logOutUser(): Promise<void> {

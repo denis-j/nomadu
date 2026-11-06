@@ -4,9 +4,10 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { setCelebrating } from '../../lib/celebration';
-import { useSubscription } from '../../hooks/useSubscription';
+import { publishEntitlement, useSubscription } from '../../hooks/useSubscription';
 import { useAuth } from '../../hooks/useAuth';
 import { deleteAccount } from '../../lib/auth';
+import { entitlementOf, rememberEntitlement, type CustomerInfo } from '../../lib/revenueCat';
 import { Colors } from '../../constants/colors';
 import { track } from '../../lib/analytics';
 import { useTranslation } from '../../contexts/LanguageContext';
@@ -14,6 +15,7 @@ import { useTranslation } from '../../contexts/LanguageContext';
 export default function OnboardingPaywallScreen() {
   const router = useRouter();
   const { isPro } = useSubscription();
+  const { t } = useTranslation();
   const navigatedRef = useRef(false);
 
   const goToCelebrate = () => {
@@ -47,9 +49,20 @@ export default function OnboardingPaywallScreen() {
           track({ name: 'purchase_completed', props: { source: 'onboarding' } });
           goToCelebrate();
         }}
-        onRestoreCompleted={() => {
+        onRestoreCompleted={({ customerInfo }: { customerInfo: CustomerInfo }) => {
+          // Also called when the restore found nothing. Celebrating that sent
+          // people to the confetti and straight back here.
+          const restored = entitlementOf(customerInfo);
+          if (!restored.isActive) {
+            Alert.alert(t('onboarding.paywall.noPlanTitle'), t('onboarding.paywall.noPlanBody'));
+            return;
+          }
           track({ name: 'purchase_restored', props: { source: 'onboarding' } });
+          // Flags the celebration first, so the router leaves it alone once the
+          // answer below reaches it.
           goToCelebrate();
+          publishEntitlement({ ...restored, verified: true });
+          rememberEntitlement(restored);
         }}
       />
       <AccountButton />

@@ -283,7 +283,7 @@ function CountryGroupCard({
   onDeleteMany: (ids: number[]) => void;
   onEdit: (trip: Trip) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   // ActionSheet still uses emoji, native iOS title strings handle it well.
   const emojiFlag = countryCodeToFlag(group.countryCode);
@@ -298,7 +298,7 @@ function CountryGroupCard({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     ActionSheetIOS.showActionSheetWithOptions(
       {
-        title: `${emojiFlag} ${group.country} · ${t('timeline.stops', { count: group.items.length })}`,
+        title: `${emojiFlag} ${countryName(group.country)} · ${t('timeline.stops', { count: group.items.length })}`,
         options: [t('timeline.deleteAllStops'), t('common.cancel')],
         destructiveButtonIndex: 0,
         cancelButtonIndex: 1,
@@ -363,7 +363,7 @@ function CountryGroupCard({
               </View>
             </View>
           </View>
-          <Text style={groupStyles.country}>{group.country}</Text>
+          <Text style={groupStyles.country}>{countryName(group.country)}</Text>
           <View style={groupStyles.headerBottom}>
             <Text style={groupStyles.dates}>{dateRange}</Text>
             {isActive && <View style={groupStyles.activeDot} />}

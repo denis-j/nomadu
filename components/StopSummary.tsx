@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { systemColor } from '../constants/colors';
+import { useTranslation } from '../contexts/LanguageContext';
 
 /**
  * Which stop a form is about, above the fields: the place on the left, the
@@ -10,11 +11,12 @@ import { systemColor } from '../constants/colors';
 const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 export function StopSummary({ city, country, start, end }: { city: string; country: string; start: Date; end: Date }) {
+  const { countryName } = useTranslation();
   const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1);
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
-        <Text style={styles.place}>{city}, {country}</Text>
+        <Text style={styles.place}>{city}, {countryName(country)}</Text>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{days}d</Text>
         </View>

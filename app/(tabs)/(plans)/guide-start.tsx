@@ -26,7 +26,7 @@ const RANGE_BG = 'rgba(0,0,0,0.08)';
  * is created.
  */
 export default function GuideStartScreen() {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const guide = guideById(id);
@@ -90,7 +90,7 @@ export default function GuideStartScreen() {
       />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
         <View style={styles.head}>
-          <Text style={styles.place}>{guide.country}</Text>
+          <Text style={styles.place}>{countryName(guide.country)}</Text>
           <Text style={styles.span}>
             {human(start)} – {human(end)} · {days} {days === 1 ? t('plans.day') : t('plans.days')}
           </Text>

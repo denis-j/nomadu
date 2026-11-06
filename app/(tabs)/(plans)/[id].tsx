@@ -586,7 +586,7 @@ const LegCard = React.memo(function LegCard({
   citizenshipCode,
   enter = true,
 }: LegCardProps) {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const days = legDays(leg.start_date, leg.end_date);
 
   const isSchengen = !!leg.country_code && (SCHENGEN_COUNTRIES as readonly string[]).includes(leg.country_code);
@@ -699,7 +699,7 @@ const LegCard = React.memo(function LegCard({
               {/* Center info */}
               <View style={styles.legCenter}>
                 <Text style={styles.legCity}>{leg.city}</Text>
-                <Text style={styles.legCountry}>{leg.country}</Text>
+                <Text style={styles.legCountry}>{countryName(leg.country)}</Text>
                 <MorphText style={styles.legDates}>
                   {fmtRange(leg.start_date, leg.end_date)}
                 </MorphText>
@@ -792,7 +792,7 @@ function SuggestionLegCard({
   onAdd: () => void;
   disabled?: boolean;
 }) {
-  const { t: tt } = useTranslation();
+  const { t: tt, countryName } = useTranslation();
   const countryCode = getCountryCode(suggestion.country);
   const days = legDays(suggestion.startDate, suggestion.endDate);
 
@@ -811,7 +811,7 @@ function SuggestionLegCard({
         <Flag code={countryCode} size={28} style={styles.legFlagWrap} />
         <View style={styles.legCenter}>
           <Text style={styles.legCity}>{suggestion.city}</Text>
-          <Text style={styles.legCountry}>{suggestion.country}</Text>
+          <Text style={styles.legCountry}>{countryName(suggestion.country)}</Text>
           <Text style={styles.legDates}>
             {fmtShort(suggestion.startDate)} – {fmtShort(suggestion.endDate)}
           </Text>

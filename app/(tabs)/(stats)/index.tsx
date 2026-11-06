@@ -33,7 +33,7 @@ const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 export default function StatsScreen() {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const [yearFilter, setYearFilter] = useState<YearFilter>(new Date().getFullYear());
   const { stats, loading, refresh: refreshStats, home } = useStats(yearFilter);
   const { visaStatuses, loading: visaLoading, refresh: refreshVisa } = useVisaTracker();
@@ -152,7 +152,7 @@ export default function StatsScreen() {
               title={t('stats.visa')}
               count={activeVisas.length}
               code={mostCritical.destinationCode}
-              country={mostCritical.destination}
+              country={countryName(mostCritical.destination)}
               daysLeft={mostCritical.daysRemaining}
               total={mostCritical.daysAllowed}
               onPress={() => {
@@ -176,7 +176,7 @@ export default function StatsScreen() {
               title={t('stats.tax')}
               count={taxStatuses.length}
               code={mostCriticalTax.countryCode}
-              country={mostCriticalTax.country}
+              country={countryName(mostCriticalTax.country)}
               daysLeft={mostCriticalTax.daysRemaining}
               total={mostCriticalTax.thresholdDays}
               onPress={() => {
@@ -219,7 +219,7 @@ export default function StatsScreen() {
                 key={country.country_code + index}
                 rank={index + 1}
                 code={country.country_code}
-                country={country.country}
+                country={countryName(country.country)}
                 days={country.days}
               />
             ))}
@@ -270,7 +270,7 @@ function StatsHero({
   yearFilter: YearFilter;
   home: { code: string; country: string } | null;
 }) {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const [size, setSize] = useState({ w: 0, h: 0 });
   const isYearMode = yearFilter !== null;
 
@@ -279,7 +279,7 @@ function StatsHero({
   // number that separates someone who travelled from someone who didn't.
   const value = isYearMode ? stats.daysAway : stats.totalCountries;
   const unit = isYearMode
-    ? `${t(stats.daysAway === 1 ? 'stats.dayAway' : 'stats.daysAway')}${home ? t('stats.awayFrom', { country: home.country }) : ''}`
+    ? `${t(stats.daysAway === 1 ? 'stats.dayAway' : 'stats.daysAway')}${home ? t('stats.awayFrom', { country: countryName(home.country) }) : ''}`
     : t(stats.totalCountries === 1 ? 'stats.countryVisited' : 'stats.countriesVisited');
 
   const pct = isYearMode

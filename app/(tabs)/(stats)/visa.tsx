@@ -60,14 +60,14 @@ function getStatusColor(status: VisaStatus['status']): string {
 }
 
 function CardHeader({ visa, interactive }: { visa: VisaStatus; interactive?: boolean }) {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const statusColor = getStatusColor(visa.status);
   return (
     <View style={styles.cardHeader}>
       <View style={styles.cardTitle}>
         <Flag code={visa.destinationCode} size={24} />
         <View style={styles.titleText}>
-          <Text style={styles.destination}>{visa.destination}</Text>
+          <Text style={styles.destination}>{countryName(visa.destination)}</Text>
           <Text style={styles.ruleLabel}>{visa.ruleLabel}</Text>
         </View>
       </View>
@@ -260,7 +260,7 @@ function SectionHeader({
 const VISA_DISCLAIMER_SEEN_KEY = '@visa_disclaimer_seen';
 
 export default function VisaScreen() {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const { visaStatuses, loading, citizenshipCode, citizenshipCountry, refresh } = useVisaTracker();
   const [refreshing, setRefreshing] = useState(false);
   const [showFirstRunDisclaimer, setShowFirstRunDisclaimer] = useState(false);
@@ -388,7 +388,7 @@ export default function VisaScreen() {
       <View style={styles.subtitleRow}>
         <Text style={styles.subtitle}>{t('visa.basedOn')}</Text>
         {citizenshipCode && <Flag code={citizenshipCode} size={14} />}
-        <Text style={styles.subtitle}>{t('visa.passportSuffix', { country: citizenshipCountry ?? '' })}</Text>
+        <Text style={styles.subtitle}>{t('visa.passportSuffix', { country: countryName(citizenshipCountry) })}</Text>
       </View>
 
       {active.map(renderCard)}

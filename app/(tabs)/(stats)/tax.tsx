@@ -47,7 +47,7 @@ function getStatusColor(status: TaxStatus['status']): string {
 }
 
 function TaxCard({ tax }: { tax: TaxStatus }) {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const progressColor = getProgressColor(tax.percentUsed);
   const statusColor = getStatusColor(tax.status);
   const progressWidth = Math.min(tax.percentUsed, 100);
@@ -58,7 +58,7 @@ function TaxCard({ tax }: { tax: TaxStatus }) {
         <View style={styles.cardTitle}>
           <Flag code={tax.countryCode} size={24} />
           <View style={styles.titleText}>
-            <Text style={styles.destination}>{tax.country}</Text>
+            <Text style={styles.destination}>{countryName(tax.country)}</Text>
             <Text style={styles.ruleLabel}>{tax.ruleLabel}</Text>
           </View>
         </View>
@@ -98,7 +98,7 @@ function TaxCard({ tax }: { tax: TaxStatus }) {
 const TAX_DISCLAIMER_SEEN_KEY = '@tax_disclaimer_seen';
 
 export default function TaxScreen() {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const { taxStatuses, availableYears, loading, citizenshipCode, citizenshipCountry, refresh } =
     useTaxTracker(year);
@@ -163,7 +163,7 @@ export default function TaxScreen() {
       <View style={styles.subtitleRow}>
         <Text style={styles.subtitle}>{t('tax.basedOn')}</Text>
         {citizenshipCode && <Flag code={citizenshipCode} size={14} />}
-        <Text style={styles.subtitle}>{t('tax.citizenshipSuffix', { country: citizenshipCountry ?? '', year })}</Text>
+        <Text style={styles.subtitle}>{t('tax.citizenshipSuffix', { country: countryName(citizenshipCountry), year })}</Text>
       </View>
       {/* Which stretch each card counts is on the card itself (ruleLabel);
           this says up front that it differs, and that it is an estimate. */}

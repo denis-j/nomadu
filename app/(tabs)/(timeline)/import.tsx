@@ -432,7 +432,7 @@ function CandidateRow({
   onToggle: () => void;
   onRemove: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const start = new Date(candidate.startDate);
   const end = candidate.endDate ? new Date(candidate.endDate) : null;
   const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -468,7 +468,7 @@ function CandidateRow({
           )}
         </View>
         <Text style={[rowStyles.meta, dup && rowStyles.dimmed]} numberOfLines={1}>
-          {candidate.country} · {dateRange}
+          {countryName(candidate.country)} · {dateRange}
           {dup && t('tlImport.alreadyInTimeline')}
         </Text>
       </View>

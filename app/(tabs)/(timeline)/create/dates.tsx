@@ -29,7 +29,7 @@ const RANGE_COLOR = '#000000';
 const RANGE_BG = 'rgba(0,0,0,0.08)';
 
 export default function CreateDatesScreen() {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const parentNav = useNavigation();
   const params = useLocalSearchParams<Params>();
   const { country, city } = params;
@@ -173,7 +173,7 @@ export default function CreateDatesScreen() {
       >
         {/* Location + days summary */}
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLocation}>{city}, {country}</Text>
+          <Text style={styles.summaryLocation}>{city}, {countryName(country)}</Text>
           <View style={styles.daysBubble}>
             <Text style={styles.daysText}>{days}d</Text>
           </View>

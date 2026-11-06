@@ -19,7 +19,7 @@ const hasGlass = isLiquidGlassAvailable();
 const GlassCard = hasGlass ? GlassView : View;
 
 export default function TripDetailScreen() {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   // undefined while loading, null when there is no such trip (deleted, or a
   // link with a made-up id), which used to leave "Loading..." up for good.
@@ -114,7 +114,7 @@ export default function TripDetailScreen() {
         {/* City & Country */}
         <View style={[styles.header, styles.headerWithMap]}>
           <Text style={styles.city}>{trip.city}</Text>
-          <Text style={styles.country}>{trip.country}</Text>
+          <Text style={styles.country}>{countryName(trip.country)}</Text>
           {isActive && (
             <View style={styles.activeBadge}>
               <View style={styles.activeDot} />

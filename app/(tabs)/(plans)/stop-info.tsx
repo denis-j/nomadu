@@ -101,7 +101,7 @@ function staySummary(plan: NonNullable<ReturnType<typeof useAccommodation>['plan
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function StopInfoScreen() {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const router = useRouter();
   const nav = useNavigation();
   const params = useLocalSearchParams<Params>();
@@ -227,7 +227,7 @@ export default function StopInfoScreen() {
         <View style={[styles.header, hasCoords && styles.headerWithMap]}>
           {!hasCoords && <Flag code={countryCode} size={32} />}
           <Text style={styles.city}>{city}</Text>
-          <Text style={styles.country}>{country}</Text>
+          <Text style={styles.country}>{countryName(country)}</Text>
         </View>
 
         {/* Stats: each fact once; the dates themselves are in the card below */}

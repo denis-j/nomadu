@@ -62,7 +62,7 @@ interface MorphChipProps {
 }
 
 function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipProps) {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const [chipWidth, setChipWidth] = useState(0);
   const [rowHeight, setRowHeight] = useState(0);
   const [statsHeight, setStatsHeight] = useState(0);
@@ -150,7 +150,7 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
           <Flag code={currentTrip.country_code} size={16} />
           <Text style={styles.chipCity}>{currentTrip.city}</Text>
           <View style={styles.chipDivider} />
-          <Text style={styles.chipCountry}>{currentTrip.country}</Text>
+          <Text style={styles.chipCountry}>{countryName(currentTrip.country)}</Text>
         </View>
 
         {/* Stats – always mounted, clipped by height + faded by opacity */}

@@ -168,6 +168,8 @@ const en = {
       deleteConfirm: 'This permanently deletes your account, all trips and all data, both on this device and in the cloud. It cannot be undone.',
       notDeletedTitle: 'Account not deleted',
       tryAgain: 'Please try again.',
+      noPlanTitle: 'No active plan found',
+      noPlanBody: 'Neither this account nor your store account has an active plan. If you bought it with another email, sign in with that one.',
     },
   },
   comp: {
@@ -1392,6 +1394,8 @@ const de: TranslationTree = {
       deleteConfirm: 'Dies löscht dein Konto, alle Reisen und alle Daten dauerhaft, auf diesem Gerät und in der Cloud. Das kann nicht rückgängig gemacht werden.',
       notDeletedTitle: 'Konto nicht gelöscht',
       tryAgain: 'Bitte versuche es erneut.',
+      noPlanTitle: 'Kein aktiver Plan gefunden',
+      noPlanBody: 'Weder dieses Konto noch dein Store-Konto hat einen aktiven Plan. Falls du mit einer anderen E-Mail gekauft hast, melde dich damit an.',
     },
   },
   comp: {

@@ -14,6 +14,7 @@ import {
   translations,
   type Language,
 } from '../lib/i18n/translations';
+import { localizedCountryName } from '../lib/i18n/country';
 
 const LANGUAGE_STORAGE_KEY = '@app_language';
 
@@ -31,6 +32,8 @@ interface LanguageContextValue {
   /** Reset to the device's language. */
   useSystemLanguage: () => Promise<void>;
   t: (key: string, params?: TParams) => string;
+  /** Localise a (data-stored, English) country name to the active language. */
+  countryName: (name: string | null | undefined) => string;
 }
 
 /** The device language if we support it, otherwise English. */
@@ -107,9 +110,14 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     [language],
   );
 
+  const countryName = useCallback(
+    (name: string | null | undefined) => localizedCountryName(name, language),
+    [language],
+  );
+
   const value = useMemo<LanguageContextValue>(
-    () => ({ language, ready, isExplicit, setLanguage, useSystemLanguage, t }),
-    [language, ready, isExplicit, setLanguage, useSystemLanguage, t],
+    () => ({ language, ready, isExplicit, setLanguage, useSystemLanguage, t, countryName }),
+    [language, ready, isExplicit, setLanguage, useSystemLanguage, t, countryName],
   );
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;

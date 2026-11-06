@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import Purchases, { CustomerInfo } from 'react-native-purchases';
-import { ENTITLEMENT_ID, checkProEntitlement, configureRevenueCat, identifyUser, readValidSnapshotFor, rememberEntitlement } from '../lib/revenueCat';
+import { checkProEntitlement, configureRevenueCat, entitlementOf, identifyUser, readValidSnapshotFor, rememberEntitlement, type Entitlement } from '../lib/revenueCat';
 
 interface SubscriptionState {
   isPro: boolean;
@@ -23,6 +23,17 @@ interface SubscriptionState {
   refresh: () => Promise<void>;
 }
 
+const instances = new Set<(entitlement: Entitlement) => void>();
+
+/**
+ * Hand a new answer to every mounted useSubscription. Each screen has its own
+ * copy of the state and the root navigator routes on its own, so a refresh that
+ * reached only the calling screen sent a customer back to the paywall.
+ */
+export function publishEntitlement(entitlement: Entitlement): void {
+  instances.forEach((apply) => apply(entitlement));
+}
+
 /**
  * Pro entitlement for the given account. Pass the signed-in uid (or null):
  * every change identifies against RevenueCat first and re-checks, so the
@@ -36,13 +47,23 @@ export function useSubscription(uid: string | null = null): SubscriptionState {
   const [loading, setLoading] = useState(true);
   const [checkedFor, setCheckedFor] = useState<string | null | undefined>(undefined);
 
+  const apply = useCallback((entitlement: Entitlement) => {
+    setIsPro(entitlement.isActive);
+    setExpirationDate(entitlement.expirationDate);
+    setProductIdentifier(entitlement.productIdentifier);
+    setVerified(entitlement.verified);
+  }, []);
+
+  useEffect(() => {
+    instances.add(apply);
+    return () => {
+      instances.delete(apply);
+    };
+  }, [apply]);
+
   const refresh = useCallback(async () => {
     setLoading(true);
-    const result = await checkProEntitlement();
-    setIsPro(result.isActive);
-    setExpirationDate(result.expirationDate);
-    setProductIdentifier(result.productIdentifier);
-    setVerified(result.verified);
+    publishEntitlement(await checkProEntitlement());
     setLoading(false);
   }, []);
 
@@ -59,26 +80,23 @@ export function useSubscription(uid: string | null = null): SubscriptionState {
         // the live check below confirms or revokes it.
         const known = await readValidSnapshotFor(uid);
         if (known && !cancelled) {
-          setIsPro(true);
-          setExpirationDate(known.expirationDate);
-          setProductIdentifier(known.productIdentifier);
-          setVerified(false);
+          apply(known);
           setCheckedFor(uid);
           setLoading(false);
         }
-        await identifyUser(uid);
+        const identified = await identifyUser(uid);
+        // RevenueCat is still on the previous user, so a check now would
+        // revoke a confirmed answer with someone else's.
+        if (!identified && known) return;
       }
       const result = await checkProEntitlement();
       if (cancelled) return;
-      setIsPro(result.isActive);
-      setExpirationDate(result.expirationDate);
-      setProductIdentifier(result.productIdentifier);
-      setVerified(result.verified);
+      apply(result);
       setCheckedFor(uid);
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [uid]);
+  }, [uid, apply]);
 
   // There is deliberately no refresh-on-focus here. This hook sits in the root
   // layout, so a focus refresh fired on every screen change and asked
@@ -90,19 +108,10 @@ export function useSubscription(uid: string | null = null): SubscriptionState {
   // Listen for real-time changes from RevenueCat
   useEffect(() => {
     const listener = (info: CustomerInfo) => {
-      const entitlement = info.entitlements.active[ENTITLEMENT_ID];
-      const next = {
-        isActive: !!entitlement,
-        expirationDate: entitlement?.expirationDate ?? null,
-        productIdentifier: entitlement?.productIdentifier ?? null,
-      };
-
-      setIsPro(next.isActive);
-      setExpirationDate(next.expirationDate);
-      setProductIdentifier(next.productIdentifier);
+      const next = entitlementOf(info);
       // The SDK only pushes this after talking to RevenueCat, so it counts as
       // verified and is worth keeping for the next offline start.
-      setVerified(true);
+      apply({ ...next, verified: true });
       rememberEntitlement(next);
     };
 
@@ -112,7 +121,7 @@ export function useSubscription(uid: string | null = null): SubscriptionState {
     return () => {
       Purchases.removeCustomerInfoUpdateListener(listener);
     };
-  }, []);
+  }, [apply]);
 
   return { isPro, expirationDate, productIdentifier, verified, loading, checkedFor, refresh };
 }
