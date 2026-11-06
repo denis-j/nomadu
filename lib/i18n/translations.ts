@@ -1128,8 +1128,8 @@ const en = {
     ofDays: 'of {days}d',
     rule183: '183d rule',
     detecting: 'Detecting your location…',
-    firstStay: 'Your first stay appears once a location is recorded',
-    enableTracking: 'Enable location tracking to see your trips',
+    firstStay: 'Waiting for your first location',
+    enableTracking: 'Enable location tracking',
   },
   timeline: {
     emptyTitle: 'Start your travel timeline',
@@ -2354,8 +2354,8 @@ const de: TranslationTree = {
     ofDays: 'von {days}T',
     rule183: '183-Tage-Regel',
     detecting: 'Dein Standort wird ermittelt…',
-    firstStay: 'Dein erster Aufenthalt erscheint, sobald ein Standort erfasst wurde',
-    enableTracking: 'Aktiviere die Standorterfassung, um deine Reisen zu sehen',
+    firstStay: 'Warte auf deinen ersten Standort',
+    enableTracking: 'Standorterfassung aktivieren',
   },
   timeline: {
     emptyTitle: 'Starte deinen Reiseverlauf',
