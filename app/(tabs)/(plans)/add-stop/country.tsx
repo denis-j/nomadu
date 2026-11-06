@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { systemColor } from '../../../../constants/colors';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { getPopularCountries, searchCountries, getCountryCode } from '../../../../utils/geography';
+import { getPopularCountries, searchCountries, getCountryCode, getCountryNames } from '../../../../utils/geography';
 import { useTranslation } from '../../../../contexts/LanguageContext';
 import { Flag } from '../../../../components/Flag';
 
@@ -23,12 +23,19 @@ type Params = {
 };
 
 export default function AddStopCountryScreen() {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<Params>();
   const [query, setQuery] = useState('');
 
-  const filtered = query.trim() ? searchCountries(query) : popularCountries;
+  const filtered = query.trim()
+    ? (() => {
+        const eng = searchCountries(query);
+        const seen = new Set(eng);
+        const ql = query.trim().toLowerCase();
+        return [...eng, ...getCountryNames().filter((c) => !seen.has(c) && countryName(c).toLowerCase().includes(ql))];
+      })()
+    : popularCountries;
   const isEditing = !!params.legId;
 
   const pickCountry = (name: string) => {
@@ -77,7 +84,7 @@ export default function AddStopCountryScreen() {
               <View style={styles.flagWrap}>
                 <Flag code={code} size={20} />
               </View>
-              <Text style={styles.itemText}>{name}</Text>
+              <Text style={styles.itemText}>{countryName(name)}</Text>
               <Text style={styles.chevron}>›</Text>
             </Pressable>
           );

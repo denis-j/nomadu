@@ -157,7 +157,7 @@ export function VisaSummary({
   ruleSummary: string;
   span: string;
 }) {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   return (
     <View style={s.summaryRow}>
       <View style={s.summaryLeft}>
@@ -169,7 +169,7 @@ export function VisaSummary({
           </View>
         )}
         <View style={s.summaryText}>
-          <Text style={s.summaryTitle} numberOfLines={1}>{country?.name ?? t('visaForm.newVisa')}</Text>
+          <Text style={s.summaryTitle} numberOfLines={1}>{country ? countryName(country.name) : t('visaForm.newVisa')}</Text>
           <Text style={s.summarySub} numberOfLines={1}>{ruleSummary}</Text>
         </View>
       </View>
@@ -200,7 +200,7 @@ export function IdentityFields({
   label: string;
   setLabel: (v: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const labelRef = useRef<TextInput>(null);
   return (
     <>
@@ -211,7 +211,7 @@ export function IdentityFields({
             {country ? (
               <>
                 <Flag code={country.code} size={18} />
-                <Text style={s.disclosureValue}>{country.name}</Text>
+                <Text style={s.disclosureValue}>{countryName(country.name)}</Text>
               </>
             ) : (
               <Text style={s.disclosurePlaceholder}>{t('visaForm.choose')}</Text>

@@ -38,7 +38,7 @@ export function CountryPicker({
   showPopularWhenEmpty = true,
   popularLabel,
 }: CountryPickerProps) {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const trimmed = query.trim();
   const isSearching = trimmed.length > 0;
 
@@ -49,8 +49,18 @@ export function CountryPicker({
     const popularSet = new Set(popularCountries);
     return getCountryNames()
       .filter((c) => !popularSet.has(c))
-      .sort((a, b) => a.localeCompare(b));
-  }, []);
+      .sort((a, b) => countryName(a).localeCompare(countryName(b)));
+  }, [countryName]);
+
+  // Match the query against the English name (with aliases) and the localised
+  // name, so searching works in either language.
+  const searchMatches = (q: string) => {
+    const eng = searchCountries(q);
+    const seen = new Set(eng);
+    const ql = q.trim().toLowerCase();
+    const de = getCountryNames().filter((c) => !seen.has(c) && countryName(c).toLowerCase().includes(ql));
+    return [...eng, ...de];
+  };
 
   const renderRow = (name: string) => {
     const code = getCountryCode(name);
@@ -61,7 +71,7 @@ export function CountryPicker({
         onPress={() => onSelect(name, code)}
       >
         {code && <Flag code={code} size={20} />}
-        <Text style={styles.itemText}>{name}</Text>
+        <Text style={styles.itemText}>{countryName(name)}</Text>
         <Text style={styles.chevron}>›</Text>
       </Pressable>
     );
@@ -75,8 +85,8 @@ export function CountryPicker({
     >
       {isSearching ? (
         <>
-          {searchCountries(trimmed).map(renderRow)}
-          {searchCountries(trimmed).length === 0 && (
+          {searchMatches(trimmed).map(renderRow)}
+          {searchMatches(trimmed).length === 0 && (
             <Text style={styles.empty}>{t('passport.noResults')}</Text>
           )}
         </>

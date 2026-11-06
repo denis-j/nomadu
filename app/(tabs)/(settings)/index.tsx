@@ -32,7 +32,7 @@ const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 export default function SettingsScreen() {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const { permissions } = useLocation();
   const [trackingSheetVisible, setTrackingSheetVisible] = useState(false);
   const { isPro, expirationDate, productIdentifier } = useSubscription();
@@ -236,7 +236,7 @@ export default function SettingsScreen() {
             {passportCode ? (
               <>
                 <Flag code={passportCode} size={18} />
-                <Text style={styles.rowValue}>{passportCountry}</Text>
+                <Text style={styles.rowValue}>{countryName(passportCountry)}</Text>
               </>
             ) : (
               <Text style={styles.rowValue}>{t('settings.notSet')}</Text>

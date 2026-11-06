@@ -74,9 +74,16 @@ export default function PassportScreen() {
     const popularSet = new Set(popularList);
     return getCountryNames()
       .filter((c) => !popularSet.has(c))
-      .sort((a, b) => a.localeCompare(b));
+      .sort((a, b) => countryName(a).localeCompare(countryName(b)));
   })();
-  const searchResults = isSearching ? searchCountries(query) : [];
+  const searchResults = (() => {
+    if (!isSearching) return [];
+    const q = query.trim().toLowerCase();
+    const eng = searchCountries(query);
+    const seen = new Set(eng);
+    const de = getCountryNames().filter((c) => !seen.has(c) && countryName(c).toLowerCase().includes(q));
+    return [...eng, ...de];
+  })();
 
   const handleSelect = useCallback(async (countryName: string) => {
     if (!user) return;
@@ -370,6 +377,7 @@ function CountryRow({
   isSelected: boolean;
   onPress: () => void;
 }) {
+  const { countryName } = useTranslation();
   const code = getCountryCode(name);
   return (
     <Pressable
@@ -377,7 +385,7 @@ function CountryRow({
       onPress={onPress}
     >
       <Flag code={code} size={22} />
-      <Text style={styles.itemText}>{name}</Text>
+      <Text style={styles.itemText}>{countryName(name)}</Text>
       {isSelected && (
         <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
       )}

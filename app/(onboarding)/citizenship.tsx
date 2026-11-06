@@ -30,6 +30,7 @@ import { LOCAL_ONBOARDING_UID, setCitizenship } from '../../lib/onboarding';
 import { playSuccessSound, playTapSound } from '../../lib/sound';
 import {
   getCountryCode,
+  getCountryNames,
   getPopularCountries,
   searchCountries,
 } from '../../utils/geography';
@@ -71,6 +72,7 @@ const COUNTRY_COORDS: Record<string, { latitude: number; longitude: number }> = 
 function SearchRow({ name, index, onPress }: {
   name: string; index: number; onPress: () => void;
 }) {
+  const { countryName } = useTranslation();
   const code = getCountryCode(name);
   return (
     <Animated.View
@@ -82,7 +84,7 @@ function SearchRow({ name, index, onPress }: {
           <View style={styles.searchFlagWrap}>
             <Flag code={code} size={22} />
           </View>
-          <Text style={styles.searchName}>{name}</Text>
+          <Text style={styles.searchName}>{countryName(name)}</Text>
           <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
         </Glass>
       </TouchableOpacity>
@@ -115,7 +117,7 @@ export default function CitizenshipScreen() {
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
   const router = useRouter();
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const mapRef = useRef<MapView>(null);
 
   // Touchdown: after the MapView has a chance to settle, zoom from the high
@@ -133,8 +135,12 @@ export default function CitizenshipScreen() {
   const popularCountries = useMemo(() => getPopularCountries(), []);
   const searchResults = useMemo(() => {
     if (!isSearching) return [];
-    return searchCountries(query);
-  }, [query, isSearching]);
+    const eng = searchCountries(query);
+    const seen = new Set(eng);
+    const ql = query.trim().toLowerCase();
+    const de = getCountryNames().filter((c) => !seen.has(c) && countryName(c).toLowerCase().includes(ql));
+    return [...eng, ...de];
+  }, [query, isSearching, countryName]);
 
   const handleSelect = useCallback(async (countryName: string) => {
     if (selected) return;
@@ -296,7 +302,7 @@ export default function CitizenshipScreen() {
                   <Flag code={getCountryCode(selected ?? hoveredCountry!)} size={32} />
                 </View>
                 <View style={styles.confirmTextWrap}>
-                  <Text style={styles.confirmName}>{selected ?? hoveredCountry}</Text>
+                  <Text style={styles.confirmName}>{countryName(selected ?? hoveredCountry)}</Text>
                   <Text style={[styles.confirmHint, selected && styles.successHint]}>
                     {selected ? t('onboarding.citizenship.added') : t('onboarding.citizenship.tapToConfirm')}
                   </Text>
