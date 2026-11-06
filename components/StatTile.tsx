@@ -85,9 +85,11 @@ export function StatRow({ children, style }: { children: React.ReactNode; style?
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10 },
   cell: { flex: 1, minWidth: 0 },
-  pressable: { flex: 1 },
-  menu: { flex: 1, alignSelf: 'stretch' },
-  tile: { flex: 1, borderRadius: 14, padding: 14, gap: 4, overflow: 'hidden' },
+  // flexGrow, not flex: the cell takes its height from what is inside it, and
+  // flex: 1 would ask for a height of zero and clip the tile to its padding.
+  pressable: { flexGrow: 1 },
+  menu: { flexGrow: 1, alignSelf: 'stretch' },
+  tile: { flexGrow: 1, borderRadius: 14, padding: 14, gap: 4, overflow: 'hidden' },
   tileFallback: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   label: { fontSize: 11, fontWeight: '600', color: Colors.textTertiary, marginBottom: 2 },
   valueRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
