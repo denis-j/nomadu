@@ -11,6 +11,7 @@ import { Colors, systemColor } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { track } from '../../../lib/analytics';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { FormField } from '../../../components/FormField';
 
 /** A trip starts with a name: one field in the app's card, a few names to tap as a start. */
 export default function CreateJourneyScreen() {
@@ -53,20 +54,16 @@ export default function CreateJourneyScreen() {
       />
       <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <Card>
-          <Pressable onPress={() => inputRef.current?.focus()} style={styles.inputRow}>
-            <TextInput
-              ref={inputRef}
-              style={styles.input}
-              value={title}
-              onChangeText={setTitle}
-              placeholder={t('plans.nameYourTrip')}
-              placeholderTextColor={Colors.textTertiary}
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={handleCreate}
-              maxLength={80}
-            />
-          </Pressable>
+          <FormField
+            ref={inputRef}
+            value={title}
+            onChangeText={setTitle}
+            placeholder={t('plans.nameYourTrip')}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={handleCreate}
+            maxLength={80}
+          />
         </Card>
         <View style={styles.pillRow}>
           {SUGGESTIONS.map((name) => {
@@ -92,8 +89,6 @@ export default function CreateJourneyScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: 20, gap: 14 },
-  inputRow: { paddingVertical: 16 },
-  input: { ...Typography.titleSmall, fontWeight: '400' },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   pillLabel: { ...Typography.label, fontWeight: '600', color: Colors.text },
   pillLabelActive: { color: Colors.white },

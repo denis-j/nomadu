@@ -389,11 +389,7 @@ const styles = StyleSheet.create({
   groupAvatarShared: { backgroundColor: Colors.surfaceSecondary },
   tileFace: { position: 'absolute', top: 8, right: 8 },
   groupAvatarText: { fontSize: 11, fontWeight: '700', color: Colors.white },
-  groupTitle: {
-    ...Typography.eyebrow,
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
+  groupTitle: { ...Typography.sectionTitle },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

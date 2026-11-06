@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { CloudyButton } from '../../../../components/CloudyButton';
@@ -21,6 +21,7 @@ import { Colors } from '../../../../constants/colors';
 import { Typography } from '../../../../constants/typography';
 import { track } from '../../../../lib/analytics';
 import { useTranslation } from '../../../../contexts/LanguageContext';
+import { FormField } from '../../../../components/FormField';
 
 /** Step 3 of 3: the dates, and a name if you want one. */
 export default function AddVisaWhenScreen() {
@@ -95,16 +96,12 @@ export default function AddVisaWhenScreen() {
 
         <SectionLabel>{t('visaForm.nameOptional')}</SectionLabel>
         <Card>
-          <Pressable style={styles.nameRow}>
-            <TextInput
-              style={styles.nameInput}
-              placeholder={t('visaForm.labelPlaceholder')}
-              placeholderTextColor={Colors.textTertiary}
-              value={label}
-              onChangeText={setLabel}
-              returnKeyType="done"
-            />
-          </Pressable>
+          <FormField
+            placeholder={t('visaForm.labelPlaceholder')}
+            value={label}
+            onChangeText={setLabel}
+            returnKeyType="done"
+          />
         </Card>
 
         <View style={styles.footer}>
@@ -124,8 +121,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     marginTop: -4,
   },
-  nameRow: { paddingVertical: 16 },
-  nameInput: { ...Typography.titleSmall, fontWeight: '400' },
   footer: { marginTop: 10, gap: 10 },
   cta: { width: '100%' },
   ctaInner: { justifyContent: 'center' },

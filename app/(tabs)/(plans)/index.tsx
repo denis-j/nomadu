@@ -26,6 +26,7 @@ import { deleteJourneyWithDocuments } from '../../../lib/documents';
 import { inviteFriends, leaveTrip, stopSharing } from '../../../lib/shareActions';
 import { Flag } from '../../../components/Flag';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { EmptyState } from '../../../components/EmptyState';
 
 const hasGlass = isLiquidGlassAvailable();
 
@@ -240,11 +241,12 @@ export default function JourneysScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {!loading && journeys.length === 0 ? (
-          <View style={styles.inlineEmpty}>
-            <Text style={styles.inlineEmptyIcon}>🗺️</Text>
-            <Text style={styles.inlineEmptyTitle}>{t('plans.noJourneysTitle')}</Text>
-            <Text style={styles.inlineEmptySub}>{t('plans.noJourneysSub')}</Text>
-          </View>
+          <EmptyState
+            icons={[{ name: 'compass', color: '#A6B4C2' }, { name: 'airplane', color: '#4DC1FF' }, { name: 'map', color: '#A6B4C2' }]}
+            title={t('plans.noJourneysTitle')}
+            subtitle={t('plans.noJourneysSub')}
+            primary={{ label: t('plans.createTrip'), icon: 'add-circle-outline', onPress: () => router.push('/(tabs)/(plans)/create') }}
+          />
         ) : (
           journeys.map((j) => (
             <JourneyCard
@@ -311,24 +313,6 @@ const styles = StyleSheet.create({
   },
 
   // ─── Inline empty state ───
-  inlineEmpty: {
-    alignItems: 'center',
-    paddingVertical: 32,
-    gap: 6,
-  },
-  inlineEmptyIcon: {
-    fontSize: 40,
-  },
-  inlineEmptyTitle: {
-    ...Typography.bodyLarge,
-    fontWeight: '600',
-  },
-  inlineEmptySub: {
-    ...Typography.bodySmall,
-    fontSize: 14,
-    color: Colors.textTertiary,
-    textAlign: 'center',
-  },
 
   // ─── Card ───
   cardTouchable: {
@@ -397,11 +381,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 12,
   },
-  featSectionTitle: {
-    ...Typography.titleLarge,
-    fontSize: 20,
-    letterSpacing: -0.3,
-  },
+  featSectionTitle: { ...Typography.sectionTitle },
   featSectionSub: {
     ...Typography.bodySmall,
     color: Colors.textTertiary,

@@ -6,9 +6,8 @@ import { formatDay } from '../../../lib/days';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useNavigation, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { SymbolView } from 'expo-symbols';
 import { useVisaTracker } from '../../../hooks/useVisaTracker';
-import { Colors, systemColor } from '../../../constants/colors';
+import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { CloudyButton } from '../../../components/CloudyButton';
 import { Flag } from '../../../components/Flag';
@@ -16,6 +15,7 @@ import { todayStr, visaGroup, VisaStatus } from '../../../lib/visaCalculations';
 import { hasNoExpiry } from '../../../lib/userVisas';
 import { getCountryName } from '../../../utils/geography';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { EmptyState } from '../../../components/EmptyState';
 
 type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
@@ -331,11 +331,12 @@ export default function VisaScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.emptyScroll}
       >
-        <View style={styles.emptyInner}>
-          <SymbolView name={{ ios: 'person.text.rectangle', android: 'id_card' }} size={48} tintColor={systemColor('tertiaryLabel')} weight="regular" />
-          <Text style={styles.emptyTitle}>{t('visa.noCitizenshipTitle')}</Text>
-          <Text style={styles.emptySubtitle}>{t('visa.noCitizenshipSubtitle')}</Text>
-        </View>
+        <EmptyState
+          icons={[{ name: 'earth', color: '#A6B4C2' }, { name: 'person', color: '#4DC1FF' }, { name: 'document-text', color: '#A6B4C2' }]}
+          title={t('visa.noCitizenshipTitle')}
+          subtitle={t('visa.noCitizenshipSubtitle')}
+          primary={{ label: t('visa.setPassport'), onPress: () => router.push('/(tabs)/(settings)/passport') }}
+        />
       </ScrollView>
     );
   }
@@ -346,13 +347,12 @@ export default function VisaScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.emptyScroll}
       >
-        <View style={styles.emptyInner}>
-          <SymbolView name={{ ios: 'doc.text', android: 'description' }} size={48} tintColor={systemColor('tertiaryLabel')} weight="regular" />
-          <Text style={styles.emptyTitle}>{t('visa.noVisasTitle')}</Text>
-          <Text style={styles.emptySubtitle}>
-            {t('visa.noVisasSubtitle')}
-          </Text>
-        </View>
+        <EmptyState
+          icons={[{ name: 'calendar', color: '#A6B4C2' }, { name: 'document-text', color: '#4DC1FF' }, { name: 'airplane', color: '#A6B4C2' }]}
+          title={t('visa.noVisasTitle')}
+          subtitle={t('visa.noVisasSubtitle')}
+          primary={{ label: t('visa.addVisa'), icon: 'add-circle-outline', onPress: goToAdd }}
+        />
       </ScrollView>
     );
   }
@@ -482,32 +482,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingBottom: 100,
   },
-  emptyScroll: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingBottom: 80,
-  },
-  emptyInner: {
-    alignItems: 'center',
-    maxWidth: 320,
-  },
-  emptyTitle: {
-    ...Typography.titleLarge,
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    ...Typography.body,
-    fontSize: 15,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 21,
-    marginTop: 6,
-  },
+  emptyScroll: { flexGrow: 1 },
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -553,11 +528,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     marginBottom: 2,
   },
-  sectionTitle: {
-    ...Typography.eyebrow,
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
+  sectionTitle: { ...Typography.sectionTitle },
   sectionMeta: {
     flexDirection: 'row',
     alignItems: 'center',

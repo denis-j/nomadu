@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import AnimatedGradientBackground from '../../components/animated-gradient-background';
 import { CloudyButton } from '../../components/CloudyButton';
+import { FormCard, FormField } from '../../components/FormField';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { resetPassword } from '../../lib/auth';
@@ -23,8 +24,6 @@ import { showToast } from '../../lib/toast';
 import { useTranslation } from '../../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
-const Glass = hasGlass ? GlassView : View;
-const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 // CloudyButton palette: deep sky blue → light blue → icy → white
 const gradientColorSets = [
@@ -113,26 +112,22 @@ export default function ForgotPasswordScreen() {
 
           {/* Form */}
           <Animated.View entering={FadeIn.delay(100).duration(400)} style={styles.formContainer}>
-            <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
-              <Pressable onPress={() => emailRef.current?.focus()} style={styles.inputRow}>
-                <TextInput
-                  ref={emailRef}
-                  style={styles.input}
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder={t('auth.email')}
-                  placeholderTextColor={Colors.textTertiary}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  autoComplete="email"
-                  textContentType="emailAddress"
-                  returnKeyType="done"
-                  onSubmitEditing={handleReset}
-                  editable={!sent}
-                />
-              </Pressable>
-            </Glass>
+            <FormCard>
+              <FormField
+                ref={emailRef}
+                value={email}
+                onChangeText={setEmail}
+                placeholder={t('auth.email')}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="done"
+                onSubmitEditing={handleReset}
+                editable={!sent}
+              />
+            </FormCard>
 
             {sent && (
               <Text style={styles.successText}>

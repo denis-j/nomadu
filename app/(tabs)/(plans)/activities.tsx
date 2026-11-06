@@ -8,7 +8,6 @@ import * as Haptics from 'expo-haptics';
 import { ActivityRow } from '../../../components/activities/ActivityRow';
 import { CITY_SPAN, PLACE_SPAN, PinsMap, type MapPin } from '../../../components/activities/PinsMap';
 import { categoryIcon } from '../../../components/activities/visuals';
-import { CloudyButton } from '../../../components/CloudyButton';
 import { Dropdown } from '../../../components/Dropdown';
 import { Flag } from '../../../components/Flag';
 import { MissingRoute } from '../../../components/MissingRoute';
@@ -23,6 +22,7 @@ import { suggestActivities, type ActivitySuggestion } from '../../../lib/ai';
 import { getJourneyWithLegs, parseDate, type JourneyLeg, type JourneyWithLegs } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
 import { track } from '../../../lib/analytics';
+import { EmptyState } from '../../../components/EmptyState';
 
 type Params = {
   /** The journey's local id, for its stops. */
@@ -247,31 +247,19 @@ export default function ActivitiesScreen() {
 function Empty({ city, readOnly, owner, onLink, onManual }: { city: string | null; readOnly: boolean; owner: string | null; onLink: () => void; onManual: () => void }) {
   const { t } = useTranslation();
   return (
-    <View style={styles.empty}>
-      <View style={styles.emptyIcon}>
-        <Ionicons name="sparkles-outline" size={26} color={Colors.text} />
-      </View>
-      <Text style={styles.emptyTitle}>{city ? t('activities.nothingInCity', { city }) : t('activities.nothingPlanned')}</Text>
-      <Text style={styles.emptyText}>
-        {readOnly
+    <EmptyState
+      icons={[{ name: 'map', color: '#A6B4C2' }, { name: 'sparkles', color: '#4DC1FF' }, { name: 'restaurant', color: '#A6B4C2' }]}
+      title={city ? t('activities.nothingInCity', { city }) : t('activities.nothingPlanned')}
+      subtitle={
+        readOnly
           ? t('activities.friendNothing', { owner: owner ?? t('activities.yourFriend') })
           : city
             ? t('activities.saveCityHint')
-            : t('activities.saveHint')}
-      </Text>
-      {!readOnly && (
-        <>
-          <CloudyButton onPress={onLink} style={styles.emptyCta} innerStyle={styles.emptyCtaInner}>
-            <Ionicons name="logo-tiktok" size={20} color={Colors.cloudyButtonText} />
-            <Text style={styles.emptyCtaText}>{t('activities.pasteTikTok')}</Text>
-          </CloudyButton>
-          <Pressable onPress={onManual} style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.55 }]}>
-            <Ionicons name="add-circle-outline" size={20} color={Colors.text} />
-            <Text style={styles.secondaryText}>{t('activities.addManually')}</Text>
-          </Pressable>
-        </>
-      )}
-    </View>
+            : t('activities.saveHint')
+      }
+      primary={readOnly ? undefined : { label: t('activities.pasteTikTok'), icon: 'logo-tiktok', onPress: onLink }}
+      secondary={readOnly ? undefined : { label: t('activities.addManually'), icon: 'add-circle-outline', onPress: onManual }}
+    />
   );
 }
 
@@ -448,40 +436,10 @@ const styles = StyleSheet.create({
 
   group: { gap: 10 },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 },
-  groupTitle: { ...Typography.eyebrow, fontSize: 13, color: Colors.textSecondary },
+  groupTitle: { ...Typography.sectionTitle },
   groupMeta: { ...Typography.caption, color: Colors.textTertiary, flex: 1, fontVariant: ['tabular-nums'] },
   list: { gap: 10 },
 
-  empty: { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 12, gap: 10 },
-  emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    borderCurve: 'continuous',
-    backgroundColor: Colors.surfaceSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  emptyTitle: { ...Typography.titleLarge, textAlign: 'center', letterSpacing: -0.4 },
-  emptyText: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 10 },
-  emptyCta: { width: '100%' },
-  emptyCtaInner: { justifyContent: 'center', gap: 10 },
-  emptyCtaText: { ...Typography.titleSmall, fontWeight: '700', color: Colors.cloudyButtonText },
-  secondary: {
-    width: '100%',
-    maxWidth: 360,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 999,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: Colors.border,
-  },
-  secondaryText: { ...Typography.button },
 
   // The ideas, headed like the itinerary's AI suggestions.
   ideas: { gap: 12 },

@@ -5,7 +5,6 @@ import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
-  Pressable,
   StatusBar,
   StyleSheet,
   Text,
@@ -18,6 +17,7 @@ import { LogoModel3D } from '../../components/LogoModel3D';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import AnimatedGradientBackground from '../../components/animated-gradient-background';
 import { CloudyButton } from '../../components/CloudyButton';
+import { FormCard, FormField, FormSeparator } from '../../components/FormField';
 import { KeyboardLift } from '../../components/KeyboardLift';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
@@ -120,61 +120,57 @@ export default function SignInScreen() {
               entering={FadeIn.delay(100).duration(400)}
               style={styles.formContainer}
             >
-              <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
-                <Pressable onPress={() => emailRef.current?.focus()} style={styles.inputRow}>
-                  <TextInput
-                    ref={emailRef}
-                    style={styles.input}
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder={t('auth.email')}
-                    placeholderTextColor={Colors.textTertiary}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="email"
-                    textContentType="emailAddress"
-                    returnKeyType="next"
-                    onSubmitEditing={() => passwordRef.current?.focus()}
-                  />
-                </Pressable>
-                <View style={styles.separator} />
-                <Pressable onPress={() => passwordRef.current?.focus()} style={[styles.inputRow, styles.inputRowIcon]}>
-                  <TextInput
-                    ref={passwordRef}
-                    style={[styles.input, styles.inputFlex]}
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder={t('auth.password')}
-                    placeholderTextColor={Colors.textTertiary}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="password"
-                    textContentType="password"
-                    returnKeyType="done"
-                    onSubmitEditing={handleSignIn}
-                  />
-                  <Link href="/(auth)/forgot-password" asChild>
-                    <TouchableOpacity hitSlop={8}>
-                      <Text style={styles.forgotInline}>{t('auth.forgot')}</Text>
-                    </TouchableOpacity>
-                  </Link>
-                  <TouchableOpacity
-                    onPress={() => setShowPassword((v) => !v)}
-                    hitSlop={10}
-                    style={styles.eyeBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
-                  >
-                    <Ionicons
-                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                      size={20}
-                      color={Colors.textTertiary}
-                    />
-                  </TouchableOpacity>
-                </Pressable>
-              </Glass>
+              <FormCard>
+                <FormField
+                  ref={emailRef}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder={t('auth.email')}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                />
+                <FormSeparator />
+                <FormField
+                  ref={passwordRef}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder={t('auth.password')}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="password"
+                  textContentType="password"
+                  returnKeyType="done"
+                  onSubmitEditing={handleSignIn}
+                  trailing={
+                    <>
+                      <Link href="/(auth)/forgot-password" asChild>
+                        <TouchableOpacity hitSlop={8}>
+                          <Text style={styles.forgotInline}>{t('auth.forgot')}</Text>
+                        </TouchableOpacity>
+                      </Link>
+                      <TouchableOpacity
+                        onPress={() => setShowPassword((v) => !v)}
+                        hitSlop={10}
+                        style={styles.eyeBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+                      >
+                        <Ionicons
+                          name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                          size={20}
+                          color={Colors.textTertiary}
+                        />
+                      </TouchableOpacity>
+                    </>
+                  }
+                />
+              </FormCard>
 
               <CloudyButton
                 onPress={handleSignIn}
@@ -273,40 +269,6 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     marginBottom: 48,
-  },
-  section: {
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 4,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.7)',
-  },
-  sectionFallback: {
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderColor: Colors.border,
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(0, 0, 0, 0.08)',
-    marginHorizontal: -20,
-  },
-  inputRow: {
-    paddingVertical: 16,
-  },
-  inputRowIcon: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  inputFlex: {
-    flex: 1,
-  },
-  input: {
-    ...Typography.titleSmall,
-    fontWeight: '400',
   },
   continueButton: {
     marginTop: 16,

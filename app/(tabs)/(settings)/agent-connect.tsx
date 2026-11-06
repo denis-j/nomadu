@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
@@ -7,12 +7,13 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
 import { httpsCallable } from 'firebase/functions';
 import { CloudyButton } from '../../../components/CloudyButton';
 import { Card, SectionLabel } from '../../../components/visaForm';
-import { Colors, systemColor } from '../../../constants/colors';
+import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { TOKEN_ENV_NAME, agentSetupText } from '../../../lib/agentSetup';
 import { functions } from '../../../lib/firebase';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { FormField } from '../../../components/FormField';
 
 const NAME_SUGGESTIONS = ['Hermes', 'Claude', 'ChatGPT'];
 
@@ -98,29 +99,25 @@ export default function ConnectAgentSheet() {
       <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <SectionLabel>{t('agent.name')}</SectionLabel>
         <Card>
-          <View style={styles.field}>
-            <TextInput
-              style={styles.input}
-              value={label}
-              onChangeText={setLabel}
-              placeholder={t('agent.namePlaceholder')}
-              placeholderTextColor={systemColor('placeholderText')}
-              returnKeyType="done"
-              maxLength={40}
-            />
-            <View style={styles.chips}>
-              {NAME_SUGGESTIONS.map((name) => (
-                <Pressable
-                  key={name}
-                  style={[styles.chip, label === name && styles.chipOn]}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setLabel(name); }}
-                >
-                  <Text style={[styles.chipText, label === name && styles.chipTextOn]}>{name}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
+          <FormField
+            value={label}
+            onChangeText={setLabel}
+            placeholder={t('agent.namePlaceholder')}
+            returnKeyType="done"
+            maxLength={40}
+          />
         </Card>
+        <View style={styles.chips}>
+          {NAME_SUGGESTIONS.map((name) => (
+            <Pressable
+              key={name}
+              style={[styles.chip, label === name && styles.chipOn]}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setLabel(name); }}
+            >
+              <Text style={[styles.chipText, label === name && styles.chipTextOn]}>{name}</Text>
+            </Pressable>
+          ))}
+        </View>
 
         <SectionLabel>{t('agent.canChange')}</SectionLabel>
         <Card>
@@ -180,16 +177,6 @@ function SecondaryButton({ icon, label, onPress }: { icon: keyof typeof Ionicons
 
 const styles = StyleSheet.create({
   content: { padding: 20, gap: 14, paddingBottom: 40 },
-  field: { paddingVertical: 14, gap: 10 },
-  input: {
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 12,
-    borderCurve: 'continuous',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 17,
-    color: Colors.text,
-  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { backgroundColor: Colors.primary + '18', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   chipOn: { backgroundColor: Colors.primary },

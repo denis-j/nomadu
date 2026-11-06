@@ -15,7 +15,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   useWindowDimensions,
@@ -42,8 +41,7 @@ import { AvatarStack, avatarPeople, avatarStackWidth, type AvatarPerson } from '
 import { TravellersContent } from '../../../components/TravellersContent';
 import { useAuth } from '../../../hooks/useAuth';
 import { EmptyState } from '../../../components/EmptyState';
-import { CloudyButton } from '../../../components/CloudyButton';
-import { Colors, systemColor } from '../../../constants/colors';
+import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import {
   JourneyLeg, TransportType,
@@ -75,6 +73,7 @@ import { getCitizenshipCache, getTaxStatusesCache, getVisaStatusesCache } from '
 import { LinearGradient } from 'expo-linear-gradient';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { MissingRoute } from '../../../components/MissingRoute';
+import { FormCard, FormField } from '../../../components/FormField';
 
 const hasGlass = isLiquidGlassAvailable();
 
@@ -974,28 +973,30 @@ function AISuggestionsSection({
 
           {showInput && (
             <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={styles.aiInputRow}>
-              <TextInput
-                style={styles.aiInput}
-                value={draft}
-                onChangeText={setDraft}
-                placeholder={t('trip.suggestionPlaceholder')}
-                placeholderTextColor={systemColor('placeholderText')}
-                returnKeyType="search"
-                onSubmitEditing={submitDraft}
-                maxLength={120}
-                editable={!loading}
-                autoFocus
-              />
-              <TouchableOpacity
-                onPress={submitDraft}
-                disabled={loading || !draft.trim()}
-                accessibilityRole="button"
-                accessibilityLabel={t('trip.getSuggestions')}
-                style={{ opacity: !draft.trim() || loading ? 0.3 : 1 }}
-                hitSlop={8}
-              >
-                <Ionicons name="arrow-up-circle" size={28} color={Colors.text} />
-              </TouchableOpacity>
+              <FormCard style={styles.aiInputCard}>
+                <FormField
+                  value={draft}
+                  onChangeText={setDraft}
+                  placeholder={t('trip.suggestionPlaceholder')}
+                  returnKeyType="search"
+                  onSubmitEditing={submitDraft}
+                  maxLength={120}
+                  editable={!loading}
+                  autoFocus
+                  trailing={
+                    <TouchableOpacity
+                      onPress={submitDraft}
+                      disabled={loading || !draft.trim()}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('trip.getSuggestions')}
+                      style={{ opacity: !draft.trim() || loading ? 0.3 : 1 }}
+                      hitSlop={8}
+                    >
+                      <Ionicons name="arrow-up-circle" size={28} color={Colors.text} />
+                    </TouchableOpacity>
+                  }
+                />
+              </FormCard>
             </Animated.View>
           )}
 
@@ -1532,20 +1533,12 @@ export default function JourneyDetailScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       {!loading && legs.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <EmptyState
-            icon="✈️"
-            title={t('trip.noStopsTitle')}
-            subtitle={readOnly ? t('trip.friendNoStops', { owner: journey?.shared_owner_name ?? t('activities.yourFriend') }) : t('trip.noStopsSubtitle')}
-          />
-          {!readOnly && (
-            <View style={styles.emptyCta}>
-              <CloudyButton onPress={openAddSheet} style={{ width: '100%' }} innerStyle={{ justifyContent: 'center' }}>
-                <Text style={styles.emptyCtaText}>{t('trip.addFirstStop')}</Text>
-              </CloudyButton>
-            </View>
-          )}
-        </View>
+        <EmptyState
+          icons={[{ name: 'location', color: '#A6B4C2' }, { name: 'airplane', color: '#4DC1FF' }, { name: 'calendar', color: '#A6B4C2' }]}
+          title={t('trip.noStopsTitle')}
+          subtitle={readOnly ? t('trip.friendNoStops', { owner: journey?.shared_owner_name ?? t('activities.yourFriend') }) : t('trip.noStopsSubtitle')}
+          primary={readOnly ? undefined : { label: t('trip.addFirstStop'), onPress: openAddSheet }}
+        />
       ) : (
         <GestureHandlerRootView style={{ flex: 1 }}>
           {/* Keeps the list out of react-native-screens' reach. */}
@@ -1609,9 +1602,6 @@ const styles = StyleSheet.create({
   },
   scrollViewShield: { height: 0 },
 
-  emptyWrap: { flex: 1 },
-  emptyCta: { paddingHorizontal: 32, paddingBottom: 140 },
-  emptyCtaText: { ...Typography.buttonLarge, color: Colors.cloudyButtonText, textAlign: 'center' },
 
   // ─── Timeline ───
   timelineLine: {
@@ -1860,19 +1850,7 @@ const styles = StyleSheet.create({
     marginRight: 16,
     marginBottom: 10,
   },
-  aiInput: {
-    flex: 1,
-    ...Typography.bodySmall,
-    fontSize: 14,
-    color: Colors.text,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 12,
-    borderCurve: 'continuous',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
+  aiInputCard: { flex: 1 },
 
   // ─── Suggestion card (a leg that is not there yet) ───
   suggDot: {

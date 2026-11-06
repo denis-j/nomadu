@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
+import { StyleSheet, Text, View, type KeyboardTypeOptions } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { Dropdown } from './Dropdown';
+import { FormField, FormSeparator } from './FormField';
 import { StatusChip } from './SheetRows';
 import { currencyChoices, promptCurrency } from '../lib/currencies';
 import { useTranslation } from '../contexts/LanguageContext';
@@ -18,7 +19,7 @@ import {
 
 /**
  * The rows the stay's sheets and the things-to-do form are built from,
- * inside the visa form's `Card`. Each row keeps a draft while it is being
+ * inside a `FormCard`. Each row keeps a draft while it is being
  * typed in and hands the value over (`onCommit`) when the field is left,
  * or on every keystroke with `live`, for a form that saves with its own
  * checkmark. While a row has focus it ignores the value coming from
@@ -113,13 +114,12 @@ function useDraft(value: string) {
 
 // ─── Rows ────────────────────────────────────────────────────────────────────
 
-/** A one-line text field: label left, value right. Commits when left. */
+/** A one-line text field, its label as the placeholder. Commits when left. */
 export function TextRow({
   label,
   value,
   onCommit,
   live,
-  placeholder,
   keyboardType,
   autoCapitalize,
   last,
@@ -129,80 +129,62 @@ export function TextRow({
   onCommit: (v: string) => void;
   /** Commit every keystroke, for a form with its own button rather than autosave. */
   live?: boolean;
-  placeholder?: string;
   keyboardType?: KeyboardTypeOptions;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   last?: boolean;
 }) {
-  const ref = useRef<TextInput>(null);
   const { draft, setDraft, focused } = useDraft(value);
   return (
     <>
-      <Pressable onPress={() => ref.current?.focus()} style={s.row}>
-        <Text style={s.rowLabel}>{label}</Text>
-        <TextInput
-          ref={ref}
-          style={s.rowInput}
-          value={draft}
-          onChangeText={(v) => { setDraft(v); if (live) onCommit(v); }}
-          onFocus={() => { focused.current = true; }}
-          onBlur={() => {
-            focused.current = false;
-            if (draft !== value) onCommit(draft);
-          }}
-          placeholder={placeholder}
-          placeholderTextColor={Colors.textTertiary}
-          keyboardType={keyboardType}
-          autoCapitalize={autoCapitalize}
-          autoCorrect={false}
-          returnKeyType="done"
-        />
-      </Pressable>
-      {!last && <View style={s.separator} />}
+      <FormField
+        value={draft}
+        onChangeText={(v) => { setDraft(v); if (live) onCommit(v); }}
+        onFocus={() => { focused.current = true; }}
+        onBlur={() => {
+          focused.current = false;
+          if (draft !== value) onCommit(draft);
+        }}
+        placeholder={label}
+        keyboardType={keyboardType}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={false}
+        returnKeyType="done"
+      />
+      {!last && <FormSeparator />}
     </>
   );
 }
 
-/** A paragraph field: label above, text below. Commits when left. */
+/** A paragraph field, what it is for as the placeholder. Commits when left. */
 export function TextArea({
-  label,
   value,
   onCommit,
   live,
   placeholder,
   last,
 }: {
-  label?: string;
   value: string;
   onCommit: (v: string) => void;
   /** Commit every keystroke, for a form with its own button rather than autosave. */
   live?: boolean;
-  placeholder?: string;
+  placeholder: string;
   last?: boolean;
 }) {
-  const ref = useRef<TextInput>(null);
   const { draft, setDraft, focused } = useDraft(value);
   return (
     <>
-      <Pressable onPress={() => ref.current?.focus()} style={s.areaRow}>
-        {label ? <Text style={s.areaLabel}>{label}</Text> : null}
-        <TextInput
-          ref={ref}
-          style={s.areaInput}
-          value={draft}
-          onChangeText={(v) => { setDraft(v); if (live) onCommit(v); }}
-          onFocus={() => { focused.current = true; }}
-          onBlur={() => {
-            focused.current = false;
-            if (draft !== value) onCommit(draft);
-          }}
-          placeholder={placeholder}
-          placeholderTextColor={Colors.textTertiary}
-          multiline
-          textAlignVertical="top"
-        />
-      </Pressable>
-      {!last && <View style={s.separator} />}
+      <FormField
+        value={draft}
+        onChangeText={(v) => { setDraft(v); if (live) onCommit(v); }}
+        onFocus={() => { focused.current = true; }}
+        onBlur={() => {
+          focused.current = false;
+          if (draft !== value) onCommit(draft);
+        }}
+        placeholder={placeholder}
+        multiline
+      />
+      {!last && <FormSeparator />}
     </>
   );
 }
@@ -235,7 +217,6 @@ export function MoneyRow({
   last?: boolean;
 }) {
   const { t } = useTranslation();
-  const ref = useRef<TextInput>(null);
   const a = useDraft(amount);
   const c = useDraft(currency);
   const shown = c.draft || (a.draft.trim() ? suggested ?? '' : '');
@@ -251,36 +232,31 @@ export function MoneyRow({
   const choices = [...currencyChoices(c.draft, suggested).map((code) => ({ id: code, label: code })), { id: 'other', label: t('comp.otherCurrency'), icon: 'ellipsis.circle' }];
   return (
     <>
-      <Pressable onPress={() => ref.current?.focus()} style={s.row}>
-        <Text style={s.rowLabel}>{label}</Text>
-        <View style={s.moneyRight}>
-          <TextInput
-            ref={ref}
-            style={[s.rowInput, s.moneyInput]}
-            value={a.draft}
-            onChangeText={(v) => { a.setDraft(v); if (live) onCommit(v, effective(c.draft, v)); }}
-            onFocus={() => { a.focused.current = true; }}
-            onBlur={() => { a.focused.current = false; commit(); }}
-            placeholder="0"
-            placeholderTextColor={Colors.textTertiary}
-            keyboardType="decimal-pad"
-            returnKeyType="done"
-          />
-          <Dropdown
-            title={t('comp.currency')}
-            options={choices}
-            value={shown || suggested || null}
-            right
-            onPick={(id) => (id === 'other' ? promptCurrency(pick) : pick(id))}
-          >
-            <View style={s.currencyPick}>
-              <Text style={[s.currencyText, !shown && s.currencyEmpty]}>{shown || suggested || 'EUR'}</Text>
-              <Ionicons name="chevron-down" size={12} color={Colors.textTertiary} />
-            </View>
-          </Dropdown>
-        </View>
-      </Pressable>
-      {!last && <View style={s.separator} />}
+      <FormField
+        style={s.moneyInput}
+        value={a.draft}
+        onChangeText={(v) => { a.setDraft(v); if (live) onCommit(v, effective(c.draft, v)); }}
+        onFocus={() => { a.focused.current = true; }}
+        onBlur={() => { a.focused.current = false; commit(); }}
+        placeholder={label}
+        keyboardType="decimal-pad"
+        returnKeyType="done"
+        trailing={
+  <Dropdown
+              title={t('comp.currency')}
+              options={choices}
+              value={shown || suggested || null}
+              right
+              onPick={(id) => (id === 'other' ? promptCurrency(pick) : pick(id))}
+            >
+              <View style={s.currencyPick}>
+                <Text style={[s.currencyText, !shown && s.currencyEmpty]}>{shown || suggested || 'EUR'}</Text>
+                <Ionicons name="chevron-down" size={12} color={Colors.textTertiary} />
+              </View>
+            </Dropdown>
+        }
+      />
+      {!last && <FormSeparator />}
     </>
   );
 }
@@ -321,37 +297,8 @@ export function parseRating(text: string, scale: 5 | 10): { rating: number | nul
 }
 
 const s = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingVertical: 14,
-    minHeight: 52,
-  },
-  rowText: { flex: 1, gap: 2 },
-  rowLabel: { ...Typography.titleSmall, fontWeight: '500' },
-  rowSub: { ...Typography.bodySmall, color: Colors.textSecondary },
-  rowInput: {
-    ...Typography.titleSmall,
-    fontWeight: '400',
-    flex: 1,
-    textAlign: 'right',
-    minWidth: 80,
-  },
-  moneyRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'flex-end' },
-  moneyInput: { fontVariant: ['tabular-nums'], flex: 0, minWidth: 90 },
+  moneyInput: { fontVariant: ['tabular-nums'] },
   currencyPick: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4 },
   currencyText: { ...Typography.titleSmall, fontWeight: '500', color: Colors.textSecondary, fontVariant: ['tabular-nums'] },
   currencyEmpty: { color: Colors.textTertiary },
-
-  areaRow: { paddingVertical: 14, gap: 6 },
-  areaLabel: { ...Typography.bodySmall, color: Colors.textSecondary },
-  areaInput: { ...Typography.titleSmall, fontWeight: '400', minHeight: 44 },
-
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(0, 0, 0, 0.08)',
-    marginHorizontal: -20,
-  },
 });

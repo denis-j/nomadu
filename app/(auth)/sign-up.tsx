@@ -5,7 +5,6 @@ import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
-  Pressable,
   StatusBar,
   StyleSheet,
   Text,
@@ -19,6 +18,7 @@ import { PRIVACY_URL, TERMS_URL, openLegal } from '../../constants/legal';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import AnimatedGradientBackground from '../../components/animated-gradient-background';
 import { CloudyButton } from '../../components/CloudyButton';
+import { FormCard, FormField, FormSeparator } from '../../components/FormField';
 import { KeyboardLift } from '../../components/KeyboardLift';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
@@ -126,42 +126,35 @@ export default function SignUpScreen() {
               entering={FadeIn.delay(100).duration(400)}
               style={styles.formContainer}
             >
-              <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
-                <Pressable onPress={() => emailRef.current?.focus()} style={styles.inputRow}>
-                  <TextInput
-                    ref={emailRef}
-                    style={styles.input}
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder={t('auth.email')}
-                    placeholderTextColor={Colors.textTertiary}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="email"
-                    textContentType="emailAddress"
-                    returnKeyType="next"
-                    onSubmitEditing={() => passwordRef.current?.focus()}
-                  />
-                </Pressable>
-                <View style={styles.separator} />
-                <Pressable onPress={() => passwordRef.current?.focus()} style={[styles.inputRow, styles.inputRowIcon]}>
-                  <TextInput
-                    ref={passwordRef}
-                    style={[styles.input, styles.inputFlex]}
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder={t('auth.password')}
-                    placeholderTextColor={Colors.textTertiary}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="new-password"
-                    textContentType="newPassword"
-                    returnKeyType="done"
-                    onSubmitEditing={handleSignUp}
-                  />
-                  <TouchableOpacity
+              <FormCard>
+                <FormField
+                  ref={emailRef}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder={t('auth.email')}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                />
+                <FormSeparator />
+                <FormField
+                  ref={passwordRef}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder={t('auth.password')}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="new-password"
+                  textContentType="newPassword"
+                  returnKeyType="done"
+                  onSubmitEditing={handleSignUp}
+                  trailing={
+                    <TouchableOpacity
                     onPress={() => setShowPassword((v) => !v)}
                     hitSlop={10}
                     accessibilityRole="button"
@@ -173,8 +166,9 @@ export default function SignUpScreen() {
                       color={Colors.textTertiary}
                     />
                   </TouchableOpacity>
-                </Pressable>
-              </Glass>
+                  }
+                />
+              </FormCard>
 
               <CloudyButton
                 onPress={handleSignUp}

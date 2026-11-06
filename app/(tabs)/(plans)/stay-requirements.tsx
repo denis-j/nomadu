@@ -113,7 +113,7 @@ function Form({ plan, params }: { plan: LocalAccommodation | null; params: Param
         <SectionLabel>{t('plans.budgetArea')}</SectionLabel>
         <Card>
           <MoneyRow label={t('plans.perNight')} amount={budget} currency={currency} suggested={suggested} onCommit={(a, c) => { setBudget(a); setCurrency(c); }} live />
-          <TextRow label={t('plans.area')} value={areas} onCommit={setAreas} live placeholder={t('plans.areaPlaceholder')} autoCapitalize="words" last />
+          <TextRow label={t('plans.area')} value={areas} onCommit={setAreas} live autoCapitalize="words" last />
         </Card>
 
         <SectionLabel>{t('plans.needs')}</SectionLabel>

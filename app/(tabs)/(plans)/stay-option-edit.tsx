@@ -115,10 +115,10 @@ function Form({ plan, existing, params }: { plan: LocalAccommodation | null; exi
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={visaFormStyles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <SectionLabel>{t('plans.place')}</SectionLabel>
         <Card>
-          <TextRow label={t('plans.name')} value={name} onCommit={setName} live placeholder={t('plans.namePlaceholder')} autoCapitalize="words" />
-          <TextRow label={t('plans.whereListed')} value={platform} onCommit={setPlatform} live placeholder={t('plans.whereListedPlaceholder')} autoCapitalize="words" />
-          <TextRow label={t('plans.link')} value={url} onCommit={setUrl} live placeholder={t('plans.httpsPlaceholder')} keyboardType="url" autoCapitalize="none" />
-          <TextRow label={t('plans.address')} value={address} onCommit={setAddress} live placeholder={t('plans.addressPlaceholder')} last />
+          <TextRow label={t('plans.name')} value={name} onCommit={setName} live autoCapitalize="words" />
+          <TextRow label={t('plans.whereListed')} value={platform} onCommit={setPlatform} live autoCapitalize="words" />
+          <TextRow label={t('plans.link')} value={url} onCommit={setUrl} live keyboardType="url" autoCapitalize="none" />
+          <TextRow label={t('plans.address')} value={address} onCommit={setAddress} live last />
         </Card>
 
         {/* What a person compares by. Fees, reviews and cancellation stay what an agent filed. */}
@@ -126,14 +126,14 @@ function Form({ plan, existing, params }: { plan: LocalAccommodation | null; exi
         <Card>
           <MoneyRow label={t('plans.perNight')} amount={perNight} currency={currency} suggested={suggested} onCommit={(a, c) => { setPerNight(a); setCurrency(c); }} live />
           <MoneyRow label={t('plans.total')} amount={total} currency={currency} suggested={suggested} onCommit={(a, c) => { setTotal(a); setCurrency(c); }} live />
-          <TextRow label={t('plans.rating')} value={rating} onCommit={setRating} live placeholder={t('plans.ratingPlaceholder')} keyboardType="numbers-and-punctuation" />
-          <TextRow label={t('plans.yourScore')} value={score} onCommit={setScore} live placeholder={t('plans.yourScorePlaceholder')} keyboardType="decimal-pad" last />
+          <TextRow label={t('plans.rating')} value={rating} onCommit={setRating} live keyboardType="numbers-and-punctuation" />
+          <TextRow label={t('plans.yourScore')} value={score} onCommit={setScore} live keyboardType="decimal-pad" last />
         </Card>
 
         <SectionLabel>{t('plans.notes')}</SectionLabel>
         <Card>
-          <TextArea label={t('plans.notes')} value={notes} onCommit={setNotes} live placeholder={t('plans.notesPlaceholder')} />
-          <TextArea label={t('plans.risks')} value={risks} onCommit={setRisks} live placeholder={t('plans.risksPlaceholder')} last />
+          <TextArea value={notes} onCommit={setNotes} live placeholder={t('plans.notes')} />
+          <TextArea value={risks} onCommit={setRisks} live placeholder={t('plans.risks')} last />
         </Card>
       </ScrollView>
     </>

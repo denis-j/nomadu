@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { ActionSheetIOS, ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActionSheetIOS, ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { ExpenseRow } from '../../../components/expenses/ExpenseRow';
-import { CloudyButton } from '../../../components/CloudyButton';
 import { MissingRoute } from '../../../components/MissingRoute';
 import { DetailCard, DetailSeparator, SectionHead } from '../../../components/SheetRows';
 import { StatRow, StatTile } from '../../../components/StatTile';
@@ -24,6 +22,8 @@ type TFunc = (key: string, params?: Record<string, string | number>) => string;
 import { pickReceipt, receiptImageUri, setPendingReceipt } from '../../../lib/receipts';
 import { showToast } from '../../../lib/toast';
 import { track } from '../../../lib/analytics';
+import { FormCard, FormField } from '../../../components/FormField';
+import { EmptyState } from '../../../components/EmptyState';
 
 type Params = {
   journeyId: string;
@@ -32,9 +32,6 @@ type Params = {
   readOnly?: string;
 };
 
-const hasGlass = isLiquidGlassAvailable();
-const Glass = hasGlass ? GlassView : View;
-const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 /** "Today", "Yesterday", "Nov 6", "Nov 6, 2025": the heading over a day's expenses. */
 function dayLabel(ymd: string, t: TFunc): string {
@@ -196,20 +193,17 @@ export default function ExpensesScreen() {
       <Stack.Screen options={{ title: t('nav.expenses') }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {!readOnly && (
-          <Glass {...glassProps} style={[styles.quick, !hasGlass && styles.quickFallback]}>
-            <TextInput
+          <FormCard>
+            <FormField
               value={draft}
               onChangeText={setDraft}
               placeholder={t('expenses.quickPlaceholder', { currency })}
-              placeholderTextColor={Colors.textTertiary}
-              style={styles.quickInput}
               returnKeyType="done"
               onSubmitEditing={quickAdd}
               blurOnSubmit={false}
               editable={!busy}
               autoCorrect={false}
-            />
-            {busy ? (
+              trailing={busy ? (
               <ActivityIndicator size="small" color={Colors.textSecondary} style={styles.quickButton} />
             ) : draft.trim() ? (
               <Pressable onPress={quickAdd} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('expenses.add')} style={({ pressed }) => [styles.quickButton, pressed && { opacity: 0.6 }]}>
@@ -220,7 +214,8 @@ export default function ExpensesScreen() {
                 <Ionicons name="camera-outline" size={20} color={Colors.text} />
               </Pressable>
             )}
-          </Glass>
+            />
+          </FormCard>
         )}
 
         {expenses.length === 0 ? (
@@ -291,29 +286,13 @@ function TransferRow({ transfer: t, meId, nameOf, person }: { transfer: Transfer
 function Empty({ readOnly, owner, onSnap, onManual }: { readOnly: boolean; owner: string | null; onSnap: () => void; onManual: () => void }) {
   const { t } = useTranslation();
   return (
-    <View style={styles.empty}>
-      <View style={styles.emptyIcon}>
-        <Ionicons name="receipt-outline" size={26} color={Colors.text} />
-      </View>
-      <Text style={styles.emptyTitle}>{t('expenses.nothingPaid')}</Text>
-      <Text style={styles.emptyText}>
-        {readOnly
-          ? t('expenses.friendNoExpenses', { owner: owner ?? t('expenses.yourFriend') })
-          : t('expenses.typeHint')}
-      </Text>
-      {!readOnly && (
-        <>
-          <CloudyButton onPress={onSnap} style={styles.emptyCta} innerStyle={styles.emptyCtaInner}>
-            <Ionicons name="camera-outline" size={20} color={Colors.cloudyButtonText} />
-            <Text style={styles.emptyCtaText}>{t('expenses.snapReceipt')}</Text>
-          </CloudyButton>
-          <Pressable onPress={onManual} style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.55 }]}>
-            <Ionicons name="add-circle-outline" size={20} color={Colors.text} />
-            <Text style={styles.secondaryText}>{t('expenses.addManually')}</Text>
-          </Pressable>
-        </>
-      )}
-    </View>
+    <EmptyState
+      icons={[{ name: 'card', color: '#A6B4C2' }, { name: 'receipt', color: '#4DC1FF' }, { name: 'cash', color: '#A6B4C2' }]}
+      title={t('expenses.nothingPaid')}
+      subtitle={readOnly ? t('expenses.friendNoExpenses', { owner: owner ?? t('expenses.yourFriend') }) : t('expenses.typeHint')}
+      primary={readOnly ? undefined : { label: t('expenses.snapReceipt'), icon: 'camera-outline', onPress: onSnap }}
+      secondary={readOnly ? undefined : { label: t('expenses.addManually'), icon: 'add-circle-outline', onPress: onManual }}
+    />
   );
 }
 
@@ -321,21 +300,7 @@ const styles = StyleSheet.create({
   // Same page measures as the things to do.
   content: { padding: 16, paddingBottom: 100, gap: 20 },
 
-  // The line to type into, as the link field: a glass row with one button.
-  quick: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingLeft: 16,
-    paddingRight: 8,
-    minHeight: 56,
-    borderRadius: 18,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-  },
-  quickFallback: { backgroundColor: Colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.border },
-  quickInput: { ...Typography.bodyLarge, flex: 1, color: Colors.text, paddingVertical: 14 },
-  quickButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  quickButton: { alignItems: 'center', justifyContent: 'center', marginVertical: -6 },
   quickCamera: { borderRadius: 12, borderCurve: 'continuous', backgroundColor: Colors.surfaceSecondary, width: 36, height: 36 },
 
   note: { ...Typography.bodySmall, color: Colors.textSecondary, paddingHorizontal: 4, marginTop: -8 },
@@ -348,34 +313,4 @@ const styles = StyleSheet.create({
   transferAmount: { ...Typography.bodySmall, fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
   transferCurrency: { ...Typography.caption, fontWeight: '600', color: Colors.textSecondary },
 
-  empty: { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 12, gap: 10 },
-  emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    borderCurve: 'continuous',
-    backgroundColor: Colors.surfaceSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  emptyTitle: { ...Typography.titleLarge, textAlign: 'center', letterSpacing: -0.4 },
-  emptyText: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 10 },
-  emptyCta: { width: '100%' },
-  emptyCtaInner: { justifyContent: 'center', gap: 10 },
-  emptyCtaText: { ...Typography.titleSmall, fontWeight: '700', color: Colors.cloudyButtonText },
-  secondary: {
-    width: '100%',
-    maxWidth: 360,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 999,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: Colors.border,
-  },
-  secondaryText: { ...Typography.button },
 });

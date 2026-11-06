@@ -79,6 +79,29 @@ Data generation:
 - **Platform differences:** guard native-only APIs; maps differ per platform (see below).
 - Keep `console` logs sparse — a babel plugin strips them in production builds.
 
+## UI rules
+
+These hold for every screen. Reuse the component named here; do not build a
+variant, and do not restyle one locally.
+
+- **Sheets are solid.** Anything presented as a sheet (`formSheet`, `sheetWithHeader`)
+  sets `contentStyle: { backgroundColor: sheetBackground }`, and so does the inner
+  stack of a sheet that has one. Never transparent. Heights may differ with the content.
+- **Text input is `FormField` inside `FormCard`** (`components/FormField.tsx`), the look
+  of the sign-in screen. The placeholder names the field; there is no label beside or
+  above it. `leading` is only the magnifier of a search, `trailing` holds one small
+  control (show password, clear, send, a currency). Do not use `TextInput` directly.
+  The one exception is the morphing search chip in `(settings)/passport.tsx`.
+- **Section headings are bold**, always `Typography.sectionTitle`, in sentence case. Use
+  `SectionHead` or `SectionLabel` where they fit. Never uppercase: `Typography.eyebrow`
+  is only for a small tag above a value (a stat label, "All time").
+- **Nothing here yet is `EmptyState`** (`components/EmptyState.tsx`), modelled on Verlauf
+  and Tracking: the moving picture, a bold title, a grey line. The way in is a cloud
+  button (`primary`), with an outlined `secondary` if there is a second one; leave them
+  out when there is nothing to do, or for a guest on a shared trip. Pick three `icons`
+  that fit the screen. No emoji, no static icon, no "tap +" in the text. Dashed
+  `SlotCard`s for suggested items and one-line "no results" in a search are not empty states.
+
 ## Secrets & env
 
 - Secrets live in `.env.local` (git-ignored); EAS reads the same names from its env.

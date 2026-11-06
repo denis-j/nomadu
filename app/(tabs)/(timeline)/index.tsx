@@ -20,8 +20,6 @@ import { Host, Menu, Button as ExpoUIButton, Image as ExpoUIImage } from '@expo/
 import * as Haptics from 'expo-haptics';
 import { useTrips } from '../../../hooks/useTrips';
 import { TripCard } from '../../../components/TripCard';
-import { TimelineBubbles } from '../../../components/TimelineBubbles';
-import { CloudyButton } from '../../../components/CloudyButton';
 import { pickImportImages, setPendingImportImages } from '../../../lib/tripImport';
 import { takePendingUnlock } from '../../../lib/badges';
 import { BadgeUnlockOverlay } from '../../../components/BadgeUnlockOverlay';
@@ -35,6 +33,7 @@ import { toYmd } from '../../../lib/days';
 import { countryCodeToFlag } from '../../../lib/geocoding';
 import { Flag } from '../../../components/Flag';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { EmptyState } from '../../../components/EmptyState';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -120,103 +119,6 @@ const gapStyles = StyleSheet.create({
   dates: {
     ...Typography.caption,
   },
-});
-
-// ─── Timeline empty state ───
-
-function TimelineEmpty({ onAdd, onImport }: { onAdd: () => void; onImport: () => void }) {
-  const { t } = useTranslation();
-  // Bump key every time the Timeline tab gains focus → bubbles remount + re-animate
-  const [focusKey, setFocusKey] = useState(0);
-  useFocusEffect(
-    useCallback(() => {
-      setFocusKey((k) => k + 1);
-    }, []),
-  );
-  return (
-    <View style={emptyStyles.container}>
-      <TimelineBubbles key={focusKey} size={70} variant="burstWobble" />
-
-      <Text style={emptyStyles.title}>{t('timeline.emptyTitle')}</Text>
-      <Text style={emptyStyles.subtitle}>
-        {t('timeline.emptySubtitle')}
-      </Text>
-
-      <CloudyButton onPress={onImport}>
-        <View style={emptyStyles.cloudyBtnContent}>
-          <Ionicons name="sparkles" size={22} color={Colors.cloudyButtonText} />
-          <Text style={emptyStyles.cloudyTitle}>{t('timeline.importFromScreenshots')}</Text>
-        </View>
-      </CloudyButton>
-
-      <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onAdd();
-        }}
-        style={({ pressed }) => [emptyStyles.secondaryBtn, pressed && emptyStyles.secondaryBtnPressed]}
-      >
-        <Ionicons name="add-circle-outline" size={20} color={Colors.text} />
-        <Text style={emptyStyles.secondaryBtnText}>{t('timeline.addTripManually')}</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-const emptyStyles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 },
-  variantLabel: {
-    ...Typography.eyebrow,
-    color: Colors.textTertiary,
-    letterSpacing: 0.6,
-    marginTop: 4,
-    marginBottom: -8,
-  },
-  heroImage: {
-    width: 220,
-    height: 140,
-    marginBottom: -16,
-  },
-  title: {
-    ...Typography.titleLarge,
-    textAlign: 'center',
-    letterSpacing: -0.4,
-    marginTop: 8,
-  },
-  subtitle: {
-    ...Typography.bodySmall,
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  cloudyBtnContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  cloudyTitle: { ...Typography.titleSmall, fontWeight: '700', color: Colors.cloudyButtonText },
-  secondaryBtn: {
-    width: '100%',
-    maxWidth: 360,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 999,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth * 2,
-    borderColor: Colors.border,
-    backgroundColor: 'transparent',
-  },
-  secondaryBtnPressed: { opacity: 0.55 },
-  secondaryBtnText: { ...Typography.button },
-  pressedBtn: { opacity: 0.92, transform: [{ scale: 0.99 }] },
-  hint: { ...Typography.caption, textAlign: 'center', marginTop: 8 },
 });
 
 // ─── Country group (collapsible) ───
@@ -1006,7 +908,14 @@ export default function TimelineScreen() {
   const renderContent = () => {
     if (loading) return null;
     if (!loading && trips.length === 0) {
-      return <TimelineEmpty onAdd={() => openSheet()} onImport={openImport} />;
+      return (
+        <EmptyState
+          title={t('timeline.emptyTitle')}
+          subtitle={t('timeline.emptySubtitle')}
+          primary={{ label: t('timeline.importFromScreenshots'), icon: 'sparkles', onPress: openImport }}
+          secondary={{ label: t('timeline.addTripManually'), icon: 'add-circle-outline', onPress: () => openSheet() }}
+        />
+      );
     }
     return (
       <View style={styles.listWrap}>

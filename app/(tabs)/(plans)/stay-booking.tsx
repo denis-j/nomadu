@@ -122,24 +122,24 @@ function Form({ plan, params }: { plan: LocalAccommodation; params: Params }) {
 
         <SectionLabel>{t('nav.booking')}</SectionLabel>
         <Card>
-          <TextRow label={t('plans.reference')} value={reference} onCommit={setReference} live placeholder={t('plans.confirmationNumber')} autoCapitalize="characters" />
+          <TextRow label={t('plans.reference')} value={reference} onCommit={setReference} live autoCapitalize="characters" />
           <MoneyRow label={t('plans.paid')} amount={price} currency={currency} suggested={suggested} onCommit={(a, c) => { setPrice(a); setCurrency(c); }} live />
-          <TextRow label={t('plans.link')} value={url} onCommit={setUrl} live placeholder={t('plans.httpsPlaceholder')} keyboardType="url" autoCapitalize="none" last />
+          <TextRow label={t('plans.link')} value={url} onCommit={setUrl} live keyboardType="url" autoCapitalize="none" last />
         </Card>
 
         <SectionLabel>{t('plans.atTheDoor')}</SectionLabel>
         <Card>
-          <TextRow label={t('plans.address')} value={address} onCommit={setAddress} live placeholder={t('plans.streetPlaceholder')} />
-          <TextArea label={t('plans.checkIn')} value={checkIn} onCommit={setCheckIn} live placeholder={t('plans.checkInPlaceholder')} />
-          <TextArea label={t('plans.checkOut')} value={checkOut} onCommit={setCheckOut} live placeholder={t('plans.checkOutPlaceholder')} />
-          <TextRow label={t('plans.contact')} value={contact} onCommit={setContact} live placeholder={t('plans.contactPlaceholder')} last />
+          <TextRow label={t('plans.address')} value={address} onCommit={setAddress} live />
+          <TextArea value={checkIn} onCommit={setCheckIn} live placeholder={t('plans.checkIn')} />
+          <TextArea value={checkOut} onCommit={setCheckOut} live placeholder={t('plans.checkOut')} />
+          <TextRow label={t('plans.contact')} value={contact} onCommit={setContact} live last />
         </Card>
 
         {afterStay && (
           <>
             <SectionLabel>{t('plans.howWasIt')}</SectionLabel>
             <Card>
-              <TextRow label={t('plans.ratingOutOf5')} value={reviewRating} onCommit={setReviewRating} live placeholder={t('plans.ratingExample')} keyboardType="decimal-pad" />
+              <TextRow label={t('plans.ratingOutOf5')} value={reviewRating} onCommit={setReviewRating} live keyboardType="decimal-pad" />
               <TextArea value={reviewText} onCommit={setReviewText} live placeholder={t('plans.stayAgainPlaceholder')} last />
             </Card>
           </>

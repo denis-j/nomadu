@@ -2,9 +2,9 @@ import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Calendar, type DateData } from 'react-native-calendars';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { Flag } from './Flag';
+import { FormCard, FormField } from './FormField';
 import { GlassPill } from './GlassPill';
 import { Colors, systemColor } from '../constants/colors';
 import { Typography } from '../constants/typography';
@@ -22,10 +22,6 @@ type TFunc = (key: string, params?: Record<string, string | number>) => string;
  * puts everything on one screen because when you are correcting a single field
  * you do not want to walk through a wizard to reach it.
  */
-
-const hasGlass = isLiquidGlassAvailable();
-const Glass = hasGlass ? GlassView : View;
-const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 // ─── Date helpers ───────────────────────────────────────────────────────────
 
@@ -138,13 +134,7 @@ export function ChoiceRow({
   );
 }
 
-export function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <Glass {...glassProps} style={[s.section, !hasGlass && s.sectionFallback]}>
-      {children}
-    </Glass>
-  );
-}
+export const Card = FormCard;
 
 
 /** Identity strip: which visa is being built, and how long it runs. */
@@ -204,7 +194,7 @@ export function IdentityFields({
   const labelRef = useRef<TextInput>(null);
   return (
     <>
-      <Glass {...glassProps} style={[s.section, !hasGlass && s.sectionFallback]}>
+      <FormCard>
         <Pressable style={s.inputRowSplit} onPress={onPickCountry}>
           <Text style={s.inputRowLabel}>{t('visaForm.country')}</Text>
           <View style={s.disclosureRight}>
@@ -220,18 +210,14 @@ export function IdentityFields({
           </View>
         </Pressable>
         <View style={s.separator} />
-        <Pressable onPress={() => labelRef.current?.focus()} style={s.inputRow}>
-          <TextInput
-            ref={labelRef}
-            style={s.input}
-            placeholder={t('visaForm.visaTypePlaceholder')}
-            placeholderTextColor={Colors.textTertiary}
-            value={label}
-            onChangeText={setLabel}
-            returnKeyType="done"
-          />
-        </Pressable>
-      </Glass>
+        <FormField
+          ref={labelRef}
+          placeholder={t('visaForm.visaTypePlaceholder')}
+          value={label}
+          onChangeText={setLabel}
+          returnKeyType="done"
+        />
+      </FormCard>
 
     </>
   );
@@ -344,20 +330,15 @@ export function StayPicker({
 
       {customOpen && (
         <Card>
-          <View style={s.customRow}>
-            <Text style={s.inputRowLabel}>{t('visaForm.daysLabel')}</Text>
-            <TextInput
-              style={s.customInput}
-              value={customDays}
-              onChangeText={(v) => {
-                setCustomDays(v);
-                pushCustom(v, customPeriodic, customWindow);
-              }}
-              keyboardType="number-pad"
-              placeholder={t('visaForm.daysNumPlaceholder')}
-              placeholderTextColor={Colors.textTertiary}
-            />
-          </View>
+          <FormField
+            value={customDays}
+            onChangeText={(v) => {
+              setCustomDays(v);
+              pushCustom(v, customPeriodic, customWindow);
+            }}
+            keyboardType="number-pad"
+            placeholder={t('visaForm.daysLabel')}
+          />
           <View style={s.customPills}>
             <GlassPill
               active={!customPeriodic}
@@ -379,20 +360,18 @@ export function StayPicker({
             >
               <Text style={[s.pillLabel, customPeriodic && s.pillLabelActive]}>{t('visaForm.inPeriod')}</Text>
             </GlassPill>
-            {customPeriodic && (
-              <TextInput
-                style={[s.customInput, s.windowInput]}
-                value={customWindow}
-                onChangeText={(v) => {
-                  setCustomWindow(v);
-                  pushCustom(customDays, true, v);
-                }}
-                keyboardType="number-pad"
-                placeholder={t('visaForm.windowPlaceholder')}
-                placeholderTextColor={Colors.textTertiary}
-              />
-            )}
           </View>
+          {customPeriodic && (
+            <FormField
+              value={customWindow}
+              onChangeText={(v) => {
+                setCustomWindow(v);
+                pushCustom(customDays, true, v);
+              }}
+              keyboardType="number-pad"
+              placeholder={t('visaForm.windowPlaceholder')}
+            />
+          )}
         </Card>
       )}
     </>
@@ -601,20 +580,15 @@ export function NotesField({ notes, setNotes }: { notes: string; setNotes: (v: s
   const { t } = useTranslation();
   const notesRef = useRef<TextInput>(null);
   return (
-    <Glass {...glassProps} style={[s.section, !hasGlass && s.sectionFallback]}>
-      <Pressable onPress={() => notesRef.current?.focus()} style={s.inputRow}>
-        <TextInput
-          ref={notesRef}
-          style={s.notesInput}
-          placeholder={t('visaForm.optionalNotes')}
-          placeholderTextColor={Colors.textTertiary}
-          value={notes}
-          onChangeText={setNotes}
-          multiline
-          textAlignVertical="top"
-        />
-      </Pressable>
-    </Glass>
+    <FormCard>
+      <FormField
+        ref={notesRef}
+        placeholder={t('visaForm.optionalNotes')}
+        value={notes}
+        onChangeText={setNotes}
+        multiline
+      />
+    </FormCard>
   );
 }
 
@@ -663,14 +637,7 @@ const s = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
 
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: systemColor('secondaryLabel'),
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 6,
-  },
+  sectionTitle: { ...Typography.sectionTitle, marginTop: 6 },
   hint: {
     ...Typography.bodySmall,
     color: Colors.textSecondary,
@@ -703,7 +670,6 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.08)',
     marginHorizontal: -20,
   },
-  inputRow: { paddingVertical: 16 },
   inputRowSplit: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -712,9 +678,6 @@ const s = StyleSheet.create({
     gap: 12,
   },
   inputRowLabel: { ...Typography.titleSmall, fontWeight: '500' },
-  input: { ...Typography.titleSmall, fontWeight: '400' },
-  numericInput: { minWidth: 80, textAlign: 'right', fontVariant: ['tabular-nums'] },
-  notesInput: { ...Typography.titleSmall, fontWeight: '400', minHeight: 80 },
 
   dateRowActive: {
     backgroundColor: 'rgba(0,0,0,0.04)',
@@ -731,19 +694,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 4,
     marginTop: -4,
   },
-  customRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 15,
-  },
-  customInput: {
-    ...Typography.titleSmall,
-    minWidth: 90,
-    textAlign: 'right',
-    fontVariant: ['tabular-nums'],
-  },
-  windowInput: { minWidth: 110 },
   customPills: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 14 },
 
   choiceRow: {

@@ -265,7 +265,7 @@ function Form({
         <SectionLabel>{t('expenses.howMuch')}</SectionLabel>
         <Card>
           <MoneyRow label={t('expenses.amount')} amount={amount} currency={currency} suggested={suggested} onCommit={(a, c) => { setAmount(a); setCurrency(c); }} live />
-          <TextRow label={t('expenses.forLabel')} value={title} onCommit={setTitle} live placeholder={t('expenses.forPlaceholder')} autoCapitalize="sentences" last />
+          <TextRow label={t('expenses.forLabel')} value={title} onCommit={setTitle} live autoCapitalize="sentences" last />
         </Card>
         {reading && (
           <View style={styles.reading}>

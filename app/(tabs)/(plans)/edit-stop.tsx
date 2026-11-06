@@ -4,7 +4,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { systemColor } from '../../../constants/colors';
@@ -20,6 +19,8 @@ import { cityCoords } from '../../../lib/geocoding';
 import { getCountryCode } from '../../../utils/geography';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { FormCard, FormField } from '../../../components/FormField';
+import { Typography } from '../../../constants/typography';
 
 type Params = {
   legId: string;
@@ -196,17 +197,14 @@ export default function EditStopScreen() {
 
         {/* Notes */}
         <Text style={styles.sectionTitle}>{t('plans.notes')}</Text>
-        <View style={styles.inputCard}>
-          <TextInput
-            style={styles.notesInput}
+        <FormCard>
+          <FormField
             placeholder={t('plans.stopNotesPlaceholder')}
-            placeholderTextColor={systemColor('tertiaryLabel') as any}
             value={notes}
             onChangeText={setNotes}
             multiline
-            textAlignVertical="top"
           />
-        </View>
+        </FormCard>
       </ScrollView>
     </>
   );
@@ -218,13 +216,7 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingBottom: 60,
   },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: systemColor('secondaryLabel'),
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  sectionTitle: { ...Typography.sectionTitle },
   hint: {
     fontSize: 13,
     color: systemColor('tertiaryLabel'),
@@ -236,17 +228,5 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     overflow: 'hidden',
     padding: 4,
-  },
-  inputCard: {
-    backgroundColor: systemColor('secondarySystemGroupedBackground'),
-    borderRadius: 14,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-  },
-  notesInput: {
-    padding: 16,
-    fontSize: 16,
-    color: systemColor('label'),
-    minHeight: 80,
   },
 });

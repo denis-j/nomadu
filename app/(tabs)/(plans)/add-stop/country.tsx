@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { getPopularCountries, searchCountries, getCountryCode, getCountryNames } from '../../../../utils/geography';
 import { useTranslation } from '../../../../contexts/LanguageContext';
 import { Flag } from '../../../../components/Flag';
+import { Typography } from '../../../../constants/typography';
 
 const popularCountries = getPopularCountries();
 
@@ -99,16 +100,7 @@ const styles = StyleSheet.create({
   list: {
     paddingBottom: 40,
   },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: systemColor('secondaryLabel'),
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 6,
-  },
+  sectionLabel: { ...Typography.sectionTitle, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 },
   item: {
     flexDirection: 'row',
     alignItems: 'center',

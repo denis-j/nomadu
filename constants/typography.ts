@@ -75,6 +75,13 @@ export const Typography = {
     color: Colors.text,
   }),
 
+  /** Every section heading in the app: bold, sentence case, never uppercase. */
+  sectionTitle: T({
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+  }),
+
   // ─── Body, content ─────────────────────────────────────────────────────
   bodyLarge: T({
     fontSize: 17,
@@ -109,7 +116,7 @@ export const Typography = {
     color: Colors.text,
   }),
 
-  // ─── Eyebrow, small uppercase tags above titles ────────────────────────
+  // ─── Eyebrow, small uppercase tags above a value, never a section heading ─
   eyebrow: T({
     fontSize: 11,
     fontWeight: '600',

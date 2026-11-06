@@ -28,6 +28,7 @@ import {
   type ImportResult,
 } from '../../../lib/tripImport';
 import { track } from '../../../lib/analytics';
+import { EmptyState } from '../../../components/EmptyState';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -348,13 +349,11 @@ function ReviewStep({
         contentContainerStyle={reviewStyles.emptyContainer}
         contentInsetAdjustmentBehavior="automatic"
       >
-        <View style={reviewStyles.emptyIconWrap}>
-          <Ionicons name="search" size={36} color={Colors.textTertiary} />
-        </View>
-        <Text style={reviewStyles.emptyTitle}>{t('tlImport.noTripsFound')}</Text>
-        <Text style={reviewStyles.emptyText}>
-          {imageCount === 1 ? t('tlImport.noTripsBodyOne') : t('tlImport.noTripsBodyMany')}
-        </Text>
+        <EmptyState
+          icons={[{ name: 'image', color: '#A6B4C2' }, { name: 'search', color: '#4DC1FF' }, { name: 'airplane', color: '#A6B4C2' }]}
+          title={t('tlImport.noTripsFound')}
+          subtitle={imageCount === 1 ? t('tlImport.noTripsBodyOne') : t('tlImport.noTripsBodyMany')}
+        />
       </ScrollView>
     );
   }
@@ -519,11 +518,7 @@ const reviewStyles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingBottom: 8,
   },
-  sectionTitle: {
-    ...Typography.eyebrow,
-    fontSize: 13,
-    letterSpacing: 0.6,
-  },
+  sectionTitle: { ...Typography.sectionTitle },
   sectionCount: { ...Typography.bodySmall, color: Colors.textTertiary },
   sectionList: {
     backgroundColor: Colors.surface,
@@ -544,18 +539,7 @@ const reviewStyles = StyleSheet.create({
     marginTop: 20,
     paddingHorizontal: 20,
   },
-  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 },
-  emptyIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  emptyTitle: { ...Typography.titleMedium, fontWeight: '600' },
-  emptyText: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 21 },
+  emptyContainer: { flexGrow: 1 },
 });
 
 const rowStyles = StyleSheet.create({

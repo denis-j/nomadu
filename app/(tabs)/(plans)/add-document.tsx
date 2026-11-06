@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
@@ -25,6 +25,7 @@ import { MissingRoute } from '../../../components/MissingRoute';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { useJourneyExists } from '../../../hooks/useJourneyExists';
 import { track } from '../../../lib/analytics';
+import { FormField } from '../../../components/FormField';
 
 interface Picked {
   uri: string;
@@ -209,16 +210,12 @@ function AddDocumentScreenContent() {
 
         <SectionLabel>{t('addDoc.name')}</SectionLabel>
         <Card>
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.input}
-              placeholder={t('addDoc.namePlaceholder')}
-              placeholderTextColor={Colors.textTertiary}
-              value={title}
-              onChangeText={setTitle}
-              returnKeyType="done"
-            />
-          </View>
+          <FormField
+            placeholder={t('addDoc.namePlaceholder')}
+            value={title}
+            onChangeText={setTitle}
+            returnKeyType="done"
+          />
         </Card>
 
         <SectionLabel>{t('addDoc.whatIsIt')}</SectionLabel>
@@ -317,8 +314,6 @@ const styles = StyleSheet.create({
   pickedName: { ...Typography.titleSmall, fontWeight: '500' },
   pickedMime: { ...Typography.bodySmall, color: Colors.textSecondary },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(0,0,0,0.08)', marginHorizontal: -20 },
-  inputRow: { paddingVertical: 16 },
-  input: { ...Typography.titleSmall, fontWeight: '400' },
   footer: { marginTop: 10, gap: 10 },
   cta: { width: '100%' },
   ctaInner: { justifyContent: 'center' },

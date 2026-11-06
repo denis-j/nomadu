@@ -10,7 +10,6 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -38,6 +37,7 @@ import { Flag } from '../../components/Flag';
 import { countryCodeToFlag } from '../../lib/geocoding';
 import { track } from '../../lib/analytics';
 import { useTranslation } from '../../contexts/LanguageContext';
+import { FormCard, FormField } from '../../components/FormField';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -247,22 +247,20 @@ export default function CitizenshipScreen() {
           </Animated.View>
 
           <Animated.View entering={FadeIn.delay(150).duration(400)} style={styles.searchWrap}>
-            <Glass {...glassProps} style={[styles.searchBar, !hasGlass && styles.searchBarFallback]}>
-              <Ionicons name="search" size={18} color={Colors.textTertiary} />
-              <TextInput
-                style={styles.searchInput}
+            <FormCard>
+              <FormField
                 value={query}
                 onChangeText={setQuery}
                 placeholder={t('onboarding.citizenship.searchPlaceholder')}
-                placeholderTextColor={Colors.textTertiary}
                 autoCorrect={false}
+                leading={<Ionicons name="search" size={18} color={Colors.textTertiary} />}
+                trailing={isSearching ? (
+                  <TouchableOpacity onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel={t('onboarding.citizenship.clearSearch')}>
+                    <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
+                  </TouchableOpacity>
+                ) : undefined}
               />
-              {isSearching && (
-                <TouchableOpacity onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel={t('onboarding.citizenship.clearSearch')}>
-                  <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
-                </TouchableOpacity>
-              )}
-            </Glass>
+            </FormCard>
           </Animated.View>
 
           {isSearching && (
@@ -351,21 +349,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   searchWrap: { paddingHorizontal: 20, marginBottom: 4 },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.7)',
-    gap: 10,
-  },
-  searchBarFallback: { backgroundColor: 'rgba(255, 255, 255, 0.9)', borderColor: Colors.border },
-  searchInput: { ...Typography.titleSmall, fontWeight: '400', flex: 1 },
   searchList: { paddingHorizontal: 20, paddingBottom: 12, gap: 6 },
   searchRow: {
     flexDirection: 'row',

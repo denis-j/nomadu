@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { categoryIcon } from '../../../components/activities/visuals';
 import { TextArea, TextRow } from '../../../components/accommodationForm';
+import { FormField } from '../../../components/FormField';
 import { CloudyButton } from '../../../components/CloudyButton';
 import { GlassPill } from '../../../components/GlassPill';
 import { MissingRoute } from '../../../components/MissingRoute';
@@ -154,20 +155,13 @@ function ManualForm({ journeySyncId, legs, defaultStop, existing }: { journeySyn
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={visaFormStyles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <SectionLabel>{t('activities.what')}</SectionLabel>
         <Card>
-          <View style={styles.nameRow}>
-            <View style={styles.nameBadge}>
-              <Ionicons name={categoryIcon(category)} size={20} color={Colors.text} />
-            </View>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder={t('activities.whatPlaceholder')}
-              placeholderTextColor={Colors.textTertiary}
-              style={styles.nameInput}
-              autoFocus={!existing}
-              returnKeyType="done"
-            />
-          </View>
+          <FormField
+            value={title}
+            onChangeText={setTitle}
+            placeholder={t('activities.whatPlaceholder')}
+            autoFocus={!existing}
+            returnKeyType="done"
+          />
         </Card>
 
         {/* One row to swipe through, not a wall of twelve. */}
@@ -195,9 +189,9 @@ function ManualForm({ journeySyncId, legs, defaultStop, existing }: { journeySyn
 
         <SectionLabel>{t('activities.where')}</SectionLabel>
         <Card>
-          <TextRow label={t('plans.place')} value={place} onCommit={setPlace} live placeholder={t('activities.placeNamePlaceholder')} autoCapitalize="words" />
-          <TextRow label={t('plans.address')} value={address} onCommit={setAddress} live placeholder={t('plans.addressPlaceholder')} />
-          <TextRow label={t('activities.website')} value={url} onCommit={setUrl} live placeholder={t('plans.httpsPlaceholder')} keyboardType="url" autoCapitalize="none" last />
+          <TextRow label={t('plans.place')} value={place} onCommit={setPlace} live autoCapitalize="words" />
+          <TextRow label={t('plans.address')} value={address} onCommit={setAddress} live />
+          <TextRow label={t('activities.website')} value={url} onCommit={setUrl} live keyboardType="url" autoCapitalize="none" last />
         </Card>
 
         <SectionLabel>{t('plans.notes')}</SectionLabel>
@@ -307,21 +301,16 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
           <>
             <SectionLabel>{t('plans.link')}</SectionLabel>
             <Card>
-              <View style={styles.linkRow}>
-                <Ionicons name="link" size={18} color={Colors.textTertiary} />
-                <TextInput
-                  value={url}
-                  onChangeText={setUrl}
-                  placeholder={t('activities.linkPlaceholder')}
-                  placeholderTextColor={Colors.textTertiary}
-                  style={styles.linkInput}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
-                  returnKeyType="go"
-                  onSubmitEditing={read}
-                />
-                {url ? (
+              <FormField
+                value={url}
+                onChangeText={setUrl}
+                placeholder={t('activities.linkPlaceholder')}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                returnKeyType="go"
+                onSubmitEditing={read}
+                trailing={url ? (
                   <Pressable onPress={() => setUrl('')} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('activities.clear')}>
                     <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
                   </Pressable>
@@ -336,7 +325,7 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
                     style={styles.pasteSystem}
                   />
                 ) : null}
-              </View>
+              />
             </Card>
             <Hint>{t('activities.linkHint')}</Hint>
 
@@ -425,17 +414,6 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
 }
 
 const styles = StyleSheet.create({
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-  nameBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderCurve: 'continuous',
-    backgroundColor: Colors.surfaceSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nameInput: { ...Typography.titleSmall, fontWeight: '500', flex: 1, color: Colors.text, paddingVertical: 4 },
 
   kindsScroll: { marginHorizontal: -20 },
   kinds: { paddingHorizontal: 20, gap: 8 },
@@ -445,8 +423,6 @@ const styles = StyleSheet.create({
 
   // The link step alone: no room kept for a tab bar the half sheet never meets.
   linkContent: { padding: 20, gap: 14, paddingBottom: 28 },
-  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, minHeight: 56 },
-  linkInput: { ...Typography.titleSmall, fontWeight: '400', flex: 1, color: Colors.text },
   // The system control needs room for its icon and word; squeezed, it draws a blank.
   pasteSystem: { width: 118, height: 36 },
 

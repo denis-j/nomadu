@@ -1,18 +1,13 @@
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
-import { Typography } from '../constants/typography';
 import { useAvatar } from '../lib/avatars';
 import { AnimatedFace } from './AnimatedFace';
+import { FormCard, FormField } from './FormField';
 import { suggestedFaces } from '../lib/profile';
 import { useTranslation } from '../contexts/LanguageContext';
-
-const hasGlass = isLiquidGlassAvailable();
-const Glass = hasGlass ? GlassView : View;
-const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 const BIG = 132;
 const SMALL = 48;
@@ -69,22 +64,19 @@ export function ProfileEditor({
         ))}
       </View>
 
-      <Glass {...glassProps} style={[styles.section, !hasGlass && styles.sectionFallback]}>
-        <TextInput
-          style={styles.input}
+      <FormCard>
+        <FormField
           value={name}
           onChangeText={onNameChange}
           placeholder={t('comp.yourName')}
-          placeholderTextColor={Colors.textTertiary}
           autoCapitalize="words"
           autoComplete="name"
           textContentType="name"
           maxLength={40}
           returnKeyType="done"
           autoFocus={autoFocus}
-          accessibilityLabel={t('comp.yourName')}
         />
-      </Glass>
+      </FormCard>
     </View>
   );
 }
@@ -114,16 +106,4 @@ const styles = StyleSheet.create({
   alternatives: { flexDirection: 'row', justifyContent: 'center', gap: 10, flexWrap: 'wrap' },
   alt: { borderRadius: SMALL / 2 + 3, padding: 2, borderWidth: 2, borderColor: 'transparent' },
   altOn: { borderColor: Colors.text },
-  section: {
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 4,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.7)',
-  },
-  sectionFallback: { backgroundColor: 'rgba(255, 255, 255, 0.85)', borderColor: Colors.border },
-  input: { ...Typography.titleSmall, fontWeight: '400', paddingVertical: 16 },
 });

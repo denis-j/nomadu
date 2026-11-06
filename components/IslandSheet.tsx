@@ -9,7 +9,6 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -28,6 +27,8 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Typography } from '../constants/typography';
 import { useTranslation } from '../contexts/LanguageContext';
+import { FormCard, FormField } from './FormField';
+import { Colors } from '../constants/colors';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -174,22 +175,20 @@ export function SheetLayer({
         )}
 
         {searchEnabled && (
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={18} color="#8E8E93" style={{ marginRight: 8 }} />
-            <TextInput
-              style={styles.searchInput}
+          <FormCard style={styles.searchCard}>
+            <FormField
               placeholder={searchPlaceholder}
-              placeholderTextColor="#8E8E93"
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoCorrect={false}
+              leading={<Ionicons name="search" size={18} color={Colors.textTertiary} />}
+              trailing={searchQuery.length > 0 ? (
+                <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityRole="button" accessibilityLabel={t('passport.clearSearch')}>
+                  <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
+                </TouchableOpacity>
+              ) : undefined}
             />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityRole="button" accessibilityLabel={t('passport.clearSearch')}>
-                <Ionicons name="close-circle" size={18} color="#C7C7CC" />
-              </TouchableOpacity>
-            )}
-          </View>
+          </FormCard>
         )}
 
         <ScrollView
@@ -335,23 +334,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F2F2F7',
-    borderRadius: 10,
-    marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  searchInput: {
-    ...Typography.titleSmall,
-    fontWeight: '400',
-    flex: 1,
-    padding: 0,
-  },
+  searchCard: { marginHorizontal: 16, marginTop: 10, marginBottom: 4 },
   body: {
     flex: 1,
     padding: 20,

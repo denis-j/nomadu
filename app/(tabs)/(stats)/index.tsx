@@ -11,14 +11,13 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Svg, { Circle } from 'react-native-svg';
 import { CloudBackdrop, type CloudPatch } from '../../../components/CloudBackdrop';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useStats } from '../../../hooks/useStats';
 import { useVisaTracker } from '../../../hooks/useVisaTracker';
 import { useTaxTracker } from '../../../hooks/useTaxTracker';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
-import { StatsBars } from '../../../components/StatsBars';
 import { BADGE_LIBRARY } from '../../../lib/badges';
 import { CountryBadge3DPreview } from '../../../components/CountryBadge3D';
 import { visaGroup } from '../../../lib/visaCalculations';
@@ -27,6 +26,7 @@ import { YearPicker } from '../../../components/YearPicker';
 import type { YearFilter } from '../../../lib/yearFilter';
 import type { Stats } from '../../../lib/database';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { EmptyState } from '../../../components/EmptyState';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -60,12 +60,6 @@ export default function StatsScreen() {
   const mostCriticalTax = taxStatuses.length > 0 ? taxStatuses[0] : null;
 
   // Re-trigger bubble animations whenever the Stats tab gains focus
-  const [focusKey, setFocusKey] = useState(0);
-  useFocusEffect(
-    useCallback(() => {
-      setFocusKey((k) => k + 1);
-    }, []),
-  );
 
   if (loading || visaLoading || taxLoading) return null;
 
@@ -75,13 +69,7 @@ export default function StatsScreen() {
   const hasAnyData = stats.availableYears.length > 1 || stats.daysTracked > 0;
   if (!hasAnyData) {
     return (
-      <View style={styles.emptyContainer}>
-        <StatsBars key={focusKey} size={80} variant="burstWobble" />
-        <Text style={styles.emptyTitle}>{t('stats.noStatsTitle')}</Text>
-        <Text style={styles.emptySubtitle}>
-          {t('stats.noStatsSubtitle')}
-        </Text>
-      </View>
+      <EmptyState bars title={t('stats.noStatsTitle')} subtitle={t('stats.noStatsSubtitle')} />
     );
   }
 
@@ -1065,11 +1053,7 @@ const badgeStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingRight: 16,
   },
-  sectionTitle: {
-    ...Typography.eyebrow,
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
+  sectionTitle: { ...Typography.sectionTitle },
   progressLink: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -1153,26 +1137,6 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingBottom: 100,
   },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    gap: 14,
-  },
-  emptyTitle: {
-    ...Typography.titleLarge,
-    textAlign: 'center',
-    letterSpacing: -0.4,
-    marginTop: 8,
-  },
-  emptySubtitle: {
-    ...Typography.bodySmall,
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
   row: {
     flexDirection: 'row',
     gap: 12,
@@ -1233,11 +1197,7 @@ const styles = StyleSheet.create({
     marginHorizontal: -16,
     paddingLeft: 16,
   },
-  sectionTitle: {
-    ...Typography.eyebrow,
-    fontSize: 13,
-    paddingLeft: 4,
-  },
+  sectionTitle: { ...Typography.sectionTitle, paddingLeft: 4 },
   cardPressed: {
     opacity: 0.7,
   },

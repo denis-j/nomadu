@@ -4,16 +4,17 @@ import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollVie
 import * as Haptics from 'expo-haptics';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { SymbolView } from 'expo-symbols';
+import { router } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useTaxTracker } from '../../../hooks/useTaxTracker';
-import { Colors, systemColor } from '../../../constants/colors';
+import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { CloudyButton } from '../../../components/CloudyButton';
 import { Flag } from '../../../components/Flag';
 import { YearPicker } from '../../../components/YearPicker';
 import { TaxStatus } from '../../../lib/taxCalculations';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { EmptyState } from '../../../components/EmptyState';
 
 type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
@@ -138,11 +139,12 @@ export default function TaxScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.emptyScroll}
       >
-        <View style={styles.emptyInner}>
-          <SymbolView name={{ ios: 'person.text.rectangle', android: 'id_card' }} size={48} tintColor={systemColor('tertiaryLabel')} weight="regular" />
-          <Text style={styles.emptyTitle}>{t('tax.noCitizenshipTitle')}</Text>
-          <Text style={styles.emptySubtitle}>{t('tax.noCitizenshipSubtitle')}</Text>
-        </View>
+        <EmptyState
+          icons={[{ name: 'earth', color: '#A6B4C2' }, { name: 'person', color: '#4DC1FF' }, { name: 'cash', color: '#A6B4C2' }]}
+          title={t('tax.noCitizenshipTitle')}
+          subtitle={t('tax.noCitizenshipSubtitle')}
+          primary={{ label: t('tax.setPassport'), onPress: () => router.push('/(tabs)/(settings)/passport') }}
+        />
       </ScrollView>
     );
   }
@@ -172,12 +174,11 @@ export default function TaxScreen() {
       </Text>
 
       {taxStatuses.length === 0 ? (
-        <View style={styles.emptyForYear}>
-          <Text style={styles.emptyForYearTitle}>{t('tax.noExposureTitle', { year })}</Text>
-          <Text style={styles.emptyForYearSubtitle}>
-            {t('tax.noExposureSubtitle')}
-          </Text>
-        </View>
+        <EmptyState
+          icons={[{ name: 'calendar', color: '#A6B4C2' }, { name: 'cash', color: '#4DC1FF' }, { name: 'earth', color: '#A6B4C2' }]}
+          title={t('tax.noExposureTitle', { year })}
+          subtitle={t('tax.noExposureSubtitle')}
+        />
       ) : (
         taxStatuses.map((tax) => <TaxCard key={tax.countryCode} tax={tax} />)
       )}
@@ -360,32 +361,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   // Native empty state (no citizenship)
-  emptyScroll: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingBottom: 80,
-  },
-  emptyInner: {
-    alignItems: 'center',
-    maxWidth: 320,
-  },
-  emptyTitle: {
-    ...Typography.titleLarge,
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    ...Typography.body,
-    fontSize: 15,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 21,
-    marginTop: 6,
-  },
+  emptyScroll: { flexGrow: 1 },
 
   // Disclaimer block (Glass, cloud tint)
   disclaimer: {
@@ -506,19 +482,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  emptyForYear: {
-    paddingVertical: 36,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    gap: 6,
-  },
-  emptyForYearTitle: {
-    ...Typography.button,
-  },
-  emptyForYearSubtitle: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 19,
-  },
 });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -17,6 +17,7 @@ import { joinJourney, myName, previewInvite, setPendingInvite, type InvitePrevie
 import { pullSharedJourneysFromCloud } from '../../lib/sync';
 import { showToast } from '../../lib/toast';
 import { useTranslation } from '../../contexts/LanguageContext';
+import { FormCard, FormField } from '../../components/FormField';
 
 type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
@@ -170,22 +171,17 @@ export default function JoinTripScreen() {
               </CloudyButton>
             ) : (
               <>
-                <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
-                  <View style={styles.nameRow}>
-                    <Text style={styles.nameLabel}>{t('join.yourName')}</Text>
-                    <TextInput
-                      style={styles.nameInput}
-                      value={name}
-                      onChangeText={setName}
-                      placeholder={t('join.namePlaceholder')}
-                      placeholderTextColor={Colors.textTertiary}
-                      autoCapitalize="words"
-                      autoCorrect={false}
-                      returnKeyType="done"
-                      onSubmitEditing={join}
-                    />
-                  </View>
-                </Glass>
+                <FormCard>
+                  <FormField
+                    value={name}
+                    onChangeText={setName}
+                    placeholder={t('join.yourName')}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    onSubmitEditing={join}
+                  />
+                </FormCard>
                 <CloudyButton onPress={join} style={styles.cta} innerStyle={styles.ctaInner}>
                   <Text style={styles.ctaText}>{busy ? t('join.joining') : t('join.comeAlong')}</Text>
                 </CloudyButton>
@@ -226,9 +222,6 @@ const styles = StyleSheet.create({
   stopCity: { ...Typography.titleSmall, fontWeight: '500', flex: 1 },
   stopDates: { ...Typography.bodySmall, color: Colors.textSecondary, fontVariant: ['tabular-nums'] },
   more: { ...Typography.bodySmall, color: Colors.textTertiary, paddingVertical: 13 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 12 },
-  nameLabel: { ...Typography.titleSmall, fontWeight: '500' },
-  nameInput: { ...Typography.titleSmall, fontWeight: '400', flex: 1, textAlign: 'right' },
   cta: { width: '100%', marginTop: 6 },
   ctaInner: { justifyContent: 'center' },
   ctaText: { ...Typography.buttonLarge, color: Colors.cloudyButtonText, textAlign: 'center' },
