@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router/stack';
-import { Colors, sheetBackground, sheetWithHeader } from '../../../constants/colors';
+import { sheetBackground, sheetWithHeader } from '../../../constants/colors';
 import { useTranslation } from '../../../contexts/LanguageContext';
 
 export default function PlansStack() {
@@ -93,7 +93,7 @@ export default function PlansStack() {
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.85, 1.0],
           headerBackButtonDisplayMode: 'minimal',
-          contentStyle: { backgroundColor: Colors.background },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -103,7 +103,7 @@ export default function PlansStack() {
           headerShown: false,
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.9, 1.0],
-          contentStyle: { backgroundColor: Colors.background },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -113,7 +113,7 @@ export default function PlansStack() {
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.85, 1.0],
           headerBackButtonDisplayMode: 'minimal',
-          contentStyle: { backgroundColor: Colors.background },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -123,7 +123,7 @@ export default function PlansStack() {
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.85, 1.0],
           headerBackButtonDisplayMode: 'minimal',
-          contentStyle: { backgroundColor: Colors.background },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -141,7 +141,7 @@ export default function PlansStack() {
           headerShown: false,
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.9, 1.0],
-          contentStyle: { backgroundColor: Colors.background },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -151,7 +151,7 @@ export default function PlansStack() {
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.9, 1.0],
           headerBackButtonDisplayMode: 'minimal',
-          contentStyle: { backgroundColor: Colors.background },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       {/* Expenses, like the things to do: a page, a sheet to read one, a form. */}
@@ -170,7 +170,7 @@ export default function PlansStack() {
           headerShown: false,
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.9, 1.0],
-          contentStyle: { backgroundColor: Colors.background },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -180,7 +180,7 @@ export default function PlansStack() {
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.9, 1.0],
           headerBackButtonDisplayMode: 'minimal',
-          contentStyle: { backgroundColor: Colors.background },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -196,7 +196,7 @@ export default function PlansStack() {
           presentation: sheetWithHeader,
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.85],
-          contentStyle: { backgroundColor: Colors.background },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -206,6 +206,7 @@ export default function PlansStack() {
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.92, 1.0],
           headerBackButtonDisplayMode: 'minimal',
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen

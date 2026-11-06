@@ -16,7 +16,7 @@ import { ToastContainer } from '../components/Toast';
 import { UpdateBanner } from '../components/UpdateBanner';
 import { useOTAUpdates } from '../hooks/useOTAUpdates';
 import { ErrorBoundary } from '../components/ErrorBoundary';
-import { Colors } from '../constants/colors';
+import { Colors, sheetBackground } from '../constants/colors';
 import { initMonitoring, reportError, setMonitoringUser } from '../lib/monitoring';
 import { setAnalyticsUser, trackScreen } from '../lib/analytics';
 import { startAuthRecovery } from '../lib/authRecovery';
@@ -137,6 +137,7 @@ function RootNavigator() {
           headerShown: false,
           presentation: 'formSheet',
           sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -145,6 +146,7 @@ function RootNavigator() {
           headerShown: false,
           presentation: 'formSheet',
           sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -153,6 +155,7 @@ function RootNavigator() {
           headerShown: false,
           presentation: 'formSheet',
           sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -162,9 +165,7 @@ function RootNavigator() {
           presentation: 'formSheet',
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.75, 1.0],
-          // Its own ground: transparent let the map of the screen behind
-          // shine through the whole invite.
-          contentStyle: { backgroundColor: Colors.background },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen

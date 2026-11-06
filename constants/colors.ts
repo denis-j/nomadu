@@ -74,12 +74,14 @@ export function systemColor(name: SystemColorName): ColorValue {
 }
 
 /**
- * Under sheets and their headers iOS draws a glass material itself, so the
- * screens leave their own background transparent. Android draws nothing
- * there: the sheet showed the screen behind it and the header lay over the
- * list. On Android they get the app background and a solid header.
+ * Every sheet has this solid ground, on both platforms: with a transparent
+ * one the screen behind shone through and its text lay under the form.
+ * Set it as `contentStyle` on anything presented as a sheet, and on the inner
+ * stack of a sheet that has one.
  */
-export const sheetBackground = Platform.OS === 'ios' ? 'transparent' : Colors.background;
+export const sheetBackground = Colors.background;
+
+/** iOS draws its header as glass over the content, Android as a solid bar. */
 export const headerTransparent = Platform.OS === 'ios';
 
 /**

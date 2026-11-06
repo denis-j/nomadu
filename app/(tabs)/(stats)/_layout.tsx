@@ -26,6 +26,7 @@ export default function StatsStack() {
           presentation: sheetWithHeader,
           sheetGrabberVisible: true,
           headerBackButtonDisplayMode: 'minimal',
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       {/* Three-step add flow. Its own stack supplies the per-step headers,
@@ -45,6 +46,7 @@ export default function StatsStack() {
           presentation: sheetWithHeader,
           sheetGrabberVisible: true,
           headerBackButtonDisplayMode: 'minimal',
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen

@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router/stack';
-import { Colors, headerTransparent, sheetWithHeader } from '../../../constants/colors';
+import { headerTransparent, sheetBackground, sheetWithHeader } from '../../../constants/colors';
 import { useTranslation } from '../../../contexts/LanguageContext';
 
 export default function SettingsStack() {
@@ -28,7 +28,7 @@ export default function SettingsStack() {
           presentation: sheetWithHeader,
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.6],
-          contentStyle: { backgroundColor: Colors.background },
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
@@ -44,6 +44,7 @@ export default function SettingsStack() {
           presentation: sheetWithHeader,
           sheetGrabberVisible: true,
           sheetAllowedDetents: [0.72, 1.0],
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
