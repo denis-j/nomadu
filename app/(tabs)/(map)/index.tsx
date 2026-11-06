@@ -409,7 +409,8 @@ const styles = StyleSheet.create({
     gap: 8,
     borderRadius: 100,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
+    maxWidth: '80%',
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
@@ -422,7 +423,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     ...Typography.bodySmall,
-    fontSize: 14,
+    fontSize: 13,
+    flexShrink: 1,
     color: Colors.textSecondary,
   },
 });
