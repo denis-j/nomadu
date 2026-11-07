@@ -95,7 +95,7 @@ variant, and do not restyle one locally.
   of the sign-in screen. The placeholder names the field; there is no label beside or
   above it. `leading` is only the magnifier of a search, `trailing` holds one small
   control (show password, clear, send, a currency). Do not use `TextInput` directly.
-  The one exception is the morphing search chip in `(settings)/passport.tsx`.
+ 
 - **Section headings come in two kinds.** The quiet one is the default: small, grey and
   uppercase, as in Settings and in every sheet: always `Typography.sectionLabel`, through
   `SectionHead` or `SectionLabel` where they fit, never its own values. The bold one is for a heading that opens a big block of
