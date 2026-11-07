@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { systemColor } from '../../../../constants/colors';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Calendar, type DateData } from 'react-native-calendars';
@@ -13,6 +13,7 @@ import { track } from '../../../../lib/analytics';
 import { useTranslation } from '../../../../contexts/LanguageContext';
 import { HeaderAction } from '../../../../components/HeaderAction';
 import { FontSize } from '../../../../constants/typography';
+import { Card, SwitchRow } from '../../../../components/visaForm';
 
 type Params = {
   country: string;
@@ -203,18 +204,17 @@ export default function CreateDatesScreen() {
         />
 
         {/* Still traveling toggle */}
-        <View style={styles.section}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>{t('timelineCreate.stillTraveling')}</Text>
-            <Switch
-              value={noEndDate}
-              onValueChange={(v) => {
-                setNoEndDate(v);
-                if (!v) setPickingEnd(false);
-              }}
-            />
-          </View>
-        </View>
+        <Card>
+          <SwitchRow
+            title={t('timelineCreate.stillTraveling')}
+            value={noEndDate}
+            onChange={(v) => {
+              setNoEndDate(v);
+              if (!v) setPickingEnd(false);
+            }}
+            last
+          />
+        </Card>
       </ScrollView>
     </>
   );
@@ -254,22 +254,5 @@ const styles = StyleSheet.create({
     fontSize: FontSize.footnote,
     color: systemColor('secondaryLabel'),
     textAlign: 'center',
-  },
-  section: {
-    backgroundColor: systemColor('secondarySystemGroupedBackground'),
-    borderRadius: 14,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  toggleLabel: {
-    fontSize: FontSize.callout,
-    color: systemColor('label'),
   },
 });

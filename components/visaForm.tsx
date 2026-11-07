@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
@@ -129,6 +129,47 @@ export function ChoiceRow({
           accessibilityElementsHidden
         />
       </Pressable>
+      {!last && <View style={s.separator} />}
+    </>
+  );
+}
+
+/**
+ * A setting that is on or off, inside a Card: the same row as ChoiceRow
+ * (title, grey line, separator), with a switch where the checkmark is.
+ */
+export function SwitchRow({
+  title,
+  subtitle,
+  value,
+  onChange,
+  disabled,
+  last,
+}: {
+  title: string;
+  subtitle?: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+  last?: boolean;
+}) {
+  return (
+    <>
+      <View style={[s.choiceRow, s.switchRow]}>
+        <View style={s.choiceText}>
+          <Text style={[s.choiceTitle, disabled && s.titleDisabled]}>{title}</Text>
+          {subtitle ? <Text style={s.choiceSub}>{subtitle}</Text> : null}
+        </View>
+        <Switch
+          value={value}
+          disabled={disabled}
+          accessibilityLabel={title}
+          onValueChange={(v) => {
+            Haptics.selectionAsync();
+            onChange(v);
+          }}
+        />
+      </View>
       {!last && <View style={s.separator} />}
     </>
   );
@@ -686,6 +727,9 @@ const s = StyleSheet.create({
     minHeight: 52,
   },
   checkHidden: { opacity: 0 },
+  // The switch is taller than the checkmark; less padding keeps the row height.
+  switchRow: { paddingVertical: 10 },
+  titleDisabled: { color: Colors.textTertiary },
   choiceText: { flex: 1, gap: 2 },
   choiceTitle: { ...Typography.titleSmall, fontWeight: '500' },
   choiceSub: { ...Typography.bodySmall, color: Colors.textSecondary },
