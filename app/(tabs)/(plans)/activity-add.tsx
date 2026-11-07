@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
@@ -9,11 +8,10 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
 import { categoryIcon } from '../../../components/activities/visuals';
 import { TextArea, TextRow } from '../../../components/accommodationForm';
 import { FormField } from '../../../components/FormField';
-import { CloudyButton } from '../../../components/CloudyButton';
 import { GlassPill } from '../../../components/GlassPill';
 import { MissingRoute } from '../../../components/MissingRoute';
 import { Card, ChoiceRow, Hint, SectionLabel, visaFormStyles } from '../../../components/visaForm';
-import { Colors, systemColor } from '../../../constants/colors';
+import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { addActivity, getActivity, moveActivity, updateActivity, type LocalActivity } from '../../../lib/activities';
 import { ACTIVITY_CATEGORIES, firstUrl, type ActivityCategory } from '../../../lib/activityModel';
@@ -22,6 +20,7 @@ import { getJourneyWithLegs, parseDate, type JourneyLeg } from '../../../lib/dat
 import { showToast } from '../../../lib/toast';
 import { track } from '../../../lib/analytics';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { HeaderAction } from '../../../components/HeaderAction';
 
 type Params = {
   mode: 'link' | 'manual';
@@ -44,16 +43,6 @@ const Clipboard = requireOptionalNativeModule('ExpoClipboard')
   ? (require('expo-clipboard') as typeof import('expo-clipboard'))
   : null;
 const PasteButton = Clipboard?.isPasteButtonAvailable ? Clipboard.ClipboardPasteButton : null;
-
-/** The checkmark every form in the app saves with. */
-function SaveButton({ onPress, disabled }: { onPress: () => void; disabled: boolean }) {
-  const { t } = useTranslation();
-  return (
-    <Pressable onPress={onPress} disabled={disabled} hitSlop={8} style={{ opacity: disabled ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel={t('common.save')}>
-      <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
-    </Pressable>
-  );
-}
 
 /**
  * Adding to the things to do, as the other forms in the app: grey labels
@@ -151,7 +140,7 @@ function ManualForm({ journeySyncId, legs, defaultStop, existing }: { journeySyn
 
   return (
     <>
-      <Stack.Screen options={{ title: existing ? t('nav.edit') : t('activities.addSomething'), headerRight: () => <SaveButton onPress={save} disabled={saving || !title.trim()} /> }} />
+      <Stack.Screen options={{ title: existing ? t('nav.edit') : t('activities.addSomething'), headerRight: () => <HeaderAction onPress={save} label={t('common.save')} disabled={!title.trim()} busy={saving} /> }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={visaFormStyles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <SectionLabel>{t('activities.what')}</SectionLabel>
         <Card>
@@ -295,7 +284,9 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
   return (
     <>
       {/* A link needs half a screen; the places found need the whole one. */}
-      <Stack.Screen options={{ title: result ? t('activities.foundInPost') : t('activities.fromPost'), sheetAllowedDetents: result ? [0.9, 1.0] : [0.46] }} />
+      <Stack.Screen options={{ title: result ? t('activities.foundInPost') : t('activities.fromPost'), sheetAllowedDetents: result ? [0.9, 1.0] : [0.46], headerRight: () => (result
+        ? <HeaderAction onPress={save} label={keepPost ? t('activities.keepAsIdea') : t('common.save')} disabled={!keepPost && chosen.length === 0} busy={saving} />
+        : <HeaderAction onPress={read} label={t('activities.findPlaces')} next disabled={!url.trim()} busy={reading} />) }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={result ? visaFormStyles.content : styles.linkContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {!result ? (
           <>
@@ -328,13 +319,6 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
               />
             </Card>
             <Hint>{t('activities.linkHint')}</Hint>
-
-            <View style={styles.footer}>
-              <CloudyButton onPress={read} disabled={reading || !url.trim()} style={styles.cta} innerStyle={styles.ctaInner}>
-                {reading ? <ActivityIndicator color={Colors.cloudyButtonText} /> : null}
-                <Text style={styles.ctaText}>{reading ? t('activities.readingPost') : t('activities.findPlaces')}</Text>
-              </CloudyButton>
-            </View>
           </>
         ) : (
           <>
@@ -398,10 +382,6 @@ function LinkAdd({ journeySyncId, legs, defaultStop }: { journeySyncId: string; 
             )}
 
             <View style={styles.footer}>
-              <CloudyButton onPress={save} disabled={saving || (!keepPost && chosen.length === 0)} style={styles.cta} innerStyle={styles.ctaInner}>
-                {saving ? <ActivityIndicator color={Colors.cloudyButtonText} /> : null}
-                <Text style={styles.ctaText}>{keepPost ? t('activities.keepAsIdea') : chosen.length === 1 ? t('activities.saveOnePlace') : t('activities.saveCountPlaces', { count: chosen.length })}</Text>
-              </CloudyButton>
               <Pressable onPress={() => { setResult(null); setPicks([]); }} style={styles.secondary}>
                 <Text style={styles.secondaryText}>{t('activities.anotherLink')}</Text>
               </Pressable>
@@ -427,9 +407,6 @@ const styles = StyleSheet.create({
   pasteSystem: { width: 118, height: 36 },
 
   footer: { marginTop: 10, gap: 10 },
-  cta: { width: '100%' },
-  ctaInner: { justifyContent: 'center', flexDirection: 'row', gap: 8 },
-  ctaText: { ...Typography.buttonLarge, color: Colors.cloudyButtonText, textAlign: 'center' },
   secondary: { alignSelf: 'center', paddingVertical: 6 },
   secondaryText: { ...Typography.titleSmall, color: Colors.textSecondary, fontWeight: '500' },
 

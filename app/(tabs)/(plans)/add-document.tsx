@@ -6,7 +6,6 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
-import { CloudyButton } from '../../../components/CloudyButton';
 import { Card, ChoiceRow, SectionLabel, visaFormStyles } from '../../../components/visaForm';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
@@ -26,6 +25,7 @@ import { useTranslation } from '../../../contexts/LanguageContext';
 import { useJourneyExists } from '../../../hooks/useJourneyExists';
 import { track } from '../../../lib/analytics';
 import { FormField } from '../../../components/FormField';
+import { HeaderAction } from '../../../components/HeaderAction';
 
 interface Picked {
   uri: string;
@@ -172,7 +172,7 @@ function AddDocumentScreenContent() {
 
   return (
     <>
-      <Stack.Screen options={{ title: t('nav.addDocument') }} />
+      <Stack.Screen options={{ title: t('nav.addDocument'), headerRight: () => <HeaderAction onPress={save} label={t('nav.addDocument')} dim={!!missing} busy={saving} /> }} />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={visaFormStyles.content}
@@ -261,12 +261,7 @@ function AddDocumentScreenContent() {
           )}
         </Card>
 
-        <View style={styles.footer}>
-          <CloudyButton onPress={save} style={styles.cta} innerStyle={styles.ctaInner}>
-            <Text style={styles.ctaText}>{saving ? t('addDoc.adding') : t('nav.addDocument')}</Text>
-          </CloudyButton>
-          {missing && <Text style={styles.missing}>{missing}</Text>}
-        </View>
+        {missing && <Text style={styles.missing}>{missing}</Text>}
       </ScrollView>
     </>
   );
@@ -314,9 +309,5 @@ const styles = StyleSheet.create({
   pickedName: { ...Typography.titleSmall, fontWeight: '500' },
   pickedMime: { ...Typography.bodySmall, color: Colors.textSecondary },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(0,0,0,0.08)', marginHorizontal: -20 },
-  footer: { marginTop: 10, gap: 10 },
-  cta: { width: '100%' },
-  ctaInner: { justifyContent: 'center' },
-  ctaText: { ...Typography.buttonLarge, color: Colors.cloudyButtonText, textAlign: 'center' },
   missing: { ...Typography.bodySmall, color: Colors.textSecondary, textAlign: 'center' },
 });

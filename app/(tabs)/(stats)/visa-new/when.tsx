@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView } from 'react-native';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { CloudyButton } from '../../../../components/CloudyButton';
 import {
   Card,
   SectionLabel,
@@ -17,11 +16,10 @@ import {
 } from '../../../../components/visaForm';
 import { insertUserVisa } from '../../../../lib/userVisas';
 import { showToast } from '../../../../lib/toast';
-import { Colors } from '../../../../constants/colors';
-import { Typography } from '../../../../constants/typography';
 import { track } from '../../../../lib/analytics';
 import { useTranslation } from '../../../../contexts/LanguageContext';
 import { FormField } from '../../../../components/FormField';
+import { HeaderAction } from '../../../../components/HeaderAction';
 
 /** Step 3 of 3: the dates, and a name if you want one. */
 export default function AddVisaWhenScreen() {
@@ -75,7 +73,7 @@ export default function AddVisaWhenScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: t('nav.untilWhenValid') }} />
+      <Stack.Screen options={{ title: t('nav.untilWhenValid'), headerRight: () => <HeaderAction onPress={handleSave} label={t('visaForm.addVisa')} busy={saving} /> }} />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={visaFormStyles.content}
@@ -103,26 +101,7 @@ export default function AddVisaWhenScreen() {
             returnKeyType="done"
           />
         </Card>
-
-        <View style={styles.footer}>
-          <CloudyButton onPress={handleSave} style={styles.cta} innerStyle={styles.ctaInner}>
-            <Text style={styles.ctaText}>{saving ? t('visaForm.adding') : t('visaForm.addVisa')}</Text>
-          </CloudyButton>
-        </View>
       </ScrollView>
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  caption: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
-    paddingHorizontal: 4,
-    marginTop: -4,
-  },
-  footer: { marginTop: 10, gap: 10 },
-  cta: { width: '100%' },
-  ctaInner: { justifyContent: 'center' },
-  ctaText: { ...Typography.buttonLarge, color: Colors.cloudyButtonText, textAlign: 'center' },
-});

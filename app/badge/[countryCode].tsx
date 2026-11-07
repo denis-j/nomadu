@@ -1,33 +1,34 @@
 import { useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { CountryBadge3D, hasCountryBadge } from '../../components/CountryBadge3D';
 import { CloudyButton } from '../../components/CloudyButton';
+import { MissingRoute } from '../../components/MissingRoute';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { getBadgeInfo, markBadgeUnlocked } from '../../lib/badges';
 import { playCollectSound } from '../../lib/sound';
 
-const BLACK_BG = '#000000';
-const hasGlass = isLiquidGlassAvailable();
-
-function formatTodayShort(): string {
-  return new Date()
-    .toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    .toUpperCase();
+function formatTodayShort(language: string): string {
+  return new Date().toLocaleDateString(language, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
-export default function BadgeFullscreenScreen() {
-  const { t } = useTranslation();
+/**
+ * One badge, built like the app's other sheets: native title, the coin on a
+ * square stage (a fixed size: flex collapses inside a form sheet), and the
+ * name centred under it as on a trip's sheet.
+ */
+export default function BadgeSheet() {
+  const { t, language, countryName } = useTranslation();
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const { countryCode, unlock } = useLocalSearchParams<{ countryCode: string; unlock?: string }>();
   const code = (countryCode ?? '').toUpperCase();
   const info = getBadgeInfo(code);
@@ -43,195 +44,44 @@ export default function BadgeFullscreenScreen() {
     }
   }, [isUnlock, code]);
 
-  const handleClose = () => {
+  const handleCollect = () => {
+    playCollectSound();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.back();
   };
 
-  const handleCollect = () => {
-    playCollectSound();
-    handleClose();
-  };
-
   if (!hasCountryBadge(code) || !info) {
-    return (
-      <>
-        <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{t('badge.noBadge', { code })}</Text>
-          <Pressable onPress={handleClose} style={styles.errorClose}>
-            <Text style={styles.errorCloseText}>{t('badge.close')}</Text>
-          </Pressable>
-        </View>
-      </>
-    );
+    return <MissingRoute title={t('badge.reward')} message={t('badge.noBadge', { code })} />;
   }
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.root}>
-        <CountryBadge3D countryCode={code} backgroundColor={BLACK_BG} />
-
-        <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-          {/* Close button, top right, liquid glass on black */}
-          <View style={styles.closeWrap}>
-            {hasGlass ? (
-              <GlassView style={styles.closeBtnGlass} isInteractive>
-                <Pressable
-                  onPress={handleClose}
-                  hitSlop={12}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('badge.close')}
-                  style={({ pressed }) => [styles.closeInner, pressed && { opacity: 0.6 }]}
-                >
-                  <Ionicons name="close" size={20} color={Colors.white} />
-                </Pressable>
-              </GlassView>
-            ) : (
-              <Pressable
-                onPress={handleClose}
-                hitSlop={12}
-                accessibilityRole="button"
-                accessibilityLabel={t('badge.close')}
-                style={({ pressed }) => [styles.closeBtnFallback, pressed && { opacity: 0.6 }]}
-              >
-                <Ionicons name="close" size={20} color={Colors.white} />
-              </Pressable>
-            )}
-          </View>
-
-          {/* Title block, same trio as unlock overlay */}
-          <View pointerEvents="none" style={styles.topBlock}>
-            <Text style={styles.eyebrow}>{t('badge.reward')}</Text>
-            <Text style={styles.title}>{info.name}</Text>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaText}>{t('badge.earned', { date: formatTodayShort() })}</Text>
-            </View>
-          </View>
-
-          {/* Bottom CTA for unlock mode only */}
-          {isUnlock && (
-            <View pointerEvents="box-none" style={styles.bottomBlock}>
-              <CloudyButton onPress={handleCollect} haptic={Haptics.ImpactFeedbackStyle.Medium}>
-                <View style={styles.ctaContent}>
-                  <Ionicons name="sparkles" size={20} color={Colors.cloudyButtonText} />
-                  <Text style={styles.ctaText}>{t('badge.collect')}</Text>
-                </View>
-              </CloudyButton>
-            </View>
-          )}
+      <Stack.Screen options={{ title: t('badge.reward') }} />
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} scrollEnabled={false}>
+        <CountryBadge3D countryCode={code} height={width} />
+        <View style={styles.header}>
+          <Text style={styles.name}>{countryName(info.name)}</Text>
+          <Text style={styles.earned}>{t('badge.earned', { date: formatTodayShort(language) })}</Text>
         </View>
-      </View>
+        {isUnlock && (
+          <View style={styles.cta}>
+            <CloudyButton onPress={handleCollect} haptic={Haptics.ImpactFeedbackStyle.Medium} innerStyle={styles.ctaInner}>
+              <Ionicons name="sparkles" size={20} color={Colors.cloudyButtonText} />
+              <Text style={styles.ctaText}>{t('badge.collect')}</Text>
+            </CloudyButton>
+          </View>
+        )}
+      </ScrollView>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: BLACK_BG,
-  },
-  closeWrap: {
-    position: 'absolute',
-    top: 56,
-    right: 20,
-  },
-  closeBtnGlass: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    overflow: 'hidden',
-  },
-  closeInner: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeBtnFallback: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topBlock: {
-    paddingTop: 84,
-    paddingHorizontal: 28,
-    alignItems: 'center',
-    gap: 10,
-  },
-  eyebrow: {
-    ...Typography.eyebrow,
-    color: Colors.whiteAlpha55,
-    letterSpacing: 3.2,
-  },
-  title: {
-    ...Typography.displayLarge,
-    fontSize: 44,
-    color: Colors.white,
-    letterSpacing: -1.2,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 4,
-  },
-  metaText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: Colors.whiteAlpha55,
-    letterSpacing: 1.6,
-  },
-  bottomBlock: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 56,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-  },
-  ctaContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  ctaText: {
-    ...Typography.titleSmall,
-    fontWeight: '700',
-    color: Colors.cloudyButtonText,
-    letterSpacing: 0.3,
-  },
-  errorContainer: {
-    flex: 1,
-    backgroundColor: BLACK_BG,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  errorText: {
-    ...Typography.bodySmall,
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  errorClose: {
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  errorCloseText: {
-    ...Typography.bodySmall,
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.white,
-  },
+  content: { paddingBottom: 24 },
+  header: { alignItems: 'center', gap: 2, paddingHorizontal: 24 },
+  name: { ...Typography.displayMedium, fontSize: 26, fontWeight: '700', textAlign: 'center' },
+  earned: { ...Typography.titleSmall, fontWeight: '400', color: Colors.textSecondary, marginTop: 2 },
+  cta: { paddingHorizontal: 24, paddingTop: 24 },
+  ctaInner: { justifyContent: 'center', gap: 10 },
+  ctaText: { ...Typography.titleSmall, fontWeight: '700', color: Colors.cloudyButtonText },
 });

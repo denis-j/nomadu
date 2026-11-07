@@ -5,7 +5,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { httpsCallable } from 'firebase/functions';
-import { CloudyButton } from '../../../components/CloudyButton';
 import { Card, SectionLabel } from '../../../components/visaForm';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
@@ -14,6 +13,7 @@ import { functions } from '../../../lib/firebase';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { FormField } from '../../../components/FormField';
+import { HeaderAction } from '../../../components/HeaderAction';
 
 const NAME_SUGGESTIONS = ['Hermes', 'Claude', 'ChatGPT'];
 
@@ -67,7 +67,7 @@ export default function ConnectAgentSheet() {
   if (ready) {
     return (
       <>
-        <Stack.Screen options={{ title: t('agent.isReady', { label: ready.label }) }} />
+        <Stack.Screen options={{ title: t('agent.isReady', { label: ready.label }), headerRight: () => <HeaderAction onPress={() => router.back()} label={t('agent.done')} /> }} />
         <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
           <Card>
             <View style={styles.hand}>
@@ -85,9 +85,6 @@ export default function ConnectAgentSheet() {
             </View>
           </Card>
           <Text style={styles.caption}>{t('agent.keyCaption', { label: ready.label })}</Text>
-          <CloudyButton onPress={() => router.back()} style={{ width: '100%' }} innerStyle={{ justifyContent: 'center' }}>
-            <Text style={styles.ctaText}>{t('agent.done')}</Text>
-          </CloudyButton>
         </ScrollView>
       </>
     );
@@ -95,7 +92,7 @@ export default function ConnectAgentSheet() {
 
   return (
     <>
-      <Stack.Screen options={{ title: t('nav.connectAgent') }} />
+      <Stack.Screen options={{ title: t('nav.connectAgent'), headerRight: () => <HeaderAction onPress={connect} label={t('agent.connect')} disabled={!label.trim()} busy={busy} /> }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <SectionLabel>{t('agent.name')}</SectionLabel>
         <Card>
@@ -137,10 +134,6 @@ export default function ConnectAgentSheet() {
             onPress={() => setEditTimeline(true)}
           />
         </Card>
-
-        <CloudyButton onPress={connect} style={{ width: '100%', opacity: canConnect ? 1 : 0.5 }} innerStyle={{ justifyContent: 'center' }}>
-          <Text style={styles.ctaText}>{busy ? t('agent.connecting') : t('agent.connect')}</Text>
-        </CloudyButton>
       </ScrollView>
     </>
   );
@@ -203,5 +196,4 @@ const styles = StyleSheet.create({
   },
   secondaryText: { ...Typography.label, fontWeight: '600' },
   caption: { ...Typography.caption, color: Colors.textSecondary, textAlign: 'center' },
-  ctaText: { ...Typography.buttonLarge, color: Colors.cloudyButtonText, textAlign: 'center' },
 });

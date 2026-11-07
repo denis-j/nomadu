@@ -1,8 +1,6 @@
 import { useState, useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { systemColor } from '../../../../constants/colors';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { MissingRoute } from '../../../../components/MissingRoute';
 import { Card, SectionLabel } from '../../../../components/visaForm';
@@ -16,6 +14,7 @@ import { getCountryCode } from '../../../../utils/geography';
 import { showToast } from '../../../../lib/toast';
 import { track } from '../../../../lib/analytics';
 import { useTranslation } from '../../../../contexts/LanguageContext';
+import { HeaderAction } from '../../../../components/HeaderAction';
 
 type Params = {
   journeyId: string;
@@ -84,11 +83,7 @@ export default function AddStopDetailsScreen() {
       <Stack.Screen
         options={{
           title: isEditing ? t('nav.editStop') : t('addStop.stopDetails'),
-          headerRight: () => (
-            <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel={t('plans.saveStop')}>
-              <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
-            </Pressable>
-          ),
+          headerRight: () => <HeaderAction onPress={handleSave} label={t('plans.saveStop')} disabled={saving} />,
         }}
       />
       <ScrollView

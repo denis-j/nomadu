@@ -1,16 +1,16 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
 import { Card, SectionLabel } from '../../../components/visaForm';
-import { Colors, systemColor } from '../../../constants/colors';
+import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { guideById, guideDays } from '../../../constants/guides';
 import { parseDate } from '../../../lib/database';
 import { createTripFromGuide } from '../../../lib/guides';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { HeaderAction } from '../../../components/HeaderAction';
 
 const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const human = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -81,11 +81,7 @@ export default function GuideStartScreen() {
       <Stack.Screen
         options={{
           title: t('nav.startDate'),
-          headerRight: () => (
-            <Pressable onPress={create} disabled={busy} hitSlop={8} style={{ opacity: busy ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel={t('plans.createTrip')}>
-              <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
-            </Pressable>
-          ),
+          headerRight: () => <HeaderAction onPress={create} label={t('plans.createTrip')} disabled={busy} />,
         }}
       />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>

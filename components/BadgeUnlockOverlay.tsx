@@ -10,16 +10,12 @@ import { getBadgeInfo, markBadgeUnlocked } from '../lib/badges';
 import { playCollectSound } from '../lib/sound';
 import { useTranslation } from '../contexts/LanguageContext';
 
-const BLACK_BG = '#000000';
-
-function formatTodayShort(): string {
-  return new Date()
-    .toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    .toUpperCase();
+function formatTodayShort(language: string): string {
+  return new Date().toLocaleDateString(language, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 interface BadgeUnlockOverlayProps {
@@ -33,7 +29,7 @@ interface BadgeUnlockOverlayProps {
  * RNScreens form-sheet detent issue when transitioning from the create flow.
  */
 export function BadgeUnlockOverlay({ countryCode, onClose }: BadgeUnlockOverlayProps) {
-  const { t } = useTranslation();
+  const { t, language, countryName } = useTranslation();
   const info = getBadgeInfo(countryCode);
 
   useEffect(() => {
@@ -61,14 +57,14 @@ export function BadgeUnlockOverlay({ countryCode, onClose }: BadgeUnlockOverlayP
       onRequestClose={onClose}
     >
       <View style={styles.root}>
-        <CountryBadge3D countryCode={countryCode} backgroundColor={BLACK_BG} />
+        <CountryBadge3D countryCode={countryCode} />
 
         <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
           <View pointerEvents="none" style={styles.topBlock}>
             <Text style={styles.eyebrow}>{t('badge.reward')}</Text>
-            <Text style={styles.title}>{info.name}</Text>
+            <Text style={styles.title}>{countryName(info.name)}</Text>
             <View style={styles.metaRow}>
-              <Text style={styles.metaText}>Earned on: {formatTodayShort()}</Text>
+              <Text style={styles.metaText}>{t('badge.earned', { date: formatTodayShort(language) })}</Text>
             </View>
           </View>
 
@@ -89,7 +85,7 @@ export function BadgeUnlockOverlay({ countryCode, onClose }: BadgeUnlockOverlayP
 const styles = StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: BLACK_BG,
+    backgroundColor: Colors.background,
     zIndex: 1000,
     elevation: 1000,
   },
@@ -99,37 +95,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  eyebrow: {
-    ...Typography.eyebrow,
-    color: Colors.whiteAlpha55,
-    letterSpacing: 3.2,
-  },
-  title: {
-    fontSize: 44,
-    fontWeight: '800',
-    color: Colors.white,
-    letterSpacing: -1.2,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 4,
-  },
-  metaDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: Colors.whiteAlpha35,
-  },
-  metaText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: Colors.whiteAlpha55,
-    letterSpacing: 1.6,
-  },
+  eyebrow: { ...Typography.sectionLabel },
+  title: { ...Typography.displayMedium, fontSize: 26, fontWeight: '700', textAlign: 'center' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  metaText: { ...Typography.titleSmall, fontWeight: '400', color: Colors.textSecondary },
   bottomBlock: {
     position: 'absolute',
     left: 0,

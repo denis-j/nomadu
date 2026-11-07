@@ -32,6 +32,16 @@ export default function SettingsStack() {
         }}
       />
       <Stack.Screen
+        name="location-info"
+        options={{
+          title: t('settings.locationTracking'),
+          presentation: sheetWithHeader,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.82, 1.0],
+          contentStyle: { backgroundColor: sheetBackground },
+        }}
+      />
+      <Stack.Screen
         name="agent"
         options={{
           title: t('nav.aiAgent'),

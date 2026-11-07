@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { systemColor } from '../../../../constants/colors';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
 import { StopSummary } from '../../../../components/StopSummary';
 import { parseDate } from '../../../../lib/database';
 import { useTranslation } from '../../../../contexts/LanguageContext';
+import { HeaderAction } from '../../../../components/HeaderAction';
 
 type Params = {
   journeyId: string;
@@ -131,16 +131,7 @@ export default function AddStopDatesScreen() {
       <Stack.Screen
         options={{
           title: isEditing ? t('timelineCreate.editDates') : t('addStop.dates'),
-          headerRight: () => (
-            <Pressable onPress={handleNext} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('addStop.next')}>
-              <SymbolView
-                name={{ ios: 'arrow.right', android: 'arrow_forward' }}
-                tintColor={systemColor('label')}
-                weight="semibold"
-                size={20}
-              />
-            </Pressable>
-          ),
+          headerRight: () => <HeaderAction onPress={handleNext} label={t('addStop.next')} next />,
         }}
       />
       <ScrollView

@@ -20,7 +20,6 @@ import { Flag } from '../../../components/Flag';
 import { LanguageSwitcher } from '../../../components/LanguageSwitcher';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { getHasFixedResidence, setHasFixedResidence } from '../../../lib/onboarding';
-import { IslandSheet } from '../../../components/IslandSheet';
 import { Avatar } from '../../../components/TravellerAvatars';
 import { useProfile } from '../../../lib/profile';
 import { avatarSeed } from '../../../lib/avatarSeed';
@@ -34,7 +33,6 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 export default function SettingsScreen() {
   const { t, countryName } = useTranslation();
   const { permissions } = useLocation();
-  const [trackingSheetVisible, setTrackingSheetVisible] = useState(false);
   const { isPro, expirationDate, productIdentifier } = useSubscription();
   const { user, signOut: handleSignOut } = useAuth();
   const profile = useProfile(user?.uid ?? null);
@@ -389,7 +387,7 @@ export default function SettingsScreen() {
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setTrackingSheetVisible(true);
+            router.push('/(tabs)/(settings)/location-info');
           }}
         >
           <Text style={styles.rowLabel}>{t('settings.howItWorks')}</Text>
@@ -495,61 +493,6 @@ export default function SettingsScreen() {
       </Text>
     </ScrollView>
 
-      <IslandSheet
-        inline
-        visible={trackingSheetVisible}
-        onClose={() => setTrackingSheetVisible(false)}
-        title={t('settings.locationTracking')}
-        snapPoint={0.55}
-      >
-        <View style={styles.sheetContent}>
-          <View style={styles.sheetItem}>
-            <Ionicons name="battery-half-outline" size={22} color={Colors.primary} />
-            <View style={styles.sheetItemText}>
-              <Text style={styles.sheetItemTitle}>{t('settings.sheetBatteryTitle')}</Text>
-              <Text style={styles.sheetItemDesc}>
-                {t('settings.sheetBatteryDesc')}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.sheetItem}>
-            <Ionicons name="time-outline" size={22} color={Colors.primary} />
-            <View style={styles.sheetItemText}>
-              <Text style={styles.sheetItemTitle}>{t('settings.sheetBgTitle')}</Text>
-              <Text style={styles.sheetItemDesc}>
-                {t('settings.sheetBgDesc')}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.sheetItem}>
-            <Ionicons name="phone-portrait-outline" size={22} color={Colors.primary} />
-            <View style={styles.sheetItemText}>
-              <Text style={styles.sheetItemTitle}>{t('settings.sheetInstantTitle')}</Text>
-              <Text style={styles.sheetItemDesc}>
-                {t('settings.sheetInstantDesc')}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.sheetItem}>
-            <Ionicons name="navigate-outline" size={22} color={Colors.primary} />
-            <View style={styles.sheetItemText}>
-              <Text style={styles.sheetItemTitle}>{t('settings.sheetCityTitle')}</Text>
-              <Text style={styles.sheetItemDesc}>
-                {t('settings.sheetCityDesc')}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.sheetItem}>
-            <Ionicons name="lock-closed-outline" size={22} color={Colors.primary} />
-            <View style={styles.sheetItemText}>
-              <Text style={styles.sheetItemTitle}>{t('settings.sheetPrivateTitle')}</Text>
-              <Text style={styles.sheetItemDesc}>
-                {t('settings.sheetPrivateDesc')}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </IslandSheet>
     </>
   );
 }
@@ -717,25 +660,4 @@ const styles = StyleSheet.create({
   },
   // ─── Upgrade Button ───
   // ─── Sheet ───
-  sheetContent: {
-    gap: 22,
-  },
-  sheetItem: {
-    flexDirection: 'row',
-    gap: 14,
-    alignItems: 'flex-start',
-  },
-  sheetItemText: {
-    flex: 1,
-    gap: 2,
-  },
-  sheetItemTitle: {
-    ...Typography.titleSmall,
-  },
-  sheetItemDesc: {
-    ...Typography.bodySmall,
-    fontSize: 14,
-    color: Colors.textSecondary,
-    lineHeight: 20,
-  },
 });

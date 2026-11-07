@@ -1,17 +1,17 @@
 import { useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { Card } from '../../../components/visaForm';
 import { GlassPill } from '../../../components/GlassPill';
 import { insertJourney } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
-import { Colors, systemColor } from '../../../constants/colors';
+import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { track } from '../../../lib/analytics';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { FormField } from '../../../components/FormField';
+import { HeaderAction } from '../../../components/HeaderAction';
 
 /** A trip starts with a name: one field in the app's card, a few names to tap as a start. */
 export default function CreateJourneyScreen() {
@@ -45,11 +45,7 @@ export default function CreateJourneyScreen() {
     <>
       <Stack.Screen
         options={{
-          headerRight: () => (
-            <Pressable onPress={handleCreate} disabled={!canSave} hitSlop={8} style={{ opacity: canSave ? 1 : 0.3 }} accessibilityRole="button" accessibilityLabel={t('plans.createTrip')}>
-              <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
-            </Pressable>
-          ),
+          headerRight: () => <HeaderAction onPress={handleCreate} label={t('plans.createTrip')} disabled={!canSave} />,
         }}
       />
       <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>

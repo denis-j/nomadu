@@ -1,8 +1,7 @@
 import { useMemo, useState, useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { systemColor } from '../../../../constants/colors';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
 import { insertTripManual, updateTripGroup, parseDate } from '../../../../lib/database';
@@ -12,6 +11,7 @@ import { showToast } from '../../../../lib/toast';
 import { hasBadge, isBadgeUnlocked, setPendingUnlock } from '../../../../lib/badges';
 import { track } from '../../../../lib/analytics';
 import { useTranslation } from '../../../../contexts/LanguageContext';
+import { HeaderAction } from '../../../../components/HeaderAction';
 
 type Params = {
   country: string;
@@ -155,16 +155,7 @@ export default function CreateDatesScreen() {
       <Stack.Screen
         options={{
           title: isEditing ? t('timelineCreate.editDates') : t('timelineCreate.tripDates'),
-          headerRight: () => (
-            <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel={t('timelineCreate.saveTrip')}>
-              <SymbolView
-                name={{ ios: 'checkmark', android: 'check' }}
-                tintColor={systemColor('label')}
-                weight="semibold"
-                size={22}
-              />
-            </Pressable>
-          ),
+          headerRight: () => <HeaderAction onPress={handleSave} label={t('timelineCreate.saveTrip')} disabled={saving} />,
         }}
       />
       <ScrollView

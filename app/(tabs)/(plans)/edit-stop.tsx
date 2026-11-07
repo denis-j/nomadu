@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,7 +7,6 @@ import {
 } from 'react-native';
 import { systemColor } from '../../../constants/colors';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
 import { MissingRoute } from '../../../components/MissingRoute';
@@ -21,6 +19,7 @@ import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { FormCard, FormField } from '../../../components/FormField';
 import { Typography } from '../../../constants/typography';
+import { HeaderAction } from '../../../components/HeaderAction';
 
 type Params = {
   legId: string;
@@ -152,11 +151,7 @@ export default function EditStopScreen() {
       <Stack.Screen
         options={{
           title: t('nav.editStop'),
-          headerRight: () => (
-            <Pressable onPress={handleSave} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel={t('plans.saveStop')}>
-              <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
-            </Pressable>
-          ),
+          headerRight: () => <HeaderAction onPress={handleSave} label={t('plans.saveStop')} disabled={saving} />,
         }}
       />
       <ScrollView

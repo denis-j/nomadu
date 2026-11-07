@@ -54,24 +54,20 @@ export function CountryBadge3D({
   return (
     <GestureHandlerRootView style={[styles.wrap, sizingStyle, { backgroundColor }]}>
       <FilamentScene>
-        <Scene source={source} backgroundColor={backgroundColor} />
+        <Scene source={source} distance={height != null ? 6.3 : 14.5} />
       </FilamentScene>
     </GestureHandlerRootView>
   );
 }
 
-function Scene({
-  source,
-  backgroundColor,
-}: {
-  source: number;
-  backgroundColor: string;
-}) {
-  // Match the surrounding view's bg so the canvas blends in seamlessly
-  useSkybox({ color: backgroundColor, envIntensity: 1.2 });
+// The view's height sets the scale, so a short stage needs the camera closer.
+function Scene({ source, distance }: { source: number; distance: number }) {
+  // No skybox: the canvas is transparent and the view behind it shows through.
+  // A colored skybox went through tone mapping and came out beige on a light ground.
+  useSkybox(null);
 
   const cameraManipulator = useCameraManipulator({
-    orbitHomePosition: [0, 0, 11],
+    orbitHomePosition: [0, 0, distance],
     targetPosition: [0, 0, 0],
     orbitSpeed: [0.006, 0.006],
   });

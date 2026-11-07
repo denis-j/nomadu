@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { MoneyRow, TextArea, TextRow, amountText, parseAmount } from '../../../components/accommodationForm';
 import { GlassPill } from '../../../components/GlassPill';
 import { MissingRoute } from '../../../components/MissingRoute';
 import { Card, SectionLabel, visaFormStyles } from '../../../components/visaForm';
-import { Colors, systemColor } from '../../../constants/colors';
+import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { useAccommodation } from '../../../hooks/useAccommodations';
 import { startAccommodation, updateAccommodation, type LocalAccommodation } from '../../../lib/accommodations';
@@ -15,6 +14,7 @@ import { ACCOMMODATION_TYPES, EMPTY_REQUIREMENTS, KNOWN_AMENITIES, type Accommod
 import { currencyForCountry } from '../../../lib/currencies';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { HeaderAction } from '../../../components/HeaderAction';
 
 type Params = {
   stopSyncId: string;
@@ -90,11 +90,7 @@ function Form({ plan, params }: { plan: LocalAccommodation | null; params: Param
       <Stack.Screen
         options={{
           title: t('nav.lookingFor'),
-          headerRight: () => (
-            <Pressable onPress={save} disabled={saving} hitSlop={8} style={{ opacity: saving ? 0.4 : 1 }} accessibilityRole="button" accessibilityLabel={t('common.save')}>
-              <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
-            </Pressable>
-          ),
+          headerRight: () => <HeaderAction onPress={save} label={t('common.save')} disabled={saving} />,
         }}
       />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={visaFormStyles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">

@@ -1,10 +1,7 @@
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
-import { CloudyButton } from '../../../components/CloudyButton';
 import { ProfileEditor } from '../../../components/ProfileEditor';
 import { useAuth } from '../../../hooks/useAuth';
 import { getProfile, setProfile } from '../../../lib/profile';
@@ -13,6 +10,7 @@ import { pushProfileToCloud } from '../../../lib/onboarding';
 import { localChanged } from '../../../lib/syncTrigger';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { HeaderAction } from '../../../components/HeaderAction';
 
 /** Name and face after onboarding: the same editor, in a sheet. */
 export default function ProfileSheet() {
@@ -47,17 +45,9 @@ export default function ProfileSheet() {
   // the form sheet.
   return (
     <>
-      <Stack.Screen options={{ title: t('settings.profileTitle') }} />
+      <Stack.Screen options={{ title: t('settings.profileTitle'), headerRight: () => <HeaderAction onPress={save} label={t('common.save')} disabled={!name.trim()} /> }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {avatar ? <ProfileEditor name={name} onNameChange={setName} avatar={avatar} onAvatarChange={setAvatar} /> : null}
-        <CloudyButton
-          onPress={save}
-          disabled={!name.trim()}
-          style={[styles.cta, !name.trim() && styles.ctaDisabled]}
-          innerStyle={styles.ctaInner}
-        >
-          <Text style={styles.ctaText}>{t('common.save')}</Text>
-        </CloudyButton>
       </ScrollView>
     </>
   );
@@ -65,8 +55,4 @@ export default function ProfileSheet() {
 
 const styles = StyleSheet.create({
   content: { padding: 24, gap: 24, paddingBottom: 40 },
-  cta: { width: '100%' },
-  ctaDisabled: { opacity: 0.5 },
-  ctaInner: { justifyContent: 'center' },
-  ctaText: { ...Typography.titleSmall, fontWeight: '600', color: Colors.cloudyButtonText },
 });

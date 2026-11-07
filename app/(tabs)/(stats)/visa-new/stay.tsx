@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { CloudyButton } from '../../../../components/CloudyButton';
 import {
   StayChoice,
   StayPicker,
@@ -16,6 +15,7 @@ import { getRuleForCitizen } from '../../../../constants/visaRules';
 import { Colors } from '../../../../constants/colors';
 import { Typography } from '../../../../constants/typography';
 import { useTranslation } from '../../../../contexts/LanguageContext';
+import { HeaderAction } from '../../../../components/HeaderAction';
 
 /**
  * Step 2 of 3: how long the visa lets you stay.
@@ -94,7 +94,7 @@ export default function AddVisaStayScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: t('nav.howLongStay') }} />
+      <Stack.Screen options={{ title: t('nav.howLongStay'), headerRight: () => <HeaderAction onPress={goNext} label={t('common.continue')} next dim={!choice} /> }} />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={visaFormStyles.content}
@@ -110,23 +110,14 @@ export default function AddVisaStayScreen() {
           }}
         />
 
-        <View style={styles.footer}>
-          <CloudyButton onPress={goNext} style={styles.cta} innerStyle={styles.ctaInner}>
-            <Text style={styles.ctaText}>{t('common.continue')}</Text>
-          </CloudyButton>
-          <Text style={styles.echo}>
+        <Text style={styles.echo}>
             {choice ? describeStay(choice, t) : t('visaForm.pickHowLong')}
-          </Text>
-        </View>
+        </Text>
       </ScrollView>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  footer: { marginTop: 10, gap: 10 },
-  cta: { width: '100%' },
-  ctaInner: { justifyContent: 'center' },
-  ctaText: { ...Typography.buttonLarge, color: Colors.cloudyButtonText, textAlign: 'center' },
   echo: { ...Typography.bodySmall, color: Colors.textSecondary, textAlign: 'center' },
 });

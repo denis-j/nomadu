@@ -16,7 +16,7 @@ import { ToastContainer } from '../components/Toast';
 import { UpdateBanner } from '../components/UpdateBanner';
 import { useOTAUpdates } from '../hooks/useOTAUpdates';
 import { ErrorBoundary } from '../components/ErrorBoundary';
-import { Colors, sheetBackground } from '../constants/colors';
+import { Colors, sheetBackground, sheetWithHeader } from '../constants/colors';
 import { initMonitoring, reportError, setMonitoringUser } from '../lib/monitoring';
 import { setAnalyticsUser, trackScreen } from '../lib/analytics';
 import { startAuthRecovery } from '../lib/authRecovery';
@@ -178,9 +178,11 @@ function RootNavigator() {
       <Stack.Screen
         name="badge/[countryCode]"
         options={{
-          headerShown: false,
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
+          headerShown: true,
+          presentation: sheetWithHeader,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.72, 1.0],
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen

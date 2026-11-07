@@ -87,6 +87,10 @@ variant, and do not restyle one locally.
 - **Sheets are solid.** Anything presented as a sheet (`formSheet`, `sheetWithHeader`)
   sets `contentStyle: { backgroundColor: sheetBackground }`, and so does the inner
   stack of a sheet that has one. Never transparent. Heights may differ with the content.
+- **A sheet saves or moves on top right**, always with `HeaderAction` (`components/HeaderAction.tsx`)
+  in `headerRight`: a checkmark saves, `next` shows the arrow. No button for this at the bottom
+  of a sheet, and no hand-built checkmark. `CloudyButton` stays for pages, empty states,
+  sign-in and onboarding.
 - **Text input is `FormField` inside `FormCard`** (`components/FormField.tsx`), the look
   of the sign-in screen. The placeholder names the field; there is no label beside or
   above it. `leading` is only the magnifier of a search, `trailing` holds one small

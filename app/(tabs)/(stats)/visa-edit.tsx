@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { ToastContainer } from '../../../components/Toast';
@@ -20,7 +19,7 @@ import {
   todayStr,
   visaFormStyles,
 } from '../../../components/visaForm';
-import { Colors, systemColor } from '../../../constants/colors';
+import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import {
   EntriesAllowed,
@@ -33,6 +32,7 @@ import { consumePendingCountry } from '../../../lib/countryPickerBridge';
 import { showToast } from '../../../lib/toast';
 import { getCountryName } from '../../../utils/geography';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { HeaderAction } from '../../../components/HeaderAction';
 
 /**
  * Editing one visa, everything on a single screen.
@@ -157,18 +157,7 @@ export default function EditVisaScreen() {
       <Stack.Screen
         options={{
           title: editId ? t('visaForm.editVisa') : t('visaForm.addVisa'),
-          headerRight: () => (
-            <Pressable
-              onPress={handleSave}
-              disabled={saving}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={t('visaForm.saveVisa')}
-              style={{ opacity: saving ? 0.3 : canSave ? 1 : 0.5 }}
-            >
-              <SymbolView name={{ ios: 'checkmark', android: 'check' }} tintColor={systemColor('label')} weight="semibold" size={22} />
-            </Pressable>
-          ),
+          headerRight: () => <HeaderAction onPress={handleSave} label={t('visaForm.saveVisa')} disabled={saving} dim={!canSave} />,
         }}
       />
 
