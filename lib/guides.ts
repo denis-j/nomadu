@@ -16,7 +16,8 @@ export async function createTripFromGuide(guide: DestinationGuide, start: Date):
     d.setDate(d.getDate() + offset - 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
-  const id = await insertJourney(`${guide.flag} ${guide.country}`);
+  // The name only: the card draws the flag above it, an emoji here showed it twice.
+  const id = await insertJourney(guide.country);
   track({ name: 'journey_created', props: { from_guide: true } });
   for (const leg of guide.legs) {
     await insertJourneyLeg(

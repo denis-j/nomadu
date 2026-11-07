@@ -26,7 +26,7 @@ export interface GuideLeg {
 
 export interface DestinationGuide {
   id: string;
-  /** Emoji, for the places that cannot draw a flag image (native dialogs, trip titles). */
+  /** Emoji, for the places that cannot draw a flag image (native dialogs). Never in a trip's name. */
   flag: string;
   countryCode: string;
   country: string;
