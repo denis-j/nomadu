@@ -3,7 +3,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
-import { Typography } from '../constants/typography';
+import { Typography, FontSize } from '../constants/typography';
 
 const hasGlass = isLiquidGlassAvailable();
 const GlassCard = hasGlass ? GlassView : View;
@@ -183,10 +183,10 @@ const styles = StyleSheet.create({
   separator: { height: 1, backgroundColor: Colors.border, marginVertical: 12 },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   detailLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  detailLabel: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary },
-  detailValue: { ...Typography.bodySmall, fontSize: 14, fontWeight: '500', flexShrink: 1, textAlign: 'right' },
+  detailLabel: { ...Typography.bodySmall, fontSize: FontSize.subheadline, color: Colors.textSecondary },
+  detailValue: { ...Typography.bodySmall, fontSize: FontSize.subheadline, fontWeight: '500', flexShrink: 1, textAlign: 'right' },
   notesRow: { gap: 8 },
-  notesText: { ...Typography.bodySmall, fontSize: 14, lineHeight: 20 },
+  notesText: { ...Typography.bodySmall, fontSize: FontSize.subheadline, lineHeight: 20 },
   linkCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   linkIcon: {
     width: 36,
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   },
   chipSmall: { paddingHorizontal: 8, paddingVertical: 3 },
   chipText: { ...Typography.label, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  chipTextSmall: { fontSize: 11 },
+  chipTextSmall: { fontSize: FontSize.caption2 },
 
   slot: {
     borderRadius: 18,

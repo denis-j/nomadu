@@ -21,7 +21,7 @@ import { CityTips } from '../../../components/MarkdownTips';
 import { MissingRoute } from '../../../components/MissingRoute';
 import { transportInfo } from '../../../components/TransportPicker';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { getRuleForCitizen, type VisaRule } from '../../../constants/visaRules';
 import { useAccommodation } from '../../../hooks/useAccommodations';
 import { useAuth } from '../../../hooks/useAuth';
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
   // ─── Header ───
   header: { alignItems: 'center', paddingTop: 28, paddingBottom: 4, gap: 2 },
   headerWithMap: { paddingTop: 20 },
-  city: { ...Typography.displayMedium, fontSize: 26, fontWeight: '700' },
+  city: { ...Typography.displayMedium, fontSize: FontSize.title1, fontWeight: '700' },
   country: { ...Typography.titleSmall, fontWeight: '400', color: Colors.textSecondary, marginTop: 2 },
   // ─── Stats ───
   statsRow: { marginHorizontal: 16, marginTop: 20 },
@@ -349,9 +349,9 @@ const styles = StyleSheet.create({
   card: { borderRadius: 16, padding: 18, overflow: 'hidden' },
   cardFallback: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   detailLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  detailLabel: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary },
+  detailLabel: { ...Typography.bodySmall, fontSize: FontSize.subheadline, color: Colors.textSecondary },
   notesRow: { gap: 8 },
-  notesText: { ...Typography.bodySmall, fontSize: 14, lineHeight: 20 },
+  notesText: { ...Typography.bodySmall, fontSize: FontSize.subheadline, lineHeight: 20 },
   // ─── Actions ───
   actions: { flexDirection: 'row', justifyContent: 'center', gap: 32, marginHorizontal: 16, marginTop: 24, paddingVertical: 14 },
   actionButton: { alignItems: 'center' },

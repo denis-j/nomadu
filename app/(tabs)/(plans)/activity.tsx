@@ -12,7 +12,7 @@ import { StatRow, StatTile } from '../../../components/StatTile';
 import { Dropdown } from '../../../components/Dropdown';
 import { MissingRoute } from '../../../components/MissingRoute';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { deleteActivity, getActivity, moveActivity, setActivityStatus, type LocalActivity } from '../../../lib/activities';
 import { type ActivityStatus } from '../../../lib/activityModel';
 import { getJourneyWithLegs, parseDate, type JourneyLeg } from '../../../lib/database';
@@ -244,12 +244,12 @@ const styles = StyleSheet.create({
   heroPlateFallback: { backgroundColor: 'rgba(255,255,255,0.9)' },
   header: { alignItems: 'center', paddingTop: 20, paddingBottom: 4, paddingHorizontal: 24, gap: 2 },
   headerAlone: { paddingTop: 32 },
-  title: { ...Typography.displayMedium, fontSize: 26, fontWeight: '700', textAlign: 'center' },
+  title: { ...Typography.displayMedium, fontSize: FontSize.title1, fontWeight: '700', textAlign: 'center' },
   where: { ...Typography.titleSmall, fontWeight: '400', color: Colors.textSecondary, marginTop: 2, textAlign: 'center' },
   statsRow: { marginHorizontal: 16, marginTop: 20 },
   section: { marginHorizontal: 16, marginTop: 16, gap: 10 },
   pick: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
-  pickText: { ...Typography.bodySmall, fontSize: 14, fontWeight: '500', flexShrink: 1 },
+  pickText: { ...Typography.bodySmall, fontSize: FontSize.subheadline, fontWeight: '500', flexShrink: 1 },
   actions: { flexDirection: 'row', justifyContent: 'center', gap: 32, marginHorizontal: 16, marginTop: 24, paddingVertical: 14 },
   editText: { ...Typography.bodyMedium, fontWeight: '600' },
   deleteText: { ...Typography.bodyMedium, color: Colors.error },

@@ -2,7 +2,7 @@ import { ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react
 import { LinearGradient } from 'expo-linear-gradient';
 import { Flag } from './Flag';
 import { Colors } from '../constants/colors';
-import { Typography } from '../constants/typography';
+import { Typography, FontSize } from '../constants/typography';
 import { guideDays, type DestinationGuide } from '../constants/guides';
 import { useTranslation } from '../contexts/LanguageContext';
 
@@ -53,6 +53,6 @@ const styles = StyleSheet.create({
   imageInner: { borderRadius: 18 },
   flag: { position: 'absolute', top: 10, left: 10 },
   text: { padding: 12, gap: 2 },
-  country: { ...Typography.titleSmall, fontSize: 17, fontWeight: '700', color: Colors.white },
-  meta: { ...Typography.caption, fontSize: 11, fontWeight: '600', color: Colors.whiteAlpha75 },
+  country: { ...Typography.titleSmall, fontSize: FontSize.body, fontWeight: '700', color: Colors.white },
+  meta: { ...Typography.caption, fontSize: FontSize.caption2, fontWeight: '600', color: Colors.whiteAlpha75 },
 });

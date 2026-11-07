@@ -42,7 +42,7 @@ import { TravellersContent } from '../../../components/TravellersContent';
 import { useAuth } from '../../../hooks/useAuth';
 import { EmptyState } from '../../../components/EmptyState';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import {
   JourneyLeg, TransportType,
   parseDate,
@@ -1917,7 +1917,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 8,
   },
-  titleChipTitle: { ...Typography.button, fontSize: 15 },
+  titleChipTitle: { ...Typography.button, fontSize: FontSize.subheadline },
   titleChipSub: { ...Typography.caption, color: Colors.textSecondary, marginTop: 1, fontVariant: ['tabular-nums'] },
   map: {
     flex: 1,

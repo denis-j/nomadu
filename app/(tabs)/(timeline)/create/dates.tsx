@@ -12,6 +12,7 @@ import { hasBadge, isBadgeUnlocked, setPendingUnlock } from '../../../../lib/bad
 import { track } from '../../../../lib/analytics';
 import { useTranslation } from '../../../../contexts/LanguageContext';
 import { HeaderAction } from '../../../../components/HeaderAction';
+import { FontSize } from '../../../../constants/typography';
 
 type Params = {
   country: string;
@@ -232,7 +233,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   summaryLocation: {
-    fontSize: 16,
+    fontSize: FontSize.callout,
     fontWeight: '600',
     color: systemColor('label'),
     flex: 1,
@@ -244,13 +245,13 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   daysText: {
-    fontSize: 14,
+    fontSize: FontSize.subheadline,
     fontWeight: '700',
     color: systemColor('label'),
     fontVariant: ['tabular-nums'],
   },
   hint: {
-    fontSize: 13,
+    fontSize: FontSize.footnote,
     color: systemColor('secondaryLabel'),
     textAlign: 'center',
   },
@@ -268,7 +269,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   toggleLabel: {
-    fontSize: 16,
+    fontSize: FontSize.callout,
     color: systemColor('label'),
   },
 });

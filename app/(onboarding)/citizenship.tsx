@@ -23,7 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import AnimatedGradientBackground from '../../components/animated-gradient-background';
 import { Colors } from '../../constants/colors';
-import { Typography } from '../../constants/typography';
+import { Typography, FontSize } from '../../constants/typography';
 import { useAuth } from '../../hooks/useAuth';
 import { LOCAL_ONBOARDING_UID, setCitizenship } from '../../lib/onboarding';
 import { playSuccessSound, playTapSound } from '../../lib/sound';
@@ -216,7 +216,7 @@ export default function CitizenshipScreen() {
                   // Google Maps draws a marker from a snapshot of its view,
                   // taken before the flag image arrives: every marker was an
                   // empty white bubble. Text is there at once.
-                  <Text style={{ fontSize: isHovered ? 20 : 16 }}>{countryCodeToFlag(code)}</Text>
+                  <Text style={{ fontSize: isHovered ? FontSize.title3 : FontSize.callout }}>{countryCodeToFlag(code)}</Text>
                 ) : (
                   <Flag code={code} size={isHovered ? 22 : 18} />
                 ))}

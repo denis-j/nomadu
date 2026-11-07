@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { systemColor } from '../constants/colors';
 import { useTranslation } from '../contexts/LanguageContext';
+import { FontSize } from '../constants/typography';
 
 /**
  * Which stop a form is about, above the fields: the place on the left, the
@@ -37,7 +38,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   place: {
-    fontSize: 16,
+    fontSize: FontSize.callout,
     fontWeight: '600',
     color: systemColor('label'),
     flex: 1,
@@ -49,13 +50,13 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   badgeText: {
-    fontSize: 14,
+    fontSize: FontSize.subheadline,
     fontWeight: '700',
     color: systemColor('label'),
     fontVariant: ['tabular-nums'],
   },
   range: {
-    fontSize: 14,
+    fontSize: FontSize.subheadline,
     color: systemColor('secondaryLabel'),
     textAlign: 'center',
   },

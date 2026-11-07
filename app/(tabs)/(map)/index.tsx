@@ -16,7 +16,7 @@ import { useTrips } from '../../../hooks/useTrips';
 import { useVisaTracker } from '../../../hooks/useVisaTracker';
 import { useTaxTracker } from '../../../hooks/useTaxTracker';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { Flag } from '../../../components/Flag';
 import { parseDate, Trip } from '../../../lib/database';
 import { VisaStatus } from '../../../lib/visaCalculations';
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
   },
   chipCountry: {
     ...Typography.bodySmall,
-    fontSize: 14,
+    fontSize: FontSize.subheadline,
     color: Colors.textSecondary,
   },
   statsSection: {},
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
   },
   trackingLabel: {
     ...Typography.eyebrow,
-    fontSize: 10,
+    fontSize: FontSize.caption2,
     letterSpacing: 0.6,
   },
   trackingValue: {
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   trackingSubLabel: {
-    fontSize: 11,
+    fontSize: FontSize.caption2,
     color: Colors.textTertiary,
   },
   // ─── Empty state chip ───
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     ...Typography.bodySmall,
-    fontSize: 13,
+    fontSize: FontSize.footnote,
     flexShrink: 1,
     color: Colors.textSecondary,
   },

@@ -108,9 +108,10 @@ variant, and do not restyle one locally.
   names more, `cardMeta` for dates and counts, `cardValue` for a number, never larger than
   the title. Dashboard tiles use `tileNumber` + `tileLabel`, small fact tiles `cardValue` +
   `tileLabel`, and a screen has at most one `heroNumber`. Stand out with weight or color
-  first; overriding those is fine, a `fontSize` of your own is not. A size the scale lacks
-  becomes a new role there first. `npm run lint` warns on every own `fontSize`; do not add
-  new warnings, and move a screen to roles when you touch it.
+  first; overriding those is fine, a `fontSize` of your own is not. Where no role fits (a
+  chart label, an emoji) use a step of `FontSize` (`FontSize.subheadline`), never the number.
+  A size the scale lacks becomes a new role there first. `npm run lint` fails on a font size
+  typed as a number.
 - **Nothing here yet is `EmptyState`** (`components/EmptyState.tsx`), modelled on Verlauf
   and Tracking: the moving picture, a bold title, a grey line. The way in is a cloud
   button (`primary`), with an outlined `secondary` if there is a second one; leave them

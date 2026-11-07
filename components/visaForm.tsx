@@ -7,7 +7,7 @@ import { Flag } from './Flag';
 import { FormCard, FormField } from './FormField';
 import { GlassPill } from './GlassPill';
 import { Colors, systemColor } from '../constants/colors';
-import { Typography } from '../constants/typography';
+import { Typography, FontSize } from '../constants/typography';
 import { NO_EXPIRY, hasNoExpiry, type EntriesAllowed } from '../lib/userVisas';
 import { formatDay } from '../lib/days';
 import { useTranslation } from '../contexts/LanguageContext';
@@ -631,7 +631,7 @@ const s = StyleSheet.create({
     paddingVertical: 5,
   },
   daysText: {
-    fontSize: 13,
+    fontSize: FontSize.footnote,
     fontWeight: '700',
     color: systemColor('label'),
     fontVariant: ['tabular-nums'],

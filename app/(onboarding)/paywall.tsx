@@ -11,6 +11,7 @@ import { entitlementOf, rememberEntitlement, type CustomerInfo } from '../../lib
 import { Colors } from '../../constants/colors';
 import { track } from '../../lib/analytics';
 import { useTranslation } from '../../contexts/LanguageContext';
+import { FontSize } from '../../constants/typography';
 
 export default function OnboardingPaywallScreen() {
   const router = useRouter();
@@ -136,5 +137,5 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: Colors.whiteAlpha75,
   },
-  accountText: { fontSize: 14, fontWeight: '600', color: Colors.text },
+  accountText: { fontSize: FontSize.subheadline, fontWeight: '600', color: Colors.text },
 });

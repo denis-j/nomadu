@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { CountryBadge3D } from './CountryBadge3D';
 import { CloudyButton } from './CloudyButton';
 import { Colors } from '../constants/colors';
-import { Typography } from '../constants/typography';
+import { Typography, FontSize } from '../constants/typography';
 import { getBadgeInfo, markBadgeUnlocked } from '../lib/badges';
 import { playCollectSound } from '../lib/sound';
 import { useTranslation } from '../contexts/LanguageContext';
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   eyebrow: { ...Typography.sectionLabel },
-  title: { ...Typography.displayMedium, fontSize: 26, fontWeight: '700', textAlign: 'center' },
+  title: { ...Typography.displayMedium, fontSize: FontSize.title1, fontWeight: '700', textAlign: 'center' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   metaText: { ...Typography.titleSmall, fontWeight: '400', color: Colors.textSecondary },
   bottomBlock: {

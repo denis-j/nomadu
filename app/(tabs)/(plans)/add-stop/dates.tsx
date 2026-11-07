@@ -8,6 +8,7 @@ import { StopSummary } from '../../../../components/StopSummary';
 import { parseDate } from '../../../../lib/database';
 import { useTranslation } from '../../../../contexts/LanguageContext';
 import { HeaderAction } from '../../../../components/HeaderAction';
+import { FontSize } from '../../../../constants/typography';
 
 type Params = {
   journeyId: string;
@@ -175,7 +176,7 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
   },
   hint: {
-    fontSize: 13,
+    fontSize: FontSize.footnote,
     color: systemColor('secondaryLabel'),
     textAlign: 'center',
   },

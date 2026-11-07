@@ -17,7 +17,7 @@ import { useStats } from '../../../hooks/useStats';
 import { useVisaTracker } from '../../../hooks/useVisaTracker';
 import { useTaxTracker } from '../../../hooks/useTaxTracker';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { BADGE_LIBRARY } from '../../../lib/badges';
 import { CountryBadge3DPreview } from '../../../components/CountryBadge3D';
 import { visaGroup } from '../../../lib/visaCalculations';
@@ -375,13 +375,13 @@ const heroStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   ringPct: {
-    fontSize: 17,
+    fontSize: FontSize.body,
     fontWeight: '700',
     color: Colors.cloudyButtonText,
     letterSpacing: -0.5,
   },
   ringSub: {
-    fontSize: 9,
+    fontSize: FontSize.caption2,
     fontWeight: '600',
     color: Colors.cloudyButtonText,
     opacity: 0.65,
@@ -628,7 +628,7 @@ const trackerStyles = StyleSheet.create({
   },
   title: {
     ...Typography.eyebrow,
-    fontSize: 10,
+    fontSize: FontSize.caption2,
     color: Colors.textTertiary,
   },
   countBadge: {
@@ -638,7 +638,7 @@ const trackerStyles = StyleSheet.create({
     borderCurve: 'continuous',
   },
   countBadgeText: {
-    fontSize: 10,
+    fontSize: FontSize.caption2,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
     letterSpacing: 0.2,
@@ -796,7 +796,7 @@ const chartStyles = StyleSheet.create({
   },
   eyebrow: {
     ...Typography.eyebrow,
-    fontSize: 10,
+    fontSize: FontSize.caption2,
     color: Colors.textSecondary,
   },
   totalValue: {
@@ -833,7 +833,7 @@ const chartStyles = StyleSheet.create({
     minHeight: 8,
   },
   barValue: {
-    fontSize: 11,
+    fontSize: FontSize.caption2,
     fontWeight: '700',
     color: Colors.text,
     fontVariant: ['tabular-nums'],
@@ -841,7 +841,7 @@ const chartStyles = StyleSheet.create({
     marginBottom: 3,
   },
   barLabel: {
-    fontSize: 11,
+    fontSize: FontSize.caption2,
     fontWeight: '600',
     color: Colors.textTertiary,
     marginTop: 8,
@@ -925,7 +925,7 @@ const topStyles = StyleSheet.create({
   },
   rank: {
     ...Typography.eyebrow,
-    fontSize: 10,
+    fontSize: FontSize.caption2,
     color: Colors.textTertiary,
   },
   crownBubble: {
@@ -1122,7 +1122,7 @@ const badgeStyles = StyleSheet.create({
   },
   tileName: {
     ...Typography.caption,
-    fontSize: 11,
+    fontSize: FontSize.caption2,
     fontWeight: '700',
     color: Colors.text,
     textAlign: 'center',

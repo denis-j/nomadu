@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useTaxTracker } from '../../../hooks/useTaxTracker';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { CloudyButton } from '../../../components/CloudyButton';
 import { DaysMeter, Footnote, PassportLine, TrackerCard } from '../../../components/TrackerParts';
 import { fromYmd } from '../../../lib/days';
@@ -274,12 +274,12 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     ...Typography.brandDisplay,
-    fontSize: 24,
+    fontSize: FontSize.title2,
     textAlign: 'center',
   },
   modalBody: {
     ...Typography.body,
-    fontSize: 14.5,
+    fontSize: FontSize.subheadline,
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,

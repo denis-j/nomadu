@@ -18,7 +18,7 @@ import { getCountryCode } from '../../../utils/geography';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { FormCard, FormField } from '../../../components/FormField';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { HeaderAction } from '../../../components/HeaderAction';
 
 type Params = {
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { ...Typography.sectionLabel },
   hint: {
-    fontSize: 13,
+    fontSize: FontSize.footnote,
     color: systemColor('tertiaryLabel'),
     marginTop: -8,
   },

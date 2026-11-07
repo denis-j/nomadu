@@ -11,7 +11,7 @@ import { StatRow, StatTile } from '../../../components/StatTile';
 import { Avatar } from '../../../components/TravellerAvatars';
 import { SectionLabel } from '../../../components/visaForm';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { useTravellerPeople } from '../../../hooks/useExpenses';
 import { getJourneyWithLegs, parseDate, type JourneyLeg } from '../../../lib/database';
 import { formatDay } from '../../../lib/days';
@@ -233,17 +233,17 @@ const styles = StyleSheet.create({
   heroPlateFallback: { backgroundColor: 'rgba(255,255,255,0.9)' },
   header: { alignItems: 'center', paddingTop: 20, paddingBottom: 4, paddingHorizontal: 24, gap: 2 },
   headerAlone: { paddingTop: 32 },
-  title: { ...Typography.displayMedium, fontSize: 26, fontWeight: '700', textAlign: 'center' },
+  title: { ...Typography.displayMedium, fontSize: FontSize.title1, fontWeight: '700', textAlign: 'center' },
   where: { ...Typography.titleSmall, fontWeight: '400', color: Colors.textSecondary, marginTop: 2, textAlign: 'center' },
   statsRow: { marginHorizontal: 16, marginTop: 20 },
   section: { marginHorizontal: 16, marginTop: 16, gap: 10 },
   pick: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
-  pickText: { ...Typography.bodySmall, fontSize: 14, fontWeight: '500', flexShrink: 1 },
+  pickText: { ...Typography.bodySmall, fontSize: FontSize.subheadline, fontWeight: '500', flexShrink: 1 },
   shareRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   shareBlank: { width: 26, height: 26 },
-  shareName: { ...Typography.bodySmall, fontSize: 14, flex: 1 },
+  shareName: { ...Typography.bodySmall, fontSize: FontSize.subheadline, flex: 1 },
   shareMine: { fontWeight: '600' },
-  shareAmount: { ...Typography.bodySmall, fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  shareAmount: { ...Typography.bodySmall, fontSize: FontSize.subheadline, fontWeight: '600', fontVariant: ['tabular-nums'] },
   shareCurrency: { ...Typography.caption, fontWeight: '600', color: Colors.textSecondary },
   actions: { flexDirection: 'row', justifyContent: 'center', gap: 32, marginHorizontal: 16, marginTop: 24, paddingVertical: 14 },
   editText: { ...Typography.bodyMedium, fontWeight: '600' },

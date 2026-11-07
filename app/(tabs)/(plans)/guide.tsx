@@ -10,7 +10,7 @@ import { Flag } from '../../../components/Flag';
 import { StatRow, StatTile } from '../../../components/StatTile';
 import { TRANSPORTS } from '../../../components/TransportPicker';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { getRuleForCitizen, type VisaRule } from '../../../constants/visaRules';
 import { appIconUrl, guideById, guideDays } from '../../../constants/guides';
 import { useAuth } from '../../../hooks/useAuth';
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   hero: { height: 240, justifyContent: 'flex-end', marginHorizontal: 16, borderRadius: 20, overflow: 'hidden', borderCurve: 'continuous', backgroundColor: Colors.surfaceSecondary },
   heroImage: { borderRadius: 20 },
   heroText: { padding: 20, gap: 4 },
-  heroCountry: { ...Typography.displayMedium, fontSize: 30, color: Colors.white, letterSpacing: -0.6 },
+  heroCountry: { ...Typography.displayMedium, fontSize: FontSize.title1, color: Colors.white, letterSpacing: -0.6 },
   heroTagline: { ...Typography.bodySmall, color: Colors.whiteAlpha75, fontWeight: '600' },
 
   stats: { marginHorizontal: 16, marginTop: 16 },

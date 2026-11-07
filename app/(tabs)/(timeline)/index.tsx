@@ -24,7 +24,7 @@ import { pickImportImages, setPendingImportImages } from '../../../lib/tripImpor
 import { takePendingUnlock } from '../../../lib/badges';
 import { BadgeUnlockOverlay } from '../../../components/BadgeUnlockOverlay';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { Trip, applyTripRepair, getAllTripsRaw, markTripGroupDeleted, parseDate } from '../../../lib/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { planRepair, type RepairPlan } from '../../../lib/tracking';
@@ -1099,7 +1099,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   warningBadgeText: {
-    fontSize: 11,
+    fontSize: FontSize.caption2,
     fontWeight: '600',
     color: Colors.error,
   },
@@ -1111,7 +1111,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   gapBadgeText: {
-    fontSize: 11,
+    fontSize: FontSize.caption2,
     fontWeight: '600',
     color: '#FF9500',
   },

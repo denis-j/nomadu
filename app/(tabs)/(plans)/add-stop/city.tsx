@@ -5,6 +5,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { getCitiesByCountryPaginated, searchCitiesByCountry } from '../../../../utils/geography';
 import { useTranslation } from '../../../../contexts/LanguageContext';
+import { FontSize } from '../../../../constants/typography';
 
 type Params = {
   journeyId: string;
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
   },
   itemText: {
     flex: 1,
-    fontSize: 16,
+    fontSize: FontSize.callout,
     color: systemColor('label'),
   },
   customItem: {
@@ -196,7 +197,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   chevron: {
-    fontSize: 20,
+    fontSize: FontSize.title3,
     color: systemColor('tertiaryLabel'),
   },
   loadMore: {
@@ -204,7 +205,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadMoreText: {
-    fontSize: 15,
+    fontSize: FontSize.subheadline,
     color: systemColor('link'),
     fontWeight: '500',
   },
@@ -212,6 +213,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: systemColor('tertiaryLabel'),
     paddingTop: 40,
-    fontSize: 15,
+    fontSize: FontSize.subheadline,
   },
 });

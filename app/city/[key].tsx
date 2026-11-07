@@ -9,7 +9,7 @@ import { MissingRoute } from '../../components/MissingRoute';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { Flag } from '../../components/Flag';
 import { Colors } from '../../constants/colors';
-import { Typography } from '../../constants/typography';
+import { Typography, FontSize } from '../../constants/typography';
 import { mapState } from '../../lib/mapState';
 
 const hasGlass = isLiquidGlassAvailable();
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   },
   city: {
     ...Typography.displayMedium,
-    fontSize: 26,
+    fontSize: FontSize.title1,
     fontWeight: '700',
   },
   country: {
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: FontSize.caption2,
     fontWeight: '600',
     color: Colors.textTertiary,
   },

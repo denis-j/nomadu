@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CloudBackdrop } from './CloudBackdrop';
 import { CloudyButton } from './CloudyButton';
 import { Colors } from '../constants/colors';
-import { Typography } from '../constants/typography';
+import { Typography, FontSize } from '../constants/typography';
 import { useTranslation } from '../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   },
   texts: { flex: 1, gap: 2 },
   title: { ...Typography.titleSmall, fontWeight: '700' },
-  body: { ...Typography.bodySmall, fontSize: 14, lineHeight: 19, color: Colors.textSecondary },
+  body: { ...Typography.bodySmall, fontSize: FontSize.subheadline, lineHeight: 19, color: Colors.textSecondary },
   ctaInner: { justifyContent: 'center' },
   ctaText: { ...Typography.titleSmall, fontWeight: '700', color: Colors.cloudyButtonText },
   later: { alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 16 },

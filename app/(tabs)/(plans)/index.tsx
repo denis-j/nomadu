@@ -20,7 +20,7 @@ import { GUIDES } from '../../../constants/guides';
 import { useAuth } from '../../../hooks/useAuth';
 import { useJourneys } from '../../../hooks/useJourneys';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { parseDate, type Journey } from '../../../lib/database';
 import { deleteJourneyWithDocuments } from '../../../lib/documents';
 import { inviteFriends, leaveTrip, stopSharing } from '../../../lib/shareActions';
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
   },
   featSectionTitle: {
     ...Typography.titleLarge,
-    fontSize: 20,
+    fontSize: FontSize.title3,
     letterSpacing: -0.3,
   },
   featSectionSub: {

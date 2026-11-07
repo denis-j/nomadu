@@ -21,7 +21,7 @@ import { CloudyButton } from '../../components/CloudyButton';
 import { FormCard, FormField, FormSeparator } from '../../components/FormField';
 import { KeyboardLift } from '../../components/KeyboardLift';
 import { Colors } from '../../constants/colors';
-import { Typography } from '../../constants/typography';
+import { Typography, FontSize } from '../../constants/typography';
 import { googleSignInAvailable, useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { signUpWithEmail, signInWithApple } from '../../lib/auth';
 import { showToast } from '../../lib/toast';
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
   },
   legal: {
     ...Typography.bodySmall,
-    fontSize: 12,
+    fontSize: FontSize.caption1,
     lineHeight: 17,
     color: Colors.textTertiary,
     textAlign: 'center',

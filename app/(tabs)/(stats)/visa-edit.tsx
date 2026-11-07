@@ -20,7 +20,7 @@ import {
   visaFormStyles,
 } from '../../../components/visaForm';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import {
   EntriesAllowed,
   getUserVisaById,
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   deleteText: {
-    fontSize: 15,
+    fontSize: FontSize.subheadline,
     fontWeight: '600',
     color: Colors.error,
   },

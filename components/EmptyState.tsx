@@ -5,7 +5,7 @@ import { useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
-import { Typography } from '../constants/typography';
+import { Typography, FontSize } from '../constants/typography';
 import { CloudyButton } from './CloudyButton';
 import { StatsBars } from './StatsBars';
 import { TimelineBubbles, type BubbleIcon } from './TimelineBubbles';
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   container: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingTop: 32, paddingBottom: 116, gap: 14 },
   inline: { paddingBottom: 32 },
   title: { ...Typography.titleLarge, textAlign: 'center', letterSpacing: -0.4, marginTop: 8 },
-  subtitle: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  subtitle: { ...Typography.bodySmall, fontSize: FontSize.subheadline, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
   subtitleBeforeButton: { marginBottom: 12 },
   primaryInner: { justifyContent: 'center', gap: 10 },
   primaryText: { ...Typography.titleSmall, fontWeight: '700', color: Colors.cloudyButtonText, flexShrink: 1 },

@@ -8,7 +8,7 @@ import { CountryBadge3D, hasCountryBadge } from '../../components/CountryBadge3D
 import { CloudyButton } from '../../components/CloudyButton';
 import { MissingRoute } from '../../components/MissingRoute';
 import { Colors } from '../../constants/colors';
-import { Typography } from '../../constants/typography';
+import { Typography, FontSize } from '../../constants/typography';
 import { getBadgeInfo, markBadgeUnlocked } from '../../lib/badges';
 import { playCollectSound } from '../../lib/sound';
 
@@ -79,7 +79,7 @@ export default function BadgeSheet() {
 const styles = StyleSheet.create({
   content: { paddingBottom: 24 },
   header: { alignItems: 'center', gap: 2, paddingHorizontal: 24 },
-  name: { ...Typography.displayMedium, fontSize: 26, fontWeight: '700', textAlign: 'center' },
+  name: { ...Typography.displayMedium, fontSize: FontSize.title1, fontWeight: '700', textAlign: 'center' },
   earned: { ...Typography.titleSmall, fontWeight: '400', color: Colors.textSecondary, marginTop: 2 },
   cta: { paddingHorizontal: 24, paddingTop: 24 },
   ctaInner: { justifyContent: 'center', gap: 10 },

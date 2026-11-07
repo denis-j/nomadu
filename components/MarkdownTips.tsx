@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Colors } from '../constants/colors';
-import { Typography } from '../constants/typography';
+import { Typography, FontSize } from '../constants/typography';
 import { useTranslation } from '../contexts/LanguageContext';
 import { getCityTips } from '../lib/ai';
 
@@ -97,14 +97,14 @@ export function CityTips({ city, country }: { city: string; country: string }) {
 
 const styles = StyleSheet.create({
   container: { gap: 10 },
-  h2: { fontSize: 15, fontWeight: '700', color: Colors.text, marginTop: 4 },
-  h3: { fontSize: 14, fontWeight: '600', color: Colors.text, marginTop: 2 },
-  body: { fontSize: 14, lineHeight: 20, color: Colors.text, flex: 1 },
+  h2: { fontSize: FontSize.subheadline, fontWeight: '700', color: Colors.text, marginTop: 4 },
+  h3: { fontSize: FontSize.subheadline, fontWeight: '600', color: Colors.text, marginTop: 2 },
+  body: { fontSize: FontSize.subheadline, lineHeight: 20, color: Colors.text, flex: 1 },
   bold: { fontWeight: '700' },
   italic: { fontStyle: 'italic' },
   bulletRow: { flexDirection: 'row', gap: 8, paddingLeft: 4 },
-  bullet: { fontSize: 14, lineHeight: 20, color: Colors.textTertiary },
-  num: { fontSize: 14, lineHeight: 20, color: Colors.textTertiary, fontVariant: ['tabular-nums'], width: 18 },
+  bullet: { fontSize: FontSize.subheadline, lineHeight: 20, color: Colors.textTertiary },
+  num: { fontSize: FontSize.subheadline, lineHeight: 20, color: Colors.textTertiary, fontVariant: ['tabular-nums'], width: 18 },
   centered: { paddingVertical: 8, alignItems: 'center', gap: 8 },
   muted: { ...Typography.bodySmall, color: Colors.textSecondary },
   empty: { ...Typography.body, color: Colors.textTertiary, textAlign: 'center' },

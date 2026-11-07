@@ -2,7 +2,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 
 const ITEMS = [
   { icon: 'battery-half-outline', title: 'settings.sheetBatteryTitle', desc: 'settings.sheetBatteryDesc' },
@@ -35,5 +35,5 @@ const styles = StyleSheet.create({
   item: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
   itemText: { flex: 1, gap: 2 },
   itemTitle: { ...Typography.titleSmall },
-  itemDesc: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary, lineHeight: 20 },
+  itemDesc: { ...Typography.bodySmall, fontSize: FontSize.subheadline, color: Colors.textSecondary, lineHeight: 20 },
 });

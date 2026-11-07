@@ -7,7 +7,7 @@ import { WebView } from 'react-native-webview';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { getJourneyDocument, getJourneyTravellers, getJourneyWithLegs, JourneyDocument } from '../../../lib/database';
 import { documentExists, documentUri, isImageMime, kindMeta } from '../../../lib/documents';
 import { deleteDocumentEverywhere } from '../../../lib/documentSync';
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 4,
   },
-  kindPillText: { fontSize: 11, fontWeight: '700', color: '#fff', letterSpacing: 0.2 },
+  kindPillText: { fontSize: FontSize.caption2, fontWeight: '700', color: '#fff', letterSpacing: 0.2 },
   captionText: { ...Typography.bodySmall, color: Colors.textSecondary },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
   missingTitle: { ...Typography.titleSmall },

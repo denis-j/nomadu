@@ -11,7 +11,7 @@ import { MissingRoute } from '../../../components/MissingRoute';
 import { DetailCard, DetailNotes, DetailRow, DetailSeparator, LinkCard, SectionControl, SectionHead, SlotCard, StatusChip } from '../../../components/SheetRows';
 import { StatRow, StatTile } from '../../../components/StatTile';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { useAccommodation } from '../../../hooks/useAccommodations';
 import {
   deleteAccommodation,
@@ -529,16 +529,16 @@ const styles = StyleSheet.create({
   },
   mapOverlayFallback: { backgroundColor: 'rgba(255,255,255,0.9)' },
   header: { alignItems: 'center', paddingTop: 20, paddingBottom: 4, paddingHorizontal: 24, gap: 2 },
-  title: { ...Typography.displayMedium, fontSize: 26, fontWeight: '700', textAlign: 'center' },
+  title: { ...Typography.displayMedium, fontSize: FontSize.title1, fontWeight: '700', textAlign: 'center' },
   subtitle: { ...Typography.titleSmall, fontWeight: '400', color: Colors.textSecondary, marginTop: 2, textAlign: 'center' },
   statsRow: { marginHorizontal: 16, marginTop: 20 },
   section: { marginHorizontal: 16, marginTop: 16, gap: 10 },
   note: { ...Typography.bodySmall, color: Colors.textSecondary, marginHorizontal: 20, marginTop: 10, lineHeight: 18 },
   noteLink: { fontWeight: '600', color: Colors.text },
-  notesText: { ...Typography.bodySmall, fontSize: 14, lineHeight: 20 },
+  notesText: { ...Typography.bodySmall, fontSize: FontSize.subheadline, lineHeight: 20 },
   lines: { gap: 4 },
   lineHead: { ...Typography.titleSmall, fontWeight: '600' },
-  line: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary, lineHeight: 20 },
+  line: { ...Typography.bodySmall, fontSize: FontSize.subheadline, color: Colors.textSecondary, lineHeight: 20 },
   textAction: { alignSelf: 'center', paddingVertical: 10 },
   textActionLabel: { ...Typography.bodyMedium, fontWeight: '600' },
 });

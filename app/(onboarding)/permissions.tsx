@@ -21,7 +21,7 @@ import {
   OPTION_BASE_DELAY,
 } from '../../constants/onboardingAnimation';
 import { Colors } from '../../constants/colors';
-import { Typography } from '../../constants/typography';
+import { Typography, FontSize } from '../../constants/typography';
 import { requestLocationPermissions } from '../../lib/location';
 import { requestNotificationPermissions } from '../../lib/notifications';
 import { track } from '../../lib/analytics';
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   },
   description: {
     ...Typography.bodyLarge,
-    fontSize: 16,
+    fontSize: FontSize.callout,
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 24,

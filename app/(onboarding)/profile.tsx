@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../../constants/colors';
-import { Typography } from '../../constants/typography';
+import { Typography, FontSize } from '../../constants/typography';
 import { ENTER_DURATION, OPTION_BASE_DELAY, TITLE_DELAY } from '../../constants/onboardingAnimation';
 import { CloudyButton } from '../../components/CloudyButton';
 import { ProfileEditor } from '../../components/ProfileEditor';
@@ -107,5 +107,5 @@ const styles = StyleSheet.create({
   ctaDisabled: { opacity: 0.5 },
   ctaInner: { justifyContent: 'center' },
   ctaText: { ...Typography.titleSmall, fontWeight: '600', color: Colors.cloudyButtonText },
-  footerText: { ...Typography.bodySmall, fontSize: 13, color: Colors.textTertiary, textAlign: 'center' },
+  footerText: { ...Typography.bodySmall, fontSize: FontSize.footnote, color: Colors.textTertiary, textAlign: 'center' },
 });

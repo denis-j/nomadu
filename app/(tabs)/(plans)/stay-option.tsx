@@ -7,7 +7,7 @@ import { DetailCard, DetailNotes, DetailRow, DetailSeparator, LinkCard } from '.
 import { StatRow, StatTile } from '../../../components/StatTile';
 import { SectionLabel } from '../../../components/visaForm';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { useAccommodation } from '../../../hooks/useAccommodations';
 import { removeAccommodationOption, selectAccommodationOption, type LocalAccommodation } from '../../../lib/accommodations';
 import { formatMoney, nightsBetween, optionNightlyPrice } from '../../../lib/accommodationModel';
@@ -217,7 +217,7 @@ export default function StayOptionSheet() {
 const styles = StyleSheet.create({
   content: { paddingBottom: 60 },
   header: { alignItems: 'center', paddingTop: 32, paddingBottom: 4, paddingHorizontal: 24, gap: 2 },
-  title: { ...Typography.displayMedium, fontSize: 26, fontWeight: '700', textAlign: 'center' },
+  title: { ...Typography.displayMedium, fontSize: FontSize.title1, fontWeight: '700', textAlign: 'center' },
   where: { ...Typography.titleSmall, fontWeight: '400', color: Colors.textSecondary, marginTop: 2, textAlign: 'center' },
   statsRow: { marginHorizontal: 16, marginTop: 20 },
   section: { marginHorizontal: 16, marginTop: 16, gap: 10 },

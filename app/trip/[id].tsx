@@ -13,7 +13,7 @@ import { Flag } from '../../components/Flag';
 import { SectionLabel } from '../../components/visaForm';
 import { StatRow, StatTile } from '../../components/StatTile';
 import { Colors } from '../../constants/colors';
-import { Typography } from '../../constants/typography';
+import { Typography, FontSize } from '../../constants/typography';
 
 const hasGlass = isLiquidGlassAvailable();
 const GlassCard = hasGlass ? GlassView : View;
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   },
   city: {
     ...Typography.displayMedium,
-    fontSize: 26,
+    fontSize: FontSize.title1,
     fontWeight: '700',
   },
   country: {
@@ -320,12 +320,12 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     ...Typography.bodySmall,
-    fontSize: 14,
+    fontSize: FontSize.subheadline,
     color: Colors.textSecondary,
   },
   detailValue: {
     ...Typography.bodySmall,
-    fontSize: 14,
+    fontSize: FontSize.subheadline,
     fontWeight: '500',
     flexShrink: 1,
     textAlign: 'right',

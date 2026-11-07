@@ -6,7 +6,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../../constants/colors';
-import { Typography } from '../../constants/typography';
+import { Typography, FontSize } from '../../constants/typography';
 import { BADGE_LIBRARY, type BadgeInfo } from '../../lib/badges';
 import { getAllTripsRaw } from '../../lib/database';
 import { CountryBadge3DPreview } from '../../components/CountryBadge3D';
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   },
   heroEyebrow: {
     ...Typography.eyebrow,
-    fontSize: 11,
+    fontSize: FontSize.caption2,
     color: Colors.textSecondary,
     marginBottom: 2,
   },
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   heroValue: {
-    fontSize: 40,
+    fontSize: FontSize.largeTitle,
     fontWeight: '800',
     color: Colors.text,
     letterSpacing: -0.8,
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   },
   tileName: {
     ...Typography.caption,
-    fontSize: 11,
+    fontSize: FontSize.caption2,
     fontWeight: '700',
     color: Colors.text,
     textAlign: 'center',

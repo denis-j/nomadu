@@ -5,7 +5,7 @@ import { Colors, systemColor } from '../constants/colors';
 import { Flag } from './Flag';
 import { getCountryCode, getCountryNames, getPopularCountries, searchCountries } from '../utils/geography';
 import { useTranslation } from '../contexts/LanguageContext';
-import { Typography } from '../constants/typography';
+import { Typography, FontSize } from '../constants/typography';
 
 const popularCountries = getPopularCountries();
 
@@ -134,17 +134,17 @@ const styles = StyleSheet.create({
   },
   itemText: {
     flex: 1,
-    fontSize: 16,
+    fontSize: FontSize.callout,
     color: systemColor('label'),
   },
   chevron: {
-    fontSize: 20,
+    fontSize: FontSize.title3,
     color: systemColor('tertiaryLabel'),
   },
   empty: {
     textAlign: 'center',
     color: systemColor('tertiaryLabel'),
     paddingTop: 40,
-    fontSize: 15,
+    fontSize: FontSize.subheadline,
   },
 });

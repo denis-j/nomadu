@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Colors } from '../../constants/colors';
-import { Typography } from '../../constants/typography';
+import { Typography, FontSize } from '../../constants/typography';
 import { useAuth } from '../../hooks/useAuth';
 import { LOCAL_ONBOARDING_UID, OnboardingGoal, setOnboardingGoal } from '../../lib/onboarding';
 import { playCardTapSound } from '../../lib/sound';
@@ -167,13 +167,13 @@ const styles = StyleSheet.create({
   optionTextWrap: { flex: 1 },
   optionTitle: {
     ...Typography.titleSmall,
-    fontSize: 16,
+    fontSize: FontSize.callout,
     fontWeight: '600',
     marginBottom: 3,
   },
   optionDescription: {
     ...Typography.bodySmall,
-    fontSize: 13.5,
+    fontSize: FontSize.footnote,
     color: Colors.textTertiary,
     lineHeight: 19,
   },
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     ...Typography.bodySmall,
-    fontSize: 13,
+    fontSize: FontSize.footnote,
     color: Colors.textTertiary,
     textAlign: 'center',
   },

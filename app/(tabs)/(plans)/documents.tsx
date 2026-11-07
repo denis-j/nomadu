@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { PillRow } from '../../../components/PillRow';
 import { Avatar, avatarPeople, type AvatarPerson } from '../../../components/TravellerAvatars';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { useJourneyDocuments } from '../../../hooks/useJourneyDocuments';
 import {
   addJourneyTraveller,
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
   },
   groupAvatarShared: { backgroundColor: Colors.surfaceSecondary },
   tileFace: { position: 'absolute', top: 8, right: 8 },
-  groupAvatarText: { fontSize: 11, fontWeight: '700', color: Colors.white },
+  groupAvatarText: { fontSize: FontSize.caption2, fontWeight: '700', color: Colors.white },
   groupTitle: { ...Typography.sectionLabel },
   grid: {
     flexDirection: 'row',
@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
   },
-  kindPillText: { fontSize: 11, fontWeight: '700', color: '#fff', letterSpacing: 0.2 },
+  kindPillText: { fontSize: FontSize.caption2, fontWeight: '700', color: '#fff', letterSpacing: 0.2 },
   tileText: { padding: 12, gap: 2 },
   tileTitle: { ...Typography.titleSmall, fontWeight: '600' },
   tileSub: { ...Typography.caption, color: Colors.textSecondary },

@@ -8,7 +8,7 @@ import { useNavigation, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useVisaTracker } from '../../../hooks/useVisaTracker';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { CloudyButton } from '../../../components/CloudyButton';
 import { CardNote, DaysMeter, Footnote, PassportLine, TrackerCard } from '../../../components/TrackerParts';
 import { todayStr, visaGroup, VisaStatus } from '../../../lib/visaCalculations';
@@ -488,12 +488,12 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     ...Typography.brandDisplay,
-    fontSize: 24,
+    fontSize: FontSize.title2,
     textAlign: 'center',
   },
   modalBody: {
     ...Typography.body,
-    fontSize: 14.5,
+    fontSize: FontSize.subheadline,
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,

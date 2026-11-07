@@ -7,7 +7,7 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
 import { httpsCallable } from 'firebase/functions';
 import { Card, SectionLabel } from '../../../components/visaForm';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { TOKEN_ENV_NAME, agentSetupText } from '../../../lib/agentSetup';
 import { functions } from '../../../lib/firebase';
 import { showToast } from '../../../lib/toast';
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   rowText: { ...Typography.bodySmall, color: Colors.textSecondary, lineHeight: 19 },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(0,0,0,0.08)', marginHorizontal: -20 },
   hand: { paddingVertical: 16, gap: 6 },
-  mono: { fontFamily: 'Menlo', fontSize: 12, color: Colors.text },
+  mono: { fontFamily: 'Menlo', fontSize: FontSize.caption1, color: Colors.text },
   secondary: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     height: 44,

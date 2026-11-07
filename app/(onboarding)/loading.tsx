@@ -20,7 +20,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Colors } from '../../constants/colors';
-import { Typography } from '../../constants/typography';
+import { Typography, FontSize } from '../../constants/typography';
 import { useOnboarding } from '../../contexts/OnboardingContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useSubscription } from '../../hooks/useSubscription';
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   },
   stageText: {
     ...Typography.brandTitle,
-    fontSize: 22,
+    fontSize: FontSize.title2,
     color: Colors.text,
     textAlign: 'center',
     minHeight: 32,

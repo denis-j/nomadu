@@ -43,6 +43,26 @@ import { Colors, systemColor } from './colors';
  *   not for ordinary section headings.
  */
 
+/**
+ * The scale as numbers, named after Apple's text styles. For a size that
+ * belongs to no role (a chart label, an emoji, a size that changes on
+ * press): `fontSize: FontSize.subheadline`. Prefer a role from `Typography`
+ * whenever one fits; never write the number itself.
+ */
+export const FontSize = {
+  hero: 52,
+  largeTitle: 34,
+  title1: 28,
+  title2: 22,
+  title3: 20,
+  body: 17,
+  callout: 16,
+  subheadline: 15,
+  footnote: 13,
+  caption1: 12,
+  caption2: 11,
+} as const;
+
 // Identity helper so each entry is typed as TextStyle without losing inference.
 const T = <S extends TextStyle>(s: S): S => s;
 

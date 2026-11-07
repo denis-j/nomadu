@@ -14,7 +14,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { FloatingBubbles } from '../../../components/FloatingBubbles';
 import { Flag } from '../../../components/Flag';
 import { showToast } from '../../../lib/toast';
@@ -294,7 +294,7 @@ const parsingStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  subtitle: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
+  subtitle: { ...Typography.bodySmall, fontSize: FontSize.subheadline, color: Colors.textSecondary, textAlign: 'center' },
 });
 
 // ─── Step 2: Review ───────────────────────────────────────────────────────────
@@ -493,7 +493,7 @@ const reviewStyles = StyleSheet.create({
   },
   headerSub: { ...Typography.bodySmall, color: Colors.textSecondary, marginTop: 2 },
   toggleAllBtn: { paddingVertical: 6, paddingHorizontal: 10 },
-  toggleAllText: { ...Typography.bodySmall, fontSize: 14, fontWeight: '600', color: Colors.primary },
+  toggleAllText: { ...Typography.bodySmall, fontSize: FontSize.subheadline, fontWeight: '600', color: Colors.primary },
   warnBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -561,7 +561,7 @@ const rowStyles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
   },
-  nowPillText: { fontSize: 11, fontWeight: '700', color: Colors.success, letterSpacing: 0.3 },
+  nowPillText: { fontSize: FontSize.caption2, fontWeight: '700', color: Colors.success, letterSpacing: 0.3 },
   daysWrap: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -569,7 +569,7 @@ const rowStyles = StyleSheet.create({
     minWidth: 36,
     justifyContent: 'flex-end',
   },
-  daysValue: { fontSize: 19, fontWeight: '700', color: Colors.text, fontVariant: ['tabular-nums'] },
+  daysValue: { fontSize: FontSize.title3, fontWeight: '700', color: Colors.text, fontVariant: ['tabular-nums'] },
   daysUnit: { ...Typography.caption, fontWeight: '600' },
   removeBtn: { padding: 4, marginLeft: 2 },
 });
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
   headerBtn: { padding: 4 },
   headerTitle: { ...Typography.buttonLarge },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
-  committingText: { ...Typography.bodySmall, fontSize: 14, color: Colors.textSecondary },
+  committingText: { ...Typography.bodySmall, fontSize: FontSize.subheadline, color: Colors.textSecondary },
   bottomBar: {
     position: 'absolute',
     bottom: 24,
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   bottomInfo: { paddingLeft: 6, flexDirection: 'row', alignItems: 'baseline', gap: 5 },
-  bottomCount: { ...Typography.titleLarge, fontSize: 20 },
+  bottomCount: { ...Typography.titleLarge, fontSize: FontSize.title3 },
   bottomLabel: { ...Typography.bodySmall, color: Colors.textSecondary },
   confirmBtn: {
     marginLeft: 'auto',

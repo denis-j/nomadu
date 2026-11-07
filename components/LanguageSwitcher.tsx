@@ -9,6 +9,7 @@ import {
   type Language,
 } from '../lib/i18n/translations';
 import { useTranslation } from '../contexts/LanguageContext';
+import { FontSize } from '../constants/typography';
 
 /**
  * Language picker backed by the native pull-down menu.
@@ -69,7 +70,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.whiteAlpha75,
   },
   pillText: {
-    fontSize: 13,
+    fontSize: FontSize.footnote,
     fontWeight: '700',
     letterSpacing: 0.5,
     color: Colors.textSecondary,
@@ -80,7 +81,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   inlineText: {
-    fontSize: 16,
+    fontSize: FontSize.callout,
     color: Colors.textSecondary,
   },
 });

@@ -9,7 +9,7 @@ import { DetailCard, DetailSeparator, SectionHead } from '../../../components/Sh
 import { StatRow, StatTile } from '../../../components/StatTile';
 import { Avatar } from '../../../components/TravellerAvatars';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { useJourneyExpenses, useTravellerPeople } from '../../../hooks/useExpenses';
 import { currencyForCountry } from '../../../lib/currencies';
 import { getJourneyWithLegs, type JourneyLeg, type JourneyWithLegs } from '../../../lib/database';
@@ -330,8 +330,8 @@ const styles = StyleSheet.create({
 
   transfer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   transferBlank: { width: 26, height: 26 },
-  transferText: { ...Typography.bodySmall, fontSize: 14, flex: 1 },
-  transferAmount: { ...Typography.bodySmall, fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  transferText: { ...Typography.bodySmall, fontSize: FontSize.subheadline, flex: 1 },
+  transferAmount: { ...Typography.bodySmall, fontSize: FontSize.subheadline, fontWeight: '600', fontVariant: ['tabular-nums'] },
   transferCurrency: { ...Typography.caption, fontWeight: '600', color: Colors.textSecondary },
 
 });

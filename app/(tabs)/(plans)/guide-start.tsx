@@ -5,7 +5,7 @@ import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
 import { Card, SectionLabel } from '../../../components/visaForm';
 import { Colors } from '../../../constants/colors';
-import { Typography } from '../../../constants/typography';
+import { Typography, FontSize } from '../../../constants/typography';
 import { guideById, guideDays } from '../../../constants/guides';
 import { parseDate } from '../../../lib/database';
 import { createTripFromGuide } from '../../../lib/guides';
@@ -128,7 +128,7 @@ export default function GuideStartScreen() {
 const styles = StyleSheet.create({
   content: { padding: 20, gap: 14, paddingBottom: 80 },
   head: { gap: 2, paddingHorizontal: 4 },
-  place: { ...Typography.titleSmall, fontSize: 17 },
+  place: { ...Typography.titleSmall, fontSize: FontSize.body },
   span: { ...Typography.bodySmall, color: Colors.textSecondary },
   foot: { ...Typography.bodySmall, color: Colors.textTertiary, paddingHorizontal: 4 },
 });
