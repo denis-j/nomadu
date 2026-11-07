@@ -18,6 +18,9 @@ import { clearAllTravelData, startRealtimeSync } from '../../../lib/sync';
 import { useSync } from '../../../contexts/SyncContext';
 import { Flag } from '../../../components/Flag';
 import { LanguageSwitcher } from '../../../components/LanguageSwitcher';
+import { HIDEABLE_TABS, setTabHidden, useHiddenTabs, type HideableTab } from '../../../hooks/useHiddenTabs';
+
+const TAB_LABEL: Record<HideableTab, string> = { map: 'map', timeline: 'timeline', plans: 'plan', stats: 'tracking' };
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { getHasFixedResidence, setHasFixedResidence } from '../../../lib/onboarding';
 import { Avatar } from '../../../components/TravellerAvatars';
@@ -33,6 +36,7 @@ const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 export default function SettingsScreen() {
   const { t, countryName } = useTranslation();
+  const hiddenTabs = useHiddenTabs();
   const { permissions } = useLocation();
   const { isPro, expirationDate, productIdentifier } = useSubscription();
   const { user, signOut: handleSignOut } = useAuth();
@@ -302,6 +306,29 @@ export default function SettingsScreen() {
           </View>
           <LanguageSwitcher variant="inline" />
         </View>
+        <View style={styles.separator} />
+        <View style={styles.rowContent}>
+          <Text style={styles.rowLabel}>{t('settings.tabs')}</Text>
+          <Text style={styles.rowDescription}>{t('settings.tabsDesc')}</Text>
+        </View>
+        {HIDEABLE_TABS.map((tab) => {
+          const on = !hiddenTabs.includes(tab);
+          // The last tab that is still on cannot go: the app needs one besides Settings.
+          const lastOn = on && hiddenTabs.length >= HIDEABLE_TABS.length - 1;
+          return (
+            <View key={tab} style={styles.row}>
+              <Text style={styles.rowLabel}>{t(`tabs.${TAB_LABEL[tab]}`)}</Text>
+              <Switch
+                value={on}
+                disabled={lastOn}
+                onValueChange={(v) => {
+                  Haptics.selectionAsync();
+                  setTabHidden(tab, !v);
+                }}
+              />
+            </View>
+          );
+        })}
       </Glass>
 
       {/* Subscription */}

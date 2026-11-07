@@ -1,20 +1,38 @@
 import { useEffect } from 'react';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNotificationCheck } from '../../hooks/useNotificationCheck';
 import { requestNotificationPermissions } from '../../lib/notifications';
 import { consumePendingInvite } from '../../lib/sharing';
 import { useTranslation } from '../../contexts/LanguageContext';
+import { consumeReturnToSettings, HIDEABLE_TABS, useHiddenTabs, type HideableTab } from '../../hooks/useHiddenTabs';
 
 const { Trigger } = NativeTabs;
 
 const NOTIF_ASKED_KEY = 'notif_permission_asked';
 
+const GROUP: Record<HideableTab, string> = { map: '(map)', timeline: '(timeline)', plans: '(plans)', stats: '(stats)' };
+
 export default function TabLayout() {
   useNotificationCheck();
   const router = useRouter();
   const { t } = useTranslation();
+  const hidden = useHiddenTabs();
+  const segments = useSegments();
+  const segment = (segments as string[])[1];
+
+  // Hiding a tab rebuilds the tab bar on its first tab. After a switch in
+  // Settings, go back there; otherwise never sit on a tab that is switched off.
+  useEffect(() => {
+    if (consumeReturnToSettings()) {
+      const id = setTimeout(() => router.navigate('/(tabs)/(settings)' as any), 0);
+      return () => clearTimeout(id);
+    }
+    const onHidden = HIDEABLE_TABS.find((tab) => GROUP[tab] === segment && hidden.includes(tab));
+    const firstVisible = HIDEABLE_TABS.find((tab) => !hidden.includes(tab));
+    if (onHidden && firstVisible) router.replace(`/(tabs)/${GROUP[firstVisible]}` as any);
+  }, [hidden, segment, router]);
 
   // An invite link opened while signed out was parked; now that the tabs
   // are up, the user is signed in, so bring the invite back.
@@ -49,19 +67,19 @@ export default function TabLayout() {
   // other tab was invisible.
   return (
     <NativeTabs minimizeBehavior="onScrollDown" iconColor={{ default: '#00000066', selected: '#000000' }} tintColor="#000000">
-      <Trigger name="(map)">
+      <Trigger name="(map)" hidden={hidden.includes('map')}>
         <Trigger.Icon sf={{ default: 'map', selected: 'map.fill' }} md="map" />
         <Trigger.Label>{t('tabs.map')}</Trigger.Label>
       </Trigger>
-      <Trigger name="(timeline)">
+      <Trigger name="(timeline)" hidden={hidden.includes('timeline')}>
         <Trigger.Icon sf={{ default: 'clock', selected: 'clock.fill' }} md="schedule" />
         <Trigger.Label>{t('tabs.timeline')}</Trigger.Label>
       </Trigger>
-      <Trigger name="(plans)">
+      <Trigger name="(plans)" hidden={hidden.includes('plans')}>
         <Trigger.Icon sf={{ default: '1.calendar', selected: '31.calendar' }} md="calendar_month" />
         <Trigger.Label>{t('tabs.plan')}</Trigger.Label>
       </Trigger>
-      <Trigger name="(stats)">
+      <Trigger name="(stats)" hidden={hidden.includes('stats')}>
         <Trigger.Icon sf={{ default: 'chart.bar', selected: 'chart.bar.fill' }} md="bar_chart" />
         <Trigger.Label>{t('tabs.tracking')}</Trigger.Label>
       </Trigger>

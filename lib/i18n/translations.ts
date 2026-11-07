@@ -1219,6 +1219,8 @@ const en = {
   },
   settings: {
     title: 'Settings',
+    tabs: 'Tabs',
+    tabsDesc: 'Switch off the tabs you do not need. Settings always stays.',
     preferences: 'Preferences',
     profileTitle: 'Your profile',
     profileUpdated: 'Profile updated',
@@ -2500,6 +2502,8 @@ const de: TranslationTree = {
   },
   settings: {
     title: 'Einstellungen',
+    tabs: 'Tabs',
+    tabsDesc: 'Blende Tabs aus, die du nicht brauchst. Einstellungen bleibt immer.',
     preferences: 'Allgemein',
     profileTitle: 'Dein Profil',
     profileUpdated: 'Profil aktualisiert',
