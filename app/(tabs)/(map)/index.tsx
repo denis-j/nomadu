@@ -33,6 +33,8 @@ const EXPANDED_WIDTH = SCREEN_WIDTH - 32;
 const hasGlass = isLiquidGlassAvailable();
 const ChipWrapper = hasGlass ? GlassView : View;
 const chipGlassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
+/** The chip's side padding, also what its width is measured with. */
+const CHIP_PAD_H = 18;
 const OPEN_CONFIG = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
 const CLOSE_CONFIG = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
 
@@ -150,12 +152,7 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses, open, onTogg
 
   return (
     <Pressable onPress={handlePress}>
-      <Animated.View
-        style={[styles.morphContainer, containerStyle]}
-        onLayout={(e) => {
-          if (chipWidth === 0) setChipWidth(e.nativeEvent.layout.width);
-        }}
-      >
+      <Animated.View style={[styles.morphContainer, containerStyle]}>
         {/* Glass / fallback background */}
         {hasGlass ? (
           <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
@@ -170,10 +167,20 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses, open, onTogg
             if (rowHeight === 0) setRowHeight(e.nativeEvent.layout.height);
           }}
         >
-          <Flag code={currentTrip.country_code} size={16} />
-          <Text style={styles.chipCity}>{currentTrip.city}</Text>
-          <View style={styles.chipDivider} />
-          <Text style={styles.chipCountry}>{countryName(currentTrip.country)}</Text>
+          {/* The closed chip is as wide as this content plus its padding;
+              the container is wider inside, for the open card's stats. */}
+          <View
+            style={styles.chipRowInner}
+            onLayout={(e) => {
+              const w = e.nativeEvent.layout.width + CHIP_PAD_H * 2;
+              if (Math.abs(w - chipWidth) > 0.5) setChipWidth(w);
+            }}
+          >
+            <Flag code={currentTrip.country_code} size={16} />
+            <Text style={styles.chipCity}>{currentTrip.city}</Text>
+            <View style={styles.chipDivider} />
+            <Text style={styles.chipCountry}>{countryName(currentTrip.country)}</Text>
+          </View>
         </View>
 
         {/* Stats – always mounted, clipped by height + faded by opacity */}
@@ -359,7 +366,7 @@ const styles = StyleSheet.create({
   morphContainer: {
     overflow: 'hidden',
     paddingVertical: 14,
-    paddingHorizontal: 18,
+    paddingHorizontal: CHIP_PAD_H,
   },
   morphFallback: {
     backgroundColor: 'rgba(255,255,255,0.88)',
@@ -369,9 +376,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   chipRow: {
+    alignItems: 'center',
+  },
+  chipRowInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 8,
   },
   chipCity: {
@@ -387,7 +396,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.subheadline,
     color: Colors.textSecondary,
   },
-  statsSection: { width: EXPANDED_WIDTH - 36 },
+  statsSection: { width: EXPANDED_WIDTH - CHIP_PAD_H * 2 },
   expandDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: Colors.border,
