@@ -5,9 +5,11 @@ import { useEffect, useRef, useState } from 'react';
 import { AppState, Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
+  Extrapolation,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import RNMapView, { PROVIDER_DEFAULT } from 'react-native-maps';
@@ -35,8 +37,13 @@ const ChipWrapper = hasGlass ? GlassView : View;
 const chipGlassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 /** The chip's side padding, also what its width is measured with. */
 const CHIP_PAD_H = 18;
-const OPEN_CONFIG = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
-const CLOSE_CONFIG = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
+// Open on a curve that pulls hard and settles softly, the feel of the
+// system's morphing pieces; close quicker. Both ran 400 ms on one curve
+// before, which read as mechanical. A clamped spring was tried: it crept on
+// for 300 ms after the move looked done and then snapped into place.
+const OPEN_TIMING = { duration: 440, easing: Easing.bezier(0.2, 0.9, 0.25, 1) };
+const CLOSE_TIMING = { duration: 260, easing: Easing.out(Easing.cubic) };
+const CLAMP = Extrapolation.CLAMP;
 
 function StatItem({ value, label }: { value: string; label: string }) {
   return (
@@ -102,8 +109,12 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses, open, onTogg
   // Animate whenever the screen opens or closes it (the chip itself, or a
   // tap on the map behind it).
   useEffect(() => {
-    progress.value = withTiming(open ? 1 : 0, open ? OPEN_CONFIG : CLOSE_CONFIG);
+    progress.value = withTiming(open ? 1 : 0, open ? OPEN_TIMING : CLOSE_TIMING);
   }, [open, progress]);
+
+  // A little give under the finger, back with a spring on release.
+  const press = useSharedValue(1);
+  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: press.value }] }));
 
   const handlePress = () => {
     Haptics.impactAsync(open ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium);
@@ -136,23 +147,36 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses, open, onTogg
   const containerStyle = useAnimatedStyle(() => ({
     width:
       chipWidth > 0
-        ? interpolate(progress.value, [0, 1], [chipWidth, EXPANDED_WIDTH])
+        ? interpolate(progress.value, [0, 1], [chipWidth, EXPANDED_WIDTH], CLAMP)
         : undefined,
-    borderRadius: interpolate(progress.value, [0, 1], [100, 22]),
+    // From a capsule (half the closed height) to the card's corner, so the
+    // corner changes from the first frame instead of after a clamped stretch.
+    borderRadius: interpolate(progress.value, [0, 1], [collapsedH > 0 ? collapsedH / 2 : 100, 22], CLAMP),
     height:
       collapsedH > 0 && expandedH > 0
-        ? interpolate(progress.value, [0, 1], [collapsedH, expandedH])
+        ? interpolate(progress.value, [0, 1], [collapsedH, expandedH], CLAMP)
         : undefined,
     overflow: 'hidden',
   }));
 
-  const statsOpacity = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0.4, 1], [0, 1]),
+  // The two rows come in after the card has made room, sliding down a few
+  // points as they fade, the second a beat after the first.
+  const rowOneStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0.35, 0.85], [0, 1], CLAMP),
+    transform: [{ translateY: interpolate(progress.value, [0.35, 1], [-6, 0], CLAMP) }],
+  }));
+  const rowTwoStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0.5, 1], [0, 1], CLAMP),
+    transform: [{ translateY: interpolate(progress.value, [0.5, 1], [-6, 0], CLAMP) }],
   }));
 
   return (
-    <Pressable onPress={handlePress}>
-      <Animated.View style={[styles.morphContainer, containerStyle]}>
+    <Pressable
+      onPress={handlePress}
+      onPressIn={() => { press.value = withTiming(0.97, { duration: 90 }); }}
+      onPressOut={() => { press.value = withSpring(1, { damping: 14, stiffness: 320 }); }}
+    >
+      <Animated.View style={[styles.morphContainer, containerStyle, pressStyle]}>
         {/* Glass / fallback background */}
         {hasGlass ? (
           <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
@@ -187,13 +211,14 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses, open, onTogg
         {/* Laid out at the open width even while the chip is narrow: measured
             in the narrow chip, the labels wrapped and the open card kept a
             gap at the bottom. Measured again whenever the content changes. */}
-        <Animated.View
-          style={[styles.statsSection, statsOpacity]}
+        <View
+          style={styles.statsSection}
           onLayout={(e) => {
             const h = e.nativeEvent.layout.height;
             if (Math.abs(h - statsHeight) > 0.5) setStatsHeight(h);
           }}
         >
+          <Animated.View style={rowOneStyle}>
           <View style={styles.expandDivider} />
 
           {/* Row 1: Here · Arrived · Total */}
@@ -204,10 +229,11 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses, open, onTogg
             <View style={styles.statSep} />
             <StatItem value={t('comp.daysShort', { n: totalDaysInCity })} label={t('map.allStays')} />
           </View>
+          </Animated.View>
 
           {/* Row 2: Visa + Tax */}
           {(visaShown || taxStatus) && (
-            <>
+            <Animated.View style={rowTwoStyle}>
               <View style={styles.expandDivider} />
               <View style={styles.trackingRow}>
                 {visaShown && (
@@ -230,9 +256,9 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses, open, onTogg
                   </View>
                 )}
               </View>
-            </>
+            </Animated.View>
           )}
-        </Animated.View>
+        </View>
       </Animated.View>
     </Pressable>
   );
