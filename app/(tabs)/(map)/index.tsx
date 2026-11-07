@@ -9,7 +9,6 @@ import Animated, {
   interpolate,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import RNMapView, { PROVIDER_DEFAULT } from 'react-native-maps';
@@ -35,6 +34,8 @@ const EXPANDED_WIDTH = SCREEN_WIDTH - 32;
 const hasGlass = isLiquidGlassAvailable();
 const ChipWrapper = hasGlass ? GlassView : View;
 const chipGlassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
+/** Lines inside the glass: a dark tint, since the light border colour read as white there. */
+const DIVIDER = 'rgba(11, 37, 65, 0.14)';
 /** The chip's side padding, also what its width is measured with. */
 const CHIP_PAD_H = 18;
 // Open on a curve that pulls hard and settles softly, the feel of the
@@ -112,7 +113,7 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses, open, onTogg
     progress.value = withTiming(open ? 1 : 0, open ? OPEN_TIMING : CLOSE_TIMING);
   }, [open, progress]);
 
-  // A little give under the finger, back with a spring on release.
+  // A little give under the finger, back on release without any bounce.
   const press = useSharedValue(1);
   const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: press.value }] }));
 
@@ -174,7 +175,7 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses, open, onTogg
     <Pressable
       onPress={handlePress}
       onPressIn={() => { press.value = withTiming(0.97, { duration: 90 }); }}
-      onPressOut={() => { press.value = withSpring(1, { damping: 14, stiffness: 320 }); }}
+      onPressOut={() => { press.value = withTiming(1, { duration: 160, easing: Easing.out(Easing.cubic) }); }}
     >
       <Animated.View style={[styles.morphContainer, containerStyle, pressStyle]}>
         {/* Glass / fallback background */}
@@ -383,7 +384,9 @@ const styles = StyleSheet.create({
   chipContainer: {
     position: 'absolute',
     // iOS lays the tab bar over the map, Android ends the map above it.
-    bottom: Platform.OS === 'ios' ? 100 : 24,
+    // Above Apple Maps' legal line in the bottom-left corner, which the chip
+    // overlapped at 100.
+    bottom: Platform.OS === 'ios' ? 124 : 24,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -415,7 +418,7 @@ const styles = StyleSheet.create({
   chipDivider: {
     width: 1,
     height: 14,
-    backgroundColor: Colors.border,
+    backgroundColor: DIVIDER,
   },
   chipCountry: {
     ...Typography.bodySmall,
@@ -425,7 +428,7 @@ const styles = StyleSheet.create({
   statsSection: { width: EXPANDED_WIDTH - CHIP_PAD_H * 2 },
   expandDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.border,
+    backgroundColor: DIVIDER,
     marginTop: 12,
     marginBottom: 12,
   },
@@ -450,7 +453,7 @@ const styles = StyleSheet.create({
   statSep: {
     width: StyleSheet.hairlineWidth,
     height: 36,
-    backgroundColor: Colors.border,
+    backgroundColor: DIVIDER,
   },
   // ─── Tracking row (Visa + Tax) ───
   trackingRow: {
