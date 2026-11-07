@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import RNMapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
@@ -71,8 +71,11 @@ export default function CityDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <View
-        style={styles.content}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
       >
         {/* Hero Map */}
         {coordTrip?.latitude && coordTrip?.longitude && (
@@ -172,7 +175,7 @@ export default function CityDetailScreen() {
             })}
           </View>
         </View>
-      </View>
+      </ScrollView>
     </>
   );
 }
@@ -190,6 +193,9 @@ const styles = StyleSheet.create({
     ...Typography.titleSmall,
     fontWeight: '400',
     color: Colors.textSecondary,
+  },
+  scroll: {
+    flex: 1,
   },
   content: {
     paddingBottom: 60,
