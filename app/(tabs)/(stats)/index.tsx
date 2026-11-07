@@ -800,10 +800,7 @@ const chartStyles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   totalValue: {
-    ...Typography.titleMedium,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-    fontVariant: ['tabular-nums'],
+    ...Typography.cardValue,
   },
   totalUnit: {
     ...Typography.bodySmall,
@@ -958,11 +955,7 @@ const topStyles = StyleSheet.create({
     gap: 4,
   },
   days: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: Colors.text,
-    letterSpacing: -0.4,
-    fontVariant: ['tabular-nums'],
+    ...Typography.tileNumber,
   },
   daysUnit: {
     ...Typography.caption,
@@ -1070,11 +1063,7 @@ const badgeStyles = StyleSheet.create({
     gap: 4,
   },
   progressValue: {
-    ...Typography.titleMedium,
-    fontWeight: '800',
-    color: Colors.text,
-    fontVariant: ['tabular-nums'],
-    letterSpacing: -0.3,
+    ...Typography.cardValue,
   },
   progressTotal: {
     ...Typography.bodySmall,
@@ -1193,9 +1182,6 @@ const styles = StyleSheet.create({
     height: 40,
     backgroundColor: Colors.border,
   },
-  combiValue: {
-    ...Typography.numericLarge,
-  },
   combiLabel: {
     ...Typography.label,
   },
@@ -1227,9 +1213,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     flex: 1,
-  },
-  visaFlag: {
-    fontSize: 28,
   },
   visaText: {
     flex: 1,
