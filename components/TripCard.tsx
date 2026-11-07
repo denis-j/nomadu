@@ -221,8 +221,7 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   city: {
-    ...Typography.bodyLarge,
-    fontWeight: '600',
+    ...Typography.cardTitle,
     marginBottom: 2,
   },
   cityInline: {
@@ -230,9 +229,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   country: {
-    ...Typography.bodySmall,
-    fontSize: 14,
-    color: Colors.textSecondary,
+    ...Typography.cardSubtitle,
     marginBottom: 8,
   },
   cardBottom: {
@@ -257,8 +254,7 @@ const styles = StyleSheet.create({
     color: Colors.error,
   },
   dates: {
-    ...Typography.bodySmall,
-    color: Colors.textTertiary,
+    ...Typography.cardMeta,
   },
   activeDot: {
     width: 6,

@@ -354,12 +354,8 @@ const heroStyles = StyleSheet.create({
     opacity: 0.7,
   },
   value: {
-    fontSize: 52,
-    fontWeight: '800',
+    ...Typography.heroNumber,
     color: Colors.cloudyButtonText,
-    letterSpacing: -1.5,
-    lineHeight: 58,
-    fontVariant: ['tabular-nums'],
     marginTop: 2,
   },
   unit: {
@@ -655,11 +651,7 @@ const trackerStyles = StyleSheet.create({
     gap: 6,
   },
   value: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: Colors.text,
-    letterSpacing: -0.5,
-    fontVariant: ['tabular-nums'],
+    ...Typography.tileNumber,
   },
   unit: {
     ...Typography.bodySmall,

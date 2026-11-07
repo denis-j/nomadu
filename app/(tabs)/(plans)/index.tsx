@@ -333,9 +333,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   cardTitle: {
-    ...Typography.titleLarge,
-    fontSize: 20,
-    letterSpacing: -0.3,
+    ...Typography.cardTitle,
   },
   flagsRow: {
     flexDirection: 'row',
@@ -344,10 +342,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   flagMore: {
-    ...Typography.bodySmall,
-    fontSize: 14,
+    ...Typography.cardMeta,
     fontWeight: '600',
-    color: Colors.textTertiary,
   },
   cardBottom: {
     flexDirection: 'row',
@@ -362,20 +358,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   cardDateRange: {
-    ...Typography.bodySmall,
-    fontSize: 14,
-    color: Colors.textSecondary,
-    fontVariant: ['tabular-nums'],
+    ...Typography.cardMeta,
   },
   cardMetaDot: {
-    ...Typography.bodySmall,
-    fontSize: 14,
-    color: Colors.textTertiary,
+    ...Typography.cardMeta,
   },
   cardMetaText: {
-    ...Typography.bodySmall,
-    fontSize: 14,
-    color: Colors.textTertiary,
+    ...Typography.cardMeta,
   },
   // ─── Featured section ───
   featSection: {

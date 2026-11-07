@@ -12,11 +12,30 @@ import { Colors, systemColor } from './colors';
  *
  *   <Text style={[Typography.body, { color: Colors.success }]}>Done</Text>
  *
- * Rules of thumb:
- * - Default to one of these. Reach for a custom fontSize only if the design
- *   genuinely needs it (oversized hero numerals, decorative outliers).
+ * The scale. Every size in the app is one of these, close to Apple's own
+ * text styles so the app reads as native:
+ *
+ *   52  hero number        34  tile number         28  display
+ *   22  large title        20  title               17  card title, value, body
+ *   16  callout            15  card subtitle, body 13  meta, labels, footnote
+ *   12  caption            11  smallest tag
+ *
+ * 14, 13.5, 14.5, 32, 36 and the like are not on it: pick the step next to it.
+ *
+ * Pick by role, not by size:
+ * - Something in a list card (a stop in the Verlauf, a trip in the Plan, a
+ *   stop in a trip, a country on the Visa or Tax page): `cardTitle` for its
+ *   name, `cardSubtitle` for the grey line that names more (the country),
+ *   `cardMeta` for dates, counts and rules, `cardValue` for a number in it.
+ *   Cards that do the same job look the same on every tab.
+ * - A tile whose number is the content (Tracking): `tileNumber`, its label
+ *   `tileLabel`. Small fact tiles (`StatTile`) take `cardValue` + `tileLabel`.
+ * - At most one `heroNumber` per screen: the one figure the page is about.
  * - A quiet section heading (grey, uppercase, above a card or list) is always
  *   `sectionLabel`; never rebuild it from `eyebrow` or from its own values.
+ * - Stand out with weight or color before size. Overriding `fontWeight` or
+ *   `color` on a role is fine; a `fontSize` of your own is not (lint warns).
+ *   A screen that truly needs a new size adds a role here first.
  * - For numeric displays add `fontVariant: ['tabular-nums']` so digits don't
  *   shimmer when they change. The dedicated `numericLarge` already includes it.
  * - Brand styles are the big welcome lines; use them for those moments,
@@ -47,7 +66,7 @@ export const Typography = {
 
   // ─── Display, hero numerals ─────────────────────────────────────────────
   displayLarge: T({
-    fontSize: 36,
+    fontSize: 34,
     fontWeight: '800',
     color: Colors.text,
     letterSpacing: -0.5,
@@ -129,6 +148,59 @@ export const Typography = {
     textTransform: 'uppercase',
   }),
 
+  // ─── Cards: one look for every list card, whichever tab it is on ──────
+  /** The name in a list card: Berlin, Thailand, Italien. Apple's Headline. */
+  cardTitle: T({
+    fontSize: 17,
+    fontWeight: '600',
+    color: Colors.text,
+  }),
+  /** The grey line under the name that names more: the country, a visa's name. */
+  cardSubtitle: T({
+    fontSize: 15,
+    fontWeight: '400',
+    color: Colors.textSecondary,
+  }),
+  /** Dates, counts, the rule a number follows: "Nov 7 – 25 · 3 Stopps". */
+  cardMeta: T({
+    fontSize: 13,
+    fontWeight: '400',
+    color: Colors.textSecondary,
+    fontVariant: ['tabular-nums'],
+  }),
+  /** A number inside a card or a small fact tile: never larger than the card's title. */
+  cardValue: T({
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.text,
+    fontVariant: ['tabular-nums'],
+  }),
+
+  // ─── Tiles and heroes: where the number is the content ─────────────────
+  /** The label over a tile's number: Länder, Dauer, Gesamt. */
+  tileLabel: T({
+    fontSize: 13,
+    fontWeight: '500',
+    color: Colors.textSecondary,
+  }),
+  /** The number in a dashboard tile (Tracking). */
+  tileNumber: T({
+    fontSize: 34,
+    fontWeight: '800',
+    color: Colors.text,
+    letterSpacing: -0.5,
+    fontVariant: ['tabular-nums'],
+  }),
+  /** The one figure a screen is about. At most one per screen. */
+  heroNumber: T({
+    fontSize: 52,
+    fontWeight: '800',
+    color: Colors.text,
+    letterSpacing: -1.5,
+    lineHeight: 58,
+    fontVariant: ['tabular-nums'],
+  }),
+
   // ─── Caption, hints, helper text, fine print ───────────────────────────
   caption: T({
     fontSize: 12,
@@ -150,7 +222,7 @@ export const Typography = {
 
   // ─── Numeric, tabular nums for stat values ─────────────────────────────
   numericLarge: T({
-    fontSize: 36,
+    fontSize: 34,
     fontWeight: '800',
     color: Colors.text,
     letterSpacing: -0.5,

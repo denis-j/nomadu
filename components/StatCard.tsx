@@ -71,15 +71,15 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   value: {
-    ...Typography.numericLarge,
+    ...Typography.tileNumber,
   },
   valueLarge: {
-    fontSize: 52,
+    ...Typography.heroNumber,
   },
   label: {
-    ...Typography.label,
+    ...Typography.tileLabel,
   },
   labelLarge: {
-    fontSize: 15,
+    ...Typography.cardSubtitle,
   },
 });

@@ -1704,18 +1704,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   legCity: {
-    ...Typography.bodyLarge,
-    fontWeight: '700',
-    letterSpacing: -0.2,
+    ...Typography.cardTitle,
   },
   legCountry: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
+    ...Typography.cardSubtitle,
   },
   legDates: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
-    fontVariant: ['tabular-nums'],
+    ...Typography.cardMeta,
     marginTop: 2,
   },
   legNotes: {

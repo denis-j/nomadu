@@ -101,6 +101,16 @@ variant, and do not restyle one locally.
   `SectionHead` or `SectionLabel` where they fit, never its own values. The bold one is for a heading that opens a big block of
   its own on a main page, like "Reiseführer" in the Plan tab. Do not make quiet headings bold.
   `npm run lint` fails on an uppercase style written outside `constants/typography.ts`.
+- **Font sizes come from roles, never from a number.** `constants/typography.ts` holds
+  the scale (52, 34, 28, 22, 20, 17, 16, 15, 13, 12, 11) and a role for each job. Components
+  that do the same job look the same on every tab: a list card (Verlauf, Plan, the stops of
+  a trip, Visa, Tax) uses `cardTitle` for its name, `cardSubtitle` for the grey line that
+  names more, `cardMeta` for dates and counts, `cardValue` for a number, never larger than
+  the title. Dashboard tiles use `tileNumber` + `tileLabel`, small fact tiles `cardValue` +
+  `tileLabel`, and a screen has at most one `heroNumber`. Stand out with weight or color
+  first; overriding those is fine, a `fontSize` of your own is not. A size the scale lacks
+  becomes a new role there first. `npm run lint` warns on every own `fontSize`; do not add
+  new warnings, and move a screen to roles when you touch it.
 - **Nothing here yet is `EmptyState`** (`components/EmptyState.tsx`), modelled on Verlauf
   and Tracking: the moving picture, a bold title, a grey line. The way in is a cloud
   button (`primary`), with an outlined `secondary` if there is a second one; leave them

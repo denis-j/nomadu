@@ -91,8 +91,8 @@ const styles = StyleSheet.create({
   menu: { flexGrow: 1, alignSelf: 'stretch' },
   tile: { flexGrow: 1, borderRadius: 14, padding: 14, gap: 4, overflow: 'hidden' },
   tileFallback: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
-  label: { fontSize: 11, fontWeight: '600', color: Colors.textTertiary, marginBottom: 2 },
+  label: { ...Typography.tileLabel, marginBottom: 2 },
   valueRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  value: { ...Typography.bodyLarge, fontWeight: '700', flexShrink: 1 },
+  value: { ...Typography.cardValue, flexShrink: 1 },
   unit: { ...Typography.label, color: Colors.textSecondary },
 });

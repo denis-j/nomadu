@@ -119,25 +119,25 @@ export function Footnote({ text, link, url }: { text: string; link: string; url:
 
 const styles = StyleSheet.create({
   passport: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 4, paddingVertical: 2 },
-  passportLabel: { ...Typography.label, fontSize: 14 },
-  passportCountry: { ...Typography.labelStrong, fontSize: 14, flexShrink: 1 },
+  passportLabel: { ...Typography.cardSubtitle },
+  passportCountry: { ...Typography.cardSubtitle, fontWeight: '600', color: Colors.text, flexShrink: 1 },
 
   card: { borderRadius: 20, borderCurve: 'continuous', padding: 18, gap: 16, overflow: 'hidden' },
   cardFallback: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   titles: { flex: 1, gap: 2 },
-  name: { ...Typography.bodyLarge, fontWeight: '700' },
-  subtitle: { ...Typography.label },
+  name: { ...Typography.cardTitle },
+  subtitle: { ...Typography.cardSubtitle },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderCurve: 'continuous' },
   pillText: { ...Typography.caption, fontWeight: '700' },
 
   meter: { gap: 8 },
-  headline: { ...Typography.numericMedium },
+  headline: { ...Typography.cardValue },
   track: { height: 8, borderRadius: 4, backgroundColor: Colors.surfaceSecondary, overflow: 'hidden' },
   bar: { height: '100%', borderRadius: 4 },
-  detail: { ...Typography.label, fontVariant: ['tabular-nums'] },
+  detail: { ...Typography.cardMeta },
 
-  note: { ...Typography.bodySmall, fontSize: 14, lineHeight: 19, color: Colors.textSecondary },
+  note: { ...Typography.cardSubtitle, lineHeight: 20 },
 
   footnote: { marginTop: 12, paddingHorizontal: 4, gap: 8 },
   footnoteText: { ...Typography.caption, lineHeight: 17 },
