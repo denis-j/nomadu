@@ -3,12 +3,9 @@ import { Platform, PlatformColor, type ColorValue } from 'react-native';
 export const Colors = {
   // Primary palette
   primary: '#000000',
-  primaryLight: '#000000',
-  primaryDark: '#000000',
 
   // Accent
   accent: '#E8976E',
-  accentLight: '#F2B899',
 
   // Neutrals
   background: '#F8F9FA',
@@ -18,10 +15,8 @@ export const Colors = {
 
   // Whites, for overlays/text on dark or vivid backgrounds
   white: '#FFFFFF',
-  whiteAlpha90: 'rgba(255, 255, 255, 0.9)',
   whiteAlpha75: 'rgba(255, 255, 255, 0.75)',
   whiteAlpha55: 'rgba(255, 255, 255, 0.55)',
-  whiteAlpha35: 'rgba(255, 255, 255, 0.35)',
 
   // Brand, Cloudy
   cloudyBlue: '#4DC1FF',
@@ -36,10 +31,6 @@ export const Colors = {
   success: '#4CAF50',
   warning: '#FF9800',
   error: '#FF3B30', // iOS system red, matches what we already use in most places
-
-  // Map
-  markerDefault: '#4A90A4',
-  markerVisited: '#E8976E',
 } as const;
 
 /**
