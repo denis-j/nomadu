@@ -24,6 +24,15 @@ export default function SettingsStack() {
         }}
       />
       <Stack.Screen
+        name="tabs"
+        options={{
+          presentation: sheetWithHeader,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.55, 1.0],
+          contentStyle: { backgroundColor: sheetBackground },
+        }}
+      />
+      <Stack.Screen
         name="profile"
         options={{
           presentation: sheetWithHeader,

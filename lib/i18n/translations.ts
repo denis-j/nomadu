@@ -1219,6 +1219,8 @@ const en = {
   },
   settings: {
     title: 'Settings',
+    tabsAll: 'All',
+    tabsCount: '{n} of {total}',
     tabs: 'Tabs',
     tabsDesc: 'Switch off the tabs you do not need. Settings always stays.',
     preferences: 'Preferences',
@@ -2502,6 +2504,8 @@ const de: TranslationTree = {
   },
   settings: {
     title: 'Einstellungen',
+    tabsAll: 'Alle',
+    tabsCount: '{n} von {total}',
     tabs: 'Tabs',
     tabsDesc: 'Blende Tabs aus, die du nicht brauchst. Einstellungen bleibt immer.',
     preferences: 'Allgemein',

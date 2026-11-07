@@ -18,9 +18,7 @@ import { clearAllTravelData, startRealtimeSync } from '../../../lib/sync';
 import { useSync } from '../../../contexts/SyncContext';
 import { Flag } from '../../../components/Flag';
 import { LanguageSwitcher } from '../../../components/LanguageSwitcher';
-import { HIDEABLE_TABS, setTabHidden, useHiddenTabs, type HideableTab } from '../../../hooks/useHiddenTabs';
-
-const TAB_LABEL: Record<HideableTab, string> = { map: 'map', timeline: 'timeline', plans: 'plan', stats: 'tracking' };
+import { HIDEABLE_TABS, useHiddenTabs } from '../../../hooks/useHiddenTabs';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { getHasFixedResidence, setHasFixedResidence } from '../../../lib/onboarding';
 import { Avatar } from '../../../components/TravellerAvatars';
@@ -307,28 +305,23 @@ export default function SettingsScreen() {
           <LanguageSwitcher variant="inline" />
         </View>
         <View style={styles.separator} />
-        <View style={styles.rowContent}>
+        <Pressable
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/(tabs)/(settings)/tabs');
+          }}
+        >
           <Text style={styles.rowLabel}>{t('settings.tabs')}</Text>
-          <Text style={styles.rowDescription}>{t('settings.tabsDesc')}</Text>
-        </View>
-        {HIDEABLE_TABS.map((tab) => {
-          const on = !hiddenTabs.includes(tab);
-          // The last tab that is still on cannot go: the app needs one besides Settings.
-          const lastOn = on && hiddenTabs.length >= HIDEABLE_TABS.length - 1;
-          return (
-            <View key={tab} style={styles.row}>
-              <Text style={styles.rowLabel}>{t(`tabs.${TAB_LABEL[tab]}`)}</Text>
-              <Switch
-                value={on}
-                disabled={lastOn}
-                onValueChange={(v) => {
-                  Haptics.selectionAsync();
-                  setTabHidden(tab, !v);
-                }}
-              />
-            </View>
-          );
-        })}
+          <View style={styles.tabsValue}>
+            <Text style={styles.rowValue}>
+              {hiddenTabs.length === 0
+                ? t('settings.tabsAll')
+                : t('settings.tabsCount', { n: HIDEABLE_TABS.length - hiddenTabs.length, total: HIDEABLE_TABS.length })}
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+          </View>
+        </Pressable>
       </Glass>
 
       {/* Subscription */}
@@ -628,6 +621,7 @@ const styles = StyleSheet.create({
     ...Typography.titleSmall,
     fontWeight: '400',
   },
+  tabsValue: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   rowDescription: {
     ...Typography.bodySmall,
     color: Colors.textTertiary,

@@ -23,11 +23,15 @@ export default function TabLayout() {
   const segment = (segments as string[])[1];
 
   // Hiding a tab rebuilds the tab bar on its first tab. After a switch in
-  // Settings, go back there; otherwise never sit on a tab that is switched off.
+  // the Tabs sheet, go back there; otherwise never sit on a tab that is switched off.
   useEffect(() => {
     if (consumeReturnToSettings()) {
-      const id = setTimeout(() => router.navigate('/(tabs)/(settings)' as any), 0);
-      return () => clearTimeout(id);
+      // Back to Settings and the Tabs sheet the switch was in, so the next
+      // switch is right there.
+      // After the rebuilt tab bar has settled; earlier, the rebuild won.
+      const a = setTimeout(() => router.navigate('/(tabs)/(settings)' as any), 450);
+      const b = setTimeout(() => router.push('/(tabs)/(settings)/tabs' as any), 950);
+      return () => { clearTimeout(a); clearTimeout(b); };
     }
     const onHidden = HIDEABLE_TABS.find((tab) => GROUP[tab] === segment && hidden.includes(tab));
     const firstVisible = HIDEABLE_TABS.find((tab) => !hidden.includes(tab));
