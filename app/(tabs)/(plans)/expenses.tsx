@@ -15,7 +15,8 @@ import { currencyForCountry } from '../../../lib/currencies';
 import { getJourneyWithLegs, type JourneyLeg, type JourneyWithLegs } from '../../../lib/database';
 import { fromYmd, toYmd } from '../../../lib/days';
 import { addExpense, type LocalExpense } from '../../../lib/expenses';
-import { balances, formatAmount, guessCategory, parseQuickEntry, settleUp, shareOf, stopIdForDate, totals, type Transfer } from '../../../lib/expenseModel';
+import { balances, formatAmount, guessCategory, parseQuickEntry, settleUp, shareOf, stopIdForDate, tileAmount, totals, type Transfer } from '../../../lib/expenseModel';
+import { Dropdown } from '../../../components/Dropdown';
 import { useTranslation } from '../../../contexts/LanguageContext';
 
 type TFunc = (key: string, params?: Record<string, string | number>) => string;
@@ -163,17 +164,29 @@ export default function ExpensesScreen() {
     );
   }, [snap]);
 
+  // The + offers the same three ways in as the empty page: a photo of the
+  // receipt, one from Photos, or the form.
   useLayoutEffect(() => {
     nav.setOptions({
       headerRight: readOnly
         ? undefined
         : () => (
-            <Pressable hitSlop={12} onPress={() => openForm()} accessibilityRole="button" accessibilityLabel={t('expenses.addExpense')}>
-              <Ionicons name="add" size={26} color={Colors.text} />
-            </Pressable>
+            <Dropdown
+              right
+              options={[
+                { id: 'camera', label: t('expenses.snapReceipt'), icon: 'camera' },
+                { id: 'library', label: t('expenses.fromPhotos'), icon: 'photo.on.rectangle' },
+                { id: 'manual', label: t('expenses.addManually'), icon: 'square.and.pencil' },
+              ]}
+              onPick={(id) => (id === 'manual' ? openForm() : snap(id as 'camera' | 'library'))}
+            >
+              <View accessibilityRole="button" accessibilityLabel={t('expenses.addExpense')} style={styles.addButton}>
+                <Ionicons name="add" size={26} color={Colors.text} />
+              </View>
+            </Dropdown>
           ),
     });
-  }, [nav, readOnly, openForm]);
+  }, [nav, readOnly, openForm, snap, t]);
 
   if (!params.journeySyncId || !journeyId || journey === null) return <MissingRoute title={t('nav.expenses')} message={t('documents.tripGone')} />;
   if (journey === undefined || !loaded || !peopleLoaded) return <Stack.Screen options={{ title: t('nav.expenses') }} />;
@@ -228,9 +241,11 @@ export default function ExpensesScreen() {
         )}
 
         <StatRow>
-          <StatTile label={t('expenses.total')} value={formatAmount(sums[0].total)} unit={main} />
-          <StatTile label={t('expenses.yourPart')} value={formatAmount(myPart)} unit={main} />
-          <StatTile label={settledWord} value={settledWord === t('expenses.balance') ? t('expenses.settled') : formatAmount(Math.abs(myNet))} unit={settledWord === t('expenses.balance') ? undefined : main} />
+          <StatTile label={t('expenses.total')} {...tileAmount(sums[0].total, main)} />
+          <StatTile label={t('expenses.yourPart')} {...tileAmount(myPart, main)} />
+          {settledWord === t('expenses.balance')
+            ? <StatTile label={settledWord} value={t('expenses.settled')} />
+            : <StatTile label={settledWord} {...tileAmount(Math.abs(myNet), main)} />}
         </StatRow>
         {others.length > 0 && (
           <Text style={styles.note}>{t('expenses.also', { list: others.map((s) => `${formatAmount(s.total)} ${s.currency}`).join(' · ') })}</Text>
@@ -302,9 +317,12 @@ function Empty({ readOnly, owner, onSnap, onManual }: { readOnly: boolean; owner
 const styles = StyleSheet.create({
   // Same page measures as the things to do.
   content: { padding: 16, paddingBottom: 100, gap: 20 },
+  addButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
 
-  quickButton: { alignItems: 'center', justifyContent: 'center', marginVertical: -6 },
-  quickCamera: { borderRadius: 12, borderCurve: 'continuous', backgroundColor: Colors.surfaceSecondary, width: 36, height: 36 },
+  // One box for the camera, the send arrow and the spinner, so the row keeps
+  // its height when typing swaps one for the other.
+  quickButton: { alignItems: 'center', justifyContent: 'center', width: 36, height: 36, marginVertical: -6 },
+  quickCamera: { borderRadius: 12, borderCurve: 'continuous', backgroundColor: Colors.surfaceSecondary },
 
   note: { ...Typography.bodySmall, color: Colors.textSecondary, paddingHorizontal: 4, marginTop: -8 },
   section: { gap: 10 },

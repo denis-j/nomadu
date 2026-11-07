@@ -361,6 +361,21 @@ export function formatAmount(amount: number): string {
   return amount.toLocaleString('en-US', { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
 }
 
+/** The sign a currency is written with, where there is one people know: € for EUR. */
+const SIGN_OF: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', JPY: '¥', THB: '฿', VND: '₫', KRW: '₩', INR: '₹', PHP: '₱' };
+
+/**
+ * An amount for a small tile: whole units, and the sign in front where the
+ * currency has one ("€1,235"), else the code after it. The tiles had room
+ * for about eight characters and "1,234.56 EUR" was cut; the exact amount
+ * stays in the list.
+ */
+export function tileAmount(amount: number, currency: string): { value: string; unit?: string } {
+  const whole = Math.round(amount).toLocaleString('en-US');
+  const sign = SIGN_OF[currency];
+  return sign ? { value: `${sign}${whole}` } : { value: whole, unit: currency };
+}
+
 /** Newest day first, then the newest edit first, so a dinner typed in a moment ago is on top. */
 export function sortExpenses<T extends Pick<Expense, 'date' | 'updated_at'>>(list: T[]): T[] {
   return [...list].sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at));

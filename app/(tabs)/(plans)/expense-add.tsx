@@ -329,7 +329,7 @@ function Form({
           })}
         </ScrollView>
 
-        <SectionLabel>Receipt</SectionLabel>
+        <SectionLabel>{t('expenses.receipt')}</SectionLabel>
         {receiptUri ? (
           <Card>
             <View style={styles.pickedRow}>

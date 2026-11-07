@@ -46,7 +46,7 @@ export function StatTile({
       <Text style={styles.label}>{label}</Text>
       <View style={styles.valueRow}>
         {icon && <Ionicons name={icon} size={16} color={Colors.text} />}
-        <Text style={styles.value} numberOfLines={1}>
+        <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
           {value}
           {unit && <Text style={styles.unit}> {unit}</Text>}
         </Text>

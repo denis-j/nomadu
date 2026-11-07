@@ -178,7 +178,7 @@ export default function PlansStack() {
         options={{
           presentation: sheetWithHeader,
           sheetGrabberVisible: true,
-          sheetAllowedDetents: [0.9, 1.0],
+          sheetAllowedDetents: [1.0],
           headerBackButtonDisplayMode: 'minimal',
           contentStyle: { backgroundColor: sheetBackground },
         }}
