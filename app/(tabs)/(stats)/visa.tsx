@@ -10,7 +10,7 @@ import { useVisaTracker } from '../../../hooks/useVisaTracker';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { CloudyButton } from '../../../components/CloudyButton';
-import { Flag } from '../../../components/Flag';
+import { CardNote, DaysMeter, Footnote, PassportLine, TrackerCard } from '../../../components/TrackerParts';
 import { todayStr, visaGroup, VisaStatus } from '../../../lib/visaCalculations';
 import { hasNoExpiry } from '../../../lib/userVisas';
 import { getCountryName } from '../../../utils/geography';
@@ -59,131 +59,78 @@ function getStatusColor(status: VisaStatus['status']): string {
   }
 }
 
-function CardHeader({ visa, interactive }: { visa: VisaStatus; interactive?: boolean }) {
+/** The card's name: the Schengen zone has none in the country table, so it gets its own. */
+function useVisaName() {
   const { t, countryName } = useTranslation();
-  const statusColor = getStatusColor(visa.status);
-  return (
-    <View style={styles.cardHeader}>
-      <View style={styles.cardTitle}>
-        <Flag code={visa.destinationCode} size={24} />
-        <View style={styles.titleText}>
-          <Text style={styles.destination}>{countryName(visa.destination)}</Text>
-          <Text style={styles.ruleLabel}>{visa.ruleLabel}</Text>
-        </View>
-      </View>
-      <View style={styles.headerRight}>
-        <View style={[styles.statusBadge, { backgroundColor: statusColor + '18' }]}>
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {getStatusLabel(visa, t)}
-          </Text>
-        </View>
-        {interactive && (
-          <Ionicons name="chevron-forward" size={14} color={Colors.textTertiary} />
-        )}
-      </View>
-    </View>
-  );
-}
-
-function VisaNeededCard({ visa, onPress }: { visa: VisaStatus; onPress: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <Pressable onPress={onPress}>
-      <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
-        <CardHeader visa={visa} interactive />
-        <Text style={styles.visaNeededHint}>
-          {t('visa.addToTrack')}
-        </Text>
-      </Glass>
-    </Pressable>
-  );
-}
-
-function ExpiredVisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <Pressable onPress={onPress}>
-      <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
-        <CardHeader visa={visa} interactive={!!onPress} />
-        <Text style={styles.visaNeededHint}>
-          {isDateExpired(visa)
-            ? t('visa.expiredOn', { date: formatDay(visa.validUntil) })
-            : visa.singleEntryUsed
-              ? t('visa.singleEntryUsed', { date: formatDay(visa.leftOn) })
-              : t('visa.expiredShort')}
-        </Text>
-      </Glass>
-    </Pressable>
-  );
+  return (visa: VisaStatus) => (visa.destinationCode === 'SCHENGEN' ? t('visa.schengen') : countryName(visa.destination));
 }
 
 function VisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void }) {
   const { t } = useTranslation();
+  const nameOf = useVisaName();
+  const status = { label: getStatusLabel(visa, t), color: getStatusColor(visa.status) };
+  // Your own visa keeps the name you gave it; an auto rule's label is English
+  // data, and the pill and the count below already say what it means.
+  const subtitle = visa.isUserVisa ? visa.ruleLabel.split(' · ')[0] : undefined;
+  const card = (children: React.ReactNode) => (
+    <TrackerCard code={visa.destinationCode} name={nameOf(visa)} subtitle={subtitle} status={status} onPress={onPress}>
+      {children}
+    </TrackerCard>
+  );
+
   if (visa.status === 'visa_needed') {
-    return <VisaNeededCard visa={visa} onPress={() => onPress?.()} />;
-  }
-  if (visa.status === 'expired') {
-    return <ExpiredVisaCard visa={visa} onPress={onPress} />;
+    return card(
+      <>
+        <CardNote>{t('visa.addToTrack')}</CardNote>
+        {onPress && (
+          <CloudyButton onPress={onPress} compact innerStyle={styles.ctaInner}>
+            <Text style={styles.ctaText}>{t('visa.addVisa')}</Text>
+          </CloudyButton>
+        )}
+      </>,
+    );
   }
 
-  const progressColor = getProgressColor(visa.percentUsed);
-  const progressWidth = Math.min(visa.percentUsed, 100);
+  if (visa.status === 'expired') {
+    return card(
+      <CardNote>
+        {isDateExpired(visa)
+          ? t('visa.expiredOn', { date: formatDay(visa.validUntil) })
+          : visa.singleEntryUsed
+            ? t('visa.singleEntryUsed', { date: formatDay(visa.leftOn) })
+            : t('visa.expiredShort')}
+      </CardNote>,
+    );
+  }
+
   // Per-stay rules stop counting on exit. Showing an empty bar would suggest
   // the allowance is running and unused; naming the exit date is the truth.
   const stayOver = !!visa.leftOn && visa.daysUsed === 0;
 
-  const body = (
-    <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
-      <CardHeader visa={visa} interactive={!!onPress} />
-
+  return card(
+    <>
       {visa.daysAllowed > 0 && stayOver ? (
-        <Text style={styles.visaNeededHint}>
+        <CardNote>
           {t('visa.counterReset', { date: formatDay(visa.leftOn) })}
           {visa.lastStayDays ? t('visa.lastStay', { used: visa.lastStayDays, allowed: visa.daysAllowed }) : ''}
-        </Text>
+        </CardNote>
       ) : visa.daysAllowed > 0 ? (
-        <>
-          <View style={styles.progressContainer}>
-            <View style={styles.progressTrack}>
-              <View
-                style={[
-                  styles.progressBar,
-                  { width: `${progressWidth}%`, backgroundColor: progressColor },
-                ]}
-              />
-            </View>
-          </View>
-
-          <View style={styles.cardFooter}>
-            <Text style={styles.daysText}>
-              <Text style={styles.daysUsed}>{visa.daysUsed}</Text>
-              <Text style={styles.daysOf}>{t('visa.ofConnector')}</Text>
-              <Text style={styles.daysAllowed}>{visa.daysAllowed}</Text>
-              <Text style={styles.daysOf}>{t('visa.daysUsedSuffix')}</Text>
-            </Text>
-            <Text style={[styles.daysRemaining, { color: progressColor }]}>
-              {t('visa.daysLeft', { days: visa.daysRemaining })}
-            </Text>
-          </View>
-        </>
+        <DaysMeter
+          used={visa.daysUsed}
+          allowed={visa.daysAllowed}
+          detail={visa.windowDays ? t('visa.ruleWindow', { window: visa.windowDays }) : t('visa.rulePerStay')}
+          color={getProgressColor(visa.percentUsed)}
+        />
       ) : (
         visa.validUntil && (
-          <Text style={styles.visaNeededHint}>
-            {hasNoExpiry(visa.validUntil)
-              ? t('visa.noExpiry')
-              : t('visa.validUntil', { date: formatDay(visa.validUntil) })}
-          </Text>
+          <CardNote>
+            {hasNoExpiry(visa.validUntil) ? t('visa.noExpiry') : t('visa.validUntil', { date: formatDay(visa.validUntil) })}
+          </CardNote>
         )
       )}
-
-      {!visa.isUserVisa && <SourceFooter visa={visa} />}
-      {!visa.isUserVisa && (
-        <Text style={styles.overrideHint}>{t('visa.overrideHint')}</Text>
-      )}
-    </Glass>
+      {!visa.isUserVisa && <SourceFooter visa={visa} hint={!!onPress} />}
+    </>,
   );
-
-  return onPress ? <Pressable onPress={onPress}>{body}</Pressable> : body;
 }
 
 /**
@@ -191,25 +138,28 @@ function VisaCard({ visa, onPress }: { visa: VisaStatus; onPress?: () => void })
  * "Open official source" link. Reduces our liability surface by making it
  * obvious that the data is a reference estimate, not the destination's word.
  */
-function SourceFooter({ visa }: { visa: VisaStatus }) {
+function SourceFooter({ visa, hint }: { visa: VisaStatus; hint: boolean }) {
   const { t } = useTranslation();
-  if (!visa.lastVerified && !visa.source) return null;
+  if (!visa.lastVerified && !visa.source && !hint) return null;
   return (
     <View style={styles.sourceFooter}>
-      {visa.lastVerified && (
-        <Text style={styles.sourceText}>{t('visa.verified', { date: formatDay(visa.lastVerified) })}</Text>
-      )}
-      {visa.source && (
-        <Pressable
-          hitSlop={6}
-          onPress={(e) => {
-            e.stopPropagation?.();
-            Linking.openURL(visa.source!);
-          }}
-        >
-          <Text style={styles.sourceLink}>{t('visa.openSource')}</Text>
-        </Pressable>
-      )}
+      <View style={styles.sourceRow}>
+        {visa.lastVerified && (
+          <Text style={styles.sourceText}>{t('visa.verified', { date: formatDay(visa.lastVerified) })}</Text>
+        )}
+        {visa.source && (
+          <Pressable
+            hitSlop={6}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              Linking.openURL(visa.source!);
+            }}
+          >
+            <Text style={styles.sourceLink}>{t('visa.openSource')}</Text>
+          </Pressable>
+        )}
+      </View>
+      {hint && <Text style={styles.sourceText}>{t('visa.overrideHint')}</Text>}
     </View>
   );
 }
@@ -331,7 +281,7 @@ export default function VisaScreen() {
         icons={[{ name: 'earth', color: '#A6B4C2' }, { name: 'person', color: '#4DC1FF' }, { name: 'document-text', color: '#A6B4C2' }]}
         title={t('visa.noCitizenshipTitle')}
         subtitle={t('visa.noCitizenshipSubtitle')}
-        primary={{ label: t('visa.setPassport'), onPress: () => router.push('/(tabs)/(settings)/passport') }}
+        primary={{ label: t('visa.setPassport'), onPress: () => router.push('/(tabs)/(stats)/passport') }}
       />
     );
   }
@@ -375,11 +325,11 @@ export default function VisaScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
     >
-      <View style={styles.subtitleRow}>
-        <Text style={styles.subtitle}>{t('visa.basedOn')}</Text>
-        {citizenshipCode && <Flag code={citizenshipCode} size={14} />}
-        <Text style={styles.subtitle}>{t('visa.passportSuffix', { country: countryName(citizenshipCountry) })}</Text>
-      </View>
+      <PassportLine
+        code={citizenshipCode}
+        country={countryName(citizenshipCountry)}
+        onPress={() => router.push('/(tabs)/(stats)/passport')}
+      />
 
       {active.map(renderCard)}
 
@@ -405,23 +355,7 @@ export default function VisaScreen() {
         </>
       )}
 
-      <Glass {...glassProps} style={[styles.disclaimerBlock, !hasGlass && styles.disclaimerBlockFallback]}>
-        <View style={styles.disclaimerIconWrap}>
-          <Ionicons name="information-circle" size={22} color={Colors.cloudyButtonText} />
-        </View>
-        <Text style={styles.disclaimerTitle}>{t('visa.disclaimerTitle')}</Text>
-        <Text style={styles.disclaimer}>
-          {t('visa.disclaimerBody')}
-        </Text>
-        <Pressable
-          hitSlop={6}
-          onPress={() => Linking.openURL('https://www.iatatravelcentre.com/')}
-          style={styles.disclaimerLinkRow}
-        >
-          <Text style={styles.disclaimerLink}>{t('visa.openIata')}</Text>
-          <Ionicons name="open-outline" size={13} color={Colors.cloudyButtonText} />
-        </Pressable>
-      </Glass>
+      <Footnote text={t('visa.footnote')} link={t('visa.openIata')} url="https://www.iatatravelcentre.com/" />
 
       <FirstRunDisclaimerModal
         visible={showFirstRunDisclaimer}
@@ -469,53 +403,22 @@ function FirstRunDisclaimerModal({ visible, onDismiss }: { visible: boolean; onD
 const styles = StyleSheet.create({
   content: {
     padding: 16,
-    gap: 12,
-    paddingBottom: 100,
+    gap: 14,
+    paddingBottom: 120,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  subtitle: {
-    ...Typography.bodySmall,
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.textSecondary,
-    paddingLeft: 4,
-    marginBottom: 4,
-  },
-  card: {
-    borderRadius: 20,
-    padding: 18,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
-    gap: 14,
-  },
-  cardFallback: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  cardTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
+  ctaInner: { justifyContent: 'center' },
+  ctaText: { ...Typography.button, fontWeight: '700', color: Colors.cloudyButtonText },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
-    paddingLeft: 4,
-    paddingRight: 4,
-    marginTop: 18,
-    marginBottom: 2,
+    paddingHorizontal: 4,
+    marginTop: 14,
   },
   sectionTitle: { ...Typography.sectionLabel },
   sectionMeta: {
@@ -524,169 +427,29 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   sectionCount: {
-    ...Typography.bodySmall,
-    fontSize: 13,
-    fontWeight: '600',
+    ...Typography.labelStrong,
     color: Colors.textTertiary,
-  },
-  subtitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  titleText: {
-    flex: 1,
-    gap: 2,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  destination: {
-    ...Typography.bodyLarge,
-    fontWeight: '700',
-  },
-  ruleLabel: {
-    ...Typography.label,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderCurve: 'continuous',
-  },
-  statusText: {
-    ...Typography.caption,
-    fontWeight: '700',
-  },
-  progressContainer: {
-    gap: 6,
-  },
-  progressTrack: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.surfaceSecondary,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  daysText: {
-    ...Typography.bodySmall,
-    fontSize: 14,
-    fontVariant: ['tabular-nums'],
-  },
-  daysUsed: {
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  daysOf: {
-    fontWeight: '400',
-    color: Colors.textSecondary,
-  },
-  daysAllowed: {
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  daysRemaining: {
-    ...Typography.button,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  visaNeededHint: {
-    ...Typography.bodySmall,
-    fontSize: 13.5,
-    color: Colors.textSecondary,
-    lineHeight: 19,
-  },
-  overrideHint: {
-    ...Typography.caption,
-    fontSize: 12,
-    color: Colors.textTertiary,
-    marginTop: 4,
   },
   sourceFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingTop: 8,
+    gap: 4,
+    paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(0,0,0,0.08)',
   },
+  sourceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   sourceText: {
     ...Typography.caption,
-    fontSize: 11,
-    color: Colors.textTertiary,
     fontVariant: ['tabular-nums'],
   },
   sourceLink: {
     ...Typography.caption,
-    fontSize: 11,
-    color: Colors.cloudyButtonText,
-    fontWeight: '600',
-  },
-  disclaimer: {
-    ...Typography.caption,
-    fontSize: 12.5,
     color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: 4,
-  },
-  disclaimerBlock: {
-    marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    alignItems: 'center',
-    gap: 8,
-    borderRadius: 20,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    backgroundColor: 'rgba(138, 211, 255, 0.18)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(77, 193, 255, 0.35)',
-  },
-  disclaimerBlockFallback: {
-    backgroundColor: 'rgba(219, 240, 255, 0.7)',
-  },
-  disclaimerIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(77, 193, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
-  disclaimerTitle: {
-    ...Typography.titleSmall,
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  disclaimerLinkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(77, 193, 255, 0.18)',
-  },
-  disclaimerLink: {
-    ...Typography.caption,
-    fontSize: 12.5,
-    color: Colors.cloudyButtonText,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   modalBackdrop: {
     flex: 1,

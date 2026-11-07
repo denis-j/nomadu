@@ -26,6 +26,8 @@ export interface VisaStatus {
   destinationCode: string;
   flag: string;
   ruleLabel: string;
+  /** Rolling-window rules: the window the allowed days are counted in (180 for 90/180). */
+  windowDays?: number;
   daysAllowed: number;
   daysUsed: number;
   daysRemaining: number;
@@ -428,6 +430,7 @@ function buildUserVisaStatus(
     destinationCode: uv.country_code,
     flag: getFlag(uv.country_code),
     ruleLabel,
+    ...(uv.max_days_per_window && uv.window_days ? { windowDays: uv.window_days } : {}),
     daysAllowed,
     daysUsed,
     daysRemaining,
@@ -532,6 +535,7 @@ export function calculateAllVisaStatuses(
       destinationCode,
       flag: getFlag(destinationCode),
       ruleLabel: rule.label,
+      ...(rule.ruleType === 'rolling_window' ? { windowDays: rule.windowDays } : {}),
       daysAllowed: rule.allowedDays,
       daysUsed,
       daysRemaining,

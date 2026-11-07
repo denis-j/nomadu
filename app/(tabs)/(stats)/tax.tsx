@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -10,7 +10,8 @@ import { useTaxTracker } from '../../../hooks/useTaxTracker';
 import { Colors } from '../../../constants/colors';
 import { Typography } from '../../../constants/typography';
 import { CloudyButton } from '../../../components/CloudyButton';
-import { Flag } from '../../../components/Flag';
+import { DaysMeter, Footnote, PassportLine, TrackerCard } from '../../../components/TrackerParts';
+import { fromYmd } from '../../../lib/days';
 import { YearPicker } from '../../../components/YearPicker';
 import { TaxStatus } from '../../../lib/taxCalculations';
 import { useTranslation } from '../../../contexts/LanguageContext';
@@ -23,7 +24,6 @@ const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 function getProgressColor(percent: number): string {
-  if (percent >= 100) return Colors.error;
   if (percent > 75) return Colors.error;
   if (percent >= 50) return Colors.warning;
   return Colors.success;
@@ -47,52 +47,42 @@ function getStatusColor(status: TaxStatus['status']): string {
   }
 }
 
+/** "Apr 6" or "6. Apr.": a day of a tax year, in the app's language. */
+function monthDay(ymd: string, language: string): string {
+  return fromYmd(ymd).toLocaleDateString(language === 'de' ? 'de-DE' : 'en-US', { month: 'short', day: 'numeric' });
+}
+
+/**
+ * What the days are counted over, in the app's language. The status carries
+ * an English label for the server; the stretch itself is rebuilt from its
+ * dates here.
+ */
+function periodText(tax: TaxStatus, t: TFunc, language: string): string {
+  if (tax.periodKind === 'year') {
+    const calendar = tax.periodStart.endsWith('-01-01') && tax.periodEnd.endsWith('-12-31');
+    return calendar
+      ? t('tax.ruleYear', { year: tax.periodStart.slice(0, 4) })
+      : t('tax.ruleTaxYear', { from: monthDay(tax.periodStart, language), to: monthDay(tax.periodEnd, language) });
+  }
+  const span = (fromYmd(tax.periodEnd).getTime() - fromYmd(tax.periodStart).getTime()) / 86_400_000 + 1;
+  return t('tax.ruleMonths', { months: Math.round(span / 30.4) });
+}
+
 function TaxCard({ tax }: { tax: TaxStatus }) {
-  const { t, countryName } = useTranslation();
-  const progressColor = getProgressColor(tax.percentUsed);
-  const statusColor = getStatusColor(tax.status);
-  const progressWidth = Math.min(tax.percentUsed, 100);
-
+  const { t, countryName, language } = useTranslation();
   return (
-    <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardTitle}>
-          <Flag code={tax.countryCode} size={24} />
-          <View style={styles.titleText}>
-            <Text style={styles.destination}>{countryName(tax.country)}</Text>
-            <Text style={styles.ruleLabel}>{tax.ruleLabel}</Text>
-          </View>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: statusColor + '18' }]}>
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {getStatusLabel(tax.status, t)}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.progressContainer}>
-        <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressBar,
-              { width: `${progressWidth}%`, backgroundColor: progressColor },
-            ]}
-          />
-        </View>
-      </View>
-
-      <View style={styles.cardFooter}>
-        <Text style={styles.daysText}>
-          <Text style={styles.daysUsed}>{tax.daysPresent}</Text>
-          <Text style={styles.daysOf}>{t('tax.ofConnector')}</Text>
-          <Text style={styles.daysAllowed}>{tax.thresholdDays}</Text>
-          <Text style={styles.daysOf}>{t('tax.daysPresentSuffix')}</Text>
-        </Text>
-        <Text style={[styles.daysRemaining, { color: progressColor }]}>
-          {t('tax.daysLeft', { days: tax.daysRemaining })}
-        </Text>
-      </View>
-    </Glass>
+    <TrackerCard
+      code={tax.countryCode}
+      name={countryName(tax.country)}
+      status={{ label: getStatusLabel(tax.status, t), color: getStatusColor(tax.status) }}
+    >
+      <DaysMeter
+        used={tax.daysPresent}
+        allowed={tax.thresholdDays}
+        detail={periodText(tax, t, language)}
+        color={getProgressColor(tax.percentUsed)}
+      />
+    </TrackerCard>
   );
 }
 
@@ -139,7 +129,7 @@ export default function TaxScreen() {
         icons={[{ name: 'earth', color: '#A6B4C2' }, { name: 'person', color: '#4DC1FF' }, { name: 'cash', color: '#A6B4C2' }]}
         title={t('tax.noCitizenshipTitle')}
         subtitle={t('tax.noCitizenshipSubtitle')}
-        primary={{ label: t('tax.setPassport'), onPress: () => router.push('/(tabs)/(settings)/passport') }}
+        primary={{ label: t('tax.setPassport'), onPress: () => router.push('/(tabs)/(stats)/passport') }}
       />
     );
   }
@@ -177,36 +167,15 @@ export default function TaxScreen() {
         includeAllTime={false}
       />
 
-      <View style={styles.subtitleRow}>
-        <Text style={styles.subtitle}>{t('tax.basedOn')}</Text>
-        {citizenshipCode && <Flag code={citizenshipCode} size={14} />}
-        <Text style={styles.subtitle}>{t('tax.citizenshipSuffix', { country: countryName(citizenshipCountry), year })}</Text>
-      </View>
-      {/* Which stretch each card counts is on the card itself (ruleLabel);
-          this says up front that it differs, and that it is an estimate. */}
-      <Text style={[styles.subtitle, styles.estimate]}>
-        {t('tax.estimate')}
-      </Text>
+      <PassportLine
+        code={citizenshipCode}
+        country={countryName(citizenshipCountry)}
+        onPress={() => router.push('/(tabs)/(stats)/passport')}
+      />
 
       {taxStatuses.map((tax) => <TaxCard key={tax.countryCode} tax={tax} />)}
 
-      <Glass {...glassProps} style={[styles.disclaimerBlock, !hasGlass && styles.disclaimerBlockFallback]}>
-        <View style={styles.disclaimerIconWrap}>
-          <Ionicons name="information-circle" size={22} color={Colors.cloudyButtonText} />
-        </View>
-        <Text style={styles.disclaimerTitle}>{t('tax.disclaimerTitle')}</Text>
-        <Text style={styles.disclaimer}>
-          {t('tax.disclaimerBody')}
-        </Text>
-        <Pressable
-          hitSlop={6}
-          onPress={() => Linking.openURL('https://en.wikipedia.org/wiki/Tax_residence')}
-          style={styles.disclaimerLinkRow}
-        >
-          <Text style={styles.disclaimerLink}>{t('tax.learnMore')}</Text>
-          <Ionicons name="open-outline" size={13} color={Colors.cloudyButtonText} />
-        </Pressable>
-      </Glass>
+      <Footnote text={t('tax.footnote')} link={t('tax.learnMore')} url="https://en.wikipedia.org/wiki/Tax_residence" />
 
       <FirstRunDisclaimerModal
         // Only while this screen is in front: a React Native modal renders
@@ -257,8 +226,8 @@ function FirstRunDisclaimerModal({ visible, onDismiss }: { visible: boolean; onD
 const styles = StyleSheet.create({
   content: {
     padding: 16,
-    gap: 12,
-    paddingBottom: 100,
+    gap: 14,
+    paddingBottom: 120,
   },
   emptyPage: { flex: 1 },
   emptyPicker: { padding: 16, paddingBottom: 0 },
@@ -267,167 +236,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  subtitle: {
-    ...Typography.bodySmall,
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.textSecondary,
-    paddingLeft: 4,
-    marginBottom: 4,
-  },
-  card: {
-    borderRadius: 20,
-    padding: 18,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
-    gap: 14,
-  },
-  cardFallback: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  cardTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  estimate: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: Colors.textTertiary,
-  },
-  subtitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  titleText: {
-    flex: 1,
-    gap: 2,
-  },
-  destination: {
-    ...Typography.bodyLarge,
-    fontWeight: '700',
-  },
-  ruleLabel: {
-    ...Typography.label,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderCurve: 'continuous',
-  },
-  statusText: {
-    ...Typography.caption,
-    fontWeight: '700',
-  },
-  progressContainer: {
-    gap: 6,
-  },
-  progressTrack: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.surfaceSecondary,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  daysText: {
-    ...Typography.bodySmall,
-    fontSize: 14,
-    fontVariant: ['tabular-nums'],
-  },
-  daysUsed: {
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  daysOf: {
-    fontWeight: '400',
-    color: Colors.textSecondary,
-  },
-  daysAllowed: {
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  daysRemaining: {
-    ...Typography.button,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  // Native empty state (no citizenship)
-
-  // Disclaimer block (Glass, cloud tint)
-  disclaimer: {
-    ...Typography.caption,
-    fontSize: 12.5,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: 4,
-  },
-  disclaimerBlock: {
-    marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    alignItems: 'center',
-    gap: 8,
-    borderRadius: 20,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    backgroundColor: 'rgba(138, 211, 255, 0.18)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(77, 193, 255, 0.35)',
-  },
-  disclaimerBlockFallback: {
-    backgroundColor: 'rgba(219, 240, 255, 0.7)',
-  },
-  disclaimerIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(77, 193, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
-  disclaimerTitle: {
-    ...Typography.titleSmall,
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  disclaimerLinkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(77, 193, 255, 0.18)',
-  },
-  disclaimerLink: {
-    ...Typography.caption,
-    fontSize: 12.5,
-    color: Colors.cloudyButtonText,
-    fontWeight: '700',
-  },
-
   // First-run modal (mirror of visa tab)
   modalBackdrop: {
     flex: 1,
