@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FullWindowOverlay } from 'react-native-screens';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { SymbolView } from 'expo-symbols';
 import Animated, { Easing, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,10 +8,6 @@ import { registerToast, ToastData } from '../lib/toast';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useTranslation } from '../contexts/LanguageContext';
-
-const hasGlass = isLiquidGlassAvailable();
-const Glass = hasGlass ? GlassView : View;
-const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 /** How long a toast stays: an error is read, a confirmation only glanced at. */
 const DURATION = { success: 2400, error: 3800 };
@@ -45,8 +40,9 @@ const exit = () => {
 };
 
 /**
- * The toast at the top of the screen: a glass pill with an SF Symbol, the
- * look of the app's other glass controls. It drops in with a short, firm
+ * The toast at the top of the screen: a solid white pill with an SF Symbol.
+ * Solid, not glass: over a sheet's title the glass let the text behind show
+ * through and the toast was hard to see. It drops in with a short, firm
  * spring and fades up and away when it goes, and a tap dismisses it at once. Each new toast
  * animates in again, also when one is still showing.
  *
@@ -98,7 +94,7 @@ export function ToastContainer() {
             accessibilityLiveRegion="polite"
             accessibilityHint={t('common.close')}
           >
-            <Glass {...glassProps} style={[styles.pill, !hasGlass && styles.pillFallback]}>
+            <View style={styles.pill}>
               <SymbolView
                 name={toast.type === 'error'
                   ? { ios: 'exclamationmark.circle.fill', android: 'error' }
@@ -107,7 +103,7 @@ export function ToastContainer() {
                 tintColor={toast.type === 'error' ? Colors.error : Colors.success}
               />
               <Text style={styles.text} numberOfLines={2}>{toast.message}</Text>
-            </Glass>
+            </View>
           </Pressable>
         </Animated.View>
       )}
@@ -127,7 +123,7 @@ const styles = StyleSheet.create({
   shadow: {
     maxWidth: '100%',
     borderRadius: 100,
-    boxShadow: '0 8px 24px rgba(11, 37, 65, 0.16)',
+    boxShadow: '0 10px 30px rgba(11, 37, 65, 0.22), 0 2px 6px rgba(11, 37, 65, 0.08)',
   },
   pill: {
     flexDirection: 'row',
@@ -138,10 +134,7 @@ const styles = StyleSheet.create({
     paddingLeft: 14,
     paddingRight: 20,
     paddingVertical: 12,
-    overflow: 'hidden',
-  },
-  pillFallback: {
-    backgroundColor: 'rgba(255, 255, 255, 0.97)',
+    backgroundColor: Colors.white,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
   },
