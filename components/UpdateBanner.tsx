@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeOut, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CloudBackdrop } from './CloudBackdrop';
+import { CloudyButton } from './CloudyButton';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { useTranslation } from '../contexts/LanguageContext';
@@ -13,16 +15,18 @@ const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
+const ICON = 44;
+
 interface UpdateBannerProps {
   visible: boolean;
   onApply: () => void;
 }
 
 /**
- * Non-blocking floating pill that surfaces a staged OTA update. Sits above the
- * tab bar so it doesn't cover the active screen's primary content. "Now"
- * triggers an immediate reload via the host's `onApply`; "Later" just hides
- * the pill, the staged update still applies on the next cold start.
+ * A glass card above the tab bar when an OTA update is staged: the small pill
+ * it replaced was easy to miss. "Update now" reloads at once through the
+ * host's `onApply`; "Later" hides the card, and the update still applies on
+ * the next cold start.
  */
 export function UpdateBanner({ visible, onApply }: UpdateBannerProps) {
   const { t } = useTranslation();
@@ -48,16 +52,22 @@ export function UpdateBanner({ visible, onApply }: UpdateBannerProps) {
       exiting={FadeOut.duration(200)}
       style={[styles.wrapper, { bottom: Math.max(insets.bottom, 16) + 92 }]}
     >
-      <Glass {...glassProps} style={[styles.pill, !hasGlass && styles.pillFallback]}>
-        <View style={styles.iconWrap}>
-          <Ionicons name="sparkles" size={14} color={Colors.cloudyButtonText} />
+      <Glass {...glassProps} style={[styles.card, !hasGlass && styles.cardFallback]}>
+        <View style={styles.head}>
+          <View style={styles.icon}>
+            <CloudBackdrop width={ICON} height={ICON} blur={2.5} />
+            <Ionicons name="sparkles" size={20} color={Colors.cloudyButtonText} />
+          </View>
+          <View style={styles.texts}>
+            <Text style={styles.title}>{t('comp.updateTitle')}</Text>
+            <Text style={styles.body}>{t('comp.updateBody')}</Text>
+          </View>
         </View>
-        <Text style={styles.text}>{t('comp.updateReady')}</Text>
-        <Pressable onPress={handleDismiss} hitSlop={6} style={styles.laterBtn}>
+        <CloudyButton onPress={handleApply} compact innerStyle={styles.ctaInner}>
+          <Text style={styles.ctaText}>{t('comp.updateNow')}</Text>
+        </CloudyButton>
+        <Pressable onPress={handleDismiss} hitSlop={8} style={({ pressed }) => [styles.later, pressed && { opacity: 0.55 }]}>
           <Text style={styles.laterText}>{t('comp.later')}</Text>
-        </Pressable>
-        <Pressable onPress={handleApply} hitSlop={6} style={styles.applyBtn}>
-          <Text style={styles.applyText}>{t('comp.now')}</Text>
         </Pressable>
       </Glass>
     </Animated.View>
@@ -67,69 +77,44 @@ export function UpdateBanner({ visible, onApply }: UpdateBannerProps) {
 const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    left: 16,
+    right: 16,
     alignItems: 'center',
     zIndex: 9999,
   },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingLeft: 14,
-    paddingRight: 6,
-    paddingVertical: 6,
-    borderRadius: 999,
+  card: {
+    width: '100%',
+    maxWidth: 420,
+    padding: 16,
+    paddingBottom: 6,
+    gap: 14,
+    borderRadius: 26,
     borderCurve: 'continuous',
     overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.82)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.7)',
     shadowColor: '#0B2541',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 22,
   },
-  pillFallback: {
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+  cardFallback: {
+    backgroundColor: 'rgba(255, 255, 255, 0.97)',
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
   },
-  iconWrap: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(77, 193, 255, 0.22)',
+  head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  icon: {
+    width: ICON,
+    height: ICON,
+    borderRadius: ICON / 2,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  text: {
-    ...Typography.button,
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.text,
-    marginRight: 4,
-  },
-  laterBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  laterText: {
-    ...Typography.button,
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  applyBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: Colors.text,
-  },
-  applyText: {
-    ...Typography.button,
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: Colors.white,
-  },
+  texts: { flex: 1, gap: 2 },
+  title: { ...Typography.titleSmall, fontWeight: '700' },
+  body: { ...Typography.bodySmall, fontSize: 14, lineHeight: 19, color: Colors.textSecondary },
+  ctaInner: { justifyContent: 'center' },
+  ctaText: { ...Typography.titleSmall, fontWeight: '700', color: Colors.cloudyButtonText },
+  later: { alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 16 },
+  laterText: { ...Typography.button, color: Colors.textSecondary },
 });
