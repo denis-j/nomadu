@@ -16,7 +16,7 @@ const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 export default function BadgeLibraryScreen() {
-  const { t } = useTranslation();
+  const { t, countryName } = useTranslation();
   const router = useRouter();
   const [earned, setEarned] = useState<Set<string>>(new Set());
 
@@ -123,7 +123,7 @@ export default function BadgeLibraryScreen() {
                     ]}
                     numberOfLines={1}
                   >
-                    {b.name}
+                    {countryName(b.name)}
                   </Text>
                 </Glass>
               </Pressable>
