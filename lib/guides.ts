@@ -2,6 +2,7 @@ import { insertJourney, insertJourneyLeg } from './database';
 import { showToast } from './toast';
 import type { DestinationGuide } from '../constants/guides';
 import { track } from './analytics';
+import { translate } from './i18n/translate';
 
 /**
  * A guide's suggested route as a real trip, from the day the user picked.
@@ -28,6 +29,6 @@ export async function createTripFromGuide(guide: DestinationGuide, start: Date):
       leg.latitude, leg.longitude,
     );
   }
-  showToast('Trip created');
+  showToast(translate('comp.tripCreated'));
   return id;
 }

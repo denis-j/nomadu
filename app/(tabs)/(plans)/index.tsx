@@ -28,24 +28,15 @@ import { Flag } from '../../../components/Flag';
 import { listCardStyles } from '../../../components/ListCard';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { EmptyState } from '../../../components/EmptyState';
+import { formatDayRange } from '../../../lib/days';
 
 const hasGlass = isLiquidGlassAvailable();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function fmtDate(dateStr: string): string {
-  const d = parseDate(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
 /** "Sep 12 – 30" inside one month, "Sep 28 – Oct 3" across. */
 function fmtRange(start: string, end: string): string {
-  const s = parseDate(start);
-  const e = parseDate(end);
-  if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) {
-    return `${fmtDate(start)} – ${e.getDate()}`;
-  }
-  return `${fmtDate(start)} – ${fmtDate(end)}`;
+  return formatDayRange(start, end);
 }
 
 function computeTotalDays(firstStart: string, lastEnd: string): number {

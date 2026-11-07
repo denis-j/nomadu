@@ -123,7 +123,7 @@ export default function StatsScreen() {
           accentColor={Colors.textSecondary}
         />
         <MiniStatCard
-          value={stats.avgStayDays ? `${stats.avgStayDays}d` : '0d'}
+          value={t('comp.daysShort', { n: stats.avgStayDays || 0 })}
           label={t('stats.averageStay')}
           icon="time"
           accentColor={Colors.accent}

@@ -1,3 +1,4 @@
+import { activeLanguage, appLocale } from './i18n/locale';
 /**
  * Calendar-day arithmetic that survives daylight saving.
  *
@@ -71,17 +72,66 @@ export function chainDates<T extends { start_date: string; end_date: string }>(
   });
 }
 
+// ─── Dates as the app writes them ────────────────────────────────────────
+// In the app's language (lib/i18n/locale.ts), not the phone's: English is the
+// base ("Sep 5, 2026"), German only swaps the order ("5. Sept. 2026"). Every
+// screen formats through these, so a date never comes out in two styles.
+
+const asDate = (d: Date | string) => (typeof d === 'string' ? fromYmd(d) : d);
+
+/** "Sep 5" / "5. Sept.": a day where the year is clear from the context. */
+export function formatMonthDay(d: Date | string): string {
+  return asDate(d).toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' });
+}
+
 /**
- * "Sep 5, 2026": a day as the app writes it wherever the year matters. One
- * fixed format in English, like the rest of the app; the phone's language
- * used to leak in ("23. Sept. 2026") next to raw "2026-07-03".
+ * "Sep 5, 2026" / "5. Sept. 2026": a day wherever the year matters. The
+ * phone's language used to leak in ("23. Sept. 2026") next to raw
+ * "2026-07-03"; now it is the app's language everywhere.
  */
 export function formatDay(ymd: string | null | undefined): string {
   if (!ymd) return '';
-  return fromYmd(ymd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return fromYmd(ymd).toLocaleDateString(appLocale(), { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-/** "Sep 24, 2026, 2:05 PM": a moment, for stamps like the last sync. */
+/** "Sep 5" this year, "Sep 5, 2025" another year. */
+export function formatDaySmart(d: Date | string): string {
+  const date = asDate(d);
+  return date.getFullYear() === new Date().getFullYear() ? formatMonthDay(date) : formatDay(toYmd(date));
+}
+
+/**
+ * A stretch of days: "Sep 12 – 18" / "12.–18. Sept." inside one month,
+ * "Sep 28 – Oct 3" / "28. Sept. – 3. Okt." across two.
+ */
+export function formatDayRange(start: Date | string, end: Date | string): string {
+  const s = asDate(start);
+  const e = asDate(end);
+  if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) {
+    if (activeLanguage() === 'de') {
+      return `${s.getDate()}.–${e.getDate()}. ${s.toLocaleDateString(appLocale(), { month: 'short' })}`;
+    }
+    return `${formatMonthDay(s)} – ${e.getDate()}`;
+  }
+  return `${formatMonthDay(s)} – ${formatMonthDay(e)}`;
+}
+
+/** "Saturday, November 7, 2026" / "Samstag, 7. November 2026". */
+export function formatLongDay(d: Date | string): string {
+  return asDate(d).toLocaleDateString(appLocale(), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+/** "Sat, Nov 7, 2026" / "Sa., 7. Nov. 2026". */
+export function formatWeekdayDay(d: Date | string): string {
+  return asDate(d).toLocaleDateString(appLocale(), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** "November 2026": the heading over a month. */
+export function formatMonthYear(d: Date | string): string {
+  return asDate(d).toLocaleDateString(appLocale(), { month: 'long', year: 'numeric' });
+}
+
+/** "Sep 24, 2026, 2:05 PM" / "24. Sept. 2026, 14:05": a moment, for stamps like the last sync. */
 export function formatMoment(iso: string): string {
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleString(appLocale(), { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }

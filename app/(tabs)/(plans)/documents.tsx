@@ -24,6 +24,7 @@ import { MissingRoute } from '../../../components/MissingRoute';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { useJourneyExists } from '../../../hooks/useJourneyExists';
 import { parseSyncStamp } from '../../../lib/syncTime';
+import { appLocale } from '../../../lib/i18n/locale';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -276,7 +277,7 @@ function DocumentTile({
   const uri = documentUri(doc.file_name);
   const image = isImageMime(doc.mime);
   const pdf = isPdfMime(doc.mime);
-  const added = parseSyncStamp(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const added = parseSyncStamp(doc.created_at).toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' });
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.tileWrap, pressed && { opacity: 0.7 }]}>
       <Glass {...glassProps} style={[styles.tile, !hasGlass && styles.tileFallback]}>

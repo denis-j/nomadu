@@ -12,7 +12,7 @@ import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { useAuth } from '../../hooks/useAuth';
 import { getJourneyBySyncId, parseDate } from '../../lib/database';
-import { toYmd } from '../../lib/days';
+import { toYmd, formatDayRange } from '../../lib/days';
 import { joinJourney, myName, previewInvite, setPendingInvite, type InvitePreview } from '../../lib/sharing';
 import { pullSharedJourneysFromCloud } from '../../lib/sync';
 import { showToast } from '../../lib/toast';
@@ -25,14 +25,9 @@ const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
-const fmt = (ymd: string) => parseDate(ymd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
 /** "Nov 10 – 13" inside a month, "Nov 28 – Dec 2" across one, as on the itinerary. */
 function fmtRange(start: string, end: string): string {
-  const s = parseDate(start);
-  const e = parseDate(end);
-  if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) return `${fmt(start)} – ${e.getDate()}`;
-  return `${fmt(start)} – ${fmt(end)}`;
+  return formatDayRange(start, end);
 }
 
 /** "in 49 days", "Tomorrow", "Under way": when the trip starts, from today. */

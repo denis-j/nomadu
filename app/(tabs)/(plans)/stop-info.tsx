@@ -34,6 +34,7 @@ import { ACTIVITIES_UI } from '../../../lib/activityModel';
 import { formatMoney, nightsBetween, primaryOption } from '../../../lib/accommodationModel';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { activeLanguage, appLocale } from '../../../lib/i18n/locale';
 
 type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
@@ -63,7 +64,7 @@ const hasGlass = isLiquidGlassAvailable();
 const GlassCard = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
-const fmtLong = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+const fmtLong = (d: Date) => d.toLocaleDateString(appLocale(), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
 /** Where the stop stands from today: "Starts in 50 days", "Today: Day 2 of 4", "Ended 3 days ago". */
 function whenStat(start: Date, end: Date, days: number, t: TFunc): { label: string; value: string; unit?: string } {
@@ -83,7 +84,12 @@ function whenStat(start: Date, end: Date, days: number, t: TFunc): { label: stri
 function visaLabel(rule: VisaRule | null, t: TFunc): string | null {
   if (!rule) return null;
   if (rule.ruleType === 'visa_required') return t('stopInfo.visaRequired');
-  return rule.label;
+  // English keeps the rule's own label; other languages rebuild it from the
+  // numbers, since the label is English data ("60 days visa-free").
+  if (activeLanguage() === 'en') return rule.label;
+  if (rule.ruleType === 'rolling_window') return t('stopInfo.visaWindow', { n: rule.allowedDays, window: rule.windowDays });
+  if (rule.ruleType === 'visa_on_arrival') return rule.allowedDays > 0 ? t('stopInfo.visaOnArrivalDays', { n: rule.allowedDays }) : t('stopInfo.visaOnArrival');
+  return rule.allowedDays > 0 ? t('stopInfo.visaFreeDays', { n: rule.allowedDays }) : t('stopInfo.visaFree');
 }
 
 /** The second line of the stay card: nights, the pick, what it costs. */
@@ -232,7 +238,7 @@ export default function StopInfoScreen() {
 
         {/* Stats: each fact once; the dates themselves are in the card below */}
         <StatRow style={styles.statsRow}>
-          <StatTile label={t('stopInfo.duration')} value={`${days}`} unit={days === 1 ? t('stopInfo.day') : t('stopInfo.days')} />
+          <StatTile label={t('stopInfo.duration')} value={`${days}`} unit={days === 1 ? t('stopInfo.day') : t('stopInfo.durationDays')} />
           <StatTile label={when.label} value={when.value} unit={when.unit} />
           <StatTile label={t('plans.transport')} value={t(`transport.${transport.type}`)} icon={transport.icon} />
         </StatRow>

@@ -11,9 +11,10 @@ import { Typography, FontSize } from '../../../constants/typography';
 import { useAccommodation } from '../../../hooks/useAccommodations';
 import { removeAccommodationOption, selectAccommodationOption, type LocalAccommodation } from '../../../lib/accommodations';
 import { formatMoney, nightsBetween, optionNightlyPrice } from '../../../lib/accommodationModel';
-import { parseDate } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { appLocale } from '../../../lib/i18n/locale';
+import { formatDayRange } from '../../../lib/days';
 
 type Params = {
   stopSyncId: string;
@@ -27,12 +28,8 @@ type Params = {
   readOnly?: string;
 };
 
-const fmtShort = (ymd: string) => parseDate(ymd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 function fmtRange(start: string, end: string): string {
-  const s = parseDate(start);
-  const e = parseDate(end);
-  if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) return `${fmtShort(start)} – ${e.getDate()}`;
-  return `${fmtShort(start)} – ${fmtShort(end)}`;
+  return formatDayRange(start, end);
 }
 
 function mapsUrl(address: string): string {
@@ -139,7 +136,7 @@ export default function StayOptionSheet() {
             ) : null}
             {o.review_count !== null ? (
               <>
-                <DetailRow icon="chatbubble-outline" label={t('stayOption.reviews')} value={`${o.review_count.toLocaleString('en-US')}`} />
+                <DetailRow icon="chatbubble-outline" label={t('stayOption.reviews')} value={`${o.review_count.toLocaleString(appLocale())}`} />
                 <DetailSeparator />
               </>
             ) : null}
@@ -169,7 +166,7 @@ export default function StayOptionSheet() {
             {o.last_checked_at ? (
               <>
                 <DetailSeparator />
-                <DetailRow icon="time-outline" label={t('stayOption.checked')} value={new Date(o.last_checked_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
+                <DetailRow icon="time-outline" label={t('stayOption.checked')} value={new Date(o.last_checked_at).toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' })} />
               </>
             ) : null}
           </DetailCard>

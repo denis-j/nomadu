@@ -15,6 +15,7 @@ import {
   type Language,
 } from '../lib/i18n/translations';
 import { localizedCountryName } from '../lib/i18n/country';
+import { setActiveLanguage } from '../lib/i18n/locale';
 
 const LANGUAGE_STORAGE_KEY = '@app_language';
 
@@ -65,6 +66,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>(deviceLanguage);
   const [isExplicit, setIsExplicit] = useState(false);
   const [ready, setReady] = useState(false);
+  // Dates and numbers formatted outside React read the language from here.
+  setActiveLanguage(language);
 
   // Read the stored preference once on mount.
   useEffect(() => {

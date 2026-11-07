@@ -1,5 +1,6 @@
 import { PillRow } from './PillRow';
 import type { YearFilter } from '../lib/yearFilter';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface YearPickerProps {
   /** Available years to choose from (newest first). */
@@ -15,8 +16,9 @@ interface YearPickerProps {
  * calendar year (or "All Time"). The pills themselves are the shared PillRow.
  */
 export function YearPicker({ years, value, onChange, includeAllTime = true }: YearPickerProps) {
+  const { t } = useTranslation();
   const options = [
-    ...(includeAllTime ? [{ label: 'All Time', year: null as YearFilter }] : []),
+    ...(includeAllTime ? [{ label: t('comp.allTime'), year: null as YearFilter }] : []),
     ...years.map((y) => ({ label: String(y), year: y as YearFilter })),
   ];
 

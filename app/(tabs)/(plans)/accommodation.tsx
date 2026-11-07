@@ -35,8 +35,7 @@ import {
   type AccommodationRequirements,
   type AccommodationStatus,
 } from '../../../lib/accommodationModel';
-import { parseDate } from '../../../lib/database';
-import { toYmd } from '../../../lib/days';
+import { toYmd, formatDayRange } from '../../../lib/days';
 import { cityCoords, forwardGeocode } from '../../../lib/geocoding';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
@@ -66,14 +65,9 @@ const hasGlass = isLiquidGlassAvailable();
 const GlassCard = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
-const fmtShort = (ymd: string) => parseDate(ymd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
 /** "Nov 10 – 13" inside a month, "Nov 28 – Dec 2" across one, as on the itinerary. */
 function fmtRange(start: string, end: string): string {
-  const s = parseDate(start);
-  const e = parseDate(end);
-  if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) return `${fmtShort(start)} – ${e.getDate()}`;
-  return `${fmtShort(start)} – ${fmtShort(end)}`;
+  return formatDayRange(start, end);
 }
 
 /** What a person can still say about the status that the plan's data does not already: arrived, stayed, called off, or back on. */

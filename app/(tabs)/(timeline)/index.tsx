@@ -34,6 +34,7 @@ import { countryCodeToFlag } from '../../../lib/geocoding';
 import { Flag } from '../../../components/Flag';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { EmptyState } from '../../../components/EmptyState';
+import { appLocale } from '../../../lib/i18n/locale';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -62,7 +63,7 @@ function GapIndicator({ fromDate, toDate, days, onAdd }: {
   onAdd: (from: Date, to: Date) => void;
 }) {
   const { t } = useTranslation();
-  const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const fmt = (d: Date) => d.toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' });
   return (
     <TouchableOpacity style={gapStyles.row} onPress={() => onAdd(fromDate, toDate)} activeOpacity={0.7}>
       <View style={gapStyles.lineSegment} pointerEvents="none" />
@@ -223,12 +224,12 @@ function CountryGroupCard({
 
   const fmtShort = (s: string) => {
     const d = parseDate(s);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' });
   };
 
   const dateRange = latestEnd
     ? `${fmtShort(earliest)} – ${fmtShort(latestEnd)}`
-    : `${fmtShort(earliest)} – Present`;
+    : `${fmtShort(earliest)} – ${t('comp.present')}`;
 
   const GroupShell = hasGlass ? GlassView : View;
 
@@ -261,7 +262,7 @@ function CountryGroupCard({
                 </Text>
               </View>
               <View style={groupStyles.daysBadge}>
-                <Text style={groupStyles.daysText}>{group.totalDays}d</Text>
+                <Text style={groupStyles.daysText}>{t('comp.daysShort', { n: group.totalDays })}</Text>
               </View>
             </View>
           </View>
@@ -677,7 +678,7 @@ export default function TimelineScreen() {
         const sortKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
         if (!grouped.has(sortKey)) {
           grouped.set(sortKey, {
-            title: cursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+            title: cursor.toLocaleDateString(appLocale(), { month: 'long', year: 'numeric' }),
             monthStart: new Date(cursor.getFullYear(), cursor.getMonth(), 1),
             monthEnd: new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0),
             data: [],
@@ -948,19 +949,19 @@ export default function TimelineScreen() {
               </PillShell>
               <View style={styles.sectionStats}>
                 <Text style={styles.sectionStatValue}>{section.tripCount}</Text>
-                <Text style={styles.sectionStatLabel}>{section.tripCount === 1 ? 'trip' : 'trips'}</Text>
+                <Text style={styles.sectionStatLabel}>{section.tripCount === 1 ? t('comp.tripOne') : t('comp.tripMany')}</Text>
                 <Text style={styles.sectionStatSep}>·</Text>
                 <Text style={styles.sectionStatValue}>{section.totalDays}</Text>
-                <Text style={styles.sectionStatLabel}>days</Text>
+                <Text style={styles.sectionStatLabel}>{section.totalDays === 1 ? t('comp.dayOne') : t('comp.dayMany')}</Text>
                 {section.hasOverlap && (
                   <View style={styles.warningBadge}>
-                    <Text style={styles.warningBadgeText}>overlap</Text>
+                    <Text style={styles.warningBadgeText}>{t('comp.overlap')}</Text>
                   </View>
                 )}
                 {!section.hasOverlap && section.gaps.length > 0 && (
                   <View style={styles.gapBadge}>
                     <Text style={styles.gapBadgeText}>
-                      {section.gaps.reduce((sum, g) => sum + g.days, 0)}d gap
+                      {t('comp.gapDays', { n: section.gaps.reduce((sum, g) => sum + g.days, 0) })}
                     </Text>
                   </View>
                 )}

@@ -21,6 +21,7 @@ import { showToast } from '../../../lib/toast';
 import { track } from '../../../lib/analytics';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { HeaderAction } from '../../../components/HeaderAction';
+import { appLocale } from '../../../lib/i18n/locale';
 
 type Params = {
   mode: 'link' | 'manual';
@@ -32,7 +33,7 @@ type Params = {
   id?: string;
 };
 
-const fmtShort = (ymd: string) => parseDate(ymd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const fmtShort = (ymd: string) => parseDate(ymd).toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' });
 
 /**
  * The system's own paste button where there is one (iOS 16+). Reading the

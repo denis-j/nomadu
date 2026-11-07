@@ -82,7 +82,7 @@ export default function BadgeLibraryScreen() {
         </Glass>
 
         <Text style={styles.intro}>
-          Tap any badge to view it in 3D. Locked badges are countries you haven&apos;t visited yet.
+          {t('badge.tapHint')}
         </Text>
 
         <View style={styles.grid}>

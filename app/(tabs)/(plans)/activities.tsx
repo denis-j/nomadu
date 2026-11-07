@@ -19,10 +19,11 @@ import { addActivity, type LocalActivity } from '../../../lib/activities';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { locateActivities } from '../../../lib/activityPlaces';
 import { suggestActivities, type ActivitySuggestion } from '../../../lib/ai';
-import { getJourneyWithLegs, parseDate, type JourneyLeg, type JourneyWithLegs } from '../../../lib/database';
+import { getJourneyWithLegs, type JourneyLeg, type JourneyWithLegs } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
 import { track } from '../../../lib/analytics';
 import { EmptyState } from '../../../components/EmptyState';
+import { formatDayRange } from '../../../lib/days';
 
 type Params = {
   /** The journey's local id, for its stops. */
@@ -42,13 +43,9 @@ const PillShell = hasGlass ? GlassView : View;
 const GlassCard = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
-const fmtShort = (ymd: string) => parseDate(ymd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 /** "Nov 6 – 13" inside a month, "Nov 28 – Dec 2" across one, as on the itinerary. */
 function fmtRange(start: string, end: string): string {
-  const s = parseDate(start);
-  const e = parseDate(end);
-  if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) return `${fmtShort(start)} – ${e.getDate()}`;
-  return `${fmtShort(start)} – ${fmtShort(end)}`;
+  return formatDayRange(start, end);
 }
 
 /**

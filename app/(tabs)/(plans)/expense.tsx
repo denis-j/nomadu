@@ -20,6 +20,7 @@ import { EXPENSE_CATEGORY_ICONS, formatAmount } from '../../../lib/expenseModel'
 import { receiptImageUri, removeReceipt } from '../../../lib/receipts';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { appLocale } from '../../../lib/i18n/locale';
 
 type Params = { id: string; journeyId: string; readOnly?: string };
 
@@ -28,7 +29,7 @@ const GlassCard = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 const NO_STOP = '__none__';
-const fmtShort = (ymd: string) => parseDate(ymd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const fmtShort = (ymd: string) => parseDate(ymd).toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' });
 
 /**
  * One expense, built like a thing to do's sheet: the receipt on top with a

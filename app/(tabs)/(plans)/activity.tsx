@@ -18,6 +18,7 @@ import { type ActivityStatus } from '../../../lib/activityModel';
 import { getJourneyWithLegs, parseDate, type JourneyLeg } from '../../../lib/database';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { appLocale } from '../../../lib/i18n/locale';
 
 type Params = { id: string; journeyId: string; readOnly?: string };
 
@@ -26,7 +27,7 @@ const GlassCard = hasGlass ? GlassView : View;
 const glassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 
 const NOT_PLACED = '__none__';
-const fmtShort = (ymd: string) => parseDate(ymd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const fmtShort = (ymd: string) => parseDate(ymd).toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' });
 
 function mapsUrl(a: LocalActivity, city: string | undefined): string {
   const name = encodeURIComponent(a.place ?? a.title);

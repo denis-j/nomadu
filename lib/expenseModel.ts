@@ -14,6 +14,7 @@
  */
 
 import { invalid, isValidYmd, pickAmount, pickCurrency, pickText } from './accommodationModel';
+import { appLocale } from './i18n/locale';
 
 // ─── Vocabulary ──────────────────────────────────────────────────────────────
 
@@ -340,7 +341,7 @@ export function guessCategory(title: string): ExpenseCategory {
 /** "1,240" or "12.50": an amount without its currency, for a row with the code set apart. */
 export function formatAmount(amount: number): string {
   const whole = Number.isInteger(amount);
-  return amount.toLocaleString('en-US', { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
+  return amount.toLocaleString(appLocale(), { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
 }
 
 /** The sign a currency is written with, where there is one people know: € for EUR. */
@@ -353,7 +354,7 @@ const SIGN_OF: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', JPY: 
  * stays in the list.
  */
 export function tileAmount(amount: number, currency: string): { value: string; unit?: string } {
-  const whole = Math.round(amount).toLocaleString('en-US');
+  const whole = Math.round(amount).toLocaleString(appLocale());
   const sign = SIGN_OF[currency];
   return sign ? { value: `${sign}${whole}` } : { value: whole, unit: currency };
 }

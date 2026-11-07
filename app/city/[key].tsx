@@ -11,6 +11,7 @@ import { Flag } from '../../components/Flag';
 import { Colors } from '../../constants/colors';
 import { Typography, FontSize } from '../../constants/typography';
 import { mapState } from '../../lib/mapState';
+import { appLocale } from '../../lib/i18n/locale';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -61,7 +62,7 @@ export default function CityDetailScreen() {
   const coordTrip = trips.find((t) => t.latitude && t.longitude);
 
   const formatDate = (dateStr: string) =>
-    parseDate(dateStr).toLocaleDateString('en-US', {
+    parseDate(dateStr).toLocaleDateString(appLocale(), {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -155,7 +156,7 @@ export default function CityDetailScreen() {
                     <View style={styles.timelineCardTop}>
                       <Text style={styles.visitNumber}>{t('cityScreen.visitN', { n: index + 1 })}</Text>
                       <View style={styles.daysBadge}>
-                        <Text style={styles.daysText}>{trip.days}d</Text>
+                        <Text style={styles.daysText}>{t('comp.daysShort', { n: trip.days })}</Text>
                       </View>
                     </View>
                     <Text style={styles.dateRange}>{dateRange}</Text>

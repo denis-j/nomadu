@@ -167,7 +167,7 @@ export default function CreateDatesScreen() {
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLocation}>{city}, {countryName(country)}</Text>
           <View style={styles.daysBubble}>
-            <Text style={styles.daysText}>{days}d</Text>
+            <Text style={styles.daysText}>{t('comp.daysShort', { n: days })}</Text>
           </View>
         </View>
 

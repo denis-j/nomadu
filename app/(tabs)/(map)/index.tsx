@@ -24,6 +24,7 @@ import { TaxStatus } from '../../../lib/taxCalculations';
 import { SCHENGEN_COUNTRIES } from '../../../constants/visaRules';
 import { checkLocationPermissions, foregroundLocationCheck, isTrackingActive, startBackgroundTracking } from '../../../lib/location';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { appLocale } from '../../../lib/i18n/locale';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const EXPANDED_WIDTH = SCREEN_WIDTH - 32;
@@ -77,7 +78,7 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
   const arrivedDate = parseDate(currentTrip.start_date);
   const now = new Date();
   const sameYear = arrivedDate.getFullYear() === now.getFullYear();
-  const arrived = arrivedDate.toLocaleDateString('en-US', {
+  const arrived = arrivedDate.toLocaleDateString(appLocale(), {
     month: 'short',
     day: 'numeric',
     ...(sameYear ? {} : { year: '2-digit' }),
@@ -164,11 +165,11 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
 
           {/* Row 1: Here · Arrived · Total */}
           <View style={styles.statsRow}>
-            <StatItem value={`${currentTrip.days}d`} label={t('map.here')} />
+            <StatItem value={t('comp.daysShort', { n: currentTrip.days })} label={t('map.here')} />
             <View style={styles.statSep} />
             <StatItem value={arrived} label={t('map.arrived')} />
             <View style={styles.statSep} />
-            <StatItem value={`${totalDaysInCity}d`} label={t('map.allStays')} />
+            <StatItem value={t('comp.daysShort', { n: totalDaysInCity })} label={t('map.allStays')} />
           </View>
 
           {/* Row 2: Visa + Tax */}
@@ -190,7 +191,7 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
                   <View style={styles.trackingItem}>
                     <Text style={styles.trackingLabel}>{t('map.tax')}</Text>
                     <Text style={[styles.trackingValue, { color: taxStatusColor(taxStatus.status) }]}>
-                      {taxStatus.daysPresent}/{taxStatus.thresholdDays}d
+                      {t('comp.daysShort', { n: `${taxStatus.daysPresent}/${taxStatus.thresholdDays}` })}
                     </Text>
                     <Text style={styles.trackingSubLabel}>{t('map.rule183')}</Text>
                   </View>

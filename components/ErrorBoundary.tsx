@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 import { reportError } from '../lib/monitoring';
+import { translate } from '../lib/i18n/translate';
 
 interface Props {
   children: React.ReactNode;
@@ -55,19 +56,16 @@ export class ErrorBoundary extends React.Component<Props, State> {
           <Ionicons name="cloud-offline-outline" size={30} color={Colors.textSecondary} />
         </View>
 
-        <Text style={styles.title}>Something went wrong</Text>
-        <Text style={styles.body}>
-          Nomadu ran into an unexpected problem and needs to restart. Your trips are stored on
-          this device and are safe.
-        </Text>
+        <Text style={styles.title}>{translate('comp.somethingWrong')}</Text>
+        <Text style={styles.body}>{translate('comp.crashBody')}</Text>
 
         <Pressable
           onPress={this.restart}
           style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
           accessibilityRole="button"
-          accessibilityLabel="Restart Nomadu"
+          accessibilityLabel={translate('comp.restartApp')}
         >
-          <Text style={styles.buttonText}>Restart</Text>
+          <Text style={styles.buttonText}>{translate('comp.restart')}</Text>
         </Pressable>
       </View>
     );

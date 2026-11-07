@@ -9,6 +9,7 @@ import { countryCodeToFlag } from '../lib/geocoding';
 import { Flag } from './Flag';
 import { DaysBadge, listCardStyles } from './ListCard';
 import { useTranslation } from '../contexts/LanguageContext';
+import { appLocale } from '../lib/i18n/locale';
 
 const hasGlass = isLiquidGlassAvailable();
 
@@ -30,11 +31,11 @@ export function TripCard({ trip, daysOverride, hasOverlap, compact, onDelete, on
   const endDate = trip.end_date ? parseDate(trip.end_date) : null;
 
   const formatDate = (date: Date) =>
-    date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    date.toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' });
 
   const dateRange = endDate
     ? `${formatDate(startDate)} – ${formatDate(endDate)}`
-    : `${formatDate(startDate)} – Present`;
+    : `${formatDate(startDate)} – ${t('comp.present')}`;
 
   const isActive = !trip.end_date;
 
@@ -87,10 +88,10 @@ export function TripCard({ trip, daysOverride, hasOverlap, compact, onDelete, on
           <View style={listCardStyles.topRight}>
             {hasOverlap && (
               <View style={styles.overlapChip}>
-                <Text style={styles.overlapChipText}>overlap</Text>
+                <Text style={styles.overlapChipText}>{t('comp.overlap')}</Text>
               </View>
             )}
-            <DaysBadge label={`${daysOverride ?? trip.days}d`} warn={hasOverlap} />
+            <DaysBadge label={t('comp.daysShort', { n: daysOverride ?? trip.days })} warn={hasOverlap} />
           </View>
         </View>
 

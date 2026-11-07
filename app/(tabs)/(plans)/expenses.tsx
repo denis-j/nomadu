@@ -25,6 +25,7 @@ import { showToast } from '../../../lib/toast';
 import { track } from '../../../lib/analytics';
 import { FormCard, FormField } from '../../../components/FormField';
 import { EmptyState } from '../../../components/EmptyState';
+import { appLocale } from '../../../lib/i18n/locale';
 
 type Params = {
   journeyId: string;
@@ -43,7 +44,7 @@ function dayLabel(ymd: string, t: TFunc): string {
   if (ymd === toYmd(y)) return t('expenses.yesterday');
   const d = fromYmd(ymd);
   const sameYear = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
+  return d.toLocaleDateString(appLocale(), { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
 }
 
 /** What a new expense is in: what the last one was in, else the money of the stop you are at, else the first stop's. */

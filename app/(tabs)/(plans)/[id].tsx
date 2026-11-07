@@ -58,7 +58,7 @@ import { calculateAllVisaStatuses, VisaStatus } from '../../../lib/visaCalculati
 import { getAllUserVisas } from '../../../lib/userVisas';
 import { calculateAllTaxStatuses, TaxStatus } from '../../../lib/taxCalculations';
 import { SCHENGEN_COUNTRIES, getRuleForCitizen } from '../../../constants/visaRules';
-import { chainDates, countDays, fromYmd, toYmd } from '../../../lib/days';
+import { chainDates, countDays, fromYmd, toYmd, formatDayRange } from '../../../lib/days';
 import { getCountryCode } from '../../../utils/geography';
 import { useTranslation } from '../../../contexts/LanguageContext';
 
@@ -75,6 +75,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { MissingRoute } from '../../../components/MissingRoute';
 import { FormCard, FormField } from '../../../components/FormField';
+import { appLocale } from '../../../lib/i18n/locale';
 
 const hasGlass = isLiquidGlassAvailable();
 
@@ -137,7 +138,7 @@ function transportIcon(t: TransportType): string {
 
 function fmtShort(dateStr: string): string {
   const d = parseDate(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' });
 }
 
 /** "Sep 12 – 18" inside one month, "Sep 28 – Oct 3" across. */
@@ -145,12 +146,7 @@ function fmtShort(dateStr: string): string {
 const lastVisaTax = new Map<string, { visa: VisaStatus[]; tax: TaxStatus[]; citizenship: string | null }>();
 
 function fmtRange(start: string, end: string): string {
-  const s = parseDate(start);
-  const e = parseDate(end);
-  if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) {
-    return `${fmtShort(start)} – ${e.getDate()}`;
-  }
-  return `${fmtShort(start)} – ${fmtShort(end)}`;
+  return formatDayRange(start, end);
 }
 
 /**
@@ -428,7 +424,7 @@ function TripMorphChip({
   maxWidth: { closed: number; open: number };
 }) {
   const { t } = useTranslation();
-  const span = tripSpan(legs);
+  const span = tripSpan(legs, t);
   const [chipWidth, setChipWidth] = useState(0);
   const [panelHeight, setPanelHeight] = useState(0);
   const progress = useSharedValue(0);
@@ -517,7 +513,7 @@ function TripMorphChip({
 }
 
 /** Span of the trip and its countries, for the chip and the summary bar. */
-function tripSpan(legs: JourneyLeg[]) {
+function tripSpan(legs: JourneyLeg[], t: (key: string, params?: Record<string, string | number>) => string) {
   if (legs.length === 0) return null;
   const start = legs.reduce((min, l) => (l.start_date < min ? l.start_date : min), legs[0].start_date);
   const end = legs.reduce((max, l) => (l.end_date > max ? l.end_date : max), legs[0].end_date);
@@ -531,11 +527,11 @@ function tripSpan(legs: JourneyLeg[]) {
   let status: string;
   if (today < start) {
     const until = countDays(parseDate(today), parseDate(start)) - 1;
-    status = until === 1 ? `Starts tomorrow · ${totalDays} days` : `Starts in ${until} days · ${totalDays} days`;
+    status = until === 1 ? t('trip.statusTomorrow', { total: totalDays }) : t('trip.statusIn', { n: until, total: totalDays });
   } else if (today > end) {
-    status = `${range} · ${totalDays} ${totalDays === 1 ? 'day' : 'days'}`;
+    status = totalDays === 1 ? t('trip.statusPastOne', { range }) : t('trip.statusPast', { range, total: totalDays });
   } else {
-    status = `Day ${countDays(parseDate(start), parseDate(today))} of ${totalDays}`;
+    status = t('trip.statusDayOf', { n: countDays(parseDate(start), parseDate(today)), total: totalDays });
   }
   return { start, end, totalDays, codes, range, status };
 }
@@ -694,7 +690,7 @@ const LegCard = React.memo(function LegCard({
             <View style={listCardStyles.top}>
               <Flag code={leg.country_code ?? ''} size={22} />
               <View style={listCardStyles.badge}>
-                <MorphText style={listCardStyles.badgeText}>{days}d</MorphText>
+                <MorphText style={listCardStyles.badgeText}>{t('comp.daysShort', { n: days })}</MorphText>
               </View>
             </View>
             <View style={styles.legBody}>
@@ -804,7 +800,7 @@ function SuggestionLegCard({
               <Ionicons name={transportIcon(suggestion.transport) as any} size={14} color={Colors.primary} />
             </View>
             <View style={listCardStyles.badge}>
-              <Text style={listCardStyles.badgeText}>{days}d</Text>
+              <Text style={listCardStyles.badgeText}>{tt('comp.daysShort', { n: days })}</Text>
             </View>
           </View>
         </View>

@@ -12,6 +12,7 @@ import { Typography } from '../../../constants/typography';
 import { auth, functions } from '../../../lib/firebase';
 import { showToast } from '../../../lib/toast';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { appLocale } from '../../../lib/i18n/locale';
 
 interface AgentToken {
   id: string;
@@ -87,7 +88,7 @@ export default function AgentAccessScreen() {
   const when = (iso: string) => {
     const d = new Date(iso);
     if (d.toDateString() === new Date().toDateString()) return t('agent.today');
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' });
   };
 
   const hasAgents = agents !== null && agents.length > 0;

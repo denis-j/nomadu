@@ -11,9 +11,10 @@ import { parseDate } from '../../../lib/database';
 import { createTripFromGuide } from '../../../lib/guides';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { HeaderAction } from '../../../components/HeaderAction';
+import { appLocale } from '../../../lib/i18n/locale';
 
 const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const human = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+const human = (d: Date) => d.toLocaleDateString(appLocale(), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
 const RANGE_COLOR = '#000000';
 const RANGE_BG = 'rgba(0,0,0,0.08)';
@@ -119,7 +120,7 @@ export default function GuideStartScreen() {
             }}
           />
         </Card>
-        <Text style={styles.foot}>The stops keep their order and length. Dates, notes and stays stay editable afterwards.</Text>
+        <Text style={styles.foot}>{t('comp.guideKeepsOrder')}</Text>
       </ScrollView>
     </>
   );

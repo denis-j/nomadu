@@ -87,7 +87,7 @@ export function CityTips({ city, country }: { city: string; country: string }) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator />
-        <Text style={styles.muted}>Getting tips…</Text>
+        <Text style={styles.muted}>{t('comp.tipsLoading')}</Text>
       </View>
     );
   }

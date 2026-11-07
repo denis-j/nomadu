@@ -16,6 +16,7 @@ import { showToast } from '../../../lib/toast';
 import { MissingRoute } from '../../../components/MissingRoute';
 import { parseSyncStamp } from '../../../lib/syncTime';
 import { useTranslation } from '../../../contexts/LanguageContext';
+import { appLocale } from '../../../lib/i18n/locale';
 
 /**
  * One document, full screen.
@@ -148,7 +149,7 @@ export default function DocumentScreen() {
               <Text style={styles.kindPillText}>{t(`docKind.${doc.kind}Short`)}</Text>
             </View>
             <Text style={styles.captionText} numberOfLines={1}>
-              {owner ? `${owner} · ` : ''}{t('document.addedCaption', { date: parseSyncStamp(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) })}
+              {owner ? `${owner} · ` : ''}{t('document.addedCaption', { date: parseSyncStamp(doc.created_at).toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' }) })}
             </Text>
           </View>
         )}

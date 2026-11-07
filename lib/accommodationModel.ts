@@ -12,6 +12,7 @@
  */
 
 import { countDays, fromYmd, toYmd } from './days';
+import { appLocale } from './i18n/locale';
 
 // ─── Vocabulary ──────────────────────────────────────────────────────────────
 
@@ -554,7 +555,7 @@ export function statusAfterUnselect(current: AccommodationStatus, optionsLeft: n
 export function formatMoney(amount: number | null, currency: string | null): string | null {
   if (amount === null || !currency) return null;
   const whole = Number.isInteger(amount);
-  const text = amount.toLocaleString('en-US', { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
+  const text = amount.toLocaleString(appLocale(), { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
   return `${text} ${currency}`;
 }
 

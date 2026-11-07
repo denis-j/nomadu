@@ -25,6 +25,7 @@ import { useProfile } from '../../../lib/profile';
 import { avatarSeed } from '../../../lib/avatarSeed';
 import { formatMoment } from '../../../lib/days';
 import { IMPRINT_URL, PRIVACY_URL, TERMS_URL, openLegal } from '../../../constants/legal';
+import { appLocale } from '../../../lib/i18n/locale';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -128,7 +129,7 @@ export default function SettingsScreen() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    return new Date(dateStr).toLocaleDateString(appLocale(), {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

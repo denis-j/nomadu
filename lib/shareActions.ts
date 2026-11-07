@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { forgetFollowedJourneyWithDocuments } from './documents';
 import { leaveJourney, presentInvite, shareJourney, unshareJourney, type ShareableJourney } from './sharing';
 import { showToast } from './toast';
+import { translate } from './i18n/translate';
 
 /**
  * The three things the trip menus do about friends, with their dialogs.
@@ -32,7 +33,7 @@ export function stopSharing(journey: ShareableJourney): Promise<void> {
           try {
             await unshareJourney(journey);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            showToast('No longer shared');
+            showToast(translate('comp.noLongerShared'));
           } catch (err: any) {
             showToast(err?.message ?? 'Could not stop sharing', 'error');
           }
@@ -58,7 +59,7 @@ export function leaveTrip(journey: ShareableJourney): Promise<void> {
               await forgetFollowedJourneyWithDocuments(journey.sync_id);
             }
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            showToast('You left the trip');
+            showToast(translate('comp.leftTrip'));
           } catch (err: any) {
             showToast(err?.message ?? 'Could not leave', 'error');
           }

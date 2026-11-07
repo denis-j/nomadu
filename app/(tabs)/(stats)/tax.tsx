@@ -11,7 +11,7 @@ import { Colors } from '../../../constants/colors';
 import { Typography, FontSize } from '../../../constants/typography';
 import { CloudyButton } from '../../../components/CloudyButton';
 import { DaysMeter, Footnote, PassportLine, TrackerCard } from '../../../components/TrackerParts';
-import { fromYmd } from '../../../lib/days';
+import { formatMonthDay, fromYmd } from '../../../lib/days';
 import { YearPicker } from '../../../components/YearPicker';
 import { TaxStatus } from '../../../lib/taxCalculations';
 import { useTranslation } from '../../../contexts/LanguageContext';
@@ -47,29 +47,24 @@ function getStatusColor(status: TaxStatus['status']): string {
   }
 }
 
-/** "Apr 6" or "6. Apr.": a day of a tax year, in the app's language. */
-function monthDay(ymd: string, language: string): string {
-  return fromYmd(ymd).toLocaleDateString(language === 'de' ? 'de-DE' : 'en-US', { month: 'short', day: 'numeric' });
-}
-
 /**
  * What the days are counted over, in the app's language. The status carries
  * an English label for the server; the stretch itself is rebuilt from its
  * dates here.
  */
-function periodText(tax: TaxStatus, t: TFunc, language: string): string {
+function periodText(tax: TaxStatus, t: TFunc): string {
   if (tax.periodKind === 'year') {
     const calendar = tax.periodStart.endsWith('-01-01') && tax.periodEnd.endsWith('-12-31');
     return calendar
       ? t('tax.ruleYear', { year: tax.periodStart.slice(0, 4) })
-      : t('tax.ruleTaxYear', { from: monthDay(tax.periodStart, language), to: monthDay(tax.periodEnd, language) });
+      : t('tax.ruleTaxYear', { from: formatMonthDay(tax.periodStart), to: formatMonthDay(tax.periodEnd) });
   }
   const span = (fromYmd(tax.periodEnd).getTime() - fromYmd(tax.periodStart).getTime()) / 86_400_000 + 1;
   return t('tax.ruleMonths', { months: Math.round(span / 30.4) });
 }
 
 function TaxCard({ tax }: { tax: TaxStatus }) {
-  const { t, countryName, language } = useTranslation();
+  const { t, countryName } = useTranslation();
   return (
     <TrackerCard
       code={tax.countryCode}
@@ -79,7 +74,7 @@ function TaxCard({ tax }: { tax: TaxStatus }) {
       <DaysMeter
         used={tax.daysPresent}
         allowed={tax.thresholdDays}
-        detail={periodText(tax, t, language)}
+        detail={periodText(tax, t)}
         color={getProgressColor(tax.percentUsed)}
       />
     </TrackerCard>

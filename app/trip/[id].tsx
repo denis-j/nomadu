@@ -14,6 +14,7 @@ import { SectionLabel } from '../../components/visaForm';
 import { StatRow, StatTile } from '../../components/StatTile';
 import { Colors } from '../../constants/colors';
 import { Typography, FontSize } from '../../constants/typography';
+import { appLocale } from '../../lib/i18n/locale';
 
 const hasGlass = isLiquidGlassAvailable();
 const GlassCard = hasGlass ? GlassView : View;
@@ -53,13 +54,13 @@ export default function TripDetailScreen() {
   // cut it to "Aug 26,…". The year is on the Arrival and Departure rows
   // right below, spelled out in full.
   const formatDate = (dateStr: string) =>
-    parseDate(dateStr).toLocaleDateString('en-US', {
+    parseDate(dateStr).toLocaleDateString(appLocale(), {
       month: 'short',
       day: 'numeric',
     });
 
   const formatDateLong = (dateStr: string) =>
-    parseDate(dateStr).toLocaleDateString('en-US', {
+    parseDate(dateStr).toLocaleDateString(appLocale(), {
       weekday: 'long',
       month: 'long',
       day: 'numeric',

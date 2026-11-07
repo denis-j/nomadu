@@ -28,6 +28,7 @@ import {
 } from '../../../lib/tripImport';
 import { track } from '../../../lib/analytics';
 import { EmptyState } from '../../../components/EmptyState';
+import { appLocale } from '../../../lib/i18n/locale';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -157,12 +158,12 @@ export default function ImportScreen() {
       setTimeout(() => {
         if (!cancelledRef.current) router.back();
         setTimeout(() => {
-          showToast(`Added ${inserted} ${inserted === 1 ? 'trip' : 'trips'}`);
+          showToast(inserted === 1 ? t('comp.importAddedOne') : t('comp.importAdded', { n: inserted }));
         }, 300);
       }, 600);
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      showToast(`Import failed: ${err?.message ?? String(err)}`, 'error');
+      showToast(t('comp.importFailed', { msg: err?.message ?? String(err) }), 'error');
       if (!cancelledRef.current) setStep('review');
     }
   }, [candidates, router]);
@@ -327,7 +328,7 @@ function ReviewStep({
     for (const c of candidates) {
       const d = new Date(c.startDate);
       const sortKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const title = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const title = d.toLocaleDateString(appLocale(), { month: 'long', year: 'numeric' });
       if (!map.has(sortKey)) map.set(sortKey, { title, sortKey, items: [] });
       map.get(sortKey)!.items.push(c);
     }
@@ -427,7 +428,7 @@ function CandidateRow({
   const { t, countryName } = useTranslation();
   const start = new Date(candidate.startDate);
   const end = candidate.endDate ? new Date(candidate.endDate) : null;
-  const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const fmtShort = (d: Date) => d.toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' });
   const dateRange = end ? `${fmtShort(start)} – ${fmtShort(end)}` : `${fmtShort(start)} – ${t('tlImport.present')}`;
   const days = end
     ? Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1)
