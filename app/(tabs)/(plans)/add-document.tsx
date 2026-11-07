@@ -26,6 +26,7 @@ import { useJourneyExists } from '../../../hooks/useJourneyExists';
 import { track } from '../../../lib/analytics';
 import { FormField } from '../../../components/FormField';
 import { HeaderAction } from '../../../components/HeaderAction';
+import { travellerName } from '../../../lib/i18n/translate';
 
 interface Picked {
   uri: string;
@@ -238,7 +239,7 @@ function AddDocumentScreenContent() {
           {(owner ? travellers.filter((t) => t.uid === user?.uid) : travellers).map((t) => (
             <ChoiceRow
               key={t.id}
-              title={travellerLabel(t, user?.uid ?? null, owner)}
+              title={travellerName(travellerLabel(t, user?.uid ?? null, owner))}
               selected={travellerId === t.id}
               onPress={() => setTravellerId(t.id)}
             />

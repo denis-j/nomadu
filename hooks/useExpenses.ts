@@ -5,6 +5,7 @@ import { useJourneyDocuments } from './useJourneyDocuments';
 import { avatarPeople, type AvatarPerson } from '../components/TravellerAvatars';
 import { getExpensesForJourney, type LocalExpense } from '../lib/expenses';
 import { sortExpenses } from '../lib/expenseModel';
+import { travellerName } from '../lib/i18n/translate';
 
 /**
  * The travellers of a journey as expenses name them: by their sync id,
@@ -30,7 +31,8 @@ export function useTravellerPeople(journeyId: number) {
     return mine?.sync_id ?? null;
   }, [travellers, uid, owner]);
   const travellerIds = useMemo(() => travellers.map((t) => t.sync_id).filter((id): id is string => !!id), [travellers]);
-  const nameOf = useCallback((id: string | null) => (id ? people.get(id)?.label ?? 'Someone' : 'Someone'), [people]);
+  // Names as shown: "You" stays the stored label in `people` and becomes "Du" here.
+  const nameOf = useCallback((id: string | null) => travellerName(id ? people.get(id)?.label ?? 'Someone' : 'Someone'), [people]);
   return { travellers, documents, owner, uid, loaded, refresh, people, meId, travellerIds, nameOf };
 }
 

@@ -31,6 +31,7 @@ import { showToast } from '../../../lib/toast';
 import { track } from '../../../lib/analytics';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { HeaderAction } from '../../../components/HeaderAction';
+import { travellerName } from '../../../lib/i18n/translate';
 
 type Params = {
   journeyId: string;
@@ -246,7 +247,7 @@ function Form({
     }
   };
 
-  const label = (t: JourneyTraveller) => travellerLabel(t, uid, owner);
+  const label = (t: JourneyTraveller) => travellerName(travellerLabel(t, uid, owner));
   const listed = travellers.filter((t) => t.sync_id);
 
   return (
@@ -285,7 +286,7 @@ function Form({
                 <ChoiceRow key={t.sync_id} title={label(t)} selected={among.has(t.sync_id!)} onPress={() => toggle(t.sync_id!)} last={i === listed.length - 1} />
               ))}
             </Card>
-            <Hint>{among.size === 0 ? (nameOf(paidBy) === 'You' ? t('expenses.notSplitYours') : t('expenses.notSplitName', { name: nameOf(paidBy) })) : each !== null ? t('expenses.eachShare', { amount: formatAmount(each), currency: effectiveCurrency }) : t('expenses.equalParts')}</Hint>
+            <Hint>{among.size === 0 ? (paidBy === meId ? t('expenses.notSplitYours') : t('expenses.notSplitName', { name: nameOf(paidBy) })) : each !== null ? t('expenses.eachShare', { amount: formatAmount(each), currency: effectiveCurrency }) : t('expenses.equalParts')}</Hint>
           </>
         )}
 

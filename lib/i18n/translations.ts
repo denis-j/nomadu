@@ -173,6 +173,8 @@ const en = {
     },
   },
   comp: {
+    you: 'You',
+    yourFriend: 'Your friend',
     tipsLoading: 'Getting tips…',
     guideKeepsOrder: 'The stops keep their order and length. Dates, notes and stays stay editable afterwards.',
     crashBody: 'Nomadu ran into an unexpected problem and needs to restart. Your trips are stored on this device and are safe.',
@@ -1450,6 +1452,8 @@ const de: TranslationTree = {
     },
   },
   comp: {
+    you: 'Du',
+    yourFriend: 'Dein Freund',
     tipsLoading: 'Tipps werden geladen…',
     guideKeepsOrder: 'Die Stopps behalten Reihenfolge und Länge. Daten, Notizen und Unterkünfte kannst du danach noch ändern.',
     crashBody: 'Nomadu hatte ein unerwartetes Problem und muss neu starten. Deine Reisen sind auf diesem Gerät gespeichert und sicher.',

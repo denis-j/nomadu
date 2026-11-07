@@ -116,7 +116,7 @@ export default function ExpenseSheet() {
 
         <View style={[styles.header, !picture && styles.headerAlone]}>
           <Text style={styles.title}>{e.title}</Text>
-          <Text style={styles.where}>{payer === 'You' ? t('expenses.youPaid') : t('expenses.paidByName', { name: payer })} · {formatDay(e.date)}</Text>
+          <Text style={styles.where}>{e.paid_by === meId ? t('expenses.youPaid') : t('expenses.paidByName', { name: payer })} · {formatDay(e.date)}</Text>
         </View>
 
         <StatRow style={styles.statsRow}>

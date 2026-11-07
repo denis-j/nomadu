@@ -25,6 +25,7 @@ import { useTranslation } from '../../../contexts/LanguageContext';
 import { useJourneyExists } from '../../../hooks/useJourneyExists';
 import { parseSyncStamp } from '../../../lib/syncTime';
 import { appLocale } from '../../../lib/i18n/locale';
+import { travellerName } from '../../../lib/i18n/translate';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -67,7 +68,7 @@ function DocumentsScreenContent() {
   // On one's own trip the first traveller is the user (ensureSelf creates it
   // at sort order 0); on a friend's trip it is whoever carries our account.
   const self = owner ? travellers.find((t) => t.uid === uid) : travellers[0];
-  const label = (t: JourneyTraveller) => travellerLabel(t, uid, owner);
+  const label = (t: JourneyTraveller) => travellerName(travellerLabel(t, uid, owner));
   // On a friend's trip the wallet has two tabs: mine, and everyone's.
   const shown = owner ? travellers.filter((t) => t.uid === uid) : travellers;
   const current = filter === 'all' ? null : travellers.find((t) => t.id === filter) ?? null;

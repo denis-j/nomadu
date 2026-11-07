@@ -12,6 +12,7 @@ import { deleteJourneyTraveller, getJourneyWithLegs, renameJourneyTraveller, typ
 import { SHARE_BASE, getMemberEditors, removeMember, setMemberCanEdit } from '../lib/sharing';
 import { inviteFriends, leaveTrip, stopSharing } from '../lib/shareActions';
 import { showToast } from '../lib/toast';
+import { travellerName } from '../lib/i18n/translate';
 
 
 /**
@@ -87,7 +88,7 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
   const remove = (trav: JourneyTraveller, p: AvatarPerson) => {
     const isMember = !!trav.uid && trav.uid !== uid;
     Alert.alert(
-      t('comp.removeNamedTitle', { name: p.label }),
+      t('comp.removeNamedTitle', { name: travellerName(p.label) }),
       isMember ? t('comp.removeMemberBody') : t('comp.theirDocsStay'),
       [
         { text: t('common.cancel'), style: 'cancel' },
@@ -103,7 +104,7 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
             });
             hide(true);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            showToast(t('comp.removedToast', { name: p.label }));
+            showToast(t('comp.removedToast', { name: travellerName(p.label) }));
             try {
               if (isMember && journey?.sync_id) {
                 await removeMember(journey.sync_id, trav.uid!);
@@ -113,7 +114,7 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
                 await deleteJourneyTraveller(trav.id);
               }
             } catch (err: any) {
-              showToast(err?.message ?? t('comp.couldNotRemoveNamed', { name: p.label }), 'error');
+              showToast(err?.message ?? t('comp.couldNotRemoveNamed', { name: travellerName(p.label) }), 'error');
             }
             await reload();
             hide(false);
@@ -128,7 +129,7 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
     try {
       await setMemberCanEdit(syncId, trav.uid, canEdit);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast(canEdit ? t('comp.canPlanNow', { name: p.label }) : t('comp.canViewNow', { name: p.label }));
+      showToast(canEdit ? t('comp.canPlanNow', { name: travellerName(p.label) }) : t('comp.canViewNow', { name: travellerName(p.label) }));
     } catch (err: any) {
       showToast(err?.message ?? t('comp.couldNotChange'), 'error');
     }
@@ -152,7 +153,7 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
     ];
     ActionSheetIOS.showActionSheetWithOptions(
       {
-        title: p.label,
+        title: travellerName(p.label),
         message: member ? (editing ? t('comp.canAddChange') : t('comp.canView')) : undefined,
         options,
         destructiveButtonIndex: self ? undefined : options.length - 2,
@@ -187,7 +188,7 @@ export function TravellersContent({ journeyId, onChanged, onClose }: { journeyId
               ) : null}
             </View>
             {/* First name only under a face; the full name is in the menu title. */}
-            <Text style={styles.name} numberOfLines={1}>{p.label.split(/\s+/)[0]}</Text>
+            <Text style={styles.name} numberOfLines={1}>{travellerName(p.label).split(/\s+/)[0]}</Text>
           </Pressable>
         ))}
         {isOwner && (

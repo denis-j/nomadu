@@ -39,7 +39,7 @@ export function ExpenseRow({
   const split = e.shares.length === 0
     ? t('expenses.notSplitLower')
     : e.shares.length === 1
-      ? (e.shares[0].traveller_id === e.paid_by ? (payer === 'You' ? t('comp.yourOwn') : t('expenses.theirOwn')) : t('expenses.forName', { name: nameOf(e.shares[0].traveller_id) }))
+      ? (e.shares[0].traveller_id === e.paid_by ? (e.paid_by === meId ? t('comp.yourOwn') : t('expenses.theirOwn')) : t('expenses.forName', { name: nameOf(e.shares[0].traveller_id) }))
       : t('expenses.splitWays', { count: e.shares.length });
   const mine = shareOf(e, meId);
   const showMine = e.shares.length > 1 && mine > 0;
@@ -61,7 +61,7 @@ export function ExpenseRow({
         )}
         <View style={styles.text}>
           <Text style={styles.title} numberOfLines={1}>{e.title}</Text>
-          <Text style={styles.sub} numberOfLines={1}>{payer === 'You' ? t('expenses.youPaid') : t('expenses.paidByName', { name: payer })} · {split}</Text>
+          <Text style={styles.sub} numberOfLines={1}>{e.paid_by === meId ? t('expenses.youPaid') : t('expenses.paidByName', { name: payer })} · {split}</Text>
         </View>
         <View style={styles.right}>
           <Text style={styles.amount}>{formatAmount(e.amount)} <Text style={styles.currency}>{e.currency}</Text></Text>
