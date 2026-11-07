@@ -691,35 +691,26 @@ const LegCard = React.memo(function LegCard({
             <View style={styles.dot} />
           </View>
           <CardWrap {...cardProps} style={[styles.legCard, !hasGlass && styles.legCardFallback]}>
-            <View style={styles.legMain}>
-              {/* Flag */}
-              <Flag code={leg.country_code ?? ''} size={28} style={styles.legFlagWrap} />
-
-              {/* Center info */}
-              <View style={styles.legCenter}>
-                <Text style={styles.legCity}>{leg.city}</Text>
-                <Text style={styles.legCountry}>{countryName(leg.country)}</Text>
-                <MorphText style={styles.legDates}>
-                  {fmtRange(leg.start_date, leg.end_date)}
-                </MorphText>
-                {leg.notes ? (
-                  <Text style={styles.legNotes} numberOfLines={2}>{leg.notes}</Text>
-                ) : null}
-              </View>
-
-              {/* Right badges */}
-              <View style={styles.legRight}>
-                <View style={styles.daysBadge}>
-                  <MorphText style={styles.daysText}>{days}d</MorphText>
-                </View>
+            {/* Flag and days on top, then the name: the same build as a card in the Verlauf. */}
+            <View style={styles.legTop}>
+              <Flag code={leg.country_code ?? ''} size={22} />
+              <View style={styles.daysBadge}>
+                <MorphText style={styles.daysText}>{days}d</MorphText>
               </View>
             </View>
+            <View style={styles.legBody}>
+              <Text style={styles.legCity}>{leg.city}</Text>
+              <Text style={styles.legCountry}>{countryName(leg.country)}</Text>
+              <MorphText style={styles.legDates}>
+                {fmtRange(leg.start_date, leg.end_date)}
+              </MorphText>
+              {leg.notes ? (
+                <Text style={styles.legNotes} numberOfLines={2}>{leg.notes}</Text>
+              ) : null}
+            </View>
 
-            {/* The chips under the whole row, in line with the city: beside
-                the days badge the text column was a few points too narrow
-                for two of them side by side. */}
             {chips.length > 0 && (
-              <View style={[styles.statusChipsRow, styles.statusChipsInset]}>
+              <View style={styles.statusChipsRow}>
                 {chips.map((chip, i) => (
                   <View key={i} style={[styles.statusChip, { backgroundColor: chip.icon ? Colors.surfaceSecondary : chip.color + '14' }]}>
                     {chip.icon && <Ionicons name={chip.icon} size={12} color={chip.color} style={styles.statusChipIcon} />}
@@ -807,8 +798,18 @@ function SuggestionLegCard({
         accessibilityLabel={tt('trip.addNamed', { city: suggestion.city, country: suggestion.country })}
         style={({ pressed }) => [styles.suggCard, pressed && { opacity: 0.6 }, disabled && { opacity: 0.5 }]}
       >
-        <Flag code={countryCode} size={28} style={styles.legFlagWrap} />
-        <View style={styles.legCenter}>
+        <View style={styles.legTop}>
+          <Flag code={countryCode} size={22} />
+          <View style={styles.legTopRight}>
+            <View style={styles.transportBadge}>
+              <Ionicons name={transportIcon(suggestion.transport) as any} size={14} color={Colors.primary} />
+            </View>
+            <View style={styles.daysBadge}>
+              <Text style={styles.daysText}>{days}d</Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.legBody}>
           <Text style={styles.legCity}>{suggestion.city}</Text>
           <Text style={styles.legCountry}>{countryName(suggestion.country)}</Text>
           <Text style={styles.legDates}>
@@ -818,14 +819,6 @@ function SuggestionLegCard({
           <View style={styles.suggAdd}>
             <Ionicons name="add" size={14} color={Colors.text} />
             <Text style={styles.suggAddText}>{tt('trip.addThisStop')}</Text>
-          </View>
-        </View>
-        <View style={styles.legRight}>
-          <View style={styles.daysBadge}>
-            <Text style={styles.daysText}>{days}d</Text>
-          </View>
-          <View style={styles.transportBadge}>
-            <Ionicons name={transportIcon(suggestion.transport) as any} size={14} color={Colors.primary} />
           </View>
         </View>
       </Pressable>
@@ -841,7 +834,7 @@ function SuggestionSkeleton() {
       </View>
       <View style={styles.suggCard}>
         <View style={styles.skeletonFlag} />
-        <View style={styles.legCenter}>
+        <View style={styles.legBody}>
           <View style={[styles.skeletonBar, { width: '55%' }]} />
           <View style={[styles.skeletonBar, { width: '35%' }]} />
           <View style={[styles.skeletonBar, { width: '80%', marginTop: 8 }]} />
@@ -1686,21 +1679,24 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderCurve: 'continuous',
   },
-  legMain: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
   legCardFallback: {
     backgroundColor: Colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
   },
-  legFlagWrap: {
-    marginTop: 2,
+  // Flag and badges in one row on top, the text below: the build of TripCard.
+  legTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
-  legCenter: {
-    flex: 1,
+  legTopRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legBody: {
     gap: 2,
   },
   legCity: {
@@ -1725,8 +1721,6 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 8,
   },
-  // Flag width plus the gap: the chips start where the city does.
-  statusChipsInset: { marginLeft: 28 + 12 },
   statusChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1739,10 +1733,6 @@ const styles = StyleSheet.create({
   statusChipText: {
     ...Typography.caption,
     fontWeight: '600',
-  },
-  legRight: {
-    alignItems: 'flex-end',
-    gap: 6,
   },
   daysBadge: {
     backgroundColor: Colors.primary + '14',
@@ -1865,9 +1855,6 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     padding: 16,
     marginBottom: 4,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
   },
   suggReason: {
     ...Typography.bodySmall,
@@ -1887,11 +1874,11 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   skeletonFlag: {
-    width: 28,
-    height: 20,
+    width: 30,
+    height: 22,
     borderRadius: 4,
     backgroundColor: Colors.border,
-    marginTop: 2,
+    marginBottom: 8,
   },
   skeletonBar: {
     height: 10,

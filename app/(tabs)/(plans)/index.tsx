@@ -155,20 +155,19 @@ function JourneyCard({
         {...cardProps}
         style={[styles.card, !hasGlass && styles.cardFallback]}
       >
-        {/* Title */}
-        <Text style={styles.cardTitle} numberOfLines={1}>{journey.title}</Text>
-
-        {/* Country flags row */}
+        {/* Flags on top, then the name: the same build as a card in the Verlauf. */}
         {countryCodes.length > 0 && (
           <View style={styles.flagsRow}>
             {countryCodes.slice(0, 8).map((code, i) => (
-              <Flag key={`${code}-${i}`} code={code} size={20} />
+              <Flag key={`${code}-${i}`} code={code} size={22} />
             ))}
             {countryCodes.length > 8 && (
               <Text style={styles.flagMore}>+{countryCodes.length - 8}</Text>
             )}
           </View>
         )}
+
+        <Text style={styles.cardTitle} numberOfLines={1}>{journey.title}</Text>
 
         {/* Date range + meta row */}
         <View style={styles.cardBottom}>
