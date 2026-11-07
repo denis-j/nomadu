@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { Fragment, useCallback, useLayoutEffect, useState, type ReactNode } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -11,7 +11,7 @@ import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import Svg, { Circle } from 'react-native-svg';
 import { CloudBackdrop, type CloudPatch } from '../../../components/CloudBackdrop';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useStats } from '../../../hooks/useStats';
 import { useVisaTracker } from '../../../hooks/useVisaTracker';
@@ -27,6 +27,8 @@ import type { YearFilter } from '../../../lib/yearFilter';
 import type { Stats } from '../../../lib/database';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { EmptyState } from '../../../components/EmptyState';
+import { useTrackingLayout, type HeroMetric, type TrackingSection } from '../../../hooks/useTrackingLayout';
+import type { VisaStatus } from '../../../lib/visaCalculations';
 
 const hasGlass = isLiquidGlassAvailable();
 const Glass = hasGlass ? GlassView : View;
@@ -39,6 +41,27 @@ export default function StatsScreen() {
   const { visaStatuses, loading: visaLoading, refresh: refreshVisa } = useVisaTracker();
   const { taxStatuses, loading: taxLoading, refresh: refreshTax } = useTaxTracker();
   const [refreshing, setRefreshing] = useState(false);
+  const layout = useTrackingLayout();
+  const navigation = useNavigation();
+
+  // The way into arranging this tab, where the other tabs keep their plus.
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          hitSlop={12}
+          onPress={() => {
+            Haptics.selectionAsync();
+            router.push('/(tabs)/(stats)/customize');
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t('trackCustom.open')}
+        >
+          <Ionicons name="options-outline" size={24} color={Colors.text} />
+        </Pressable>
+      ),
+    });
+  }, [navigation, t]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -73,32 +96,10 @@ export default function StatsScreen() {
     );
   }
 
-  return (
-    <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-    >
-      <YearPicker
-        years={stats.availableYears}
-        value={yearFilter}
-        onChange={setYearFilter}
-      />
-
-      {/* Hero: days away, with a share-of-period bar */}
-      <StatsHero stats={stats} yearFilter={yearFilter} home={home} />
-
-      {/* Coverage, stated plainly. It is a data-quality hint, not a score:
-          the gap is days with no recorded location, not days spent at home. */}
-      {yearFilter !== null && stats.daysInWindow > 0 && (
-        <Text style={styles.coverage}>
-          {t('stats.daysTrackedLine', { tracked: stats.daysTracked, total: stats.daysInWindow })}
-          {stats.daysTracked < stats.daysInWindow
-            ? t('stats.withNoLocation', { count: stats.daysInWindow - stats.daysTracked })
-            : ''}
-        </Text>
-      )}
-
+  // Every block below the big card, by id, so the order can be the user's.
+  const sections: Record<TrackingSection, ReactNode> = {
+    tiles: (
+      <>
       {/* 2-col mini grid */}
       <View style={styles.miniRow}>
         <MiniStatCard
@@ -129,7 +130,10 @@ export default function StatsScreen() {
           accentColor={Colors.accent}
         />
       </View>
-
+      </>
+    ),
+    tracking: (
+      <>
       {/* Active tracking: Visa + Tax side-by-side, always 2-col */}
       <View style={styles.countriesSection}>
         <Text style={styles.sectionTitle}>{t('stats.activeTracking')}</Text>
@@ -184,15 +188,24 @@ export default function StatsScreen() {
           )}
         </View>
       </View>
-
+      </>
+    ),
+    chart: (
+      <>
       {/* Monthly bar chart, only in year mode */}
       {stats.daysAwayByMonth && stats.daysAwayByMonth.some((d: number) => d > 0) && (
         <MonthlyChart days={stats.daysAwayByMonth} year={yearFilter as number} />
       )}
-
+      </>
+    ),
+    badges: (
+      <>
       {/* Badge Library overview, always all-time; the year filter does not apply */}
       <BadgesSection visitedCodes={new Set(stats.allTimeCountryCodes)} />
-
+      </>
+    ),
+    top: (
+      <>
       {/* Top destinations, horizontal scroll */}
       {stats.topCountries.length > 0 && (
         <View style={styles.topDestSection}>
@@ -214,6 +227,38 @@ export default function StatsScreen() {
           </ScrollView>
         </View>
       )}
+      </>
+    ),
+  };
+
+  return (
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+    >
+      <YearPicker
+        years={stats.availableYears}
+        value={yearFilter}
+        onChange={setYearFilter}
+      />
+
+      {/* Hero: days away, with a share-of-period bar */}
+      <StatsHero stats={stats} yearFilter={yearFilter} home={home} metric={layout.hero} visa={mostCritical} />
+
+      {/* Coverage, stated plainly. It is a data-quality hint, not a score:
+          the gap is days with no recorded location, not days spent at home. */}
+      {yearFilter !== null && stats.daysInWindow > 0 && (
+        <Text style={styles.coverage}>
+          {t('stats.daysTrackedLine', { tracked: stats.daysTracked, total: stats.daysInWindow })}
+          {stats.daysTracked < stats.daysInWindow
+            ? t('stats.withNoLocation', { count: stats.daysInWindow - stats.daysTracked })
+            : ''}
+        </Text>
+      )}
+
+      {/* The blocks in the order and selection this person chose (Customize). */}
+      {layout.order.filter((id) => !layout.hidden.includes(id)).map((id) => <Fragment key={id}>{sections[id]}</Fragment>)}
     </ScrollView>
   );
 }
@@ -253,10 +298,16 @@ function StatsHero({
   stats,
   yearFilter,
   home,
+  metric,
+  visa,
 }: {
   stats: Stats;
   yearFilter: YearFilter;
   home: { code: string; country: string } | null;
+  /** What the person chose to see big (Customize); falls back when it has nothing to show. */
+  metric: HeroMetric;
+  /** The visa that runs out first, for the "visa days left" choice. */
+  visa: VisaStatus | null;
 }) {
   const { t, countryName } = useTranslation();
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -264,19 +315,35 @@ function StatsHero({
 
   // "Days tracked" could only ever answer how complete the location history is,
   // because a person is always somewhere. Days away from the home country is a
-  // number that separates someone who travelled from someone who didn't.
-  const value = isYearMode ? stats.daysAway : stats.totalCountries;
-  const unit = isYearMode
-    ? `${t(stats.daysAway === 1 ? 'stats.dayAway' : 'stats.daysAway')}${home ? t('stats.awayFrom', { country: countryName(home.country) }) : ''}`
-    : t(stats.totalCountries === 1 ? 'stats.countryVisited' : 'stats.countriesVisited');
+  // number that separates someone who travelled from someone who didn't. In
+  // "all time" there is no window to be away in, so the card counts countries.
+  const show: HeroMetric = metric === 'visa' && !visa ? 'away' : metric === 'away' && !isYearMode ? 'countries' : metric;
 
-  const pct = isYearMode
-    ? (stats.daysInWindow > 0 ? Math.min(100, (stats.daysAway / stats.daysInWindow) * 100) : 0)
-    : Math.min(100, (stats.totalCountries / TOTAL_COUNTRIES) * 100);
-  // One word. The denominator (the days elapsed) is already on screen in the
-  // coverage line right under the card; repeating it inside a 72px ring
-  // squeezed three words into eight-point type.
-  const ringSub = isYearMode ? t('stats.ringAway') : t('stats.ringOfWorld');
+  let eyebrow = isYearMode ? `${yearFilter}` : t('stats.allTime');
+  let value: number;
+  let unit: string;
+  let pct: number;
+  // One word. The denominator is already on screen nearby; repeating it
+  // inside a 72px ring squeezed three words into eight-point type.
+  let ringSub: string;
+  if (show === 'visa' && visa) {
+    const place = visa.destinationCode === 'SCHENGEN' ? t('visa.schengen') : countryName(visa.destination);
+    eyebrow = t('stats.visa');
+    value = visa.daysRemaining;
+    unit = t(visa.daysRemaining === 1 ? 'trackCustom.dayLeftIn' : 'trackCustom.visaLeftIn', { country: place });
+    pct = visa.daysAllowed > 0 ? Math.min(100, (visa.daysUsed / visa.daysAllowed) * 100) : 0;
+    ringSub = t('trackCustom.ringUsed');
+  } else if (show === 'countries') {
+    value = stats.totalCountries;
+    unit = t(stats.totalCountries === 1 ? 'stats.countryVisited' : 'stats.countriesVisited');
+    pct = Math.min(100, (stats.totalCountries / TOTAL_COUNTRIES) * 100);
+    ringSub = t('stats.ringOfWorld');
+  } else {
+    value = stats.daysAway;
+    unit = `${t(stats.daysAway === 1 ? 'stats.dayAway' : 'stats.daysAway')}${home ? t('stats.awayFrom', { country: countryName(home.country) }) : ''}`;
+    pct = stats.daysInWindow > 0 ? Math.min(100, (stats.daysAway / stats.daysInWindow) * 100) : 0;
+    ringSub = t('stats.ringAway');
+  }
   const dashOffset = RING_CIRCUMFERENCE * (1 - pct / 100);
 
   return (
@@ -290,7 +357,7 @@ function StatsHero({
       <CloudBackdrop width={size.w} height={size.h} patches={HERO_PATCHES} blur={7} />
       <View style={heroStyles.row}>
         <View style={heroStyles.textBlock}>
-          <Text style={heroStyles.eyebrow}>{isYearMode ? `${yearFilter}` : t('stats.allTime')}</Text>
+          <Text style={heroStyles.eyebrow}>{eyebrow}</Text>
           <Text style={heroStyles.value}>{value}</Text>
           <Text style={heroStyles.unit}>{unit}</Text>
         </View>
@@ -866,6 +933,7 @@ function TopDestinationCard({
   country: string;
   days: number;
 }) {
+  const { t } = useTranslation();
   const isPodium = rank === 1;
   return (
     <Glass
@@ -891,7 +959,7 @@ function TopDestinationCard({
         </Text>
         <View style={topStyles.daysRow}>
           <Text style={topStyles.days}>{days}</Text>
-          <Text style={topStyles.daysUnit}>days</Text>
+          <Text style={topStyles.daysUnit}>{days === 1 ? t('comp.dayOne') : t('comp.dayMany')}</Text>
         </View>
       </View>
     </Glass>

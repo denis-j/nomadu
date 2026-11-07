@@ -60,6 +60,15 @@ export default function StatsStack() {
         }}
       />
       <Stack.Screen
+        name="customize"
+        options={{
+          presentation: sheetWithHeader,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.85, 1.0],
+          contentStyle: { backgroundColor: sheetBackground },
+        }}
+      />
+      <Stack.Screen
         name="tax"
         options={{
           title: t('nav.taxResidence'),
