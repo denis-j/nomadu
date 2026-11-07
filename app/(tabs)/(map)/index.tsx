@@ -384,9 +384,9 @@ const styles = StyleSheet.create({
   chipContainer: {
     position: 'absolute',
     // iOS lays the tab bar over the map, Android ends the map above it.
-    // Above Apple Maps' legal line in the bottom-left corner, which the chip
-    // overlapped at 100.
-    bottom: Platform.OS === 'ios' ? 124 : 24,
+    // Apple's logo and legal link moved to the top (components/MapView), so
+    // nothing sits under the chip down here.
+    bottom: Platform.OS === 'ios' ? 100 : 24,
     left: 0,
     right: 0,
     alignItems: 'center',

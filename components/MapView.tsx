@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import RNMapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Trip } from '../lib/database';
@@ -33,6 +34,7 @@ interface MapViewProps {
 }
 
 export function MapView({ trips }: MapViewProps) {
+  const insets = useSafeAreaInsets();
   const mapRef = useRef<RNMapView>(null);
   const markerRefs = useRef<Map<string, any>>(new Map());
   const selectedKeyRef = useRef<string | null>(null);
@@ -119,6 +121,11 @@ export function MapView({ trips }: MapViewProps) {
         showsCompass
         showsScale
         mapType="standard"
+        // Apple's logo and legal link have to stay visible, but not at the
+        // bottom, where the trip chip and the tab bar sit: top left, under
+        // the status bar, where the map has nothing else.
+        appleLogoInsets={{ left: 16, top: insets.top + 6, right: 0, bottom: 0 }}
+        legalLabelInsets={{ left: 16, top: insets.top + 30, right: 0, bottom: 0 }}
       >
         {markers.map((marker) => (
           <Marker
