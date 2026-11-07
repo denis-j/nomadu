@@ -25,13 +25,6 @@ export const ACTIVITIES_UI = true;
 export const ACTIVITY_STATUSES = ['idea', 'planned', 'booked', 'done'] as const;
 export type ActivityStatus = (typeof ACTIVITY_STATUSES)[number];
 
-export const ACTIVITY_STATUS_LABELS: Record<ActivityStatus, string> = {
-  idea: 'Idea',
-  planned: 'Planned',
-  booked: 'Booked',
-  done: 'Done',
-};
-
 export const ACTIVITY_CATEGORIES = [
   'food',
   'cafe',
@@ -47,21 +40,6 @@ export const ACTIVITY_CATEGORIES = [
   'other',
 ] as const;
 export type ActivityCategory = (typeof ACTIVITY_CATEGORIES)[number];
-
-export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, string> = {
-  food: 'Food',
-  cafe: 'Café',
-  nightlife: 'Nightlife',
-  sight: 'Sightseeing',
-  culture: 'Culture',
-  nature: 'Nature',
-  beach: 'Beach',
-  tour: 'Tour',
-  sport: 'Sport',
-  wellness: 'Wellness',
-  shopping: 'Shopping',
-  other: 'Other',
-};
 
 /** Ionicons per category, for the list and the chips. */
 export const ACTIVITY_CATEGORY_ICONS: Record<ActivityCategory, string> = {
@@ -181,13 +159,6 @@ const STATUS_ORDER: Record<ActivityStatus, number> = { booked: 0, planned: 1, id
 export function sortActivities<T extends Pick<Activity, 'status' | 'sort_order' | 'title'>>(list: T[]): T[] {
   return [...list].sort((a, b) =>
     STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.sort_order - b.sort_order || a.title.localeCompare(b.title));
-}
-
-/** "3 things to do" on a stop's card; null when there are none. */
-export function activitiesChipText(list: Pick<Activity, 'status' | 'deleted'>[]): string | null {
-  const live = list.filter((a) => !a.deleted);
-  if (live.length === 0) return null;
-  return live.length === 1 ? '1 thing to do' : `${live.length} things to do`;
 }
 
 /** Which platform a shared link is from, for the source and the import. */

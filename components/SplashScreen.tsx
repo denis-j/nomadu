@@ -139,17 +139,4 @@ const styles = StyleSheet.create({
     gap: 24,
     paddingHorizontal: 32,
   },
-  iconWrapper: {
-    shadowColor: '#0A3A5C',
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.22,
-    shadowRadius: 28,
-    elevation: 16,
-  },
-  icon: {
-    width: 124,
-    height: 124,
-    borderRadius: 28,
-    borderCurve: 'continuous',
-  },
 });

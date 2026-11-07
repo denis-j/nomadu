@@ -305,13 +305,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   // ─── Skeleton ───
-  skeletonCard: {
-    height: 100,
-    borderRadius: listCardStyles.shell.borderRadius,
-    backgroundColor: Colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
 
   // ─── Inline empty state ───
 

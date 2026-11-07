@@ -379,8 +379,6 @@ function JourneyMapCard({ legs, headerHeight, onPress }: { legs: JourneyLeg[]; h
   );
 }
 
-const ChipShell = hasGlass ? GlassView : View;
-const chipGlassProps = hasGlass ? { glassEffectStyle: 'regular' as const } : {};
 /** The bar's height; the discs and the chip are as tall as this. */
 const BAR_H = 44;
 /** The faces inside the closed chip. */
@@ -1882,14 +1880,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   barSpacer: { flex: 1 },
-  disc: {
-    width: BAR_H,
-    height: BAR_H,
-    borderRadius: BAR_H / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
   morphSlot: {
     position: 'absolute',
     left: 0,

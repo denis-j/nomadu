@@ -644,27 +644,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 4,
     marginTop: -4,
   },
-  calendarHint: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    paddingTop: 12,
-  },
 
-  section: {
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 4,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.7)',
-  },
-  sectionFallback: {
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderColor: Colors.border,
-  },
   separator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: 'rgba(0, 0, 0, 0.08)',
@@ -685,7 +665,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
   },
   dateValue: { ...Typography.titleSmall, fontWeight: '500', fontVariant: ['tabular-nums'] },
-  dateValueMuted: { color: Colors.textSecondary },
   calendarInline: { marginHorizontal: -12, paddingVertical: 4 },
 
   caption: {

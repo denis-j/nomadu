@@ -220,27 +220,6 @@ const styles = StyleSheet.create({
   formContainer: {
     marginBottom: 48,
   },
-  section: {
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 4,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.7)',
-  },
-  sectionFallback: {
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderColor: Colors.border,
-  },
-  inputRow: {
-    paddingVertical: 16,
-  },
-  input: {
-    ...Typography.titleSmall,
-    fontWeight: '400',
-  },
   successText: {
     ...Typography.bodySmall,
     color: Colors.success,

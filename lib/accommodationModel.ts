@@ -69,17 +69,6 @@ export const ACCOMMODATION_TYPES = [
 ] as const;
 export type AccommodationType = (typeof ACCOMMODATION_TYPES)[number];
 
-export const TYPE_LABELS: Record<AccommodationType, string> = {
-  hotel: 'Hotel',
-  apartment: 'Apartment',
-  airbnb: 'Airbnb',
-  condo: 'Condo',
-  hostel: 'Hostel',
-  guesthouse: 'Guesthouse',
-  coliving: 'Coliving',
-  other: 'Something else',
-};
-
 /** Amenities the app offers as chips. Any other word is kept as typed. */
 export const KNOWN_AMENITIES: { key: string; label: string }[] = [
   { key: 'wifi', label: 'Fast Wi-Fi' },
@@ -94,10 +83,6 @@ export const KNOWN_AMENITIES: { key: string; label: string }[] = [
   { key: 'parking', label: 'Parking' },
   { key: 'breakfast', label: 'Breakfast' },
 ];
-
-export function amenityLabel(key: string): string {
-  return KNOWN_AMENITIES.find((a) => a.key === key)?.label ?? key;
-}
 
 // ─── Shapes ──────────────────────────────────────────────────────────────────
 
@@ -285,10 +270,6 @@ function pickDate(value: unknown, fallback: string, field: string): string {
 
 const CURRENCY = /^[A-Z]{3}$/;
 const MAX_AMOUNT = 10_000_000;
-
-export function isValidCurrency(value: unknown): value is string {
-  return typeof value === 'string' && CURRENCY.test(value);
-}
 
 /** Money is a number with two decimals and a currency beside it, never a string. */
 export function pickAmount(value: unknown, fallback: number | null, field: string): number | null {
@@ -565,11 +546,6 @@ export function advanceStatus(current: AccommodationStatus, target: Accommodatio
 export function statusAfterUnselect(current: AccommodationStatus, optionsLeft: number): AccommodationStatus {
   if (current !== 'selected' && current !== 'deciding') return current;
   return optionsLeft > 0 ? 'options_available' : 'searching';
-}
-
-/** Is the plan past the point where options still matter? */
-export function isSettled(status: AccommodationStatus): boolean {
-  return STATUS_RANK[status] >= STATUS_RANK.booked;
 }
 
 // ─── Presentation helpers shared by app and API ──────────────────────────────

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -578,16 +577,6 @@ const rowStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 14 : 18,
-    paddingBottom: 4,
-  },
-  headerBtn: { padding: 4 },
-  headerTitle: { ...Typography.buttonLarge },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   committingText: { ...Typography.bodySmall, fontSize: FontSize.subheadline, color: Colors.textSecondary },
   bottomBar: {

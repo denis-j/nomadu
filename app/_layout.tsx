@@ -150,15 +150,6 @@ function RootNavigator() {
         }}
       />
       <Stack.Screen
-        name="paywall"
-        options={{
-          headerShown: false,
-          presentation: 'formSheet',
-          sheetGrabberVisible: true,
-          contentStyle: { backgroundColor: sheetBackground },
-        }}
-      />
-      <Stack.Screen
         name="join/[code]"
         options={{
           headerShown: false,

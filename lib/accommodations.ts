@@ -9,7 +9,6 @@ import {
   removeOption,
   saveBooking,
   selectOption,
-  setNotes,
   setStatus,
   updateOption,
   updatePlan,
@@ -321,10 +320,6 @@ export async function updateAccommodation(stopSyncId: string, input: unknown): P
 
 export async function setAccommodationStatus(stopSyncId: string, status: AccommodationStatus): Promise<LocalAccommodation> {
   return writeLocal(setStatus(await requirePlan(stopSyncId), status));
-}
-
-export async function setAccommodationNotes(stopSyncId: string, notes: string | null): Promise<LocalAccommodation> {
-  return writeLocal(setNotes(await requirePlan(stopSyncId), notes));
 }
 
 export async function addAccommodationOption(stopSyncId: string, input: unknown): Promise<LocalAccommodation> {

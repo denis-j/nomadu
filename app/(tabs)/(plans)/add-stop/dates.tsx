@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
-import { systemColor } from '../../../../constants/colors';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
@@ -8,7 +7,6 @@ import { StopSummary } from '../../../../components/StopSummary';
 import { parseDate } from '../../../../lib/database';
 import { useTranslation } from '../../../../contexts/LanguageContext';
 import { HeaderAction } from '../../../../components/HeaderAction';
-import { FontSize } from '../../../../constants/typography';
 
 type Params = {
   journeyId: string;
@@ -174,10 +172,5 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 12,
     paddingBottom: 60,
-  },
-  hint: {
-    fontSize: FontSize.footnote,
-    color: systemColor('secondaryLabel'),
-    textAlign: 'center',
   },
 });

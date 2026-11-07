@@ -1136,10 +1136,6 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingBottom: 100,
   },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
   coverage: {
     ...Typography.bodySmall,
     color: Colors.textSecondary,
@@ -1154,37 +1150,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  card: {
-    borderRadius: 20,
-    padding: 20,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
-  },
-  cardFallback: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  cardWide: {
-    flex: 2,
-  },
-  combiRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  combiStat: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-  },
-  combiDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: Colors.border,
-  },
-  combiLabel: {
-    ...Typography.label,
-  },
   countriesSection: {
     gap: 10,
   },
@@ -1194,36 +1159,4 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
   },
   sectionTitle: { ...Typography.sectionLabel, paddingLeft: 4 },
-  cardPressed: {
-    opacity: 0.7,
-  },
-  visaCard: {
-    borderRadius: 20,
-    padding: 18,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
-  },
-  visaCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  visaInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  visaText: {
-    flex: 1,
-    gap: 2,
-  },
-  visaDestination: {
-    ...Typography.titleSmall,
-    fontWeight: '700',
-  },
-  visaPreview: {
-    ...Typography.label,
-    fontVariant: ['tabular-nums'],
-  },
 });

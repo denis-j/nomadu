@@ -20,17 +20,6 @@ import { invalid, isValidYmd, pickAmount, pickCurrency, pickText } from './accom
 export const EXPENSE_CATEGORIES = ['food', 'drinks', 'transport', 'stay', 'activity', 'groceries', 'shopping', 'other'] as const;
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 
-export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
-  food: 'Food',
-  drinks: 'Drinks',
-  transport: 'Transport',
-  stay: 'Stay',
-  activity: 'Activity',
-  groceries: 'Groceries',
-  shopping: 'Shopping',
-  other: 'Other',
-};
-
 /** Ionicons per category, for the rows and the chips. */
 export const EXPENSE_CATEGORY_ICONS: Record<ExpenseCategory, string> = {
   food: 'restaurant-outline',
@@ -119,13 +108,6 @@ export function rescaleShares(shares: ExpenseShare[], amount: number): ExpenseSh
     rest -= extra;
     return { traveller_id: s.traveller_id, amount: (scaled[i] + extra) / 100 };
   });
-}
-
-/** Does every share carry the same amount, give or take the odd cent? */
-export function isEqualSplit(shares: ExpenseShare[]): boolean {
-  if (shares.length < 2) return true;
-  const all = shares.map((s) => cents(s.amount));
-  return Math.max(...all) - Math.min(...all) <= 1;
 }
 
 /** This traveller's part of the expense, 0 when they are not in it. */
