@@ -3,7 +3,6 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
-import { ToastContainer } from '../../../components/Toast';
 import {
   EntriesFields,
   IdentityFields,
@@ -212,10 +211,6 @@ export default function EditVisaScreen() {
           </Pressable>
         )}
       </ScrollView>
-      {/* Sheet-level toast, sits in this sheet's view hierarchy so it renders
-          above the form. The toast handler stack ensures this one wins while
-          the sheet is mounted; the root container takes over again on pop. */}
-      <ToastContainer />
     </>
   );
 }

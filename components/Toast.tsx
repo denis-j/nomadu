@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
+import { FullWindowOverlay } from 'react-native-screens';
 import Animated, { Easing, FadeOut, SlideInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { registerToast, ToastData } from '../lib/toast';
 import { Colors } from '../constants/colors';
 import { Typography } from '../constants/typography';
 
+/**
+ * The toast at the top of the screen. On iOS it draws in a FullWindowOverlay,
+ * a window of its own above everything: a native sheet (formSheet) is shown
+ * above the app's root view, so a toast mounted there played its sound and
+ * haptic behind the sheet where nobody could see it.
+ */
 export function ToastContainer() {
   const [toast, setToast] = useState<ToastData | null>(null);
   const insets = useSafeAreaInsets();
@@ -25,7 +32,7 @@ export function ToastContainer() {
   if (!toast) return null;
   const isError = toast.type === 'error';
 
-  return (
+  const content = (
     <View style={[styles.wrapper, { top: insets.top + 8 }]} pointerEvents="none">
       <Animated.View
         entering={SlideInUp.duration(400).easing(Easing.out(Easing.cubic))}
@@ -37,6 +44,7 @@ export function ToastContainer() {
       </Animated.View>
     </View>
   );
+  return Platform.OS === 'ios' ? <FullWindowOverlay>{content}</FullWindowOverlay> : content;
 }
 
 const styles = StyleSheet.create({
