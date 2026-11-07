@@ -25,6 +25,7 @@ import { parseDate, type Journey } from '../../../lib/database';
 import { deleteJourneyWithDocuments } from '../../../lib/documents';
 import { inviteFriends, leaveTrip, stopSharing } from '../../../lib/shareActions';
 import { Flag } from '../../../components/Flag';
+import { listCardStyles } from '../../../components/ListCard';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { EmptyState } from '../../../components/EmptyState';
 
@@ -167,10 +168,10 @@ function JourneyCard({
           </View>
         )}
 
-        <Text style={styles.cardTitle} numberOfLines={1}>{journey.title}</Text>
+        <Text style={listCardStyles.title} numberOfLines={1}>{journey.title}</Text>
 
         {/* Date range + meta row */}
-        <View style={styles.cardBottom}>
+        <View style={[styles.cardBottom, listCardStyles.metaAfterTitle]}>
           <View style={styles.cardMeta}>
             <Text style={styles.cardDateRange}>{dateRange}</Text>
             {hasLegs && (
@@ -306,7 +307,7 @@ const styles = StyleSheet.create({
   // ─── Skeleton ───
   skeletonCard: {
     height: 100,
-    borderRadius: 20,
+    borderRadius: listCardStyles.shell.borderRadius,
     backgroundColor: Colors.surfaceSecondary,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -316,29 +317,22 @@ const styles = StyleSheet.create({
 
   // ─── Card ───
   cardTouchable: {
-    borderRadius: 20,
+    borderRadius: listCardStyles.shell.borderRadius,
     overflow: 'hidden',
   },
   card: {
-    borderRadius: 20,
-    padding: 18,
-    gap: 10,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
+    ...listCardStyles.shell,
   },
   cardFallback: {
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  cardTitle: {
-    ...Typography.cardTitle,
-  },
   flagsRow: {
-    flexDirection: 'row',
+    ...listCardStyles.top,
+    justifyContent: 'flex-start',
     flexWrap: 'wrap',
     gap: 4,
-    alignItems: 'center',
   },
   flagMore: {
     ...Typography.cardMeta,
@@ -356,15 +350,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexWrap: 'wrap',
   },
-  cardDateRange: {
-    ...Typography.cardMeta,
-  },
-  cardMetaDot: {
-    ...Typography.cardMeta,
-  },
-  cardMetaText: {
-    ...Typography.cardMeta,
-  },
+  cardDateRange: listCardStyles.meta,
+  cardMetaDot: listCardStyles.meta,
+  cardMetaText: listCardStyles.meta,
   // ─── Featured section ───
   featSection: {
     marginTop: 8,

@@ -64,6 +64,7 @@ import { useTranslation } from '../../../contexts/LanguageContext';
 
 type TFunc = (key: string, params?: Record<string, string | number>) => string;
 import { Flag } from '../../../components/Flag';
+import { listCardStyles } from '../../../components/ListCard';
 import { suggestNextStops, StopSuggestion } from '../../../lib/ai';
 import { cachedMapSnapshot, storeMapSnapshot } from '../../../lib/mapSnapshot';
 import { Image } from 'expo-image';
@@ -692,10 +693,10 @@ const LegCard = React.memo(function LegCard({
           </View>
           <CardWrap {...cardProps} style={[styles.legCard, !hasGlass && styles.legCardFallback]}>
             {/* Flag and days on top, then the name: the same build as a card in the Verlauf. */}
-            <View style={styles.legTop}>
+            <View style={listCardStyles.top}>
               <Flag code={leg.country_code ?? ''} size={22} />
-              <View style={styles.daysBadge}>
-                <MorphText style={styles.daysText}>{days}d</MorphText>
+              <View style={listCardStyles.badge}>
+                <MorphText style={listCardStyles.badgeText}>{days}d</MorphText>
               </View>
             </View>
             <View style={styles.legBody}>
@@ -798,14 +799,14 @@ function SuggestionLegCard({
         accessibilityLabel={tt('trip.addNamed', { city: suggestion.city, country: suggestion.country })}
         style={({ pressed }) => [styles.suggCard, pressed && { opacity: 0.6 }, disabled && { opacity: 0.5 }]}
       >
-        <View style={styles.legTop}>
+        <View style={listCardStyles.top}>
           <Flag code={countryCode} size={22} />
-          <View style={styles.legTopRight}>
+          <View style={listCardStyles.topRight}>
             <View style={styles.transportBadge}>
               <Ionicons name={transportIcon(suggestion.transport) as any} size={14} color={Colors.primary} />
             </View>
-            <View style={styles.daysBadge}>
-              <Text style={styles.daysText}>{days}d</Text>
+            <View style={listCardStyles.badge}>
+              <Text style={listCardStyles.badgeText}>{days}d</Text>
             </View>
           </View>
         </View>
@@ -1674,41 +1675,18 @@ const styles = StyleSheet.create({
   // ─── Leg card ───
   legCard: {
     flex: 1,
-    borderRadius: 18,
-    padding: 16,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
+    ...listCardStyles.shell,
   },
   legCardFallback: {
     backgroundColor: Colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
   },
-  // Flag and badges in one row on top, the text below: the build of TripCard.
-  legTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  legTopRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legBody: {
-    gap: 2,
-  },
-  legCity: {
-    ...Typography.cardTitle,
-  },
-  legCountry: {
-    ...Typography.cardSubtitle,
-  },
-  legDates: {
-    ...Typography.cardMeta,
-    marginTop: 2,
-  },
+  // The text of a stop card spaces like the Verlauf card (components/ListCard).
+  legBody: {},
+  legCity: listCardStyles.title,
+  legCountry: listCardStyles.subtitle,
+  legDates: listCardStyles.meta,
   legNotes: {
     ...Typography.bodySmall,
     color: Colors.textTertiary,
@@ -1733,19 +1711,6 @@ const styles = StyleSheet.create({
   statusChipText: {
     ...Typography.caption,
     fontWeight: '600',
-  },
-  daysBadge: {
-    backgroundColor: Colors.primary + '14',
-    borderRadius: 8,
-    borderCurve: 'continuous',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  daysText: {
-    ...Typography.caption,
-    fontWeight: '700',
-    color: Colors.primary,
-    fontVariant: ['tabular-nums'],
   },
   transportBadge: {
     width: 28,
@@ -1848,12 +1813,12 @@ const styles = StyleSheet.create({
   },
   suggCard: {
     flex: 1,
-    borderRadius: 18,
+    borderRadius: listCardStyles.shell.borderRadius,
     borderCurve: 'continuous',
     borderWidth: 1.5,
     borderStyle: 'dashed',
     borderColor: Colors.border,
-    padding: 16,
+    padding: listCardStyles.shell.padding,
     marginBottom: 4,
   },
   suggReason: {

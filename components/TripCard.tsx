@@ -7,6 +7,7 @@ import { Typography } from '../constants/typography';
 import { Trip, parseDate } from '../lib/database';
 import { countryCodeToFlag } from '../lib/geocoding';
 import { Flag } from './Flag';
+import { DaysBadge, listCardStyles } from './ListCard';
 import { useTranslation } from '../contexts/LanguageContext';
 
 const hasGlass = isLiquidGlassAvailable();
@@ -80,28 +81,24 @@ export function TripCard({ trip, daysOverride, hasOverlap, compact, onDelete, on
         : { style: [styles.card, compact && styles.cardCompact, styles.cardFallback, hasOverlap && styles.cardFallbackOverlap] }
       )}>
         {hasOverlap && <View style={styles.overlapTint} />}
-        <View style={styles.cardTop}>
+        <View style={listCardStyles.top}>
           {!compact && <Flag code={trip.country_code} size={22} />}
           {compact && <Text style={styles.cityInline}>{trip.city}</Text>}
-          <View style={styles.cardTopRight}>
+          <View style={listCardStyles.topRight}>
             {hasOverlap && (
               <View style={styles.overlapChip}>
                 <Text style={styles.overlapChipText}>overlap</Text>
               </View>
             )}
-            <View style={[styles.daysBadge, hasOverlap && styles.daysBadgeOverlap]}>
-              <Text style={[styles.daysText, hasOverlap && styles.daysTextOverlap]}>
-                {daysOverride ?? trip.days}d
-              </Text>
-            </View>
+            <DaysBadge label={`${daysOverride ?? trip.days}d`} warn={hasOverlap} />
           </View>
         </View>
 
-        {!compact && <Text style={styles.city}>{trip.city}</Text>}
-        {!compact && <Text style={styles.country}>{countryName(trip.country)}</Text>}
+        {!compact && <Text style={listCardStyles.title}>{trip.city}</Text>}
+        {!compact && <Text style={listCardStyles.subtitle}>{countryName(trip.country)}</Text>}
 
         <View style={styles.cardBottom}>
-          <Text style={styles.dates}>{dateRange}</Text>
+          <Text style={listCardStyles.meta}>{dateRange}</Text>
           {isActive && <View style={styles.activeDot} />}
         </View>
       </CardShell>
@@ -167,11 +164,9 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   card: {
-    borderRadius: 14,
-    padding: 14,
+    ...listCardStyles.shell,
     marginBottom: 6,
     marginTop: 2,
-    overflow: 'hidden',
   },
   cardCompact: {
     padding: 10,
@@ -198,39 +193,9 @@ const styles = StyleSheet.create({
   cardPressed: {
     opacity: 0.7,
   },
-  cardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  cardTopRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  daysBadge: {
-    backgroundColor: Colors.primary + '18',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  daysText: {
-    ...Typography.bodySmall,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  city: {
-    ...Typography.cardTitle,
-    marginBottom: 2,
-  },
   cityInline: {
     ...Typography.button,
     flex: 1,
-  },
-  country: {
-    ...Typography.cardSubtitle,
-    marginBottom: 8,
   },
   cardBottom: {
     flexDirection: 'row',
@@ -246,15 +211,6 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     fontWeight: '600',
     color: Colors.error,
-  },
-  daysBadgeOverlap: {
-    backgroundColor: '#FF3B3018',
-  },
-  daysTextOverlap: {
-    color: Colors.error,
-  },
-  dates: {
-    ...Typography.cardMeta,
   },
   activeDot: {
     width: 6,
