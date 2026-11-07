@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
-import { systemColor } from '../constants/colors';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Colors, systemColor } from '../constants/colors';
 import { Flag } from './Flag';
 import { getCountryCode, getCountryNames, getPopularCountries, searchCountries } from '../utils/geography';
 import { useTranslation } from '../contexts/LanguageContext';
@@ -21,6 +22,8 @@ interface CountryPickerProps {
   showPopularWhenEmpty?: boolean;
   /** Section heading shown above the popular list. */
   popularLabel?: string;
+  /** English name of the country already chosen: its row gets a checkmark instead of a chevron. */
+  selected?: string | null;
 }
 
 /**
@@ -38,6 +41,7 @@ export function CountryPicker({
   onSelect,
   showPopularWhenEmpty = true,
   popularLabel,
+  selected,
 }: CountryPickerProps) {
   const { t, countryName } = useTranslation();
   const trimmed = query.trim();
@@ -73,7 +77,11 @@ export function CountryPicker({
       >
         {code && <Flag code={code} size={20} />}
         <Text style={styles.itemText}>{countryName(name)}</Text>
-        <Text style={styles.chevron}>›</Text>
+        {name === selected ? (
+          <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+        ) : (
+          <Text style={styles.chevron}>›</Text>
+        )}
       </Pressable>
     );
   };

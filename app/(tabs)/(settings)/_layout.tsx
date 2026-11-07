@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router/stack';
-import { headerTransparent, sheetBackground, sheetWithHeader } from '../../../constants/colors';
+import { sheetBackground, sheetWithHeader } from '../../../constants/colors';
 import { useTranslation } from '../../../contexts/LanguageContext';
 
 export default function SettingsStack() {
@@ -17,9 +17,10 @@ export default function SettingsStack() {
         name="passport"
         options={{
           title: t('nav.passport'),
-          headerTransparent,
-          headerBlurEffect: 'systemMaterial',
-          headerBackButtonDisplayMode: 'minimal',
+          presentation: sheetWithHeader,
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.82, 1.0],
+          contentStyle: { backgroundColor: sheetBackground },
         }}
       />
       <Stack.Screen
