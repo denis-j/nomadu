@@ -25,6 +25,8 @@ import { SCHENGEN_COUNTRIES } from '../../../constants/visaRules';
 import { checkLocationPermissions, foregroundLocationCheck, isTrackingActive, startBackgroundTracking } from '../../../lib/location';
 import { useTranslation } from '../../../contexts/LanguageContext';
 import { appLocale } from '../../../lib/i18n/locale';
+import { formatDay } from '../../../lib/days';
+import { hasNoExpiry } from '../../../lib/userVisas';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const EXPANDED_WIDTH = SCREEN_WIDTH - 32;
@@ -37,8 +39,8 @@ const CLOSE_CONFIG = { duration: 400, easing: Easing.bezier(0.4, 0, 0.2, 1) };
 function StatItem({ value, label }: { value: string; label: string }) {
   return (
     <View style={styles.statItem}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{value}</Text>
+      <Text style={styles.statLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{label}</Text>
     </View>
   );
 }
@@ -60,15 +62,17 @@ interface MorphChipProps {
   currentTrip: Trip;
   visaStatuses: VisaStatus[];
   taxStatuses: TaxStatus[];
+  /** Open or closed; the screen holds it, so a tap on the map can close it. */
+  open: boolean;
+  onToggle: (open: boolean) => void;
 }
 
-function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipProps) {
+function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses, open, onToggle }: MorphChipProps) {
   const { t, countryName } = useTranslation();
   const [chipWidth, setChipWidth] = useState(0);
   const [rowHeight, setRowHeight] = useState(0);
   const [statsHeight, setStatsHeight] = useState(0);
   const progress = useSharedValue(0);
-  const isExpanded = useSharedValue(false);
 
   const totalDaysInCity = trips
     .filter((t) => t.city === currentTrip.city && t.country_code === currentTrip.country_code)
@@ -93,17 +97,35 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
   // Find tax status for current country
   const taxStatus = taxStatuses.find((t) => t.countryCode === currentTrip.country_code) ?? null;
 
+  // Animate whenever the screen opens or closes it (the chip itself, or a
+  // tap on the map behind it).
+  useEffect(() => {
+    progress.value = withTiming(open ? 1 : 0, open ? OPEN_CONFIG : CLOSE_CONFIG);
+  }, [open, progress]);
+
   const handlePress = () => {
-    const next = !isExpanded.value;
-    isExpanded.value = next;
-    if (next) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      progress.value = withTiming(1, OPEN_CONFIG);
-    } else {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      progress.value = withTiming(0, CLOSE_CONFIG);
-    }
+    Haptics.impactAsync(open ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium);
+    onToggle(!open);
   };
+
+  // What the visa part says. A country that needs a visa has no days to
+  // count, and a visa without a day cap has only its end date: both showed
+  // "0 days left of 0" before.
+  const visaShown = !visaStatus
+    ? null
+    : visaStatus.status === 'visa_needed'
+      ? { value: t('visa.statusVisaNeeded'), sub: '', color: Colors.textSecondary }
+      : visaStatus.daysAllowed > 0
+        ? {
+            value: visaStatus.daysRemaining === 1 ? t('tracker.dayLeft') : t('tracker.daysLeft', { days: visaStatus.daysRemaining }),
+            sub: t('map.ofTotalDays', { days: visaStatus.daysAllowed }),
+            color: visaStatusColor(visaStatus.status),
+          }
+        : {
+            value: t('visa.statusOk'),
+            sub: visaStatus.validUntil && !hasNoExpiry(visaStatus.validUntil) ? t('visa.validUntil', { date: formatDay(visaStatus.validUntil) }) : '',
+            color: visaStatusColor(visaStatus.status),
+          };
 
   const PAD = 28; // paddingVertical 14 * 2
   const collapsedH = rowHeight > 0 ? rowHeight + PAD : 0;
@@ -155,10 +177,14 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
         </View>
 
         {/* Stats – always mounted, clipped by height + faded by opacity */}
+        {/* Laid out at the open width even while the chip is narrow: measured
+            in the narrow chip, the labels wrapped and the open card kept a
+            gap at the bottom. Measured again whenever the content changes. */}
         <Animated.View
           style={[styles.statsSection, statsOpacity]}
           onLayout={(e) => {
-            if (statsHeight === 0) setStatsHeight(e.nativeEvent.layout.height);
+            const h = e.nativeEvent.layout.height;
+            if (Math.abs(h - statsHeight) > 0.5) setStatsHeight(h);
           }}
         >
           <View style={styles.expandDivider} />
@@ -173,27 +199,27 @@ function MorphChip({ trips, currentTrip, visaStatuses, taxStatuses }: MorphChipP
           </View>
 
           {/* Row 2: Visa + Tax */}
-          {(visaStatus || taxStatus) && (
+          {(visaShown || taxStatus) && (
             <>
               <View style={styles.expandDivider} />
               <View style={styles.trackingRow}>
-                {visaStatus && (
+                {visaShown && (
                   <View style={styles.trackingItem}>
                     <Text style={styles.trackingLabel}>{t('map.visa')}</Text>
-                    <Text style={[styles.trackingValue, { color: visaStatusColor(visaStatus.status) }]}>
-                      {t('map.daysLeft', { days: visaStatus.daysRemaining })}
+                    <Text style={[styles.trackingValue, { color: visaShown.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                      {visaShown.value}
                     </Text>
-                    <Text style={styles.trackingSubLabel}>{t('map.ofDays', { days: visaStatus.daysAllowed })}</Text>
+                    {!!visaShown.sub && <Text style={styles.trackingSubLabel} numberOfLines={1}>{visaShown.sub}</Text>}
                   </View>
                 )}
-                {visaStatus && taxStatus && <View style={styles.statSep} />}
+                {visaShown && taxStatus && <View style={styles.statSep} />}
                 {taxStatus && (
                   <View style={styles.trackingItem}>
                     <Text style={styles.trackingLabel}>{t('map.tax')}</Text>
                     <Text style={[styles.trackingValue, { color: taxStatusColor(taxStatus.status) }]}>
-                      {t('comp.daysShort', { n: `${taxStatus.daysPresent}/${taxStatus.thresholdDays}` })}
+                      {`${taxStatus.daysPresent} / ${taxStatus.thresholdDays}`}
                     </Text>
-                    <Text style={styles.trackingSubLabel}>{t('map.rule183')}</Text>
+                    <Text style={styles.trackingSubLabel} numberOfLines={1}>{t('map.taxSub')}</Text>
                   </View>
                 )}
               </View>
@@ -252,6 +278,7 @@ export default function MapScreen() {
 
   const hasTrips = !loading && trips.length > 0;
   const currentTrip = hasTrips ? trips[0] : null;
+  const [chipOpen, setChipOpen] = useState(false);
 
   return (
     <View style={styles.container}>
@@ -273,7 +300,16 @@ export default function MapScreen() {
         />
       )}
 
-      <View style={styles.chipContainer}>
+      {/* While the chip is open, a tap anywhere on the map folds it back. */}
+      {chipOpen && (
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setChipOpen(false); }}
+          accessibilityLabel={t('common.close')}
+        />
+      )}
+
+      <View style={styles.chipContainer} pointerEvents="box-none">
         {currentTrip ? (
           <MorphChip
             key={`${currentTrip.id}-${currentTrip.city}-${currentTrip.country}`}
@@ -281,6 +317,8 @@ export default function MapScreen() {
             currentTrip={currentTrip}
             visaStatuses={visaStatuses}
             taxStatuses={taxStatuses}
+            open={chipOpen}
+            onToggle={setChipOpen}
           />
         ) : !loading && (detecting || hasLocationPermission !== null) ? (
           <ChipWrapper
@@ -349,7 +387,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.subheadline,
     color: Colors.textSecondary,
   },
-  statsSection: {},
+  statsSection: { width: EXPANDED_WIDTH - 36 },
   expandDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: Colors.border,
@@ -358,7 +396,7 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   statItem: {
     flex: 1,
@@ -382,7 +420,7 @@ const styles = StyleSheet.create({
   // ─── Tracking row (Visa + Tax) ───
   trackingRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   trackingItem: {
     flex: 1,
