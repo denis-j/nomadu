@@ -376,7 +376,7 @@ const heroStyles = StyleSheet.create({
   },
   ringPct: {
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '700',
     color: Colors.cloudyButtonText,
     letterSpacing: -0.5,
   },
@@ -418,8 +418,16 @@ function MiniStatCard({
           <Ionicons name={icon} size={18} color={accentColor} />
         </View>
       </View>
-      <Text style={miniStyles.value}>{value}</Text>
-      {sublabel ? <Text style={miniStyles.sublabel}>{sublabel}</Text> : null}
+      {/* What is new sits beside the number as a pill, like the "+1" on the
+          tracker cards: a line under it made this tile taller than the rest. */}
+      <View style={miniStyles.valueRow}>
+        <Text style={miniStyles.value}>{value}</Text>
+        {sublabel ? (
+          <View style={miniStyles.newPill}>
+            <Text style={miniStyles.newPillText}>{sublabel}</Text>
+          </View>
+        ) : null}
+      </View>
     </Glass>
   );
 }
@@ -444,8 +452,7 @@ const miniStyles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   label: {
-    ...Typography.label,
-    color: Colors.textSecondary,
+    ...Typography.tileLabel,
     flex: 1,
   },
   iconBubble: {
@@ -456,14 +463,25 @@ const miniStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sublabel: {
-    ...Typography.caption,
-    color: Colors.textTertiary,
-    marginTop: 2,
+  valueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   value: {
-    ...Typography.numericLarge,
-    fontSize: 32,
+    ...Typography.tileNumber,
+  },
+  newPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderCurve: 'continuous',
+    backgroundColor: Colors.success + '1F',
+  },
+  newPillText: {
+    ...Typography.caption,
+    fontWeight: '700',
+    color: Colors.success,
   },
 });
 

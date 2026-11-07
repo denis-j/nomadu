@@ -15,7 +15,7 @@ import { Colors, systemColor } from './colors';
  * The scale. Every size in the app is one of these, close to Apple's own
  * text styles so the app reads as native:
  *
- *   52  hero number        34  tile number         28  display
+ *   52  hero number        34  large display       28  tile number, display
  *   22  large title        20  title               17  card title, value, body
  *   16  callout            15  card subtitle, body 13  meta, labels, footnote
  *   12  caption            11  smallest tag
@@ -31,6 +31,7 @@ import { Colors, systemColor } from './colors';
  * - A tile whose number is the content (Tracking): `tileNumber`, its label
  *   `tileLabel`. Small fact tiles (`StatTile`) take `cardValue` + `tileLabel`.
  * - At most one `heroNumber` per screen: the one figure the page is about.
+ * - Numbers are bold (700) like everything else; 800 stays for the brand lines.
  * - A quiet section heading (grey, uppercase, above a card or list) is always
  *   `sectionLabel`; never rebuild it from `eyebrow` or from its own values.
  * - Stand out with weight or color before size. Overriding `fontWeight` or
@@ -185,16 +186,16 @@ export const Typography = {
   }),
   /** The number in a dashboard tile (Tracking). */
   tileNumber: T({
-    fontSize: 34,
-    fontWeight: '800',
+    fontSize: 28,
+    fontWeight: '700',
     color: Colors.text,
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
     fontVariant: ['tabular-nums'],
   }),
   /** The one figure a screen is about. At most one per screen. */
   heroNumber: T({
     fontSize: 52,
-    fontWeight: '800',
+    fontWeight: '700',
     color: Colors.text,
     letterSpacing: -1.5,
     lineHeight: 58,
